@@ -5,8 +5,14 @@ services:
       - "7860:7860"
     environment:
       - LANGFLOW_DATABASE_URL=postgresql://langflow:langflow@postgres:5432/langflow
+      - LANGFLOW_COMPONENTS_PATH=/app/custom_components:/app/shared_components
+      - LANGFLOW_SUPERUSER=admin
+      - LANGFLOW_SUPERUSER_PASSWORD=admin123
+      - GROQ_API_KEY=${GROQ_API_KEY}
     volumes:
       - ./custom_components:/app/custom_components
+      - ../shared-components/universal-model-selector:/app/shared_components
+      - ./scripts:/app/scripts
     depends_on:
       - postgres
 
