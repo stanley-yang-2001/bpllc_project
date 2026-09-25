@@ -13,6 +13,7 @@ services:
       - ./custom_components:/app/custom_components
       - ../shared-components/universal-model-selector:/app/shared_components
       - ./scripts:/app/scripts
+      - ./tests:/app/tests
     depends_on:
       - postgres
 
