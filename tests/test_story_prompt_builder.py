@@ -13,14 +13,14 @@ is ever built (Step 8's job, not Step 7's). This module assumes it's only ever c
 non-empty word list.
 
 Run from inside the langflow container:
-    docker compose exec langflow python /app/tests/test_prompt_template.py
+    docker compose exec langflow python /app/tests/test_story_prompt_builder.py
 """
 
 import sys
 
 sys.path.insert(0, "/app/custom_components")
 
-from prompt_template import build_story_prompt  # noqa: E402
+from story_prompt_builder import build_story_prompt  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -91,6 +91,88 @@ def test_both_styles_do_not_force_every_word():
     )
 
 
+def test_both_styles_require_logical_flow():
+    narration = build_story_prompt("Spanish", "hello, world, friend", style="narration")
+    dialogue = build_story_prompt("Spanish", "hello, world, friend", style="dialogue")
+    check(
+        "narration prompt explicitly requires sentences to connect logically",
+        "logical" in narration.lower(),
+    )
+    check(
+        "dialogue prompt explicitly requires each line to respond sensibly to the last",
+        "logical" in dialogue.lower(),
+    )
+
+
+def test_both_styles_instruct_a_hidden_planning_summary():
+    narration = build_story_prompt("Spanish", "hello, world, friend", style="narration")
+    dialogue = build_story_prompt("Spanish", "hello, world, friend", style="dialogue")
+    check(
+        "narration prompt instructs a summary/planning step before the passage",
+        "summary" in narration.lower(),
+    )
+    check(
+        "dialogue prompt instructs a summary/planning step before the dialogue",
+        "summary" in dialogue.lower(),
+    )
+
+
+def test_both_styles_include_the_delimiter_marker():
+    narration = build_story_prompt("Spanish", "hello, world, friend", style="narration")
+    dialogue = build_story_prompt("Spanish", "hello, world, friend", style="dialogue")
+    check("narration prompt includes the ===STORY=== delimiter", "===STORY===" in narration)
+    check("dialogue prompt includes the ===STORY=== delimiter", "===STORY===" in dialogue)
+
+
+def test_both_styles_require_event_to_pose_a_question_or_problem():
+    narration = build_story_prompt("Spanish", "hello, world, friend", style="narration")
+    dialogue = build_story_prompt("Spanish", "hello, world, friend", style="dialogue")
+    check(
+        "narration prompt requires the Event to create a question/request/problem",
+        "question, request, or" in narration.lower(),
+    )
+    check(
+        "dialogue prompt requires the Event to create a question/request/problem",
+        "question, request, or" in dialogue.lower(),
+    )
+
+
+def test_both_styles_vary_resolution_shapes():
+    narration = build_story_prompt("Spanish", "hello, world, friend", style="narration")
+    dialogue = build_story_prompt("Spanish", "hello, world, friend", style="dialogue")
+    check(
+        "narration prompt offers resolution shapes beyond yes/no (agreement)",
+        "agreement" in narration.lower(),
+    )
+    check(
+        "narration prompt offers resolution shapes beyond yes/no (farewell)",
+        "farewell" in narration.lower(),
+    )
+    check(
+        "dialogue prompt offers resolution shapes beyond yes/no (agreement)",
+        "agreement" in dialogue.lower(),
+    )
+    check(
+        "dialogue prompt offers resolution shapes beyond yes/no (farewell)",
+        "farewell" in dialogue.lower(),
+    )
+
+
+def test_both_styles_disclaim_example_topic_overfitting():
+    narration = build_story_prompt("Spanish", "hello, world, friend", style="narration")
+    dialogue = build_story_prompt("Spanish", "hello, world, friend", style="dialogue")
+    check(
+        "narration prompt tells the model its topic must come from its own planned Event, "
+        "not the example",
+        "own planned event" in narration.lower(),
+    )
+    check(
+        "dialogue prompt tells the model its topic must come from its own planned Event, "
+        "not the example",
+        "own planned event" in dialogue.lower(),
+    )
+
+
 def test_invalid_style_raises():
     try:
         build_story_prompt("Spanish", "hello, world", style="poem")
@@ -123,6 +205,12 @@ def main():
     test_dialogue_style_requests_dialogue_format()
     test_no_style_given_picks_one_of_the_two_valid_styles()
     test_both_styles_do_not_force_every_word()
+    test_both_styles_require_logical_flow()
+    test_both_styles_instruct_a_hidden_planning_summary()
+    test_both_styles_include_the_delimiter_marker()
+    test_both_styles_require_event_to_pose_a_question_or_problem()
+    test_both_styles_vary_resolution_shapes()
+    test_both_styles_disclaim_example_topic_overfitting()
     test_invalid_style_raises()
     test_rejects_empty_language()
     test_rejects_empty_words()
