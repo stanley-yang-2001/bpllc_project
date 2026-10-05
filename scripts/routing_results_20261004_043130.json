@@ -1,0 +1,87 @@
+{
+  "flow_id": "564b5d01-2144-4b60-8f37-a693e2a1fe87",
+  "results": [
+    {
+      "case": "S1",
+      "name": "English story",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "Tom: Hello, Anna, do you have water?  \nAnna: Yes, I have water today.  \nTom: Please give me some water.  \nAnna: Yes, I can bring water tomorrow.  \nTom: Okay, thank you.  \nAnna: Goodbye, see you tomorrow.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Tom: Hello, Anna, do you have water?  \nAnna: Yes, I have water today.  \nTom: Please give me some water.  \nAnna: Yes, I can bring water tomorrow.  \nTom: Okay, thank you.  \nAnna: Goodbye, see you tomorrow.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Tom: Hello, Anna, do you have water?  \nAnna: Yes, I have water today.  \nTom: Please give me some water.  \nAnna: Yes, I can bring water tomorrow.  \nTom: Okay, thank you.  \nAnna: Goodbye, see you tomorrow.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "203 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units, stray words ['bring', 'okay']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N1",
+      "name": "A greeting needs no tool",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "hi",
+          "reply": "Hello! How can I help you today?",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "32 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

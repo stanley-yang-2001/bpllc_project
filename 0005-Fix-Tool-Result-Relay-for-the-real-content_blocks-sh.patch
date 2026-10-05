@@ -1,0 +1,250 @@
+From 3c1285831611fa2b149ee03e1244c39dcff4fb46 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 3 Oct 2026 05:08:45 +0000
+Subject: [PATCH] Fix Tool Result Relay for the real content_blocks shape
+
+A live debug log showed the Agent message's content_blocks is
+[ToolContent, TextContent]: the tool call sits directly in the list,
+not inside a ContentBlock wrapper. The extractor only looked inside
+wrappers, so nothing was ever relayed.
+
+- Walk content_blocks recursively so both shapes are found
+- Unwrap tool outputs recorded as structured data (dict with 'text',
+  JSON or Python-repr strings) while leaving plain stories untouched
+- Add tests using the real flat shape and structured outputs
+- Note in CHANGELOG/DEVELOPER-DIARY
+---
+ CHANGELOG.md                           | 11 +++-
+ DEVELOPER-DIARY.md                     |  6 +++
+ custom_components/tool_result_relay.py | 70 +++++++++++++++++++-------
+ tests/test_tool_result_relay.py        | 56 +++++++++++++++++++++
+ 4 files changed, 125 insertions(+), 18 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index ca77427..fd2fa88 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -19,11 +19,20 @@ chooses the tool and its argument, so LO 5 and LO 6 are unaffected.
+ (`ToolContent.output`). The same Message object is returned, so Chat Output should update the
+ existing bubble instead of adding a second one, and the tool-call trace stays visible.
+ 
++**Fix after first live run:** a debug log from the Playground showed the Agent message's
++`content_blocks` is `[ToolContent, TextContent]` — the tool call sits *directly* in the list,
++not inside a `ContentBlock` wrapper as the first version (and its tests) assumed, so nothing was
++ever relayed. The extractor now walks both shapes. It also unwraps tool outputs recorded as
++structured data (a dict with `text`, or a JSON/Python-repr string), while leaving plain stories
++untouched. New tests use the real flat shape.
++
+ **Tests:** `tests/test_tool_result_relay.py` (20 checks; real Langflow `Message` / `ToolContent`
+ objects, no database or network).
+ 
+ **Not yet verified in the live Playground:** that the shape of `ToolContent.output` matches the
+-helper's assumptions for this tool, and that Chat Output shows one reply rather than two.
++helper's assumptions for this tool (its exact shape was not captured), and that Chat Output
++shows one reply rather than two. Note: a canvas node keeps its own copy of a component's code,
++so after updating the file, replace the node with a fresh Tool Result Relay.
+ 
+ ## Unreleased — Fix: Story Generator Tool returned an empty string
+ 
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index ea5ffec..a1549a5 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -75,6 +75,12 @@ Agent's reply separately, and the tool Result was always correct, so the fix is
+ `content_blocks` into the reply. Lesson: when exact wording matters, don't let an LLM write
+ the final text; let it choose the tool and let code deliver the result.
+ 
++First live run: the relay changed nothing. A file-based debug log (container `print` output never
++reached `docker logs`) showed `content_blocks` held `ToolContent` directly, not inside a
++`ContentBlock`, so the extractor found no tool calls. Lesson: my tests had been built from my own
++assumption of the data shape, so they passed while the real shape failed; capture one real
++object before writing fixtures.
++
+ ## Current obstacle
+ 
+ **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace
+diff --git a/custom_components/tool_result_relay.py b/custom_components/tool_result_relay.py
+index ba09f54..790cfe3 100644
+--- a/custom_components/tool_result_relay.py
++++ b/custom_components/tool_result_relay.py
+@@ -16,27 +16,54 @@ The pure functions are kept separate from the Langflow class so they can be test
+ (see tests/test_tool_result_relay.py).
+ """
+ 
++import ast
++import json
++
+ from langflow.custom import Component
+ from langflow.io import MessageInput, Output
+ from langflow.schema.message import Message
+ 
+ _TOOL_BLOCK_TYPE = "tool_use"
++_TEXT_KEYS = ("text", "result", "content", "message", "output", "data")
++_MAX_DEPTH = 6
++
+ 
++def _parse_structured_string(value):
++    """If a string holds a JSON or Python-repr dict/list, return it parsed; otherwise None."""
++    stripped = value.strip()
++    if stripped[:1] not in ("{", "["):
++        return None
++    try:
++        return json.loads(stripped)
++    except ValueError:
++        pass
++    try:
++        parsed = ast.literal_eval(stripped)
++    except (ValueError, SyntaxError):
++        return None
++    return parsed if isinstance(parsed, (dict, list)) else None
+ 
+-def output_to_text(output):
++
++def output_to_text(output, _depth=0):
+     """Turn a tool call's recorded output into plain text. Unusable shapes become ''."""
+-    if output is None:
++    if output is None or _depth > _MAX_DEPTH:
+         return ""
+     if isinstance(output, str):
+-        return output
++        parsed = _parse_structured_string(output)
++        if parsed is not None:
++            inner = output_to_text(parsed, _depth + 1)
++            if inner.strip():
++                return inner
++        return output  # a plain story is returned exactly as it is
+     if isinstance(output, dict):
+-        for key in ("text", "result", "content"):
+-            value = output.get(key)
+-            if isinstance(value, str):
+-                return value
++        for key in _TEXT_KEYS:
++            if key in output:
++                inner = output_to_text(output[key], _depth + 1)
++                if inner.strip():
++                    return inner
+         return ""
+     if isinstance(output, (list, tuple)):
+-        parts = [output_to_text(item) for item in output]
++        parts = [output_to_text(item, _depth + 1) for item in output]
+         return "\n".join(p for p in parts if p.strip())
+     text = getattr(output, "text", None)  # Message / Data and similar objects
+     if isinstance(text, str):
+@@ -44,6 +71,16 @@ def output_to_text(output):
+     return str(output)
+ 
+ 
++def _walk_content(blocks, _depth=0):
++    """Yield every content item, whether it sits directly in content_blocks (how Langflow
++    builds an Agent message) or inside a ContentBlock wrapper."""
++    if _depth > _MAX_DEPTH:
++        return
++    for block in blocks or []:
++        yield block
++        yield from _walk_content(getattr(block, "contents", None), _depth + 1)
++
++
+ def extract_last_tool_output(message):
+     """Return the output of the last successful, non-empty tool call on this message, or None."""
+     blocks = getattr(message, "content_blocks", None)
+@@ -51,15 +88,14 @@ def extract_last_tool_output(message):
+         return None
+ 
+     last = None
+-    for block in blocks:
+-        for item in getattr(block, "contents", None) or []:
+-            if getattr(item, "type", None) != _TOOL_BLOCK_TYPE:
+-                continue
+-            if getattr(item, "error", None):
+-                continue
+-            text = output_to_text(getattr(item, "output", None))
+-            if text.strip():
+-                last = text
++    for item in _walk_content(blocks):
++        if getattr(item, "type", None) != _TOOL_BLOCK_TYPE:
++            continue
++        if getattr(item, "error", None):
++            continue
++        text = output_to_text(getattr(item, "output", None))
++        if text.strip():
++            last = text
+     return last
+ 
+ 
+diff --git a/tests/test_tool_result_relay.py b/tests/test_tool_result_relay.py
+index 375acbd..8a4c071 100644
+--- a/tests/test_tool_result_relay.py
++++ b/tests/test_tool_result_relay.py
+@@ -144,6 +144,56 @@ def test_relay_relays_add_word_confirmations_too():
+     check("any tool's output is relayed, not just the story tool", relay_message(msg).text == "Successfully added 'bread'.")
+ 
+ 
++# --- The REAL shape seen in Langflow: ToolContent sits directly in content_blocks ----------
++
++
++def flat_agent_message(agent_text, *tool_contents):
++    """Message as Langflow actually builds it: tool calls are top-level content_blocks entries
++    (no ContentBlock wrapper), and the Agent's own text is a top-level TextContent."""
++    return Message(text=agent_text, content_blocks=list(tool_contents))
++
++
++def test_flat_tool_content_is_found():
++    msg = flat_agent_message("Anna: ...... ... ...", tool(STORY))
++    check("[real shape] a top-level ToolContent is found", extract_last_tool_output(msg) == STORY)
++
++
++def test_flat_relay_replaces_the_agents_text():
++    msg = flat_agent_message("Hello, I am ...", tool(STORY))
++    out = relay_message(msg)
++    check("[real shape] reply text becomes exactly the tool output", out.text == STORY)
++
++
++def test_flat_relay_keeps_the_tool_call_and_leaves_one_text_block():
++    msg = flat_agent_message("Hello, I am ...", tool(STORY))
++    out = relay_message(msg)
++    kinds = [type(b).__name__ for b in out.content_blocks]
++    check("[real shape] tool call is still attached", kinds.count("ToolContent") == 1)
++    check("[real shape] exactly one text block remains, holding the tool output",
++          kinds.count("TextContent") == 1 and out.text == STORY)
++
++
++def test_flat_last_good_call_wins_and_errors_are_skipped():
++    msg = flat_agent_message("x", tool("first"), tool("second"), tool("bad", error="boom"), tool(""))
++    check("[real shape] last successful non-empty call wins", extract_last_tool_output(msg) == "second")
++
++
++def test_flat_no_tool_passes_agent_text_through():
++    msg = flat_agent_message("Hi there!")
++    check("[real shape] no tool call -> Agent text untouched", relay_message(msg).text == "Hi there!")
++
++
++# --- Tool outputs recorded as structured data (the Result panel showed a 'text' box) -------
++
++
++def test_structured_outputs():
++    check("dict output with nested data/text is unwrapped", output_to_text({"data": {"text": STORY}}) == STORY)
++    check("a JSON string holding {'text': ...} is unwrapped", output_to_text('{"text": "Hello there"}') == "Hello there")
++    check("a Python-repr string holding {'text': ...} is unwrapped", output_to_text("{'text': 'Hello there'}") == "Hello there")
++    check("a story that merely starts with '[' is NOT altered", output_to_text("[Scene] Anna: hi") == "[Scene] Anna: hi")
++    check("a multi-line story is returned exactly (no stripping)", output_to_text(STORY) == STORY)
++
++
+ def main():
+     print("Running Tool Result Relay tests...\n")
+     test_output_to_text_shapes()
+@@ -160,6 +210,12 @@ def main():
+     test_relay_passes_through_when_every_tool_call_failed()
+     test_relay_accepts_a_plain_string()
+     test_relay_relays_add_word_confirmations_too()
++    test_flat_tool_content_is_found()
++    test_flat_relay_replaces_the_agents_text()
++    test_flat_relay_keeps_the_tool_call_and_leaves_one_text_block()
++    test_flat_last_good_call_wins_and_errors_are_skipped()
++    test_flat_no_tool_passes_agent_text_through()
++    test_structured_outputs()
+ 
+     print()
+     if failures:
+-- 
+2.43.0
+

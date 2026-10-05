@@ -1,0 +1,410 @@
+From a2c5b07cbaaf187be693184c77303171f3cf65f0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 3 Oct 2026 17:57:54 +0000
+Subject: [PATCH] Close out Step 9: record final Agent instructions and refresh
+ docs
+
+- Add docs/AGENT-INSTRUCTIONS.md (the instructions are a canvas-only setting)
+- Mark Step 9 done and Step 10 next in README, OVERVIEW and the guide
+- Record the language-handling fix, the skipped A/B comparison, and the
+  120b story-call change; update the diagrams to match
+- Add new deferred items to DEVELOPER-DIARY (stale credentials, reasoning
+  leak, hardcoded models, canvas copies of components, debug leftovers)
+---
+ CHANGELOG.md                 | 27 ++++++++++++++++++----
+ DEVELOPER-DIARY.md           | 20 ++++++++++++----
+ README.md                    | 10 ++++----
+ docs/AGENT-INSTRUCTIONS.md   | 45 ++++++++++++++++++++++++++++++++++++
+ docs/IMPLEMENTATION-GUIDE.md | 39 +++++++++++++++++++------------
+ docs/OVERVIEW.md             | 24 ++++++++++---------
+ docs/architecture-diagram.md |  6 ++---
+ docs/class-diagram.md        |  4 ++--
+ docs/state-diagram.md        |  2 +-
+ docs/workflow-diagram.md     |  2 +-
+ 10 files changed, 133 insertions(+), 46 deletions(-)
+ create mode 100644 docs/AGENT-INSTRUCTIONS.md
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index fd2fa88..6ff6338 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,7 +2,25 @@
+ 
+ Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
+-## Unreleased — Step 9: Tool Result Relay (pending live verification)
++## Unreleased — Step 9 complete
++
++- **Fixed: language handling.** After a non-English story the Agent refused English ("I can only
++  generate stories in languages other than English"), and a non-English request could return an
++  English story. Nothing in the code rejected English; the Agent inferred it from the "target
++  language" wording. Added an explicit instruction ("any language name is valid, including
++  English ... use the language in the LATEST message"), removed the "call a tool at most once"
++  rule (the Agent's leaked reasoning showed it confusing that rule across turns), and reworded
++  the `language` input's description in `story_tool.py`. Verified: stories now come back in the
++  requested language across a mixed sequence. Final instructions recorded in
++  `docs/AGENT-INSTRUCTIONS.md`.
++- **Recorded:** the story call and the Agent now both use `openai/gpt-oss-120b`; docs updated
++  (the Step 8 canvas pipeline still uses 20b).
++- **Skipped:** the planned 120b-vs-20b orchestrator A/B comparison. The Tool Result Relay made the
++  Agent's reply text irrelevant to correctness, so the orchestrator only has to pick the right
++  tool and argument.
++- **Still to do:** a formal acceptance run (folded into Step 10) and an export of the canvas flow.
++
++## Unreleased — Step 9: Tool Result Relay (verified in the Playground)
+ 
+ **Problem:** even with a working tool and strict Agent Instructions, the Agent sometimes
+ shortened the tool's output ("... Ben: Yes, we have water today — ..."), reworded it, or added
+@@ -29,10 +47,9 @@ untouched. New tests use the real flat shape.
+ **Tests:** `tests/test_tool_result_relay.py` (20 checks; real Langflow `Message` / `ToolContent`
+ objects, no database or network).
+ 
+-**Not yet verified in the live Playground:** that the shape of `ToolContent.output` matches the
+-helper's assumptions for this tool (its exact shape was not captured), and that Chat Output
+-shows one reply rather than two. Note: a canvas node keeps its own copy of a component's code,
+-so after updating the file, replace the node with a fresh Tool Result Relay.
++**Verified in the Playground:** the chat reply now matches the tool's Result, including runs
++where the Agent's own draft was garbled. Note: a canvas node keeps its own copy of a component's
++code, so after updating the file, replace the node with a fresh Tool Result Relay.
+ 
+ ## Unreleased — Fix: Story Generator Tool returned an empty string
+ 
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index a1549a5..bee40a8 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -109,9 +109,9 @@ problem) — hypothesis being that a larger model is meaningfully more obedient
+ relay this tool's result," without needing a paid model. The deterministic router approach remains
+ available as a fallback if 120b doesn't close the gap.
+ 
+-**Open question, not yet resolved:** whether 120b's improvement (if any) is reliable enough
+-in practice, or whether this project ultimately has to choose between "genuinely agentic"
+-and "reliably correct output" as long as it stays on free infrastructure.
++**Resolved (Step 9):** the project did not have to choose. The Agent stays genuinely agentic (it
++picks the tool and the argument) and a Tool Result Relay delivers the tool's output in code.
++See the Step 9 update above.
+ 
+ ## Known code issues (deferred)
+ 
+@@ -137,4 +137,16 @@ To be resolved once all steps in `docs/IMPLEMENTATION-GUIDE.md` are finished —
+   `_FAILURE_CACHE_TTL_SECONDS`.
+ - **Repo hygiene.** `.gitignore` is empty and `custom_components/__pycache__/*.pyc` is committed
+   (including a stale `prompt_template.cpython-314.pyc`). The README says `.env` is gitignored.
+-
++- **Stale Langflow credentials.** The Langflow log repeats "API key decryption failed ...
++  SECRET_KEY mismatch" (`InvalidToken`) on each run, probably from keys stored before
++  `LANGFLOW_SECRET_KEY` was pinned. Runs still work; re-enter any stored keys or variables.
++- **Agent leaks its reasoning.** The orchestrator's draft reply often contains its own reasoning
++  and stray non-breaking / zero-width spaces. The relay hides this, but it wastes tokens and time.
++  Try a low reasoning effort on the orchestrator (check how `groq_language_model.py` can pass it).
++- **Both model names are hardcoded** (the orchestrator on the canvas, the story call in
++  `story_tool.py`).
++- **Canvas copies of components.** A Langflow node keeps its own copy of a component's code, so
++  file edits don't reach existing nodes until the node is replaced. Export the flow JSON to the
++  repo so the canvas wiring is versioned.
++- **Debug leftovers.** Delete `custom_components/relay_debug.log` if it exists, and make sure no
++  canvas node still carries the temporary debug `relay()`.
+diff --git a/README.md b/README.md
+index 9c462bd..948b7df 100644
+--- a/README.md
++++ b/README.md
+@@ -7,9 +7,10 @@ tutorial, adapted to run entirely on free infrastructure.
+ 
+ ## Current status
+ 
+-Implementation Steps 1–8 are complete; **Step 9 (top-level Language Agent) is in progress**,
+-comparing `gpt-oss-120b` against `gpt-oss-20b` as the orchestrating model. Steps 10 (end-to-end
+-tuning) and 11 (per-learner vocabulary) are not started. See
++Implementation Steps 1–9 are complete: the Language Agent (`gpt-oss-120b`) routes chat messages
++to the Add Word and Story Generator tools, and a Tool Result Relay makes sure the learner sees
++the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is next**; Step 11
++(per-learner vocabulary) is not started. See
+ `docs/IMPLEMENTATION-GUIDE.md` for the full build order and per-step status, and
+ `DEVELOPER-DIARY.md` for the current obstacle and a list of known code issues deferred until all
+ steps are done.
+@@ -48,7 +49,7 @@ seen yet.
+ | **Docker / Docker Compose** | Container orchestration | Runs Langflow + Postgres locally, one command |
+ | **Postgres** | Relational database | Stores the learner's vocabulary (`words` table) |
+ | **Python** | Custom component language | `psycopg2` for Postgres, stdlib `urllib` for Groq |
+-| **Groq** | Free LLM hosting (OpenAI-compatible API) | Serves `openai/gpt-oss-20b` and `openai/gpt-oss-120b` |
++| **Groq** | Free LLM hosting (OpenAI-compatible API) | Serves `openai/gpt-oss-120b` (Language Agent and story generation) and `openai/gpt-oss-20b` (Step 8 canvas pipeline) |
+ 
+ ## Quick start
+ 
+@@ -102,6 +103,7 @@ sample_data/starter_vocabulary.csv
+ docs/
+ ├── OVERVIEW.md                  # Project overview, technology, components, user stories
+ ├── IMPLEMENTATION-GUIDE.md      # Build order (Steps 1–11 + bonus) with per-step status
++├── AGENT-INSTRUCTIONS.md        # The Language Agent's final instructions (canvas-only setting)
+ ├── LEARNING-OBJECTIVES.md       # LO 1–8, with implementation notes
+ ├── architecture-diagram.md      # Deployment diagram
+ ├── class-diagram.md
+diff --git a/docs/AGENT-INSTRUCTIONS.md b/docs/AGENT-INSTRUCTIONS.md
+new file mode 100644
+index 0000000..fdb3e6a
+--- /dev/null
++++ b/docs/AGENT-INSTRUCTIONS.md
+@@ -0,0 +1,45 @@
++# Language Agent — final instructions (Step 9)
++
++These live in the **Agent Instructions** field of the Agent node on the Langflow canvas, not in
++a file Langflow reads, so they are recorded here. If you change them on the canvas, update this
++file too.
++
++```
++You are a language tutor with two tools: Add Word and Story Generator Tool.
++
++- If the user wants to add a word, call Add Word with just that word.
++- If the user asks for a story, passage, or dialogue, call Story Generator Tool
++  with the language the user names in their LATEST message as the language
++  argument. Any language name is valid, including English. Never refuse a
++  language, and never reuse the language from an earlier message.
++
++RULES FOR YOUR REPLY AFTER A TOOL CALL:
++- The tool's output is the complete, final answer. Reply with that text exactly,
++  character for character. Do not translate, rewrite, expand, or summarize it.
++- Your reply must contain only the tool's output. No notes, no explanations,
++  no ellipses, no comments about the text. Never write your own story.
++- If the tool returns an error or "trouble" message, reply with that message and
++  nothing else. Do not try to answer yourself.
++
++If the message needs no tool, reply briefly.
++```
++
++## Why it reads this way
++
++- **"Any language name is valid, including English"**: after a non-English story, the Agent
++  started refusing English ("I can only generate stories in languages other than English"),
++  although nothing in the code rejects English. It was the model's own inference from the words
++  "target language" and "language tutor".
++- **"LATEST message / never reuse the language from an earlier message"**: stops the Agent from
++  copying the previous turn's `language` argument.
++- **No "call a tool at most once" rule**: an earlier version had one, and the Agent's leaked
++  reasoning showed it confusing that rule with earlier turns. The story cache already absorbs
++  repeated calls.
++- **Reply rules**: these help, but they cannot guarantee exact relay, because an LLM still writes
++  the reply. `tool_result_relay.py` enforces it in code.
++
++## Matching tool text (in `story_tool.py`)
++
++The `language` input's `info` reads: `Name of the language for the story, e.g. 'Spanish',
++'Chinese' or 'English'. Required.` It previously said "The target language ... e.g. 'Spanish'",
++which nudged the Agent toward treating English as not allowed.
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+index 7cd2494..2014603 100644
+--- a/docs/IMPLEMENTATION-GUIDE.md
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -16,8 +16,8 @@ learning objective(s) it exercises (see `LEARNING-OBJECTIVES.md`, "LO 1–8").
+ | 6 — Word Loader | Done |
+ | 7 — Story prompt template | Done (`story_prompt_builder.py`) |
+ | 8 — Story-generation pipeline | Done (consolidated into `story_tool.py`) |
+-| 9 — Top-level Language Agent | **In progress** (120b vs 20b orchestrator A/B comparison) |
+-| 10 — End-to-end test and prompt tuning | Not started |
++| 9 — Top-level Language Agent | Done (120b orchestrator + Tool Result Relay) |
++| 10 — End-to-end test and prompt tuning | **Next** |
+ | 11 — Stretch: per-learner vocabulary | Not started |
+ | Bonus — Universal model-provider component | Not started |
+ 
+@@ -179,10 +179,10 @@ Add the orchestrating Agent node, wired to Chat Input and Chat Output, with both
+ tool (Step 5) and the story-generation agent (Step 8) attached as tools. Write its instruction
+ prompt: call the story tool for story requests, call the word tool for "add a word" requests,
+ and just return the tool's result without extra commentary.
+-- **Implemented as (in progress):** Chat Input → Language Agent → Chat Output, with Add Word and
+-  Story Generator Tool (both in Tool Mode) attached as tools, and a "Groq Orchestrator — 120b"
+-  node as the Agent's Language Model. Instructions follow the tutorial's wording. A disconnected
+-  20b node stays on the canvas for A/B comparison.
++- **Implemented as:** Chat Input → Language Agent → Tool Result Relay → Chat Output, with Add
++  Word and Story Generator Tool (both in Tool Mode) attached as tools, and a "Groq Orchestrator —
++  120b" node as the Agent's Language Model. The final instructions are recorded in
++  `AGENT-INSTRUCTIONS.md`.
+ - **Relay fix:** a `Tool Result Relay` component (`tool_result_relay.py`) sits between the Agent
+   and Chat Output (Chat Input → Agent → Tool Result Relay → Chat Output). It replaces the
+   Agent's reply with the tool's exact output whenever a tool was called, because prompt tuning
+@@ -190,13 +190,21 @@ and just return the tool's result without extra commentary.
+ - **Bug found and fixed during this step:** the story tool sometimes returned an *empty* result
+   (reasoning tokens exhausted `max_tokens`), and the Agent invented its own answer. See
+   `CHANGELOG.md`. Re-run the test set after this fix before judging the orchestrator model.
+-- **Open problem:** with the 20b orchestrator, the Agent sometimes sent an empty `language`
+-  argument, called the tool 3–5 times per request, and discarded the tool's result in favor of its
+-  own story. The tutorial's reliability comes from `gpt-4.1`, not a prompt technique. The
+-  deterministic keyword router (prototyped, not in this repo) is the fallback.
+-- **Remaining:** run identical requests (add a word, request a story in a named language, an
+-  unrelated message) against 120b and then 20b, record the results, and decide whether 120b is
+-  reliable enough.
++- **Language bug found and fixed:** after a non-English story the Agent refused English ("I can
++  only generate stories in languages other than English"), and a non-English request could come
++  back in English. Nothing in the code rejected English; the Agent inferred it from the wording
++  "target language". Fixed by an explicit instruction ("any language name is valid, including
++  English ... use the language in the LATEST message") and a clearer `language` input description.
++- **Earlier orchestrator problems** (empty `language` argument, 3–5 repeated tool calls,
++  discarded tool output) were observed with the 20b orchestrator.
++- **A/B comparison not run:** the planned 120b-vs-20b (and Qwen) orchestrator comparison was
++  skipped, because the Relay made the Agent's reply text irrelevant to correctness. The
++  orchestrator now only has to choose the right tool and argument. Revisit the comparison in
++  Step 10 if routing proves unreliable.
++- **Finding for LO 5, LO 6 and LO 8:** a small free model chose tools reliably but could not be
++  trusted to relay text faithfully. Let the model decide, and let code deliver the result.
++- **Not yet done:** a formal acceptance run (folded into Step 10) and an export of the canvas
++  flow to the repo.
+ - **Satisfies:** Story 6.
+ - **Covers:** **LO 5** (tool-calling configuration), **LO 6** (multi-agent orchestration).
+ 
+@@ -206,8 +214,9 @@ vocabulary-empty guard (from Story 5's acceptance criteria) triggers correctly w
+ is empty. Because the project runs on a smaller open-source model rather than GPT-4.1, expect
+ to spend real time here tightening both the routing instructions (Step 9) and the story
+ constraint wording (Step 7) until behavior is reliable.
+-- **Note:** The Step 9 A/B comparison feeds directly into this step. Groq free-tier rate limits are
+-  shared by the orchestrator and the story tool, so expect 429s during testing.
++- **Note:** Groq free-tier rate limits are shared by the orchestrator and the story tool (both
++  use `gpt-oss-120b`), so expect 429s during testing. Include a language-switching sequence in the
++  routing tests (English → Spanish → English → French in one session).
+ - **Satisfies:** Stories 5 and 6's acceptance criteria, holistically.
+ - **Covers:** **LO 7**, **LO 8** (the trade-off called out in the learning objective becomes
+   concrete here).
+diff --git a/docs/OVERVIEW.md b/docs/OVERVIEW.md
+index db77803..d0a70b2 100644
+--- a/docs/OVERVIEW.md
++++ b/docs/OVERVIEW.md
+@@ -2,7 +2,7 @@
+ 
+ Tutorial reference: https://www.datacamp.com/tutorial/langflow
+ 
+-> **Status:** Steps 1–8 complete; Step 9 (top-level Language Agent) in progress. See
++> **Status:** Steps 1–9 complete; Step 10 (end-to-end testing and prompt tuning) is next. See
+ > `IMPLEMENTATION-GUIDE.md` for the build order and per-step status.
+ 
+ ---
+@@ -14,8 +14,8 @@ workflow builder. The agent generates short reading passages (a first-person nar
+ two-person dialogue) in a target language using only vocabulary the learner already knows —
+ pulled from a **Postgres** database — and lets the learner add new words simply by chatting
+ with it. Core stack: Langflow (agent orchestration/UI), Postgres (vocabulary store), a **free,
+-open-weight LLM hosted on Groq** (`openai/gpt-oss-20b` for story generation,
+-`openai/gpt-oss-120b` for the orchestrating agent) — the tutorial's OpenAI model is swapped out
++open-weight LLM hosted on Groq** (`openai/gpt-oss-120b` for both the orchestrating agent
++and story generation) — the tutorial's OpenAI model is swapped out
+ to avoid any per-token API cost — Python custom components (`psycopg2` for Postgres, stdlib
+ `urllib` for Groq), and Docker (local run environment).
+ 
+@@ -55,9 +55,9 @@ API:
+   have enough RAM/GPU to run a 7–8B model comfortably. A Hugging Face Inference fallback was
+   also planned but is not used.
+ - **Current: Groq (free tier).** Groq's `llama-3.1-8b-instant` and `llama-3.3-70b-versatile`
+-  were deprecated (shutdown Aug 16, 2026), so the project uses `openai/gpt-oss-20b` (story
+-  generation, and the 20b Language Model node kept for A/B comparison) and `openai/gpt-oss-120b`
+-  (the top-level Agent's Language Model). Langflow connects to Groq via a custom component
++  were deprecated (shutdown Aug 16, 2026), so the project uses `openai/gpt-oss-120b` (the top-level Agent's
++  Language Model, and the story-generation call in `story_tool.py`; the Step 8 canvas pipeline
++  still uses `openai/gpt-oss-20b`). Langflow connects to Groq via a custom component
+   (`groq_language_model.py`) that wraps `ChatOpenAI` with Groq's `base_url`; `story_tool.py` calls
+   Groq directly with `urllib`.
+ - **Not yet implemented:** automatic fallback / switching between multiple providers (see the
+@@ -84,7 +84,8 @@ unchanged. This is the project's central documented finding (see `CHANGELOG.md`
+ | 8 | Story Guard (`story_guard.py`) | Plain function | Empty-vocabulary check (mirrors the If-Else node on the Step 8 canvas) |
+ | 9 | Final Passage Extractor (`final_passage_extractor.py`) | Langflow custom component | Strips the hidden planning summary using the `===STORY===` delimiter (Step 8 canvas pipeline) |
+ | 10 | **Story Generator Tool** (`story_tool.py`) | Langflow custom component (tool mode) | **Production story path.** Consolidates 6–9 into one atomic call: load words, empty-vocabulary guard, build prompt, call Groq (retry on 429), strip planning, cache |
+-| 11 | Language Agent | Langflow Agent node (top-level), backed by Groq `gpt-oss-120b` | Orchestrator: routes each chat message to Add Word or Story Generator Tool and returns the tool's result |
++| 11 | Language Agent | Langflow Agent node (top-level), backed by Groq `gpt-oss-120b` | Orchestrator: routes each chat message to Add Word or Story Generator Tool |
++| 11b | Tool Result Relay (`tool_result_relay.py`) | Langflow custom component | After the Agent: replaces its reply with the called tool's exact output (passes the Agent's text through when no tool was called) |
+ | 12 | Chat Input / Chat Output | Langflow built-in components | The learner-facing chat interface |
+ | 13 | Groq Language Model (`groq_language_model.py`) | Langflow custom component | Wraps Groq's OpenAI-compatible API as a Langflow Language Model |
+ 
+@@ -162,7 +163,7 @@ reading using only vocabulary I already know.
+   vocabulary list is empty, the learner is asked to add words first instead of generating.
+ - **Implementation:** `story_tool.py` (production, single tool call) and the Step 8 canvas
+   pipeline (Word Loader → Story Prompt Builder → Agent → Final Passage Extractor) for debugging.
+-- **Stack:** Python custom components, Groq `openai/gpt-oss-20b`, Postgres.
++- **Stack:** Python custom components, Groq `openai/gpt-oss-120b` (production tool) / `openai/gpt-oss-20b` (Step 8 canvas pipeline), Postgres.
+ - **Time:** 2–4 hrs, plus several prompt iterations (open-weight models need more prompt
+   iteration than GPT-4.1 to follow the vocabulary constraint).
+ - **Cost:** $0 per story — Groq free tier. Rate limits (429) are handled by retry with backoff
+@@ -178,9 +179,10 @@ I'm asking for a story or adding a word.
+ - **Stack:** Langflow Agent node, Groq `openai/gpt-oss-120b`, Chat Input/Output components.
+ - **Time:** 1–2 hrs, plus extra time for reliability testing.
+ - **Cost:** $0 — Groq free tier.
+-- **Status:** In progress. The `gpt-oss-20b` orchestrator was observed discarding tool output
+-  and writing its own story; the orchestrator was switched to `gpt-oss-120b` for an A/B
+-  comparison. A deterministic keyword router (prototyped, not in this repo) is the fallback.
++- **Status:** Done. The Agent reliably chooses tools but cannot be trusted to relay the tool's
++  text unchanged (it shortened, reworded and sometimes leaked its reasoning), so a Tool Result
++  Relay component replaces its reply with the tool's exact output. Final Agent instructions are in
++  `AGENT-INSTRUCTIONS.md`.
+ 
+ ### Story 7 — Per-learner vocabulary (stretch)
+ **As a** product owner, **I want** each learner's vocabulary tracked separately, **so that**
+diff --git a/docs/architecture-diagram.md b/docs/architecture-diagram.md
+index 1ad3627..9f3d0ed 100644
+--- a/docs/architecture-diagram.md
++++ b/docs/architecture-diagram.md
+@@ -5,12 +5,12 @@ flowchart LR
+     UD[User Device<br/>Browser - Langflow Chat UI]
+     WS[Web Server<br/>Langflow - Docker Container]
+     DB[(Database<br/>Postgres - Docker Container)]
+-    GQ[Cloud Service<br/>Groq API - gpt-oss-20b / gpt-oss-120b]
++    GQ[Cloud Service<br/>Groq API - gpt-oss-120b]
+ 
+     UD -- HTTP chat request --> WS
+     WS -- SQL read/write --> DB
+     DB -- vocabulary rows --> WS
+-    WS -- "orchestration prompt (120b)<br/>story prompt (20b)" --> GQ
++    WS -- "orchestration prompt<br/>story prompt" --> GQ
+     GQ -- generated text --> WS
+     WS -- chat response --> UD
+ ```
+@@ -24,5 +24,5 @@ flowchart LR
+   provider fallback (see the Bonus Challenge in `IMPLEMENTATION-GUIDE.md`).
+ - Two kinds of Groq calls exist: Langflow's Agent node calls Groq through the custom
+   `GroqLanguageModel` component (orchestrator, `gpt-oss-120b`), and `story_tool.py` calls Groq
+-  directly via `urllib` (story generation, `gpt-oss-20b`). Groq's free-tier rate limit is shared
++  directly via `urllib` (story generation, `gpt-oss-120b`). Groq's free-tier rate limit is shared
+   across both.
+diff --git a/docs/class-diagram.md b/docs/class-diagram.md
+index ca0c282..4f04b4b 100644
+--- a/docs/class-diagram.md
++++ b/docs/class-diagram.md
+@@ -64,7 +64,7 @@ classDiagram
+     }
+ 
+     class GroqAPI {
+-        +model: gpt-oss-20b or gpt-oss-120b
++        +model: gpt-oss-120b
+         +chat_completions() str
+     }
+ 
+@@ -80,7 +80,7 @@ classDiagram
+     LanguageAgent --> GroqLanguageModel : model (120b)
+     LanguageAgent --> ToolResultRelay : reply passes through
+     GroqLanguageModel --> GroqAPI : invokes
+-    StoryGeneratorTool --> GroqAPI : calls directly (20b)
++    StoryGeneratorTool --> GroqAPI : calls directly (120b)
+     StoryGeneratorTool --> WordsTable : queries
+     AddWordTool --> WordsTable : inserts into
+     WordLoader --> WordsTable : queries
+diff --git a/docs/state-diagram.md b/docs/state-diagram.md
+index 4f8e085..8736085 100644
+--- a/docs/state-diagram.md
++++ b/docs/state-diagram.md
+@@ -11,7 +11,7 @@ stateDiagram-v2
+     LoadingVocabulary --> PromptBuilding: word list has entries
+     VocabularyEmpty --> AwaitingWords: ask learner to add words
+     AwaitingWords --> [*]
+-    PromptBuilding --> Generating: prompt sent to Groq gpt-oss-20b
++    PromptBuilding --> Generating: prompt sent to Groq gpt-oss-120b
+     Generating --> Generated: response returned
+     Generating --> RateLimited: HTTP 429
+     RateLimited --> Generating: backoff 1.5s, retry (up to 3 attempts)
+diff --git a/docs/workflow-diagram.md b/docs/workflow-diagram.md
+index 63d2673..899252f 100644
+--- a/docs/workflow-diagram.md
++++ b/docs/workflow-diagram.md
+@@ -18,7 +18,7 @@ flowchart TD
+     E1 --> E2{Vocabulary empty?}
+     E2 -->|Yes| E3[Return 'add words first' message]
+     E2 -->|No| E4[Build prompt: random narration or dialogue template]
+-    E4 --> E5[Call Groq gpt-oss-20b<br/>retry on 429]
++    E4 --> E5[Call Groq gpt-oss-120b<br/>retry on 429]
+     E5 --> E6[Strip hidden plan at ===STORY===]
+     E6 --> E8[Cache result and return passage]
+     E7 --> Z
+-- 
+2.43.0
+

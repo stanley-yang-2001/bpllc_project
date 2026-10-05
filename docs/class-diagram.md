@@ -6,7 +6,8 @@ classDiagram
         +csv_file: File
         +column_name: str
         +run() str
-        -create_table_if_missing()
+        -ensure_words_table()
+        -words_from_csv_text()
         -bulk_insert_words()
     }
 
@@ -16,34 +17,55 @@ classDiagram
         -insert_word()
     }
 
-    class WordLoader {
-        +run() str
-        -query_all_words() List~str~
+    class StoryGeneratorTool {
+        +language: str
+        +run() Message
+        -load_words()
+        -build_story_prompt()
+        -call_groq()
+        -extract_final_passage()
+        -cache: language to result
     }
 
-    class StoryPromptTemplate {
+    class WordLoader {
+        +run() Message
+        -load_words()
+    }
+
+    class StoryPromptBuilder {
         +language: str
         +words: str
-        +build_prompt() str
+        +style: narration or dialogue or random
+        +run() Message
     }
 
-    class StoryGenerationAgent {
-        +prompt: str
-        +model: OllamaModel
-        +generate_story() str
+    class FinalPassageExtractor {
+        +raw_text: str
+        +run() Message
     }
 
     class LanguageAgent {
         +tools: List~Tool~
-        +model: OllamaModel
+        +model: GroqLanguageModel
         +chat_input: str
         +route_and_respond() str
     }
 
-    class OllamaModel {
+    class ToolResultRelay {
+        +agent_response: Message
+        +relay() Message
+        -extract_last_tool_output()
+    }
+
+    class GroqLanguageModel {
+        +api_key: str
         +model_name: str
-        +endpoint: str
-        +invoke(prompt: str) str
+        +build_model() LanguageModel
+    }
+
+    class GroqAPI {
+        +model: gpt-oss-120b
+        +chat_completions() str
     }
 
     class WordsTable {
@@ -54,16 +76,22 @@ classDiagram
     }
 
     LanguageAgent --> AddWordTool : uses as tool
-    LanguageAgent --> StoryGenerationAgent : uses as tool
-    StoryGenerationAgent --> StoryPromptTemplate : fills
-    StoryGenerationAgent --> WordLoader : reads vocabulary via
-    StoryGenerationAgent --> OllamaModel : invokes
-    LanguageAgent --> OllamaModel : invokes
+    LanguageAgent --> StoryGeneratorTool : uses as tool
+    LanguageAgent --> GroqLanguageModel : model (120b)
+    LanguageAgent --> ToolResultRelay : reply passes through
+    GroqLanguageModel --> GroqAPI : invokes
+    StoryGeneratorTool --> GroqAPI : calls directly (120b)
+    StoryGeneratorTool --> WordsTable : queries
     AddWordTool --> WordsTable : inserts into
     WordLoader --> WordsTable : queries
     UploadWordFileComponent --> WordsTable : seeds
+    StoryPromptBuilder ..> WordLoader : canvas pipeline (debug)
+    FinalPassageExtractor ..> StoryPromptBuilder : canvas pipeline (debug)
 ```
 
 **Notes**
-- "Rough" by design — this mirrors the 9 components from `OVERVIEW.md` section 4, not a full implementation-ready class model.
-- `OllamaModel` stands in for whichever model component is active (Ollama primary, Hugging Face Inference fallback) — swap the class name/attributes if you standardize on the fallback instead.
+- "Rough" by design — not a full implementation-ready class model.
+- `StoryGeneratorTool` consolidates the logic of `WordLoader`, `StoryPromptBuilder`,
+  `story_guard.py`, and `FinalPassageExtractor`, because Langflow's Tool Mode returns only a
+  component's own output. The dotted arrows show the standalone Step 8 canvas pipeline, which is
+  kept for manual debugging and is not what the Language Agent calls.

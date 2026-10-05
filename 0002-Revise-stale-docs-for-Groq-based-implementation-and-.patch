@@ -1,0 +1,1110 @@
+From 3235371406db3c296db3cf6886b5294d443e8e7d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 2 Oct 2026 20:49:41 +0000
+Subject: [PATCH] Revise stale docs for Groq-based implementation and add
+ guide/objectives
+
+- Rewrite OVERVIEW and the architecture, class, concept-map, state and
+  workflow diagrams to reflect Groq (not Ollama/Hugging Face) and the
+  consolidated story_tool.py
+- Add docs/IMPLEMENTATION-GUIDE.md with per-step status (Step 9 in progress)
+- Add docs/LEARNING-OBJECTIVES.md with implementation notes on LO 6 and LO 8
+- Update README (status, project structure, full test list) and CHANGELOG
+- Remove references to files not in the repo (language_tutor_router.py,
+  tests/test_router.py, FREE-LLM-PROVIDERS.md)
+- Add a deferred 'Known code issues' section to DEVELOPER-DIARY.md
+---
+ CHANGELOG.md                 |  95 ++++++++++----
+ DEVELOPER-DIARY.md           |  32 ++++-
+ README.md                    |  51 ++++++--
+ docs/IMPLEMENTATION-GUIDE.md | 244 +++++++++++++++++++++++++++++++++++
+ docs/LEARNING-OBJECTIVES.md  |  50 +++++++
+ docs/OVERVIEW.md             | 165 ++++++++++++-----------
+ docs/architecture-diagram.md |  21 +--
+ docs/class-diagram.md        |  61 ++++++---
+ docs/concept-map.md          |   8 +-
+ docs/state-diagram.md        |  26 ++--
+ docs/workflow-diagram.md     |  26 ++--
+ 11 files changed, 618 insertions(+), 161 deletions(-)
+ create mode 100644 docs/IMPLEMENTATION-GUIDE.md
+ create mode 100644 docs/LEARNING-OBJECTIVES.md
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 172dbb3..d8eae94 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,38 +1,81 @@
+ # Changelog — Language Tutor with Langflow
+ 
+-## Architecture: reverted to agent-based tool orchestration
++Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
+-**Why:** the deterministic router (`language_tutor_router.py`) solved the reliability
+-problem (the Agent discarding tool output and substituting its own unconstrained story)
+-but abandoned the project's core teaching objective — demonstrating real multi-agent tool
+-orchestration (LO 5, LO 6). Checked the original tutorial's own agent instructions; they
+-are nearly identical to what we'd already tried, confirming the tutorial's reliability came
+-from using `gpt-4.1`, not a technique we were missing.
++## Unreleased — Step 9 in progress: agent-based orchestration with a 120b orchestrator
++
++**Why:** the deterministic keyword router (prototyped, not included in this repo) solved the reliability problem
++(the Agent discarding tool output and substituting its own unconstrained story) but abandoned the
++project's core teaching objective — demonstrating real multi-agent tool orchestration (LO 5,
++LO 6). The tutorial's own agent instructions are nearly identical to what we'd already tried,
++confirming its reliability came from using `gpt-4.1`, not a technique we were missing.
+ 
+ **Changed (canvas/UI only — no files modified):**
+-- Re-enabled Tool Mode on `Add Word` and `Story Generator Tool` (code already supported
++- Re-enabled Tool Mode on `Add Word` and `Story Generator Tool` (the code already supported
+   this; the toggle had been turned off when we built the router).
+-- Added a second Groq model node ("Groq Orchestrator — 120b", model
+-  `openai/gpt-oss-120b`) as the default Language Model for the top-level Agent — a larger
+-  model specifically for the orchestrator, since instruction-following under agentic
+-  tool-use is where model size matters most.
+-- Kept the original Groq 20b node on the canvas, disconnected, for direct A/B comparison
+-  against the 120b orchestrator using identical instructions/tools.
+-- Rebuilt the top-level **Language Agent**, instructions now matching the tutorial's exact
+-  wording:
++- Added a second Groq model node ("Groq Orchestrator — 120b", model `openai/gpt-oss-120b`) as the
++  default Language Model for the top-level Agent — a larger model for the orchestrator, since
++  instruction-following under agentic tool use is where model size matters most.
++- Kept the original Groq 20b node on the canvas, disconnected, for A/B comparison against the
++  120b orchestrator using identical instructions and tools.
++- Rebuilt the top-level **Language Agent**, with instructions matching the tutorial's wording:
+   > "You will help the user practice their language skills... When using a tool, your
+   > answer should just be the result from the tool and nothing else."
+ - Wired: Chat Input → Agent → Chat Output; Add Word + Story Generator Tool → Agent's Tools
+   input; Groq 120b → Agent's Language Model input.
+ 
++**Docs:**
++- Rewrote the stale docs (`OVERVIEW.md`, architecture, class, concept, state, and workflow
++  diagrams) to reflect Groq instead of Ollama/Hugging Face and the consolidated
++  `story_tool.py`.
++- Added `docs/IMPLEMENTATION-GUIDE.md` with per-step status and `docs/LEARNING-OBJECTIVES.md`
++  (with implementation notes on LO 6 and LO 8, which changed from the original plan).
++- Updated the README (current status, full project structure, complete test list).
++- Added a "Known code issues" section to `DEVELOPER-DIARY.md`.
++
+ **Not changed:**
+-- `story_tool.py`'s internal story-generation call stays on `openai/gpt-oss-20b` — that
+-  call was never the source of the relay-reliability problem.
+-- `language_tutor_router.py` and `tests/test_router.py` — left on disk, unwired, as a
+-  working fallback if the 120b orchestrator still proves unreliable.
+-- `OVERVIEW.md` / `IMPLEMENTATION-GUIDE.md` — already describe this agent-based
+-  architecture from when Step 9 was first written, so nothing needs updating there.
+-
+-**Testing plan:** run identical requests (add a word, request a story in a named language,
+-an unrelated message) with the 120b orchestrator wired in, then swap to 20b and repeat, to
+-compare agentic obedience between the two model sizes on the exact same instructions/tools.
++- `story_tool.py`'s internal story-generation call stays on `openai/gpt-oss-20b` — that call was
++  never the source of the relay-reliability problem.
++- The deterministic router approach is kept as a fallback if the 120b orchestrator still
++  proves unreliable.
++
++**Testing plan:** run identical requests (add a word, request a story in a named language, an
++unrelated message) with the 120b orchestrator wired in, then swap to 20b and repeat, to compare
++agentic obedience between the two model sizes on the exact same instructions and tools.
++
++## 2026-10-02 — Reliability work and deterministic router (Steps 8–9)
++
++- Consolidated the four-component story pipeline into `story_tool.py`, because Tool Mode returns
++  only a component's own output (see `DEVELOPER-DIARY.md`).
++- Added retry with backoff on Groq HTTP 429 (3 attempts, 1.5s).
++- Added a short-lived result cache keyed by language (success 20s, failure 15s), because the
++  Agent sometimes calls the story tool 3–5 times per request. Failures are cached too, so a
++  rate-limited burst doesn't run the full retry loop on every call.
++- Made an empty `language` argument fall back to English rather than raising, so the Agent
++  doesn't give up on the tool.
++- Built a deterministic keyword-based router with no LLM discretion,
++  as a reliability fallback (later unwired, see above).
++
++## 2026-09-25 — Story pipeline components (Steps 6–8)
++
++- Added `word_loader.py`, `story_prompt_builder.py`, `story_guard.py`, and
++  `final_passage_extractor.py`, each with tests written first.
++- Prompt design iterated five times: forced every word in → "use words that fit" with coherence
++  rules → hidden Character/Want/Event/Resolution plan behind a `===STORY===` delimiter, stripped
++  in code → richer Event/Resolution shapes → random narration/dialogue styles, 5–6 sentence
++  length, and word inflection.
++
++## 2026-09-21 — Language agent and environment check (Steps 1–2, 4–5)
++
++- Added `scripts/smoke_test.py` (Postgres + Groq reachability) and `docker-compose.yml` fixes:
++  explicit Langflow superuser and a pinned `LANGFLOW_SECRET_KEY`.
++- Added `upload_word_file.py`, `add_word.py`, and `groq_language_model.py`, with tests.
++- Switched the model provider from the planned local Ollama to Groq (insufficient local
++  hardware); replaced the deprecated Groq Llama models with `openai/gpt-oss-20b`.
++
++## 2026-09-20 — Documentation
++
++- Added `docs/` with the overview, user stories, and architecture, class, concept, state,
++  use-case, and workflow diagrams.
++
++## 2026-09-16 — Initial commit
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index 9abcf62..82c7d12 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -71,7 +71,7 @@ on `gpt-4.1`, not from any particular prompt pattern. This is a real, documented
+ agentic instruction-following between frontier and small open-weight models, not a bug in
+ our setup.
+ 
+-**Built and tested a deterministic alternative** (`language_tutor_router.py`) that removes
++**Built and tested a deterministic alternative** (a keyword router, not included in this repo) that removes
+ the Agent's discretion entirely — intent classification and parameter extraction via plain
+ keyword matching, no LLM positioned to override the result. Confirmed working. Trade-off:
+ no real natural-language flexibility in how a request can be phrased.
+@@ -82,9 +82,35 @@ router as the production path. Currently set up for an A/B comparison: the orche
+ Agent's model swapped from `openai/gpt-oss-20b` to the larger `openai/gpt-oss-120b`
+ (story-generation itself stays on 20b, since that call was never the source of the relay
+ problem) — hypothesis being that a larger model is meaningfully more obedient at "just
+-relay this tool's result," without needing a paid model. The deterministic router stays on
+-disk, unwired, as a fallback if 120b doesn't close the gap.
++relay this tool's result," without needing a paid model. The deterministic router approach remains
++available as a fallback if 120b doesn't close the gap.
+ 
+ **Open question, not yet resolved:** whether 120b's improvement (if any) is reliable enough
+ in practice, or whether this project ultimately has to choose between "genuinely agentic"
+ and "reliably correct output" as long as it stays on free infrastructure.
++
++## Known code issues (deferred)
++
++To be resolved once all steps in `docs/IMPLEMENTATION-GUIDE.md` are finished — not before.
++
++- **Hardcoded DB credentials.** `DB_CONFIG` (`langflow`/`langflow`@`postgres`) is duplicated in
++  `upload_word_file.py`, `add_word.py`, `word_loader.py`, `story_tool.py`, and
++  `scripts/smoke_test.py`, and the tests. Move to environment variables or one shared config.
++- **Hardcoded model name.** `story_tool.py` pins `openai/gpt-oss-20b` inside `call_groq`; it
++  should be configurable (and could use the Bonus universal model component).
++- **Possibly unused component.** `groq_language_model.py` isn't called by any code in the repo;
++  confirm whether the canvas still uses it, and whether it should be replaced by the Bonus
++  universal model component.
++- **Duplicated logic.** `load_words`, `build_story_prompt`/the templates, `extract_final_passage`,
++  and the empty-vocabulary message exist in both `story_tool.py` and the Step 8 components
++  (`word_loader.py`, `story_prompt_builder.py`, `final_passage_extractor.py`, `story_guard.py`).
++  This is deliberate for now (Tool Mode limitation, and Langflow's component scanner makes
++  cross-file imports unreliable), but the two copies can drift apart.
++- **Starter data.** `sample_data/starter_vocabulary.csv` has a duplicate `hello` row and a
++  trailing blank line.
++- **Cache comment is stale.** `generate_story_for_learner`'s docstring mentions
++  `_CACHE_TTL_SECONDS`, which was split into `_SUCCESS_CACHE_TTL_SECONDS` and
++  `_FAILURE_CACHE_TTL_SECONDS`.
++- **Repo hygiene.** `.gitignore` is empty and `custom_components/__pycache__/*.pyc` is committed
++  (including a stale `prompt_template.cpython-314.pyc`). The README says `.env` is gitignored.
++
+diff --git a/README.md b/README.md
+index 354743b..adac06c 100644
+--- a/README.md
++++ b/README.md
+@@ -5,6 +5,15 @@ stories (or dialogues) using only words a learner already knows, and lets the le
+ that vocabulary just by chatting. Based on DataCamp's ["13 LLM Projects For All Levels"](https://www.datacamp.com/tutorial/langflow)
+ tutorial, adapted to run entirely on free infrastructure.
+ 
++## Current status
++
++Implementation Steps 1–8 are complete; **Step 9 (top-level Language Agent) is in progress**,
++comparing `gpt-oss-120b` against `gpt-oss-20b` as the orchestrating model. Steps 10 (end-to-end
++tuning) and 11 (per-learner vocabulary) are not started. See
++`docs/IMPLEMENTATION-GUIDE.md` for the full build order and per-step status, and
++`DEVELOPER-DIARY.md` for the current obstacle and a list of known code issues deferred until all
++steps are done.
++
+ ## What this project is about
+ 
+ The core idea is **comprehensible input**: a learner reads more easily, and learns faster,
+@@ -17,12 +26,12 @@ seen yet.
+ 
+ - **Zero cost.** Every piece of this — the LLM, the database, the orchestration layer —
+   runs on a free tier or entirely locally. No OpenAI subscription, no paid infrastructure.
+-  See `FREE-LLM-PROVIDERS.md` (project root) for the reasoning behind the model choice.
++  The model choice is explained in `docs/OVERVIEW.md`.
+ - **Real multi-agent tool orchestration.** This is the project's actual teaching point: an
+   LLM Agent autonomously deciding, through its own reasoning, which of two tools to invoke
+   (add a word, or generate a story) and relaying the result — not a hardcoded if/else. A
+-  deterministic fallback exists (`language_tutor_router.py`) for comparison, but the
+-  intended architecture is agent-based.
++  deterministic keyword-router alternative was prototyped for comparison (it is not part of
++  this repo), but the intended architecture is agent-based.
+ - **Test-first development.** Every piece of real logic — vocabulary parsing, prompt
+   building, the empty-vocabulary guard, rate-limit retry, caching — has tests written
+   *before* the implementation. See `tests/`.
+@@ -59,34 +68,60 @@ This reflects what's actually in the directory as of the last update:
+ .env                             # Real credentials (GROQ_API_KEY, LANGFLOW_SECRET_KEY) — gitignored
+ .gitignore
+ docker-compose.yml               # Langflow + Postgres services
++README.md
++CHANGELOG.md
++DEVELOPER-DIARY.md
+ 
+ custom_components/
+ ├── upload_word_file.py          # Standalone admin tool — seeds vocabulary from a CSV
+ ├── add_word.py                  # Tool: adds one word to the learner's vocabulary
+ ├── story_tool.py                # Tool: generates a vocabulary-constrained story/dialogue
+-└── story_prompt_builder.py      # Prompt template for the agent
+-                                  # kept on disk, currently unwired on the canvas
++│                                #   (single atomic call; the production path for the Agent)
++├── word_loader.py               # Step 8 canvas pipeline: loads all known words
++├── story_prompt_builder.py      # Step 8 canvas pipeline: builds the story prompt
++├── story_guard.py               # Step 8 canvas pipeline: empty-vocabulary check
++├── final_passage_extractor.py   # Step 8 canvas pipeline: strips the hidden plan
++└── groq_language_model.py       # Langflow Language Model component for Groq
+ 
+ tests/
+ ├── test_upload_word_file.py
+ ├── test_add_word.py
++├── test_word_loader.py
+ ├── test_story_tool.py
+ ├── test_call_groq_retry.py
+-└── test_router.py
++├── test_story_prompt_builder.py
++├── test_story_guard.py
++└── test_final_passage_extractor.py
+ 
+ scripts/smoke_test.py            # Environment health check (Postgres + Groq)
+ sample_data/starter_vocabulary.csv
+ 
+-For more information about this project, see the markdown files in the docs folder
++docs/
++├── OVERVIEW.md                  # Project overview, technology, components, user stories
++├── IMPLEMENTATION-GUIDE.md      # Build order (Steps 1–11 + bonus) with per-step status
++├── LEARNING-OBJECTIVES.md       # LO 1–8, with implementation notes
++├── architecture-diagram.md      # Deployment diagram
++├── class-diagram.md
++├── concept-map.md
++├── state-diagram.md             # Story request lifecycle (cache, retry, failure)
++├── use-case-diagram.md
++└── workflow-diagram.md          # One chat message, end to end
++```
++
++`story_tool.py` duplicates the logic of the four Step 8 components on purpose: Langflow's Tool
++Mode returns only a component's own output, so a multi-step pipeline can't be called as one tool
++unless it lives in one component. The Step 8 components stay on the canvas for visual debugging.
++
++For more information about this project, see the markdown files in the `docs` folder.
+ 
+ ## Running the tests
+ 
+ ```bash
+ docker compose exec langflow python /app/tests/test_upload_word_file.py
+ docker compose exec langflow python /app/tests/test_add_word.py
++docker compose exec langflow python /app/tests/test_word_loader.py
+ docker compose exec langflow python /app/tests/test_story_tool.py
+ docker compose exec langflow python /app/tests/test_call_groq_retry.py
+-docker compose exec langflow python /app/tests/test_router.py
+ docker compose exec langflow python /app/tests/test_final_passage_extractor.py
+ docker compose exec langflow python /app/tests/test_story_guard.py
+ docker compose exec langflow python /app/tests/test_story_prompt_builder.py
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+new file mode 100644
+index 0000000..aba7801
+--- /dev/null
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -0,0 +1,244 @@
++# Implementation Guide — Language Tutor with Langflow
++
++A build order for the project, going from an empty environment to the full working tutor.
++Each step names the story/acceptance criteria it satisfies (see `OVERVIEW.md`) and which
++learning objective(s) it exercises (see `LEARNING-OBJECTIVES.md`, "LO 1–8").
++
++## Progress
++
++| Step | Status |
++|------|--------|
++| 1 — Local environment | Done |
++| 2 — Free model serving | Done (Groq instead of Ollama) |
++| 3 — Component/tool-calling groundwork | Done |
++| 4 — Upload Word File | Done |
++| 5 — Add Word tool | Done |
++| 6 — Word Loader | Done |
++| 7 — Story prompt template | Done (`story_prompt_builder.py`) |
++| 8 — Story-generation pipeline | Done (consolidated into `story_tool.py`) |
++| 9 — Top-level Language Agent | **In progress** (120b vs 20b orchestrator A/B comparison) |
++| 10 — End-to-end test and prompt tuning | Not started |
++| 11 — Stretch: per-learner vocabulary | Not started |
++| Bonus — Universal model-provider component | Not started |
++
++> **Deviations from the original plan** are marked *Implemented as:* under each step. The
++> original text is kept for traceability.
++
++---
++
++## Tech Stack
++
++What each piece of the stack is, and specifically how it's used in this project.
++
++**Langflow**
++A low-code, node-based platform for building AI agent workflows: you connect pre-built or
++custom "components" on a canvas, where each component takes typed inputs, performs one
++action, and passes its output to the next node. In this project, Langflow is the framework
++everything else plugs into — it hosts the custom Postgres-reading/writing components, the
++Prompt component, and both Agent nodes, and it's what the learner actually chats with via its
++built-in Chat Input/Output.
++
++**Docker / Docker Compose**
++Docker packages an application and its dependencies into isolated, portable containers;
++Docker Compose defines and runs multiple linked containers (services) together from one
++config file. Here, Compose is what brings up Langflow and Postgres as one linked
++local stack with a single `docker compose up` — no service needs to be installed or configured
++by hand outside its container.
++
++**Postgres**
++An open-source relational (SQL) database. In this project it's the single source of truth for
++the learner's vocabulary: one `words` table that the Upload Word File component seeds, the Add
++Word tool inserts into, and the Word Loader reads from before every story is generated.
++
++**psycopg2**
++The standard Python library for connecting to and querying a Postgres database. Every custom
++Langflow component that touches the `words` table (Upload Word File, Add Word, Word Loader)
++uses `psycopg2` internally to run its SQL.
++
++**Python**
++The language Langflow's custom components are written in. Anywhere the built-in nodes don't
++cover what's needed — reading a CSV, running a SQL query, formatting a word list — a small
++Python class with typed `inputs` and an `outputs` method fills the gap.
++
++**Groq**
++A hosted inference service with a free tier and an OpenAI-compatible API. It's the model
++backend for this project: `openai/gpt-oss-120b` orchestrates the top-level Language Agent, and
++`openai/gpt-oss-20b` generates the stories. It was chosen over local Ollama because the
++development machine lacks the RAM/GPU to run a model comfortably, and over Groq's older
++`llama-3.1-8b-instant` / `llama-3.3-70b-versatile`, which were deprecated (shutdown
++Aug 16, 2026). Langflow reaches it through a custom component (`groq_language_model.py`,
++wrapping `ChatOpenAI` with Groq's `base_url`); `story_tool.py` calls it directly with stdlib
++`urllib`.
++
++**Ollama / Hugging Face Inference (not used)**
++Originally planned as the primary and fallback model providers. Dropped in favor of Groq (see
++above). Multi-provider switching with automatic fallback is now the Bonus Challenge.
++
++---
++
++### Step 1 — Stand up the local environment
++Install Docker, clone the official Langflow repo, and run `docker compose up` from its
++`docker_example` folder. Confirm the Langflow UI loads in the browser and that the linked
++Postgres service is reachable from inside the Langflow container.
++- **Implemented as:** this repo's own `docker-compose.yml` (Langflow + Postgres 16). Langflow
++  needed explicit `LANGFLOW_SUPERUSER` / `LANGFLOW_SUPERUSER_PASSWORD`, and a pinned
++  `LANGFLOW_SECRET_KEY` so restarts don't invalidate saved API keys (`InvalidToken` error).
++  Verified with `scripts/smoke_test.py`.
++- **Satisfies:** Story 1.
++- **Covers:** **LO 2** (stand up a local Langflow + Postgres environment via Docker).
++
++### Step 2 — Add free, open-source model serving
++Add an `ollama` service to the same `docker-compose.yml`, pull an instruction-tuned model
++(e.g. Llama 3.1 8B Instruct or Mistral 7B Instruct), and confirm it responds to a test prompt.
++Configure a Hugging Face Inference (free tier) model component as a fallback in case local
++hardware struggles.
++- **Implemented as:** Groq's free tier (`openai/gpt-oss-20b`, `openai/gpt-oss-120b`) with
++  `GROQ_API_KEY` supplied via `.env`; the key and reachability are checked by
++  `scripts/smoke_test.py`. The Ollama service and Hugging Face fallback were not built.
++- **Satisfies:** Story 1b.
++- **Covers:** **LO 8** (swap a hosted commercial model for a free, open-source one; reason
++  about the cost/latency/quality trade-offs).
++
++### Step 3 — Learn the component and tool-calling pattern
++Before building anything custom, open Langflow's built-in "Simple Agent" template and trace
++through it: a Chat Input, an Agent node with a couple of attached tools, and a Chat Output.
++Change the model provider on that template's Agent node to the free model from Step 2
++(Groq), and confirm it still runs. This is pure exploration — nothing here ships in the final
++project, but it's what makes the later steps make sense.
++- **Satisfies:** groundwork for Stories 3, 5, 6 (no dedicated story of its own).
++- **Covers:** **LO 1** (explain Langflow's component model), **LO 5** (configure an Agent's
++  tools and explain tool-calling).
++
++### Step 4 — Build the "Upload Word File" component and seed the vocabulary
++Write the custom Python component: typed inputs for a CSV file and a column name, an
++`outputs` method that creates the `words` table if it doesn't exist and bulk-inserts the
++words (skipping duplicates). Run it once against a starter vocabulary list to seed the
++database — this is a standalone component, run by you as admin, not wired to any agent.
++- **Implemented as:** `custom_components/upload_word_file.py`, tested by
++  `tests/test_upload_word_file.py`; seed data in `sample_data/starter_vocabulary.csv`.
++- **Satisfies:** Story 2.
++- **Covers:** **LO 3** (build a custom Python component with typed inputs/outputs), **LO 4**
++  (read/write Postgres via `psycopg2` from a component).
++
++### Step 5 — Build the "Add Word" tool
++Write a second custom component that inserts a single word into the `words` table, and mark
++it as usable in "tool mode" so an Agent node can call it later. Test it standalone first
++(call it directly with a hardcoded word) before wiring it to any agent.
++- **Implemented as:** `custom_components/add_word.py`, tested by `tests/test_add_word.py`.
++  The input must be a `MessageTextInput` with `tool_mode=True` before Langflow's Tool Mode toggle
++  appears.
++- **Satisfies:** Story 3 (partially — the DB-write half; agent wiring comes in Step 9).
++- **Covers:** **LO 3**, **LO 4**, and a first look at **LO 5** (marking a component for tool
++  use).
++
++### Step 6 — Build the "Word Loader" component
++Write the component that queries every row in `words` and returns them as a single
++comma-separated string, handling the empty-table case gracefully. Test it standalone against
++the vocabulary seeded in Step 4.
++- **Implemented as:** `custom_components/word_loader.py`, tested by
++  `tests/test_word_loader.py`.
++- **Satisfies:** Story 4.
++- **Covers:** **LO 3**, **LO 4**.
++
++### Step 7 — Build the story prompt template
++Add a Prompt component with two variables — `{language}` and `{words}` — that instructs a
++model to write a short story in the target language using only the supplied vocabulary. Test
++it by manually filling in sample values and checking the rendered prompt text looks right
++before any LLM is involved.
++- **Implemented as:** `custom_components/story_prompt_builder.py` (a Python component rather than
++  Langflow's Prompt node), tested by `tests/test_story_prompt_builder.py`. It holds two
++  interchangeable templates (first-person narration and two-person dialogue), picked at random in
++  code. Each asks the model for a hidden Character/Want/Event/Resolution plan, a `===STORY===`
++  delimiter, then the passage. The prompt went through five documented iterations (see
++  `DEVELOPER-DIARY.md`).
++- **Satisfies:** Story 5 (prompt half).
++- **Covers:** **LO 7** (write and iterate on a constrained prompt template).
++
++### Step 8 — Build the story-generation agent
++Wire an Agent node to: the Prompt component (Step 7), the Word Loader (Step 6) feeding its
++`{words}` variable, and your Groq model (Step 2) as its LLM. Run it end-to-end and check
++the story actually stays inside the supplied vocabulary — if it doesn't, this is where you
++iterate on the prompt wording. Mark this agent as a tool so it can be called by the top-level
++agent in Step 9.
++- **Implemented as:** a Step 8 canvas pipeline (Word Loader → Story Prompt Builder → Agent →
++  `final_passage_extractor.py`, with `story_guard.py` mirroring the empty-vocabulary If-Else),
++  followed by a consolidation into `custom_components/story_tool.py`. The consolidation was
++  needed because **Tool Mode returns only a component's own output and does not run anything
++  downstream of it**, so the extractor would never have run and the hidden plan would have leaked
++  to the learner. `story_tool.py` also adds Groq 429 retry/backoff and a short-lived cache for
++  successes and failures. Tested by `tests/test_story_tool.py`, `tests/test_call_groq_retry.py`,
++  `tests/test_story_guard.py`, and `tests/test_final_passage_extractor.py`. The Step 8 canvas
++  components remain for manual debugging.
++- **Satisfies:** Story 5 (agent half).
++- **Covers:** **LO 6** (design a sub-agent used as a tool by another agent), **LO 7**
++  (iterating the prompt against real output), **LO 8** (using the open-source model for
++  actual generation, not just a test prompt).
++
++### Step 9 — Build the top-level Language Agent
++Add the orchestrating Agent node, wired to Chat Input and Chat Output, with both the Add Word
++tool (Step 5) and the story-generation agent (Step 8) attached as tools. Write its instruction
++prompt: call the story tool for story requests, call the word tool for "add a word" requests,
++and just return the tool's result without extra commentary.
++- **Implemented as (in progress):** Chat Input → Language Agent → Chat Output, with Add Word and
++  Story Generator Tool (both in Tool Mode) attached as tools, and a "Groq Orchestrator — 120b"
++  node as the Agent's Language Model. Instructions follow the tutorial's wording. A disconnected
++  20b node stays on the canvas for A/B comparison.
++- **Open problem:** with the 20b orchestrator, the Agent sometimes sent an empty `language`
++  argument, called the tool 3–5 times per request, and discarded the tool's result in favor of its
++  own story. The tutorial's reliability comes from `gpt-4.1`, not a prompt technique. The
++  deterministic keyword router (prototyped, not in this repo) is the fallback.
++- **Remaining:** run identical requests (add a word, request a story in a named language, an
++  unrelated message) against 120b and then 20b, record the results, and decide whether 120b is
++  reliable enough.
++- **Satisfies:** Story 6.
++- **Covers:** **LO 5** (tool-calling configuration), **LO 6** (multi-agent orchestration).
++
++### Step 10 — End-to-end test and prompt tuning
++Run the full chat flow: add a few new words, request a story, and confirm the
++vocabulary-empty guard (from Story 5's acceptance criteria) triggers correctly when the table
++is empty. Because the project runs on a smaller open-source model rather than GPT-4.1, expect
++to spend real time here tightening both the routing instructions (Step 9) and the story
++constraint wording (Step 7) until behavior is reliable.
++- **Note:** The Step 9 A/B comparison feeds directly into this step. Groq free-tier rate limits are
++  shared by the orchestrator and the story tool, so expect 429s during testing.
++- **Satisfies:** Stories 5 and 6's acceptance criteria, holistically.
++- **Covers:** **LO 7**, **LO 8** (the trade-off called out in the learning objective becomes
++  concrete here).
++
++### Step 11 — Stretch: per-learner vocabulary
++Add a user/session identifier column to `words`, and filter both the Add Word tool (Step 5)
++and Word Loader (Step 6) by it, so multiple learners don't share one word list.
++- **Satisfies:** Story 7.
++- **Covers:** **LO 4** (extending the Postgres read/write logic).
++
++### Bonus Challenge — Universal model-provider component
++Instead of wiring a single model component (currently the Groq one) directly into the
++Language Agent and the story call, build a reusable component that can switch between multiple free providers
++(Ollama, Groq, Hugging Face, etc.) through one input, with automatic fallback if the primary
++provider fails. This one is **not** project-specific — it's meant to be built once and reused
++across every project in the roadmap, so it belongs a level above this project directory, not
++inside it.
++- **Note:** the Ollama and Hugging Face examples are now moot for this project, which uses Groq; the
++  component would add switching and fallback across providers. Not yet implemented, which is why
++  `docker-compose.yml` still mounts a `shared-components/universal-model-selector` path.
++- **Spec:** `../UNIVERSAL-MODEL-COMPONENT-CHALLENGE.md`
++- **Satisfies:** none of Project 1's stories directly — this is a roadmap-level stretch item.
++- **Covers:** extends **LO 8** into a reusable, runtime-configurable design.
++
++---
++
++### Learning objective coverage check
++
++| LO | Covered in |
++|----|------------|
++| 1 — Explain Langflow's component model | Step 3 |
++| 2 — Stand up Langflow + Postgres via Docker | Step 1 |
++| 3 — Build a custom Python component | Steps 4, 5, 6 |
++| 4 — Read/write Postgres via `psycopg2` | Steps 4, 5, 6, 11 |
++| 5 — Configure tools and explain tool-calling | Steps 3, 5, 9 |
++| 6 — Design a multi-agent (agent-as-tool) system | Steps 8, 9 |
++| 7 — Write/iterate a constrained prompt template | Steps 7, 8, 10 |
++| 8 — Swap to a free open-source model, reason about trade-offs | Steps 2, 8, 9, 10 |
++
++Every objective is exercised at least once, and the ones that matter most for this project
++(4, 5, 7, 8) get revisited more than once as the build progresses.
+diff --git a/docs/LEARNING-OBJECTIVES.md b/docs/LEARNING-OBJECTIVES.md
+new file mode 100644
+index 0000000..a205c83
+--- /dev/null
++++ b/docs/LEARNING-OBJECTIVES.md
+@@ -0,0 +1,50 @@
++# Learning Objectives — Building a Language Tutor with Langflow
++
++Based on the tutorial referenced in the roadmap: https://www.datacamp.com/tutorial/langflow
++
++By the end of this project, you should be able to:
++
++1. **Explain Langflow's component model** — describe how a low-code workflow is built from
++   nodes that take typed inputs, perform one action, and pass outputs to the next node, and
++   when a built-in component is enough versus when you need a custom one.
++
++2. **Stand up a local Langflow + Postgres environment** — use Docker and Docker Compose to run
++   Langflow and a linked Postgres database locally, without relying on any hosted service.
++
++3. **Build a custom Python component in Langflow** — define a component class with typed
++   `inputs` and an `outputs` method, and understand how that component becomes usable on the
++   canvas.
++
++4. **Read from and write to Postgres from a component** — use `psycopg2` inside a Langflow
++   component to create a table if missing, bulk-insert records, and query existing rows.
++
++5. **Configure an Agent node's tools and explain tool-calling** — attach one or more components
++   to an Agent in "tool mode," and explain how the underlying LLM decides which tool (if any)
++   to invoke based on a natural-language message and each tool's description.
++
++6. **Design a small multi-agent system** — wire an orchestrating agent to call a specialized
++   sub-agent as one of its own tools (here: a top-level routing agent calling a dedicated
++   story-generation agent), rather than building everything into a single agent.
++
++   > **Implementation note:** the story generator was first built as a sub-agent pipeline (the
++   > Step 8 canvas components), then consolidated into a single tool component
++   > (`story_tool.py`) because Tool Mode returns only a component's own output. The objective is
++   > still met through the orchestrator-plus-tools design; the story call is now a direct Groq
++   > request rather than a second Agent node. See `IMPLEMENTATION-GUIDE.md`, Step 8.
++
++7. **Write and iterate on a constrained prompt template** — build a Prompt component that
++   injects variables (e.g. `{language}`, `{words}`) into an instruction that limits the LLM's
++   output to a fixed vocabulary, and refine it based on how well the model actually respects
++   the constraint.
++
++8. **Swap an agent's model provider and reason about the trade-offs** — replace a paid, hosted
++   model (e.g. OpenAI GPT) with a free, open-source model served locally via Ollama (or a
++   hosted free-tier alternative like Hugging Face Inference), and explain the resulting
++   trade-offs in cost, latency, and output quality/consistency.
++
++   > **Implementation note:** this project uses Groq's free tier (`openai/gpt-oss-20b` and
++   > `openai/gpt-oss-120b`) rather than Ollama or Hugging Face, because local hardware couldn't
++   > run a model comfortably. The trade-off to reason about now also includes free-tier rate
++   > limits and, most importantly, agentic instruction-following: smaller open-weight models
++   > are less reliable at relaying a tool's output unchanged. See `CHANGELOG.md` and
++   > `DEVELOPER-DIARY.md`.
+diff --git a/docs/OVERVIEW.md b/docs/OVERVIEW.md
+index 0590662..db77803 100644
+--- a/docs/OVERVIEW.md
++++ b/docs/OVERVIEW.md
+@@ -2,18 +2,22 @@
+ 
+ Tutorial reference: https://www.datacamp.com/tutorial/langflow
+ 
++> **Status:** Steps 1–8 complete; Step 9 (top-level Language Agent) in progress. See
++> `IMPLEMENTATION-GUIDE.md` for the build order and per-step status.
++
+ ---
+ 
+ ## 2. Project Overview
+ 
+ This project builds an AI language-learning tutor using **Langflow**, a low-code AI agent
+-workflow builder. The agent generates short reading stories in a target language using only
+-vocabulary the learner already knows — pulled from a **Postgres** database — and lets the
+-learner add new words simply by chatting with it. Core stack: Langflow (agent
+-orchestration/UI), Postgres (vocabulary store), a **free, open-source LLM** served locally via
+-**Ollama** (the tutorial's OpenAI model is swapped out to avoid any per-token API cost) — with
+-a hosted **Hugging Face Inference** endpoint as a fallback — Python custom components (via
+-`psycopg2`), and Docker (local run environment).
++workflow builder. The agent generates short reading passages (a first-person narration or a
++two-person dialogue) in a target language using only vocabulary the learner already knows —
++pulled from a **Postgres** database — and lets the learner add new words simply by chatting
++with it. Core stack: Langflow (agent orchestration/UI), Postgres (vocabulary store), a **free,
++open-weight LLM hosted on Groq** (`openai/gpt-oss-20b` for story generation,
++`openai/gpt-oss-120b` for the orchestrating agent) — the tutorial's OpenAI model is swapped out
++to avoid any per-token API cost — Python custom components (`psycopg2` for Postgres, stdlib
++`urllib` for Groq), and Docker (local run environment).
+ 
+ ---
+ 
+@@ -26,36 +30,43 @@ concepts do most of the work in this project:
+ 
+ - **Custom components** — when the built-in nodes aren't enough, you write a Python class that
+   declares a list of typed `inputs` and an `outputs` method. This is how the project talks to
+-  Postgres, since there's no built-in "vocabulary database" component.
++  Postgres and Groq, since there's no built-in "vocabulary database" component.
+ - **Agents with tools** — a Langflow Agent node is backed by an LLM and can have other
+   components attached to it in "tool mode." The LLM itself decides, based on each tool's
+   description, which tool (if any) to call for a given chat message — this is what lets one
+   agent both generate stories and add vocabulary from natural chat input, without hardcoded
+   if/else routing.
++  - **Important constraint discovered during the build:** Tool Mode only returns the tool
++    component's *own* output; it does not execute anything wired downstream of it on the
++    canvas. Any multi-step pipeline meant to be called as one tool therefore has to live
++    inside a single component (see `story_tool.py`).
+ 
+ **Docker** runs Langflow locally and, in the same step, spins up a **Postgres** instance
+ alongside it — which is why the custom components can connect directly to a database rather
+ than an external managed service. **Postgres** (accessed via the `psycopg2` Python library) is
+ the persistence layer for the learner's known-word list.
+ 
+-**LLM choice — open-source instead of OpenAI.** The tutorial's Agent nodes default to an
+-OpenAI GPT model, which bills per token. To keep this project free to run, that's swapped for
+-an open-source model:
+-
+-- **Primary: Ollama, running locally.** Langflow ships a built-in Ollama model component, so
+-  the Agent node's model provider is pointed at a local Ollama server instead of OpenAI. Adding
+-  an `ollama` service to the existing `docker-compose.yml` (alongside Langflow and Postgres)
+-  keeps everything in the same one-command local stack. An instruction-tuned 7–8B model (e.g.
+-  Llama 3.1 8B Instruct or Mistral 7B Instruct) is a reasonable default — small enough to run
+-  on a modest GPU or even CPU, and capable enough for short constrained-vocabulary story
+-  writing and simple tool-routing decisions.
+-- **Fallback: Hugging Face Inference API (free tier).** If local hardware can't comfortably run
+-  a 7–8B model, Langflow's Hugging Face model component can call a hosted free-tier inference
+-  endpoint instead — still $0 in API fees, at the cost of external network dependency, rate
+-  limits, and less predictable latency than a local model.
+-
+-The trade-off either way: no per-token bill, but lower output quality/consistency than
+-GPT-4.1 and (for the local option) a hardware requirement instead of a cloud one.
++**LLM choice — free hosted open-weight models on Groq instead of OpenAI.** The tutorial's Agent
++nodes default to an OpenAI GPT model, which bills per token. To keep this project free to run,
++that's swapped for open-weight models served by Groq's free tier through its OpenAI-compatible
++API:
++
++- **Original plan: Ollama, running locally.** Ruled out early — the development machine doesn't
++  have enough RAM/GPU to run a 7–8B model comfortably. A Hugging Face Inference fallback was
++  also planned but is not used.
++- **Current: Groq (free tier).** Groq's `llama-3.1-8b-instant` and `llama-3.3-70b-versatile`
++  were deprecated (shutdown Aug 16, 2026), so the project uses `openai/gpt-oss-20b` (story
++  generation, and the 20b Language Model node kept for A/B comparison) and `openai/gpt-oss-120b`
++  (the top-level Agent's Language Model). Langflow connects to Groq via a custom component
++  (`groq_language_model.py`) that wraps `ChatOpenAI` with Groq's `base_url`; `story_tool.py` calls
++  Groq directly with `urllib`.
++- **Not yet implemented:** automatic fallback / switching between multiple providers (see the
++  Bonus Challenge in `IMPLEMENTATION-GUIDE.md`).
++
++The trade-off: no per-token bill, but a smaller open-weight model is meaningfully less reliable
++than GPT-4.1 at agentic instruction-following — in particular, at relaying a tool's output
++unchanged. This is the project's central documented finding (see `CHANGELOG.md` and
++`DEVELOPER-DIARY.md` in the project root).
+ 
+ ---
+ 
+@@ -63,16 +74,22 @@ GPT-4.1 and (for the local option) a hardware requirement instead of a cloud one
+ 
+ | # | Component | Type | Responsibility |
+ |---|-----------|------|-----------------|
+-| 1 | Docker environment | Infra | Runs Langflow + Postgres + Ollama locally as linked containers |
++| 1 | Docker environment | Infra | Runs Langflow + Postgres locally as linked containers (`docker-compose.yml`) |
+ | 2 | Postgres `words` table | Data store | Persists the learner's known vocabulary |
+-| 3 | Ollama model server (+ HF Inference fallback) | Model-serving | Serves the free, open-source LLM (e.g. Llama 3.1 8B / Mistral 7B) to both agents |
+-| 4 | Upload Word File | Langflow custom component (standalone) | One-off CSV import to seed the vocabulary table |
+-| 5 | Add Word tool | Langflow custom component (tool mode) | Inserts a single new word, callable by the agent |
+-| 6 | Word Loader | Langflow custom component | Reads all known words, outputs them as one string |
+-| 7 | Story prompt template | Langflow Prompt component | Templates `{language}` + `{words}` into a story-generation instruction |
+-| 8 | Story-generation agent | Langflow Agent node (tool mode), backed by the open-source LLM | Sub-agent that writes a story constrained to the known vocabulary |
+-| 9 | Language agent | Langflow Agent node (top-level), backed by the open-source LLM | Orchestrator: routes each chat message to the right tool and returns its result |
+-| 10 | Chat Input / Chat Output | Langflow built-in components | The learner-facing chat interface |
++| 3 | Groq API (`gpt-oss-20b`, `gpt-oss-120b`) | Hosted model serving | Serves the free open-weight LLMs used by the orchestrating agent and the story-generation call |
++| 4 | Upload Word File (`upload_word_file.py`) | Langflow custom component (standalone) | One-off CSV import to seed the vocabulary table |
++| 5 | Add Word (`add_word.py`) | Langflow custom component (tool mode) | Inserts a single new word, callable by the agent |
++| 6 | Word Loader (`word_loader.py`) | Langflow custom component | Reads all known words, outputs them as one string (Step 8 canvas pipeline) |
++| 7 | Story Prompt Builder (`story_prompt_builder.py`) | Langflow custom component | Builds the story prompt from `{language}` + `{words}`; picks narration or dialogue at random (Step 8 canvas pipeline) |
++| 8 | Story Guard (`story_guard.py`) | Plain function | Empty-vocabulary check (mirrors the If-Else node on the Step 8 canvas) |
++| 9 | Final Passage Extractor (`final_passage_extractor.py`) | Langflow custom component | Strips the hidden planning summary using the `===STORY===` delimiter (Step 8 canvas pipeline) |
++| 10 | **Story Generator Tool** (`story_tool.py`) | Langflow custom component (tool mode) | **Production story path.** Consolidates 6–9 into one atomic call: load words, empty-vocabulary guard, build prompt, call Groq (retry on 429), strip planning, cache |
++| 11 | Language Agent | Langflow Agent node (top-level), backed by Groq `gpt-oss-120b` | Orchestrator: routes each chat message to Add Word or Story Generator Tool and returns the tool's result |
++| 12 | Chat Input / Chat Output | Langflow built-in components | The learner-facing chat interface |
++| 13 | Groq Language Model (`groq_language_model.py`) | Langflow custom component | Wraps Groq's OpenAI-compatible API as a Langflow Language Model |
++
++Components 6–9 remain on the canvas as a standalone Step 8 pipeline for visual debugging in the
++Playground; the Language Agent calls component 10.
+ 
+ ---
+ 
+@@ -84,28 +101,27 @@ time/cost estimate (per the Agile Methodology Reference, step 4).
+ ### Story 1 — Local environment setup
+ **As a** developer, **I want** a local Langflow + Postgres environment running via Docker,
+ **so that** I can build and test the tutor without any external hosting.
+-- **Acceptance criteria:** `docker compose up` (from the Langflow repo's `docker_example`
+-  folder) brings up a reachable Langflow UI; the Postgres service is reachable from within the
+-  Langflow container; verified by running one trivial component end-to-end.
+-- **Stack:** Docker, Docker Compose, official Langflow repo.
++- **Acceptance criteria:** `docker compose up` brings up a reachable Langflow UI; the Postgres
++  service is reachable from within the Langflow container (verified by
++  `scripts/smoke_test.py`); one trivial component runs end-to-end.
++- **Stack:** Docker, Docker Compose, Langflow image.
+ - **Time:** ~1–2 hrs (mostly one-time).
+ - **Cost:** $0 infra (local only), $0 LLM (no LLM call in this story).
+ 
+-### Story 1b — Free, open-source model serving
+-**As a** developer, **I want** an open-source LLM available to the agents at no per-request
++### Story 1b — Free, open-weight model serving
++**As a** developer, **I want** an open-weight LLM available to the agents at no per-request
+ cost, **so that** the tutor can generate stories and route chat messages without an OpenAI
+ subscription.
+-- **Acceptance criteria:** an `ollama` service is added to the Docker Compose stack and an
+-  instruction-tuned model (e.g. Llama 3.1 8B Instruct or Mistral 7B Instruct) is pulled and
+-  responds to a test prompt; Langflow's Ollama model component is confirmed reachable from an
+-  Agent node; a Hugging Face Inference (free tier) model component is configured as a fallback
+-  in case local hardware can't run the model comfortably.
+-- **Stack:** Ollama (Docker service), an open-weights instruction-tuned model, Langflow's
+-  Ollama/Hugging Face model components.
+-- **Time:** 1–3 hrs (mostly first-time model download + hardware tuning).
+-- **Cost:** $0 in API fees either way; local option costs compute/electricity only, no ongoing
+-  monetary charge. (Note: response quality/speed will trail a frontier hosted model like
+-  GPT-4.1 — worth noting as a trade-off, not billed anywhere.)
++- **Acceptance criteria:** a Groq API key is configured via `.env`; `scripts/smoke_test.py`
++  confirms the key is accepted; Langflow can use `openai/gpt-oss-20b` / `openai/gpt-oss-120b`
++  from an Agent node.
++- **Stack:** Groq (free tier, OpenAI-compatible API), custom `GroqLanguageModel` component.
++- **Time:** 1–3 hrs (including working around deprecated models and Langflow's missing Groq
++  component).
++- **Cost:** $0 in API fees (free tier, subject to rate limits). Response quality trails a
++  frontier hosted model like GPT-4.1 — a trade-off, not billed anywhere.
++- **Change from original plan:** Ollama (local) + Hugging Face (fallback) was planned, but
++  local hardware was insufficient, so the project moved to Groq.
+ 
+ ### Story 2 — Seed vocabulary from CSV
+ **As a** learner, **I want** to upload a CSV of words I already know, **so that** the tutor has
+@@ -123,11 +139,10 @@ start including it.
+ - **Acceptance criteria:** Add Word tool is callable by the top-level agent; inserts the word if
+   not already present; agent confirms the word was added; requires the `words` table to already
+   exist (Story 2 run at least once).
+-- **Stack:** Langflow tool-mode component, `psycopg2`, Postgres, open-source LLM via Ollama
+-  (agent routing).
++- **Stack:** Langflow tool-mode component (`MessageTextInput` with `tool_mode=True`),
++  `psycopg2`, Postgres, Groq-hosted LLM (agent routing).
+ - **Time:** 1–2 hrs.
+-- **Cost:** $0 — no per-request API fee; the only "cost" is the local compute already running
+-  from Story 1b.
++- **Cost:** $0 — Groq free tier.
+ 
+ ### Story 4 — Load known vocabulary for story generation
+ **As the** system, **I need to** retrieve the learner's full known-word list, **so that** the
+@@ -141,28 +156,31 @@ story generator can be constrained to it.
+ ### Story 5 — Generate a story in the target language
+ **As a** learner, **I want** to ask for a story in a given language, **so that** I can practice
+ reading using only vocabulary I already know.
+-- **Acceptance criteria:** Prompt template receives `{language}` and `{words}`; the
+-  story-generation agent produces a short story using only the supplied vocabulary; the story is
+-  returned in chat; if the vocabulary list is empty, the agent asks the learner to add words
+-  first instead of generating.
+-- **Stack:** Langflow Prompt component + Agent node, open-source LLM via Ollama, Word Loader
+-  (Story 4).
+-- **Time:** 2–4 hrs (including prompt tuning — open-source models generally need more prompt
+-  iteration than GPT-4.1 to reliably follow the "only use these words" constraint).
+-- **Cost:** $0 per story — local compute only, no API billing.
++- **Acceptance criteria:** the prompt receives `{language}` and `{words}`; the model produces a
++  short passage (narration or dialogue) using only vocabulary that fits plus basic grammar
++  words; the hidden planning summary is stripped before the passage is returned; if the
++  vocabulary list is empty, the learner is asked to add words first instead of generating.
++- **Implementation:** `story_tool.py` (production, single tool call) and the Step 8 canvas
++  pipeline (Word Loader → Story Prompt Builder → Agent → Final Passage Extractor) for debugging.
++- **Stack:** Python custom components, Groq `openai/gpt-oss-20b`, Postgres.
++- **Time:** 2–4 hrs, plus several prompt iterations (open-weight models need more prompt
++  iteration than GPT-4.1 to follow the vocabulary constraint).
++- **Cost:** $0 per story — Groq free tier. Rate limits (429) are handled by retry with backoff
++  and a short-lived result cache.
+ 
+ ### Story 6 — Route requests appropriately (top-level orchestration)
+ **As a** learner, **I want** to just chat naturally, **so that** the tutor figures out whether
+ I'm asking for a story or adding a word.
+-- **Acceptance criteria:** The Language agent has both the Add Word tool and the
+-  story-generation tool attached; "add word"-type phrasing correctly triggers the add-word tool
+-  and "tell me a story"-type phrasing triggers the story tool; per the agent's instructions, the
++- **Acceptance criteria:** The Language agent has both the Add Word tool and the Story Generator
++  Tool attached; "add word"-type phrasing correctly triggers the add-word tool and
++  "tell me a story"-type phrasing triggers the story tool; per the agent's instructions, the
+   reply is just the tool's result, with no extra commentary layered on top.
+-- **Stack:** Langflow Agent node, open-source LLM via Ollama, Chat Input/Output components.
+-- **Time:** 1–2 hrs, plus extra time for routing-accuracy testing — smaller open-source models
+-  are more prone to mis-routing between the two tools than GPT-4.1, so this story may need a
+-  few extra iterations on the instruction prompt.
+-- **Cost:** $0 — local compute only, no API billing.
++- **Stack:** Langflow Agent node, Groq `openai/gpt-oss-120b`, Chat Input/Output components.
++- **Time:** 1–2 hrs, plus extra time for reliability testing.
++- **Cost:** $0 — Groq free tier.
++- **Status:** In progress. The `gpt-oss-20b` orchestrator was observed discarding tool output
++  and writing its own story; the orchestrator was switched to `gpt-oss-120b` for an A/B
++  comparison. A deterministic keyword router (prototyped, not in this repo) is the fallback.
+ 
+ ### Story 7 — Per-learner vocabulary (stretch)
+ **As a** product owner, **I want** each learner's vocabulary tracked separately, **so that**
+@@ -172,3 +190,4 @@ multiple people can use the tutor without their word lists mixing together.
+ - **Stack:** Postgres schema change; minor updates to the Add Word and Word Loader components.
+ - **Time:** 2–3 hrs.
+ - **Cost:** $0 additional infra (still a single local Postgres instance).
++- **Status:** Not started.
+diff --git a/docs/architecture-diagram.md b/docs/architecture-diagram.md
+index 4f55d81..1ad3627 100644
+--- a/docs/architecture-diagram.md
++++ b/docs/architecture-diagram.md
+@@ -5,19 +5,24 @@ flowchart LR
+     UD[User Device<br/>Browser - Langflow Chat UI]
+     WS[Web Server<br/>Langflow - Docker Container]
+     DB[(Database<br/>Postgres - Docker Container)]
+-    MS[Model Server<br/>Ollama - Docker Container]
+-    CS[Cloud Services<br/>Hugging Face Inference - fallback only]
++    GQ[Cloud Service<br/>Groq API - gpt-oss-20b / gpt-oss-120b]
+ 
+     UD -- HTTP chat request --> WS
+     WS -- SQL read/write --> DB
+     DB -- vocabulary rows --> WS
+-    WS -- prompt --> MS
+-    MS -- generated text --> WS
+-    WS -. fallback prompt if local model unavailable .-> CS
+-    CS -. generated text .-> WS
++    WS -- "orchestration prompt (120b)<br/>story prompt (20b)" --> GQ
++    GQ -- generated text --> WS
+     WS -- chat response --> UD
+ ```
+ 
+ **Notes**
+-- All four boxes besides Cloud Services run locally via the same Docker Compose stack (Story 1 + Story 1b in `OVERVIEW.md`) — nothing here requires external hosting.
+-- The Cloud Services box is dashed/optional: it's only exercised if local hardware can't run the Ollama model, per Story 1b's fallback plan.
++- Langflow and Postgres run locally via the same Docker Compose stack (Story 1 in
++  `OVERVIEW.md`). The only external dependency is the Groq API (free tier), reached over HTTPS
++  with `GROQ_API_KEY` from `.env` (Story 1b).
++- The original design used a local Ollama container with a Hugging Face Inference fallback. That
++  was dropped because local hardware couldn't run the model; there is currently no automatic
++  provider fallback (see the Bonus Challenge in `IMPLEMENTATION-GUIDE.md`).
++- Two kinds of Groq calls exist: Langflow's Agent node calls Groq through the custom
++  `GroqLanguageModel` component (orchestrator, `gpt-oss-120b`), and `story_tool.py` calls Groq
++  directly via `urllib` (story generation, `gpt-oss-20b`). Groq's free-tier rate limit is shared
++  across both.
+diff --git a/docs/class-diagram.md b/docs/class-diagram.md
+index fa72537..5f51bd1 100644
+--- a/docs/class-diagram.md
++++ b/docs/class-diagram.md
+@@ -6,7 +6,8 @@ classDiagram
+         +csv_file: File
+         +column_name: str
+         +run() str
+-        -create_table_if_missing()
++        -ensure_words_table()
++        -words_from_csv_text()
+         -bulk_insert_words()
+     }
+ 
+@@ -16,34 +17,49 @@ classDiagram
+         -insert_word()
+     }
+ 
++    class StoryGeneratorTool {
++        +language: str
++        +run() Message
++        -load_words()
++        -build_story_prompt()
++        -call_groq()
++        -extract_final_passage()
++        -cache: language to result
++    }
++
+     class WordLoader {
+-        +run() str
+-        -query_all_words() List~str~
++        +run() Message
++        -load_words()
+     }
+ 
+-    class StoryPromptTemplate {
++    class StoryPromptBuilder {
+         +language: str
+         +words: str
+-        +build_prompt() str
++        +style: narration or dialogue or random
++        +run() Message
+     }
+ 
+-    class StoryGenerationAgent {
+-        +prompt: str
+-        +model: OllamaModel
+-        +generate_story() str
++    class FinalPassageExtractor {
++        +raw_text: str
++        +run() Message
+     }
+ 
+     class LanguageAgent {
+         +tools: List~Tool~
+-        +model: OllamaModel
++        +model: GroqLanguageModel
+         +chat_input: str
+         +route_and_respond() str
+     }
+ 
+-    class OllamaModel {
++    class GroqLanguageModel {
++        +api_key: str
+         +model_name: str
+-        +endpoint: str
+-        +invoke(prompt: str) str
++        +build_model() LanguageModel
++    }
++
++    class GroqAPI {
++        +model: gpt-oss-20b or gpt-oss-120b
++        +chat_completions() str
+     }
+ 
+     class WordsTable {
+@@ -54,16 +70,21 @@ classDiagram
+     }
+ 
+     LanguageAgent --> AddWordTool : uses as tool
+-    LanguageAgent --> StoryGenerationAgent : uses as tool
+-    StoryGenerationAgent --> StoryPromptTemplate : fills
+-    StoryGenerationAgent --> WordLoader : reads vocabulary via
+-    StoryGenerationAgent --> OllamaModel : invokes
+-    LanguageAgent --> OllamaModel : invokes
++    LanguageAgent --> StoryGeneratorTool : uses as tool
++    LanguageAgent --> GroqLanguageModel : model (120b)
++    GroqLanguageModel --> GroqAPI : invokes
++    StoryGeneratorTool --> GroqAPI : calls directly (20b)
++    StoryGeneratorTool --> WordsTable : queries
+     AddWordTool --> WordsTable : inserts into
+     WordLoader --> WordsTable : queries
+     UploadWordFileComponent --> WordsTable : seeds
++    StoryPromptBuilder ..> WordLoader : canvas pipeline (debug)
++    FinalPassageExtractor ..> StoryPromptBuilder : canvas pipeline (debug)
+ ```
+ 
+ **Notes**
+-- "Rough" by design — this mirrors the 9 components from `OVERVIEW.md` section 4, not a full implementation-ready class model.
+-- `OllamaModel` stands in for whichever model component is active (Ollama primary, Hugging Face Inference fallback) — swap the class name/attributes if you standardize on the fallback instead.
++- "Rough" by design — not a full implementation-ready class model.
++- `StoryGeneratorTool` consolidates the logic of `WordLoader`, `StoryPromptBuilder`,
++  `story_guard.py`, and `FinalPassageExtractor`, because Langflow's Tool Mode returns only a
++  component's own output. The dotted arrows show the standalone Step 8 canvas pipeline, which is
++  kept for manual debugging and is not what the Language Agent calls.
+diff --git a/docs/concept-map.md b/docs/concept-map.md
+index 717dcfc..3eae479 100644
+--- a/docs/concept-map.md
++++ b/docs/concept-map.md
+@@ -6,11 +6,11 @@ flowchart TD
+     Vocabulary[Known Vocabulary]
+     Word[Word]
+     Language[Target Language]
+-    Story[Generated Story]
++    Story[Generated Story or Dialogue]
+     Agent[Language Agent]
+     Tool1[Add Word Tool]
+-    Tool2[Story-Generation Agent / Tool]
+-    LLM[Open-Source LLM - Ollama]
++    Tool2[Story Generator Tool]
++    LLM[Open-Weight LLM - Groq]
+     DB[(Postgres Database)]
+ 
+     Learner -- chats with --> Agent
+@@ -23,9 +23,11 @@ flowchart TD
+     Tool2 -- constrained by --> Language
+     Tool2 -- generates --> Story
+     Tool2 -- powered by --> LLM
++    Agent -- orchestrated by --> LLM
+     Story -- delivered to --> Learner
+ ```
+ 
+ **Notes**
+ - This is a concept-level view (not a component/class view) — it shows how the *ideas* of learner, vocabulary, language, story, and model relate to each other, independent of implementation details.
+ - The recurring theme: the *Vocabulary* concept is the shared constraint that both the "add word" and "generate story" paths revolve around.
++- The LLM appears twice: once orchestrating (the Language Agent decides which tool to call) and once generating (inside the story tool). These are different Groq models in the current setup.
+diff --git a/docs/state-diagram.md b/docs/state-diagram.md
+index a3f5a03..4f8e085 100644
+--- a/docs/state-diagram.md
++++ b/docs/state-diagram.md
+@@ -4,21 +4,27 @@
+ stateDiagram-v2
+     [*] --> Received: Learner asks for a story
+     Received --> Routing: Language Agent evaluates intent
+-    Routing --> LoadingVocabulary: story intent confirmed
++    Routing --> CacheCheck: story tool called
++    CacheCheck --> Delivered: fresh cached result (success 20s / failure 15s)
++    CacheCheck --> LoadingVocabulary: no fresh cache entry
+     LoadingVocabulary --> VocabularyEmpty: word list is empty
+     LoadingVocabulary --> PromptBuilding: word list has entries
+     VocabularyEmpty --> AwaitingWords: ask learner to add words
+     AwaitingWords --> [*]
+-    PromptBuilding --> Generating: prompt sent to open-source LLM
+-    Generating --> Generated: story returned
+-    Generating --> Failed: LLM error / timeout
+-    Failed --> Retrying: automatic retry
+-    Retrying --> Generating
+-    Failed --> [*]: max retries exceeded
+-    Generated --> Delivered: story shown in chat
++    PromptBuilding --> Generating: prompt sent to Groq gpt-oss-20b
++    Generating --> Generated: response returned
++    Generating --> RateLimited: HTTP 429
++    RateLimited --> Generating: backoff 1.5s, retry (up to 3 attempts)
++    RateLimited --> Failed: attempts exhausted
++    Generating --> Failed: other error / timeout
++    Failed --> Delivered: fallback message, cached 15s
++    Generated --> Extracting: strip planning at ===STORY===
++    Extracting --> Delivered: passage cached 20s and shown in chat
+     Delivered --> [*]
+ ```
+ 
+ **Notes**
+-- Chosen over the "Word" entity because a story request has the most non-trivial lifecycle in this project (branching on empty vocabulary, and a generation-failure/retry path that's more likely with a smaller open-source model than with a hosted frontier model).
+-- `Failed → Retrying → Generating` is worth implementing explicitly, since open-source models served locally are more prone to malformed or empty completions than GPT-4.1.
++- Chosen over the "Word" entity because a story request has the most non-trivial lifecycle in this project (cache hit, empty-vocabulary branch, rate-limit retry, failure fallback).
++- The retry, caching, and failure handling are implemented in `story_tool.py` (`call_groq`, `generate_story_for_learner`) and tested in `tests/test_call_groq_retry.py` and `tests/test_story_tool.py`.
++- Failures are cached briefly so that an Agent calling the tool several times in one turn during a rate-limit burst doesn't re-run the full retry loop on every call.
++- Non-429 errors are not retried.
+diff --git a/docs/workflow-diagram.md b/docs/workflow-diagram.md
+index d6611d1..c85b7e0 100644
+--- a/docs/workflow-diagram.md
++++ b/docs/workflow-diagram.md
+@@ -2,26 +2,32 @@
+ 
+ ```mermaid
+ flowchart TD
+-    A[Learner sends chat message] --> B[Language Agent receives message]
++    A[Learner sends chat message] --> B[Language Agent receives message<br/>Groq gpt-oss-120b]
+     B --> C{Agent decides intent}
+ 
+     C -->|"add word" request| D[Call Add Word tool]
+-    C -->|"story" request| E[Call Story-generation tool]
++    C -->|"story" request| E[Call Story Generator Tool]
+ 
+-    D --> D1[Add Word tool inserts word into Postgres words table]
++    D --> D1[Add Word inserts word into Postgres words table]
+     D1 --> D2[Return confirmation to Language Agent]
+     D2 --> Z[Language Agent replies in chat]
+ 
+-    E --> E1[Word Loader queries Postgres for all known words]
++    E --> E0{Fresh cache entry for this language?}
++    E0 -->|Yes| E7[Return cached result]
++    E0 -->|No| E1[Load all known words from Postgres]
+     E1 --> E2{Vocabulary empty?}
+-    E2 -->|Yes| E3[Ask learner to add words first]
+-    E2 -->|No| E4[Fill Prompt Template with language + word list]
+-    E4 --> E5[Story-generation Agent calls open-source LLM via Ollama]
+-    E5 --> E6[Story returned to Language Agent]
+-    E6 --> Z
++    E2 -->|Yes| E3[Return 'add words first' message]
++    E2 -->|No| E4[Build prompt: random narration or dialogue template]
++    E4 --> E5[Call Groq gpt-oss-20b<br/>retry on 429]
++    E5 --> E6[Strip hidden plan at ===STORY===]
++    E6 --> E8[Cache result and return passage]
++    E7 --> Z
+     E3 --> Z
++    E8 --> Z
+ ```
+ 
+ **Notes**
+ - This traces one full round-trip of a chat message, matching Stories 3, 4, 5, and 6 from `OVERVIEW.md`.
+-- The `E2` branch is the "vocabulary empty" guard called out explicitly in Story 5's acceptance criteria.
++- Everything inside the `E` branch runs inside one component (`story_tool.py`), because Langflow's Tool Mode returns only the tool's own output.
++- The `E2` branch is the "vocabulary empty" guard called out in Story 5's acceptance criteria.
++- Known issue (Step 9): the Agent sometimes discards the tool's result and writes its own story. That happens at node Z, not inside the tool. See `CHANGELOG.md` and `DEVELOPER-DIARY.md`.
+-- 
+2.43.0
+

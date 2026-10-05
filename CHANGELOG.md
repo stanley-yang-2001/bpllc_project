@@ -1,38 +1,303 @@
 # Changelog — Language Tutor with Langflow
 
-## Architecture: reverted to agent-based tool orchestration
+Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
-**Why:** the deterministic router (`language_tutor_router.py`) solved the reliability
-problem (the Agent discarding tool output and substituting its own unconstrained story)
-but abandoned the project's core teaching objective — demonstrating real multi-agent tool
-orchestration (LO 5, LO 6). Checked the original tutorial's own agent instructions; they
-are nearly identical to what we'd already tried, confirming the tutorial's reliability came
-from using `gpt-4.1`, not a technique we were missing.
+## Unreleased — Web app design (React)
+
+Added `docs/WEB-APP-DESIGN.md`: a design for a local demo web app (not hosted) around the tutor.
+- **Stack:** React + TypeScript (Vite, React Router, TanStack Query, Tailwind), a small FastAPI
+  backend, the existing Langflow flow as the AI layer, Postgres, Groq. React cannot hold the Groq or
+  Langflow keys or reach Postgres, so it talks only to the API.
+- **Two backend paths:** chat goes through the Langflow Agent (exact output via the Tool Result
+  Relay); vocabulary, stories and practice call shared Python (`tutor_core`) directly.
+- **Login:** local accounts, bcrypt, JWT in an httpOnly cookie; every query filtered by the user.
+- **Target-language vocabulary:** `words` gains `user_id` and `language` (unique per user,
+  language and word); stories use the words directly.
+- Includes architecture, auth and chat sequence diagrams, an ER diagram, an API table, wireframes,
+  code structure, testing strategy, milestones and risks. Streamlit was considered and dropped.
+- Open items it depends on: exporting the Langflow flow into the repo, extracting `tutor_core`,
+  passing the user id to Langflow tools (verify Langflow `tweaks` with Agent Tool Mode).
+
+## Unreleased — Step 10: language-aware story prompt (tuning change #1)
+
+**Why:** only 5/15 non-English stories were written in the requested language. Two probable
+causes: the vocabulary list is English and "use words from this list" keeps the model in English;
+and the tone examples in the prompt are English, which primes English output.
+
+**Changed (`story_tool.py`, tests first):**
+- For any language other than English, the prompt opens with a language rule (write the entire
+  story in the language; the list is English *meanings* to express in it; no English words left in;
+  names excepted), ends with a final-check reminder, and the English tone example is left out.
+- `normalize_language`: a language given by its own name is mapped to its English name
+  ("日本語" → Japanese, "español" → Spanish, "français" → French, ...), used in the prompt and as
+  the cache key (so "日本語" and "Japanese" share one cached story).
+- **English prompts are unchanged**, pinned by SHA-256 of both templates in the tests, so the
+  English baseline (85%) is not put at risk.
+
+**Tests:** `tests/test_story_prompt_language.py` (no database). The existing database-free story
+tests still pass.
+
+**Not measured yet.** Run the baseline batch before applying, the same batch after, and record both
+in the tuning log in `docs/STEP-10-TEST-PLAN.md`.
+
+**Not changed:** `story_prompt_builder.py` (Step 8 canvas pipeline) keeps the old templates;
+its drift from `story_tool.py` is on the deferred list.
+
+## Unreleased — Step 10: first live routing run, language check, runner fixes
+
+**Live result (45 turns on the real flow):** right tool 42/42, right argument 36/36, reply
+identical to the tool output 36/36 (the Relay), language switching 12/12, empty-vocabulary guard
+3/3, English story quality 8/9. The harness, the Relay and the language-switching fix all work.
+
+**Found: non-English stories were mostly not in the requested language.** The structure-only
+check passed them. Reading the replies: 2/3 "Spanish" and 3/3 "Japanese" stories were English, and
+all French stories had English words left in. Re-scored, only 5/15 were in the right language.
+
+**Added (tests first)**
+- `language_check` in `scripts/vocab_adherence.py`: non-Latin languages must be mostly in their
+  script; other languages must have a low share of English words (grammar words plus the
+  vocabulary; ambiguous ones like "no", "a", "me" excluded): ≥ 50% English = "english", ≥ 20% =
+  "mixed". Used by `check_passage(language=...)`, the batch runner (`--languages Spanish,French`),
+  `--rescore` and the routing tests; the summary reports "written in the requested language".
+  Tested on the real outputs from the run. Thresholds separate real data cleanly (good Spanish and
+  French 0.00–0.05, mixed French 0.25–0.29, English 0.66–0.72).
+- Routing cases for non-English stories now name their language.
+
+**Fixed in the runner**
+- `--repeat`: the throwaway word is removed before every repeat (it only was at the end, so A1
+  failed from the second repeat on) and case-insensitively.
+- Tool calls listed twice in the response are collapsed by id; the id is saved in the results.
+- Per-turn latency is saved and summarized.
+- The runner's snapshot table is now `words_autotest_snapshot` (a manual `words_snapshot`
+  backup no longer blocks a run), and restoring **merges** missing words back (`INSERT ... ON
+  CONFLICT (word) DO NOTHING`) instead of replacing the table, so nothing added meanwhile is lost.
+
+**Tests:** 74 checks in `test_vocab_adherence.py`, 40 in `test_routing_checks.py`, 23 in
+`test_routing_runner_with_fake_langflow.py`.
+
+**Config, not code:** the Add Word node on the canvas must be replaced with a fresh copy for the
+normalization fix to apply (the first run showed "AutoTestApple" stored as a separate word).
+
+## Unreleased — Step 10: automated routing tests
+
+**Added (tests first)**
+- `scripts/routing_checks.py` + `tests/test_routing_checks.py` (32 checks): parses a Langflow
+  `/api/v1/run` response (final reply, tool calls in any nesting) and checks each turn: right tool
+  (or none), right argument (case-insensitive, accepted alternatives such as "español"), reply
+  identical to the tool output, add-word reply wording, English story quality (vocabulary, length,
+  format) or structure only for other languages, and the empty-vocabulary guard.
+- `scripts/run_routing_tests.py`: runs 12 cases (add word, duplicate and case variant, English /
+  Spanish / French / Japanese stories, English→Spanish→English→French in one session, small talk,
+  an unrelated question, a story request without a language, the empty-vocabulary guard) through the
+  flow's HTTP API, with one fresh session per test, a report, and a JSON file of every reply.
+  It logs in with the superuser from `docker-compose.yml` and creates an API key (or takes
+  `--api-key`). It adds and removes a throwaway word and snapshots, empties and restores the
+  vocabulary in a `finally` block; a leftover snapshot stops the next run until
+  `--restore-leftover`. `--only`, `--repeat N`, `--delay`, `--list`, `--debug`.
+- `tests/test_routing_runner_with_fake_langflow.py` (15 checks): runs the runner against a fake
+  Langflow server on localhost. A healthy flow passes (exit 0); the Step 9 bugs (previous language
+  reused, reply differing from the tool output) are caught (exit 1); the database is restored even
+  after failing tests; a leftover snapshot is refused and can be restored.
+
+**Not verified against the real Langflow:** the response shape and the authentication calls were
+written from Langflow's documented API and a fake server. Run `--only N1,S1 --debug` first.
+
+## Unreleased — Step 10: baseline measured, pass rule relaxed
+
+**Baseline (20 English stories, Groq `gpt-oss-120b`, strict rule of 0 stray words):** 7/20 passed
+(35%). All of the failures were vocabulary: 0 failures to generate, 0 leaked plans, 0 off-length
+and 0 bad-format stories. Mean 1.30 stray words per story. Most common strays: bring, drink,
+together, share, eat, sure, happily, offers, bake. Latency p50 / p90: 1.1s / 2.1s.
+
+**Decision (owner):** the strays are ordinary everyday words, and the starter vocabulary has almost
+no verbs, so a zero-stray rule was unrealistic. The pass rule is now **≤ 2 stray words per story**;
+the strict rule remains available. This is recorded in the test plan so the target is not moved
+silently.
+
+**Added (tests first, 45 → 58 checks in `tests/test_vocab_adherence.py`)**
+- Readability metrics: mean and longest words per sentence/line in every result and summary;
+  `max_unit_words` / `--max-unit-words` enforces a limit when wanted.
+- `rescore_results` and `run_story_batch.py --rescore FILE`: re-score a saved run under different
+  rules, with no generation, no Groq calls, no database.
+- `--max-oov` now defaults to 2 in the batch runner and the checker CLI (the `check_passage`
+  function itself still defaults to 0).
+
+## Unreleased — Step 10 in progress: measuring tools and test plan
+
+**Added**
+- `scripts/vocab_adherence.py` + `tests/test_vocab_adherence.py` (45 checks): scores a passage
+  against the vocabulary. Handles inflections (plural, -ed, -ing, y→ies, doubled consonants),
+  phrase vocabulary ("thank you"), grammar words and simple verbs the prompt allows, character
+  names (speaker labels and capitalised mid-sentence words), contractions, sentence/line count
+  (4–8), dialogue format, leaked planning text, and failure/fallback messages. Non-English
+  passages skip the vocabulary check.
+- `scripts/run_story_batch.py`: generates N stories per language through the production path
+  (`generate_story_for_learner`, cache off), scores them, records latency, saves JSON. Wiring
+  tested with fakes; not yet run against Groq.
+- `docs/STEP-10-TEST-PLAN.md`: pass criteria fixed before tuning, a routing matrix (R1–R15),
+  edge cases, the LO 8 write-up template and a tuning log.
+
+**Fixed: Add Word created duplicate vocabulary.** The `words` column is `UNIQUE` but
+case-sensitive, and only the ends were stripped, so "Water", "water" and "water." were separate
+rows (and an Agent passing `'bread.'` stored the punctuation). `normalize_word` now lowercases,
+collapses whitespace and strips edge punctuation/quotes; the confirmation shows the stored form.
+Tests: `tests/test_add_word_normalization.py` (no database needed). Existing rows are not
+rewritten.
+
+**Findings so far (hypotheses to test, not conclusions)**
+- The story prompt's own tone example uses words outside its vocabulary rule ("hungry", "shop",
+  "bread", "eat", "happily").
+- Rule 3 lists six simple verbs, but the example also uses "say"; the checker allows a few basic
+  verbs by default and has a strict mode.
+- The tool has no `style` input, so a request for a "dialogue" may return a narration.
+
+## Unreleased — Step 9 complete
+
+- **Fixed: language handling.** After a non-English story the Agent refused English ("I can only
+  generate stories in languages other than English"), and a non-English request could return an
+  English story. Nothing in the code rejected English; the Agent inferred it from the "target
+  language" wording. Added an explicit instruction ("any language name is valid, including
+  English ... use the language in the LATEST message"), removed the "call a tool at most once"
+  rule (the Agent's leaked reasoning showed it confusing that rule across turns), and reworded
+  the `language` input's description in `story_tool.py`. Verified: stories now come back in the
+  requested language across a mixed sequence. Final instructions recorded in
+  `docs/AGENT-INSTRUCTIONS.md`.
+- **Recorded:** the story call and the Agent now both use `openai/gpt-oss-120b`; docs updated
+  (the Step 8 canvas pipeline still uses 20b).
+- **Skipped:** the planned 120b-vs-20b orchestrator A/B comparison. The Tool Result Relay made the
+  Agent's reply text irrelevant to correctness, so the orchestrator only has to pick the right
+  tool and argument.
+- **Still to do:** a formal acceptance run (folded into Step 10) and an export of the canvas flow.
+
+## Unreleased — Step 9: Tool Result Relay (verified in the Playground)
+
+**Problem:** even with a working tool and strict Agent Instructions, the Agent sometimes
+shortened the tool's output ("... Ben: Yes, we have water today — ..."), reworded it, or added
+its own note. Several instruction rewrites did not stop it, because an LLM writes the Agent's
+final reply and exact relay cannot be guaranteed by prompting.
+
+**Added:** `custom_components/tool_result_relay.py`, placed between the Agent and Chat Output
+(Chat Input → Agent → Tool Result Relay → Chat Output). If the Agent called a tool, the reply
+text is replaced with that tool's own output exactly (last successful, non-empty call; errored
+calls are skipped). If no tool was called, the Agent's text passes through. The Agent still
+chooses the tool and its argument, so LO 5 and LO 6 are unaffected.
+
+**Implementation notes:** the tool outputs are read from the Message's `content_blocks`
+(`ToolContent.output`). The same Message object is returned, so Chat Output should update the
+existing bubble instead of adding a second one, and the tool-call trace stays visible.
+
+**Fix after first live run:** a debug log from the Playground showed the Agent message's
+`content_blocks` is `[ToolContent, TextContent]` — the tool call sits *directly* in the list,
+not inside a `ContentBlock` wrapper as the first version (and its tests) assumed, so nothing was
+ever relayed. The extractor now walks both shapes. It also unwraps tool outputs recorded as
+structured data (a dict with `text`, or a JSON/Python-repr string), while leaving plain stories
+untouched. New tests use the real flat shape.
+
+**Tests:** `tests/test_tool_result_relay.py` (20 checks; real Langflow `Message` / `ToolContent`
+objects, no database or network).
+
+**Verified in the Playground:** the chat reply now matches the tool's Result, including runs
+where the Agent's own draft was garbled. Note: a canvas node keeps its own copy of a component's
+code, so after updating the file, replace the node with a fresh Tool Result Relay.
+
+## Unreleased — Fix: Story Generator Tool returned an empty string
+
+**Symptom (Step 9 Playground):** the tool ran, but its output (Result) was empty. The Agent
+then filled the gap itself: a made-up story, or a made-up error ("Invalid language specified.
+Please provide a supported language.") that exists nowhere in the code.
+
+**Root cause:** `openai/gpt-oss-20b` is a reasoning model, and hidden reasoning tokens count
+against `max_tokens`. With `max_tokens=400`, 398 tokens went to reasoning, so Groq returned
+`finish_reason: "length"` with `content: ""`. The empty passage was then cached as a *success*
+for 20 seconds, so repeat calls got the same empty answer.
+
+**Fixed in `story_tool.py`:**
+- `max_tokens` 400 → 1500, and `reasoning_effort: "low"`, so the plan and passage fit after the
+  model's reasoning.
+- An empty or whitespace-only passage (including an empty passage after `===STORY===`) is now
+  treated as a failure: the fallback message is returned and cached briefly, never an empty
+  string.
+
+**Tests:** `tests/test_empty_response_handling.py` (new; no Postgres needed).
+
+**Note:** this is separate from the relay problem documented below. Earlier traces show the
+Agent also discarding *successful* tool output, so that investigation continues. Re-run the
+Step 9 test set now that the tool no longer returns empty results.
+
+## Unreleased — Step 9 in progress: agent-based orchestration with a 120b orchestrator
+
+**Why:** the deterministic keyword router (prototyped, not included in this repo) solved the reliability problem
+(the Agent discarding tool output and substituting its own unconstrained story) but abandoned the
+project's core teaching objective — demonstrating real multi-agent tool orchestration (LO 5,
+LO 6). The tutorial's own agent instructions are nearly identical to what we'd already tried,
+confirming its reliability came from using `gpt-4.1`, not a technique we were missing.
 
 **Changed (canvas/UI only — no files modified):**
-- Re-enabled Tool Mode on `Add Word` and `Story Generator Tool` (code already supported
+- Re-enabled Tool Mode on `Add Word` and `Story Generator Tool` (the code already supported
   this; the toggle had been turned off when we built the router).
-- Added a second Groq model node ("Groq Orchestrator — 120b", model
-  `openai/gpt-oss-120b`) as the default Language Model for the top-level Agent — a larger
-  model specifically for the orchestrator, since instruction-following under agentic
-  tool-use is where model size matters most.
-- Kept the original Groq 20b node on the canvas, disconnected, for direct A/B comparison
-  against the 120b orchestrator using identical instructions/tools.
-- Rebuilt the top-level **Language Agent**, instructions now matching the tutorial's exact
-  wording:
+- Added a second Groq model node ("Groq Orchestrator — 120b", model `openai/gpt-oss-120b`) as the
+  default Language Model for the top-level Agent — a larger model for the orchestrator, since
+  instruction-following under agentic tool use is where model size matters most.
+- Kept the original Groq 20b node on the canvas, disconnected, for A/B comparison against the
+  120b orchestrator using identical instructions and tools.
+- Rebuilt the top-level **Language Agent**, with instructions matching the tutorial's wording:
   > "You will help the user practice their language skills... When using a tool, your
   > answer should just be the result from the tool and nothing else."
 - Wired: Chat Input → Agent → Chat Output; Add Word + Story Generator Tool → Agent's Tools
   input; Groq 120b → Agent's Language Model input.
 
-**Not changed:**
-- `story_tool.py`'s internal story-generation call stays on `openai/gpt-oss-20b` — that
-  call was never the source of the relay-reliability problem.
-- `language_tutor_router.py` and `tests/test_router.py` — left on disk, unwired, as a
-  working fallback if the 120b orchestrator still proves unreliable.
-- `OVERVIEW.md` / `IMPLEMENTATION-GUIDE.md` — already describe this agent-based
-  architecture from when Step 9 was first written, so nothing needs updating there.
+**Docs:**
+- Rewrote the stale docs (`OVERVIEW.md`, architecture, class, concept, state, and workflow
+  diagrams) to reflect Groq instead of Ollama/Hugging Face and the consolidated
+  `story_tool.py`.
+- Added `docs/IMPLEMENTATION-GUIDE.md` with per-step status and `docs/LEARNING-OBJECTIVES.md`
+  (with implementation notes on LO 6 and LO 8, which changed from the original plan).
+- Updated the README (current status, full project structure, complete test list).
+- Added a "Known code issues" section to `DEVELOPER-DIARY.md`.
 
-**Testing plan:** run identical requests (add a word, request a story in a named language,
-an unrelated message) with the 120b orchestrator wired in, then swap to 20b and repeat, to
-compare agentic obedience between the two model sizes on the exact same instructions/tools.
+**Not changed:**
+- `story_tool.py`'s internal story-generation call stays on `openai/gpt-oss-20b` — that call was
+  never the source of the relay-reliability problem.
+- The deterministic router approach is kept as a fallback if the 120b orchestrator still
+  proves unreliable.
+
+**Testing plan:** run identical requests (add a word, request a story in a named language, an
+unrelated message) with the 120b orchestrator wired in, then swap to 20b and repeat, to compare
+agentic obedience between the two model sizes on the exact same instructions and tools.
+
+## 2026-10-02 — Reliability work and deterministic router (Steps 8–9)
+
+- Consolidated the four-component story pipeline into `story_tool.py`, because Tool Mode returns
+  only a component's own output (see `DEVELOPER-DIARY.md`).
+- Added retry with backoff on Groq HTTP 429 (3 attempts, 1.5s).
+- Added a short-lived result cache keyed by language (success 20s, failure 15s), because the
+  Agent sometimes calls the story tool 3–5 times per request. Failures are cached too, so a
+  rate-limited burst doesn't run the full retry loop on every call.
+- Made an empty `language` argument fall back to English rather than raising, so the Agent
+  doesn't give up on the tool.
+- Built a deterministic keyword-based router with no LLM discretion,
+  as a reliability fallback (later unwired, see above).
+
+## 2026-09-25 — Story pipeline components (Steps 6–8)
+
+- Added `word_loader.py`, `story_prompt_builder.py`, `story_guard.py`, and
+  `final_passage_extractor.py`, each with tests written first.
+- Prompt design iterated five times: forced every word in → "use words that fit" with coherence
+  rules → hidden Character/Want/Event/Resolution plan behind a `===STORY===` delimiter, stripped
+  in code → richer Event/Resolution shapes → random narration/dialogue styles, 5–6 sentence
+  length, and word inflection.
+
+## 2026-09-21 — Language agent and environment check (Steps 1–2, 4–5)
+
+- Added `scripts/smoke_test.py` (Postgres + Groq reachability) and `docker-compose.yml` fixes:
+  explicit Langflow superuser and a pinned `LANGFLOW_SECRET_KEY`.
+- Added `upload_word_file.py`, `add_word.py`, and `groq_language_model.py`, with tests.
+- Switched the model provider from the planned local Ollama to Groq (insufficient local
+  hardware); replaced the deprecated Groq Llama models with `openai/gpt-oss-20b`.
+
+## 2026-09-20 — Documentation
+
+- Added `docs/` with the overview, user stories, and architecture, class, concept, state,
+  use-case, and workflow diagrams.
+
+## 2026-09-16 — Initial commit

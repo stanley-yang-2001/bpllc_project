@@ -136,6 +136,13 @@ _STORY_CACHE = {}
 _SUCCESS_CACHE_TTL_SECONDS = 20
 _FAILURE_CACHE_TTL_SECONDS = 15
 
+# openai/gpt-oss-20b is a reasoning model: hidden "reasoning" tokens count against max_tokens.
+# With max_tokens=400, nearly the whole budget (398 tokens) was spent reasoning, so Groq
+# returned finish_reason="length" with content="" — an empty story. A larger budget plus a
+# low reasoning effort leaves room for the plan and the passage itself.
+_MAX_COMPLETION_TOKENS = 1500
+_REASONING_EFFORT = "low"
+
 FAILURE_FALLBACK_MESSAGE = (
     "I'm having trouble generating a story right now — please try again in a moment."
 )
@@ -161,8 +168,84 @@ def load_words(conn, table_name: str = "words") -> str:
     return ", ".join(row[0] for row in rows)
 
 
+# --- language handling -------------------------------------------------------------------------
+# Found in the first live routing run: only 5 of 15 non-English stories were actually written in
+# the requested language. Two causes are addressed here:
+#   1. The vocabulary list is English, and "use words from this list" keeps the model in English.
+#      For other languages the prompt now says the list holds English MEANINGS to be expressed in
+#      the target language, with no English left in.
+#   2. The tone examples in the templates are written in English, which primes English output.
+#      For other languages the English example is left out.
+# The English prompt is untouched (the two templates above are used exactly as written).
+
+_NATIVE_LANGUAGE_NAMES = {
+    "\u65e5\u672c\u8a9e": "Japanese", "\u306b\u307b\u3093\u3054": "Japanese", "nihongo": "Japanese",
+    "\u4e2d\u6587": "Chinese", "\u6c49\u8bed": "Chinese", "\u6f22\u8a9e": "Chinese",
+    "\u666e\u901a\u8bdd": "Chinese", "\u56fd\u8bed": "Chinese", "\u570b\u8a9e": "Chinese",
+    "\ud55c\uad6d\uc5b4": "Korean",
+    "espa\u00f1ol": "Spanish", "espanol": "Spanish", "castellano": "Spanish",
+    "fran\u00e7ais": "French", "francais": "French",
+    "deutsch": "German", "italiano": "Italian",
+    "portugu\u00eas": "Portuguese", "portugues": "Portuguese",
+    "\u0440\u0443\u0441\u0441\u043a\u0438\u0439": "Russian",
+    "\u0627\u0644\u0639\u0631\u0628\u064a\u0629": "Arabic",
+    "\u0939\u093f\u0928\u094d\u0926\u0940": "Hindi",
+    "\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac": "Greek",
+    "\u0e44\u0e17\u0e22": "Thai", "\u05e2\u05d1\u05e8\u05d9\u05ea": "Hebrew",
+    "nederlands": "Dutch", "svenska": "Swedish", "t\u00fcrk\u00e7e": "Turkish", "polski": "Polish",
+    "ti\u1ebfng vi\u1ec7t": "Vietnamese", "bahasa indonesia": "Indonesian",
+    "ingl\u00e9s": "English", "ingles": "English", "anglais": "English", "englisch": "English",
+    "\u82f1\u8a9e": "English", "\u82f1\u8bed": "English",
+}
+
+
+def normalize_language(language) -> str:
+    """The English name of a language, whatever the learner typed: "\u65e5\u672c\u8a9e" -> "Japanese",
+    "fran\u00e7ais" -> "French", " spanish " -> "Spanish". Unknown names are only tidied up."""
+    text = " ".join((language or "").split())
+    if not text:
+        return ""
+    known = _NATIVE_LANGUAGE_NAMES.get(text.casefold())
+    if known:
+        return known
+    if text.isascii():
+        return " ".join(word.capitalize() for word in text.split(" "))
+    return text
+
+
+def is_english(language) -> bool:
+    return normalize_language(language) == "English"
+
+
+_LANGUAGE_BLOCK = (
+    "LANGUAGE RULE (most important): write the ENTIRE passage or dialogue (everything after "
+    "the ===STORY=== line) in {language}, and nothing in English. The vocabulary list below is "
+    "written in English: treat each entry as a MEANING and use its natural {language} word for "
+    "it (if the list has \"water\", write the {language} word for water). Do not leave any "
+    "English word in the story; only character names may stay as they are.\n\n"
+)
+_LANGUAGE_REMINDER = (
+    "Final check before you write: every word of the story is in {language} \u2014 each one the "
+    "{language} equivalent of a word from the list, or a basic grammar word or simple verb. "
+    "No English.\n\n"
+)
+
+
+def _template_for_other_languages(template: str) -> str:
+    """The same template with the language rule added after the intro, the English tone example
+    removed, and a final reminder before 'Begin:'."""
+    intro_end = template.index("\n\n") + 2
+    example_start = template.index("Tone example only")
+    begin = template.index("Begin:")
+    return (template[:intro_end] + _LANGUAGE_BLOCK + template[intro_end:example_start]
+            + _LANGUAGE_REMINDER + template[begin:])
+
+
+_OTHER_LANGUAGE_STYLES = {style: _template_for_other_languages(t) for style, t in VALID_STYLES.items()}
+
+
 def build_story_prompt(language: str, words: str, style: Optional[str] = None) -> str:
-    language = (language or "").strip()
+    language = normalize_language(language)
     words = (words or "").strip()
     if not language:
         raise ValueError("language must be a non-empty string")
@@ -172,7 +255,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None) -
         style = random.choice(list(VALID_STYLES.keys()))
     if style not in VALID_STYLES:
         raise ValueError(f"style must be one of {list(VALID_STYLES.keys())}, got {style!r}")
-    return VALID_STYLES[style].format(language=language, words=words)
+    templates = VALID_STYLES if is_english(language) else _OTHER_LANGUAGE_STYLES
+    return templates[style].format(language=language, words=words)
 
 
 def extract_final_passage(raw_text, delimiter: str = DELIMITER) -> str:
@@ -206,9 +290,10 @@ def call_groq(prompt: str) -> str:
     url = "https://api.groq.com/openai/v1/chat/completions"
     payload = json.dumps(
         {
-            "model": "openai/gpt-oss-20b",
+            "model": "openai/gpt-oss-120b",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 400,
+            "max_tokens": _MAX_COMPLETION_TOKENS,
+            "reasoning_effort": _REASONING_EFFORT,
         }
     ).encode("utf-8")
 
@@ -262,7 +347,7 @@ def generate_story_for_learner(
     if owns_connection:
         conn = get_connection()
 
-    cache_key = (language or "").strip().lower()
+    cache_key = normalize_language(language).lower()
 
     try:
         if use_cache and cache_key in _STORY_CACHE:
@@ -289,6 +374,15 @@ def generate_story_for_learner(
 
         result = extract_final_passage(raw_response)
 
+        # An empty passage (the model ran out of tokens, or returned nothing after the
+        # delimiter) must never reach the Agent as an empty string: the Agent fills the gap
+        # by inventing its own story or error. Treat it as a failure instead — cached
+        # briefly, like any other failure.
+        if not result.strip():
+            if use_cache:
+                _STORY_CACHE[cache_key] = (time.time(), FAILURE_FALLBACK_MESSAGE, "failure")
+            return FAILURE_FALLBACK_MESSAGE
+
         if use_cache:
             _STORY_CACHE[cache_key] = (time.time(), result, "success")
 
@@ -313,7 +407,7 @@ class StoryGeneratorTool(Component):
         MessageTextInput(
             name="language",
             display_name="Language",
-            info="The target language for the story, e.g. 'Spanish'.",
+            info="Name of the language for the story, e.g. 'Spanish', 'Chinese' ,'English' etc. Required.",
             tool_mode=True,
         ),
     ]

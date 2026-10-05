@@ -6,11 +6,11 @@ flowchart TD
     Vocabulary[Known Vocabulary]
     Word[Word]
     Language[Target Language]
-    Story[Generated Story]
+    Story[Generated Story or Dialogue]
     Agent[Language Agent]
     Tool1[Add Word Tool]
-    Tool2[Story-Generation Agent / Tool]
-    LLM[Open-Source LLM - Ollama]
+    Tool2[Story Generator Tool]
+    LLM[Open-Weight LLM - Groq]
     DB[(Postgres Database)]
 
     Learner -- chats with --> Agent
@@ -23,9 +23,11 @@ flowchart TD
     Tool2 -- constrained by --> Language
     Tool2 -- generates --> Story
     Tool2 -- powered by --> LLM
+    Agent -- orchestrated by --> LLM
     Story -- delivered to --> Learner
 ```
 
 **Notes**
 - This is a concept-level view (not a component/class view) — it shows how the *ideas* of learner, vocabulary, language, story, and model relate to each other, independent of implementation details.
 - The recurring theme: the *Vocabulary* concept is the shared constraint that both the "add word" and "generate story" paths revolve around.
+- The LLM appears twice: once orchestrating (the Language Agent decides which tool to call) and once generating (inside the story tool). These are different Groq models in the current setup.

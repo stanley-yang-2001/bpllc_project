@@ -5,19 +5,24 @@ flowchart LR
     UD[User Device<br/>Browser - Langflow Chat UI]
     WS[Web Server<br/>Langflow - Docker Container]
     DB[(Database<br/>Postgres - Docker Container)]
-    MS[Model Server<br/>Ollama - Docker Container]
-    CS[Cloud Services<br/>Hugging Face Inference - fallback only]
+    GQ[Cloud Service<br/>Groq API - gpt-oss-120b]
 
     UD -- HTTP chat request --> WS
     WS -- SQL read/write --> DB
     DB -- vocabulary rows --> WS
-    WS -- prompt --> MS
-    MS -- generated text --> WS
-    WS -. fallback prompt if local model unavailable .-> CS
-    CS -. generated text .-> WS
+    WS -- "orchestration prompt<br/>story prompt" --> GQ
+    GQ -- generated text --> WS
     WS -- chat response --> UD
 ```
 
 **Notes**
-- All four boxes besides Cloud Services run locally via the same Docker Compose stack (Story 1 + Story 1b in `OVERVIEW.md`) — nothing here requires external hosting.
-- The Cloud Services box is dashed/optional: it's only exercised if local hardware can't run the Ollama model, per Story 1b's fallback plan.
+- Langflow and Postgres run locally via the same Docker Compose stack (Story 1 in
+  `OVERVIEW.md`). The only external dependency is the Groq API (free tier), reached over HTTPS
+  with `GROQ_API_KEY` from `.env` (Story 1b).
+- The original design used a local Ollama container with a Hugging Face Inference fallback. That
+  was dropped because local hardware couldn't run the model; there is currently no automatic
+  provider fallback (see the Bonus Challenge in `IMPLEMENTATION-GUIDE.md`).
+- Two kinds of Groq calls exist: Langflow's Agent node calls Groq through the custom
+  `GroqLanguageModel` component (orchestrator, `gpt-oss-120b`), and `story_tool.py` calls Groq
+  directly via `urllib` (story generation, `gpt-oss-120b`). Groq's free-tier rate limit is shared
+  across both.

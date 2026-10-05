@@ -1,0 +1,2294 @@
+{
+  "flow_id": "564b5d01-2144-4b60-8f37-a693e2a1fe87",
+  "results": [
+    {
+      "case": "A1",
+      "name": "Add a new word",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word autotestapple",
+          "reply": "Added 'autotestapple' to your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "Added 'autotestapple' to your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "Added 'autotestapple' to your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "41 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": true,
+              "detail": "expected one of ['added']; got \"Added 'autotestapple' to your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A2",
+      "name": "Adding the same word again is a duplicate",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word autotestapple",
+          "reply": "'autotestapple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": true,
+              "detail": "expected one of ['already']; got \"'autotestapple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A3",
+      "name": "A case variant is a duplicate",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word AutoTestApple",
+          "reply": "Added 'AutoTestApple' to your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "AutoTestApple"
+              },
+              "output": "Added 'AutoTestApple' to your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "AutoTestApple"
+              },
+              "output": "Added 'AutoTestApple' to your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "41 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": false,
+              "detail": "expected one of ['already']; got \"Added 'AutoTestApple' to your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S1",
+      "name": "English story",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "Hello, I am Sam today. I want water now. I see my friend. Friend is yes. Thank you, I have water.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello, I am Sam today. I want water now. I see my friend. Friend is yes. Thank you, I have water.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello, I am Sam today. I want water now. I see my friend. Friend is yes. Thank you, I have water.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "97 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 5 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S2",
+      "name": "Spanish story",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in Spanish",
+          "reply": "Ana: Hola, ¿tienes agua, por favor?  \nLuis: Sí, tengo agua en mi casa.  \nAna: ¿Podemos beber agua hoy?  \nLuis: No, hoy no.  \nAna: Entonces mañana, sí?  \nLuis: Sí, mañana, gracias.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hola, ¿tienes agua, por favor?  \nLuis: Sí, tengo agua en mi casa.  \nAna: ¿Podemos beber agua hoy?  \nLuis: No, hoy no.  \nAna: Entonces mañana, sí?  \nLuis: Sí, mañana, gracias.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hola, ¿tienes agua, por favor?  \nLuis: Sí, tengo agua en mi casa.  \nAna: ¿Podemos beber agua hoy?  \nLuis: No, hoy no.  \nAna: Entonces mañana, sí?  \nLuis: Sí, mañana, gracias.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "179 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='spanish'; accepted ['spanish', 'español', 'espanol']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S3",
+      "name": "French story",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Write a short story in French",
+          "reply": "Bonjour, je suis Léa today.  \nJ'ai soif et je veux water.  \nJe demande à ami please water.  \nIl dit oui et me donne water.  \nJe dis thank you et bois water.  \nTomorrow je aiderai ami gentil.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Bonjour, je suis Léa today.  \nJ'ai soif et je veux water.  \nJe demande à ami please water.  \nIl dit oui et me donne water.  \nJe dis thank you et bois water.  \nTomorrow je aiderai ami gentil.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Bonjour, je suis Léa today.  \nJ'ai soif et je veux water.  \nJe demande à ami please water.  \nIl dit oui et me donne water.  \nJe dis thank you et bois water.  \nTomorrow je aiderai ami gentil.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "190 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='french'; accepted ['french', 'français', 'francais']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S4",
+      "name": "Story requested in the target language's own name",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Story in 日本語",
+          "reply": "Hello, I am Taro today. I want water. My friend is nearby. I say, please water. Friend says yes and has water. Thank you, we will drink tomorrow.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "日本語"
+              },
+              "output": "Hello, I am Taro today. I want water. My friend is nearby. I say, please water. Friend says yes and has water. Thank you, we will drink tomorrow.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "日本語"
+              },
+              "output": "Hello, I am Taro today. I want water. My friend is nearby. I say, please water. Friend says yes and has water. Thank you, we will drink tomorrow.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "145 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='日本語'; accepted ['japanese', '日本語']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M1",
+      "name": "Language switching in one session (English, Spanish, English, French)",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Create a story in English",
+          "reply": "Sam wants water today please. I see my friend please. My friend has water yes. Thank you I have water now. Tomorrow I go to house.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Sam wants water today please. I see my friend please. My friend has water yes. Thank you I have water now. Tomorrow I go to house.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Sam wants water today please. I see my friend please. My friend has water yes. Thank you I have water now. Tomorrow I go to house.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "130 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 5 units, stray words ['sam']"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "say": "Create a story in Spanish",
+          "reply": "Ana: Hola, ¿tienes agua hoy?\nLuis: Sí, tengo agua.\nAna: ¿Puedes traer agua mañana, por favor?\nLuis: Mañana traeré agua, gracias.\nAna: Gracias, amigo. ¡Hasta luego!",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hola, ¿tienes agua hoy?\nLuis: Sí, tengo agua.\nAna: ¿Puedes traer agua mañana, por favor?\nLuis: Mañana traeré agua, gracias.\nAna: Gracias, amigo. ¡Hasta luego!",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hola, ¿tienes agua hoy?\nLuis: Sí, tengo agua.\nAna: ¿Puedes traer agua mañana, por favor?\nLuis: Mañana traeré agua, gracias.\nAna: Gracias, amigo. ¡Hasta luego!",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "163 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='spanish'; accepted ['spanish', 'español', 'espanol']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 5 units"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "say": "Create a story in English",
+          "reply": "Anna: Hello, do you have a biscuit?\nBen: Yes, I have biscuit today.\nAnna: Please give me the biscuit.\nBen: Here is biscuit, thank you.\nAnna: Goodbye, friend, see you.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello, do you have a biscuit?\nBen: Yes, I have biscuit today.\nAnna: Please give me the biscuit.\nBen: Here is biscuit, thank you.\nAnna: Goodbye, friend, see you.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello, do you have a biscuit?\nBen: Yes, I have biscuit today.\nAnna: Please give me the biscuit.\nBen: Here is biscuit, thank you.\nAnna: Goodbye, friend, see you.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "166 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 5 units"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "say": "Create a story in French",
+          "reply": "Claire: Bonjour, Pierre, as-tu de l'eau ?\nPierre: Oui, j'ai de l'eau ici.\nClaire: Super, je veux de l'eau, s'il te plaît.\nPierre: Bien sûr, prends l'eau maintenant.\nClaire: Merci ! Demain, il fera sunny, on boira ensemble.\nPierre: D'accord, à demain, au revoir.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Claire: Bonjour, Pierre, as-tu de l'eau ?\nPierre: Oui, j'ai de l'eau ici.\nClaire: Super, je veux de l'eau, s'il te plaît.\nPierre: Bien sûr, prends l'eau maintenant.\nClaire: Merci ! Demain, il fera sunny, on boira ensemble.\nPierre: D'accord, à demain, au revoir.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Claire: Bonjour, Pierre, as-tu de l'eau ?\nPierre: Oui, j'ai de l'eau ici.\nClaire: Super, je veux de l'eau, s'il te plaît.\nPierre: Bien sûr, prends l'eau maintenant.\nClaire: Merci ! Demain, il fera sunny, on boira ensemble.\nPierre: D'accord, à demain, au revoir.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "261 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='french'; accepted ['french', 'français', 'francais']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N1",
+      "name": "A greeting needs no tool",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "hi",
+          "reply": "Hello! How can I help you today?",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "32 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N2",
+      "name": "An unrelated question needs no tool",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "What's the weather like today?",
+          "reply": "I’m not able to provide real‑time weather information.",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "54 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "I1",
+      "name": "Story request without a language (record only)",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story",
+          "reply": "Anna: Hello Ben, do you have water?  \nBen: Yes I have water today.  \nAnna: Please can I have some?  \nBen: No I need water today.  \nAnna: Okay we will get water tomorrow.  \nBen: Thank you friend, goodbye.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello Ben, do you have water?  \nBen: Yes I have water today.  \nAnna: Please can I have some?  \nBen: No I need water today.  \nAnna: Okay we will get water tomorrow.  \nBen: Thank you friend, goodbye.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello Ben, do you have water?  \nBen: Yes I have water today.  \nAnna: Please can I have some?  \nBen: No I need water today.  \nAnna: Okay we will get water tomorrow.  \nBen: Thank you friend, goodbye.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "203 chars",
+              "info": true
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "recorded: ['story_generator_tool', 'story_generator_tool']",
+              "info": true
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical",
+              "info": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A1",
+      "name": "Add a new word",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word autotestapple",
+          "reply": "'autotestapple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": false,
+              "detail": "expected one of ['added']; got \"'autotestapple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A2",
+      "name": "Adding the same word again is a duplicate",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word autotestapple",
+          "reply": "'autotestapple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": true,
+              "detail": "expected one of ['already']; got \"'autotestapple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A3",
+      "name": "A case variant is a duplicate",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word AutoTestApple",
+          "reply": "'AutoTestApple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "AutoTestApple"
+              },
+              "output": "'AutoTestApple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "AutoTestApple"
+              },
+              "output": "'AutoTestApple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": true,
+              "detail": "expected one of ['already']; got \"'AutoTestApple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S1",
+      "name": "English story",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "Hello, I am Sam.  \nToday I want water.  \nI ask my friend.  \nFriend says yes, please.  \nWe drink water together.  \nTomorrow we will share bread.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello, I am Sam.  \nToday I want water.  \nI ask my friend.  \nFriend says yes, please.  \nWe drink water together.  \nTomorrow we will share bread.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello, I am Sam.  \nToday I want water.  \nI ask my friend.  \nFriend says yes, please.  \nWe drink water together.  \nTomorrow we will share bread.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "143 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": false,
+              "detail": "narration, 6 units, stray words ['drink', 'together', 'share']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S2",
+      "name": "Spanish story",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in Spanish",
+          "reply": "Ana: hello, do you have water?  \nLuis: yes, I have water.  \nAna: please, I want water today.  \nLuis: no, I need water today.  \nAna: okay, tomorrow then?  \nLuis: yes, I bring water tomorrow, thank you.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: hello, do you have water?  \nLuis: yes, I have water.  \nAna: please, I want water today.  \nLuis: no, I need water today.  \nAna: okay, tomorrow then?  \nLuis: yes, I bring water tomorrow, thank you.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: hello, do you have water?  \nLuis: yes, I have water.  \nAna: please, I want water today.  \nLuis: no, I need water today.  \nAna: okay, tomorrow then?  \nLuis: yes, I bring water tomorrow, thank you.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "200 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='spanish'; accepted ['spanish', 'español', 'espanol']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S3",
+      "name": "French story",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Write a short story in French",
+          "reply": "Hello, je suis Marie aujourd'hui.  \nJ'ai soif et je veux water.  \nMon ami demande biscuit, please.  \nJe dis oui, je partage water.  \nThank you, il sourit sous le sunny.  \nDemain, j'apporte biscuit et bread.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Hello, je suis Marie aujourd'hui.  \nJ'ai soif et je veux water.  \nMon ami demande biscuit, please.  \nJe dis oui, je partage water.  \nThank you, il sourit sous le sunny.  \nDemain, j'apporte biscuit et bread.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Hello, je suis Marie aujourd'hui.  \nJ'ai soif et je veux water.  \nMon ami demande biscuit, please.  \nJe dis oui, je partage water.  \nThank you, il sourit sous le sunny.  \nDemain, j'apporte biscuit et bread.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "206 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='french'; accepted ['french', 'français', 'francais']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S4",
+      "name": "Story requested in the target language's own name",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Story in 日本語",
+          "reply": "Hello, I am Taro today.  \nI have water and bread.  \nMy friend wants water today.  \nI say yes please.  \nWe drink water and eat bread.  \nTomorrow we will go to house.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "日本語"
+              },
+              "output": "Hello, I am Taro today.  \nI have water and bread.  \nMy friend wants water today.  \nI say yes please.  \nWe drink water and eat bread.  \nTomorrow we will go to house.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "日本語"
+              },
+              "output": "Hello, I am Taro today.  \nI have water and bread.  \nMy friend wants water today.  \nI say yes please.  \nWe drink water and eat bread.  \nTomorrow we will go to house.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "164 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='日本語'; accepted ['japanese', '日本語']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M1",
+      "name": "Language switching in one session (English, Spanish, English, French)",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Create a story in English",
+          "reply": "Hello I am Sam.  \nI am thirsty today.  \nI see my friend.  \nI ask please give water.  \nMy friend says yes and gives water.  \nThank you I have water goodbye.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello I am Sam.  \nI am thirsty today.  \nI see my friend.  \nI ask please give water.  \nMy friend says yes and gives water.  \nThank you I have water goodbye.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello I am Sam.  \nI am thirsty today.  \nI see my friend.  \nI ask please give water.  \nMy friend says yes and gives water.  \nThank you I have water goodbye.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "155 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units, stray words ['thirsty']"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "say": "Create a story in Spanish",
+          "reply": "Ana: Hola, ¿tienes agua?  \nLuis: No, no tengo agua hoy.  \nAna: ¿Puedes traer agua mañana?  \nLuis: Sí, traeré agua mañana.  \nAna: Gracias, Luis.  \nLuis: Hasta luego, amigo.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hola, ¿tienes agua?  \nLuis: No, no tengo agua hoy.  \nAna: ¿Puedes traer agua mañana?  \nLuis: Sí, traeré agua mañana.  \nAna: Gracias, Luis.  \nLuis: Hasta luego, amigo.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hola, ¿tienes agua?  \nLuis: No, no tengo agua hoy.  \nAna: ¿Puedes traer agua mañana?  \nLuis: Sí, traeré agua mañana.  \nAna: Gracias, Luis.  \nLuis: Hasta luego, amigo.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "171 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='spanish'; accepted ['spanish', 'español', 'espanol']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "say": "Create a story in English",
+          "reply": "Anna: Hello, friend, do you have water?\nBen: Yes, I have water today.\nAnna: Please give me some water.\nBen: I will bring more water tomorrow.\nAnna: Thank you, friend.\nBen: Goodbye, see you tomorrow.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello, friend, do you have water?\nBen: Yes, I have water today.\nAnna: Please give me some water.\nBen: I will bring more water tomorrow.\nAnna: Thank you, friend.\nBen: Goodbye, see you tomorrow.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello, friend, do you have water?\nBen: Yes, I have water today.\nAnna: Please give me some water.\nBen: I will bring more water tomorrow.\nAnna: Thank you, friend.\nBen: Goodbye, see you tomorrow.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "198 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units, stray words ['bring']"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "say": "Create a story in French",
+          "reply": "hello, je suis Léa et je suis contente.  \nJe veux de l'eau today.  \nMon friend voit ma soif.  \nJe dis please, donnez water.  \nIl répond yes et donne water.  \nthank you, je bois tomorrow.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "hello, je suis Léa et je suis contente.  \nJe veux de l'eau today.  \nMon friend voit ma soif.  \nJe dis please, donnez water.  \nIl répond yes et donne water.  \nthank you, je bois tomorrow.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "hello, je suis Léa et je suis contente.  \nJe veux de l'eau today.  \nMon friend voit ma soif.  \nJe dis please, donnez water.  \nIl répond yes et donne water.  \nthank you, je bois tomorrow.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "186 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='french'; accepted ['french', 'français', 'francais']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N1",
+      "name": "A greeting needs no tool",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "hi",
+          "reply": "Hello! How can I help you with your language learning today?",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "60 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N2",
+      "name": "An unrelated question needs no tool",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "What's the weather like today?",
+          "reply": "I’m not able to check real-time weather, but you can look up today’s forecast on a weather website or app for the most accurate information.",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "140 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "I1",
+      "name": "Story request without a language (record only)",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story",
+          "reply": "Hello I am Tom.  \nI need water today.  \nMy friend is near the house.  \nI ask please give water.  \nYes I have water now.  \nThank you I drink water.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello I am Tom.  \nI need water today.  \nMy friend is near the house.  \nI ask please give water.  \nYes I have water now.  \nThank you I drink water.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello I am Tom.  \nI need water today.  \nMy friend is near the house.  \nI ask please give water.  \nYes I have water now.  \nThank you I drink water.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "146 chars",
+              "info": true
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "recorded: ['story_generator_tool', 'story_generator_tool']",
+              "info": true
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical",
+              "info": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A1",
+      "name": "Add a new word",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word autotestapple",
+          "reply": "'autotestapple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": false,
+              "detail": "expected one of ['added']; got \"'autotestapple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A2",
+      "name": "Adding the same word again is a duplicate",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word autotestapple",
+          "reply": "'autotestapple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "autotestapple"
+              },
+              "output": "'autotestapple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": true,
+              "detail": "expected one of ['already']; got \"'autotestapple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "A3",
+      "name": "A case variant is a duplicate",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Add the word AutoTestApple",
+          "reply": "'AutoTestApple' is already in your vocabulary.",
+          "tool_calls": [
+            {
+              "name": "add_word",
+              "args": {
+                "word": "AutoTestApple"
+              },
+              "output": "'AutoTestApple' is already in your vocabulary.",
+              "error": null
+            },
+            {
+              "name": "add_word",
+              "args": {
+                "word": "AutoTestApple"
+              },
+              "output": "'AutoTestApple' is already in your vocabulary.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "46 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected add_word; called: add_word, add_word (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "word='autotestapple'; accepted ['autotestapple']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "reply wording",
+              "ok": true,
+              "detail": "expected one of ['already']; got \"'AutoTestApple' is already in your vocabulary.\""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S1",
+      "name": "English story",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "Hello, I am Sam, your friend. I want water today, please. I ask my friend for water. Friend says yes and shares water. We drink water and see sunny. Tomorrow I will go with water to house.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello, I am Sam, your friend. I want water today, please. I ask my friend for water. Friend says yes and shares water. We drink water and see sunny. Tomorrow I will go with water to house.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Hello, I am Sam, your friend. I want water today, please. I ask my friend for water. Friend says yes and shares water. We drink water and see sunny. Tomorrow I will go with water to house.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "188 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units, stray words ['shares', 'drink']"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S2",
+      "name": "Spanish story",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in Spanish",
+          "reply": "Ana: Hello, do you have water, please?  \nLuis: Yes, I have water in my house.  \nAna: Can you bring it tomorrow?  \nLuis: Tomorrow I will bring water, thank you.  \nAna: Great, see you today.  \nLuis: Goodbye, friend.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hello, do you have water, please?  \nLuis: Yes, I have water in my house.  \nAna: Can you bring it tomorrow?  \nLuis: Tomorrow I will bring water, thank you.  \nAna: Great, see you today.  \nLuis: Goodbye, friend.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hello, do you have water, please?  \nLuis: Yes, I have water in my house.  \nAna: Can you bring it tomorrow?  \nLuis: Tomorrow I will bring water, thank you.  \nAna: Great, see you today.  \nLuis: Goodbye, friend.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "213 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='spanish'; accepted ['spanish', 'español', 'espanol']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S3",
+      "name": "French story",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Write a short story in French",
+          "reply": "Hello, je suis Léo aujourd'hui.  \nJ'ai soif et je veux water.  \nJe demande à mon ami pour water.  \nMon ami répond yes et donne water.  \nNous buvons water et je dis thank you.  \nTomorrow je vais lire mon book.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Hello, je suis Léo aujourd'hui.  \nJ'ai soif et je veux water.  \nJe demande à mon ami pour water.  \nMon ami répond yes et donne water.  \nNous buvons water et je dis thank you.  \nTomorrow je vais lire mon book.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Hello, je suis Léo aujourd'hui.  \nJ'ai soif et je veux water.  \nJe demande à mon ami pour water.  \nMon ami répond yes et donne water.  \nNous buvons water et je dis thank you.  \nTomorrow je vais lire mon book.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "208 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='french'; accepted ['french', 'français', 'francais']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "S4",
+      "name": "Story requested in the target language's own name",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Story in 日本語",
+          "reply": "Hello, I am Ken.  \nToday I have water.  \nMy friend asks for bread.  \nI say please give me bread.  \nI say thank you and share water.  \nTomorrow we will have bread.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "日本語"
+              },
+              "output": "Hello, I am Ken.  \nToday I have water.  \nMy friend asks for bread.  \nI say please give me bread.  \nI say thank you and share water.  \nTomorrow we will have bread.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "日本語"
+              },
+              "output": "Hello, I am Ken.  \nToday I have water.  \nMy friend asks for bread.  \nI say please give me bread.  \nI say thank you and share water.  \nTomorrow we will have bread.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "162 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='日本語'; accepted ['japanese', '日本語']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "M1",
+      "name": "Language switching in one session (English, Spanish, English, French)",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Create a story in English",
+          "reply": "Tom: Hello, Anna, do you have water?\nAnna: Yes, I have water today.\nTom: Please, can I have some water?\nAnna: Sure, I will bring water tomorrow.\nTom: Thank you, friend.\nAnna: Goodbye.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Tom: Hello, Anna, do you have water?\nAnna: Yes, I have water today.\nTom: Please, can I have some water?\nAnna: Sure, I will bring water tomorrow.\nTom: Thank you, friend.\nAnna: Goodbye.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Tom: Hello, Anna, do you have water?\nAnna: Yes, I have water today.\nTom: Please, can I have some water?\nAnna: Sure, I will bring water tomorrow.\nTom: Thank you, friend.\nAnna: Goodbye.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "183 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units, stray words ['sure', 'bring']"
+            }
+          ]
+        },
+        {
+          "turn": 2,
+          "say": "Create a story in Spanish",
+          "reply": "Ana: Hello Luis, do you have water?  \nLuis: Yes, I have water today.  \nAna: Please, can I have some?  \nLuis: I will give you water tomorrow.  \nAna: Thank you, see you tomorrow.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hello Luis, do you have water?  \nLuis: Yes, I have water today.  \nAna: Please, can I have some?  \nLuis: I will give you water tomorrow.  \nAna: Thank you, see you tomorrow.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "Spanish"
+              },
+              "output": "Ana: Hello Luis, do you have water?  \nLuis: Yes, I have water today.  \nAna: Please, can I have some?  \nLuis: I will give you water tomorrow.  \nAna: Thank you, see you tomorrow.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "176 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='spanish'; accepted ['spanish', 'español', 'espanol']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 5 units"
+            }
+          ]
+        },
+        {
+          "turn": 3,
+          "say": "Create a story in English",
+          "reply": "Anna: Hello friend, do you have water?  \nBen: No, I do not have water today.  \nAnna: Please, can you bring water tomorrow?  \nBen: Yes, I will bring water tomorrow.  \nAnna: Thank you, Ben!  \nBen: Goodbye, see you tomorrow.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello friend, do you have water?  \nBen: No, I do not have water today.  \nAnna: Please, can you bring water tomorrow?  \nBen: Yes, I will bring water tomorrow.  \nAnna: Thank you, Ben!  \nBen: Goodbye, see you tomorrow.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello friend, do you have water?  \nBen: No, I do not have water today.  \nAnna: Please, can you bring water tomorrow?  \nBen: Yes, I will bring water tomorrow.  \nAnna: Thank you, Ben!  \nBen: Goodbye, see you tomorrow.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "221 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "dialogue, 6 units, stray words ['bring']"
+            }
+          ]
+        },
+        {
+          "turn": 4,
+          "say": "Create a story in French",
+          "reply": "Bonjour, je suis Marie aujourd'hui.  \nJ'ai soif et je veux de l'eau.  \nJe demande à mon ami, s'il vous plaît.  \nIl répond oui et me donne de l'eau.  \nJe dis merci et je bois le water.  \nDemain nous boirons water ensemble.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Bonjour, je suis Marie aujourd'hui.  \nJ'ai soif et je veux de l'eau.  \nJe demande à mon ami, s'il vous plaît.  \nIl répond oui et me donne de l'eau.  \nJe dis merci et je bois le water.  \nDemain nous boirons water ensemble.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "French"
+              },
+              "output": "Bonjour, je suis Marie aujourd'hui.  \nJ'ai soif et je veux de l'eau.  \nJe demande à mon ami, s'il vous plaît.  \nIl répond oui et me donne de l'eau.  \nJe dis merci et je bois le water.  \nDemain nous boirons water ensemble.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "221 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='french'; accepted ['french', 'français', 'francais']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "story quality",
+              "ok": true,
+              "detail": "narration, 6 units"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N1",
+      "name": "A greeting needs no tool",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "hi",
+          "reply": "Hello! How can I help you today?",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "32 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "N2",
+      "name": "An unrelated question needs no tool",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "What's the weather like today?",
+          "reply": "I’m not able to provide real‑time weather updates. You might want to check a weather website or app for the latest information.",
+          "tool_calls": [],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "127 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "no tool expected; called: none"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "I1",
+      "name": "Story request without a language (record only)",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story",
+          "reply": "Anna: Hello, do you have water?\nTom: Yes, I have water today.\nAnna: Please, can I have water tomorrow?\nTom: No, I have water today.\nAnna: Thank you, friend. Goodbye.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello, do you have water?\nTom: Yes, I have water today.\nAnna: Please, can I have water tomorrow?\nTom: No, I have water today.\nAnna: Thank you, friend. Goodbye.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "Anna: Hello, do you have water?\nTom: Yes, I have water today.\nAnna: Please, can I have water tomorrow?\nTom: No, I have water today.\nAnna: Thank you, friend. Goodbye.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "165 chars",
+              "info": true
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "recorded: ['story_generator_tool', 'story_generator_tool']",
+              "info": true
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical",
+              "info": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "E1",
+      "name": "Empty vocabulary returns the guard message",
+      "repeat": 1,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "125 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "empty-vocabulary guard",
+              "ok": true,
+              "detail": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it —"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "E1",
+      "name": "Empty vocabulary returns the guard message",
+      "repeat": 2,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "125 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "empty-vocabulary guard",
+              "ok": true,
+              "detail": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it —"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "E1",
+      "name": "Empty vocabulary returns the guard message",
+      "repeat": 3,
+      "turns": [
+        {
+          "turn": 1,
+          "say": "Tell me a story in English",
+          "reply": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+          "tool_calls": [
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+              "error": null
+            },
+            {
+              "name": "story_generator_tool",
+              "args": {
+                "language": "English"
+              },
+              "output": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it — once you've added a few, ask me for a story.",
+              "error": null
+            }
+          ],
+          "checks": [
+            {
+              "check": "reply not empty",
+              "ok": true,
+              "detail": "125 chars"
+            },
+            {
+              "check": "tool called",
+              "ok": true,
+              "detail": "expected story; called: story_generator_tool, story_generator_tool (2 call(s))"
+            },
+            {
+              "check": "tool argument",
+              "ok": true,
+              "detail": "language='english'; accepted ['english']"
+            },
+            {
+              "check": "reply equals tool output",
+              "ok": true,
+              "detail": "identical"
+            },
+            {
+              "check": "empty-vocabulary guard",
+              "ok": true,
+              "detail": "You don't have any vocabulary yet! Tell me a word to add, and I'll remember it —"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

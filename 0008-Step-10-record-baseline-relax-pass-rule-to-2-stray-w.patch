@@ -1,0 +1,442 @@
+From 5ba78f8a9c59b74627c34df98451f42408c0dcb6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 3 Oct 2026 23:37:31 +0000
+Subject: [PATCH] Step 10: record baseline, relax pass rule to <=2 stray words,
+ add rescore and readability
+
+- Baseline: 7/20 pass under a zero-stray-words rule; all failures were
+  everyday words (eat, drink, bring...) and the 12-word vocabulary has
+  almost no verbs; structure had 0 failures/leaks/off-length/bad format
+- Relax the default pass rule to <=2 stray words (strict mode remains);
+  record the decision in the test plan
+- Add readability metrics (mean/longest words per sentence or line) and
+  an optional --max-unit-words limit
+- Add rescore_results and run_story_batch.py --rescore to re-score a saved
+  run without generating anything
+- Update test plan, README, CHANGELOG, DEVELOPER-DIARY, IMPLEMENTATION-GUIDE
+---
+ CHANGELOG.md                  | 20 ++++++++++++++
+ DEVELOPER-DIARY.md            |  7 +++++
+ README.md                     |  2 +-
+ docs/IMPLEMENTATION-GUIDE.md  |  7 +++--
+ docs/STEP-10-TEST-PLAN.md     | 22 +++++++++++++--
+ scripts/run_story_batch.py    | 37 +++++++++++++++++++++----
+ scripts/vocab_adherence.py    | 49 ++++++++++++++++++++++++++++-----
+ tests/test_vocab_adherence.py | 52 +++++++++++++++++++++++++++++++++++
+ 8 files changed, 177 insertions(+), 19 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 578ff2b..8e407fb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,26 @@
+ 
+ Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
++## Unreleased — Step 10: baseline measured, pass rule relaxed
++
++**Baseline (20 English stories, Groq `gpt-oss-120b`, strict rule of 0 stray words):** 7/20 passed
++(35%). All of the failures were vocabulary: 0 failures to generate, 0 leaked plans, 0 off-length
++and 0 bad-format stories. Mean 1.30 stray words per story. Most common strays: bring, drink,
++together, share, eat, sure, happily, offers, bake. Latency p50 / p90: 1.1s / 2.1s.
++
++**Decision (owner):** the strays are ordinary everyday words, and the starter vocabulary has almost
++no verbs, so a zero-stray rule was unrealistic. The pass rule is now **≤ 2 stray words per story**;
++the strict rule remains available. This is recorded in the test plan so the target is not moved
++silently.
++
++**Added (tests first, 45 → 58 checks in `tests/test_vocab_adherence.py`)**
++- Readability metrics: mean and longest words per sentence/line in every result and summary;
++  `max_unit_words` / `--max-unit-words` enforces a limit when wanted.
++- `rescore_results` and `run_story_batch.py --rescore FILE`: re-score a saved run under different
++  rules, with no generation, no Groq calls, no database.
++- `--max-oov` now defaults to 2 in the batch runner and the checker CLI (the `check_passage`
++  function itself still defaults to 0).
++
+ ## Unreleased — Step 10 in progress: measuring tools and test plan
+ 
+ **Added**
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index 8ce635a..1f24131 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -95,6 +95,13 @@ case-sensitive, so case/punctuation variants became separate rows. Fixed with no
+ (lowercase is right for an English vocabulary; revisit if vocabulary is ever stored in a language
+ where case carries meaning, such as German nouns).
+ 
++First baseline: structure was already perfect (no failures, leaks, off-length or bad-format
++stories) and the 35% pass rate was entirely my own zero-stray-words rule. The stray words were
++ordinary everyday words, and the 12-word vocabulary has almost no verbs, so the strict rule could
++hardly be met. Lesson: look at what the failing items actually are before tuning the prompt; here
++the right fix was the measuring stick, not the model. The owner relaxed the rule to at most 2
++stray words, and that decision is written into the test plan.
++
+ ## Current obstacle
+ 
+ **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace
+diff --git a/README.md b/README.md
+index 05e0d5e..8b018c5 100644
+--- a/README.md
++++ b/README.md
+@@ -101,7 +101,7 @@ tests/
+ 
+ scripts/smoke_test.py            # Environment health check (Postgres + Groq)
+ scripts/vocab_adherence.py       # Step 10: scores a story against the vocabulary (pure functions + CLI)
+-scripts/run_story_batch.py       # Step 10: generates N stories through the production path and scores them
++scripts/run_story_batch.py       # Step 10: generates N stories through the production path and scores them (--rescore re-scores a saved run)
+ sample_data/starter_vocabulary.csv
+ 
+ docs/
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+index 7d26516..b88de7b 100644
+--- a/docs/IMPLEMENTATION-GUIDE.md
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -224,8 +224,11 @@ constraint wording (Step 7) until behavior is reliable.
+   failures) with `tests/test_vocab_adherence.py`; `scripts/run_story_batch.py` (N stories through
+   the production path, cache off, scored, with latency); and Add Word normalization (case,
+   whitespace, edge punctuation) with `tests/test_add_word_normalization.py`.
+-- **Design decision:** the stored vocabulary stays English, so the vocabulary check applies to
+-  English stories only; other languages are checked for structure and read by a person.
++- **Design decisions:** the stored vocabulary stays English, so the vocabulary check applies to
++  English stories only; other languages are checked for structure and read by a person. After the
++  first baseline (35% pass under a zero-stray-words rule, with only everyday words such as
++  "eat" and "drink" as strays), the pass rule was relaxed to at most 2 stray words per story.
++  Baseline and the decision are in `docs/STEP-10-TEST-PLAN.md`.
+ - **To do:** run the batch and the Playground matrix, tune one thing at a time, fill in the
+   results and the tuning log, and write the trade-off verdict.
+ - **Satisfies:** Stories 5 and 6's acceptance criteria, holistically.
+diff --git a/docs/STEP-10-TEST-PLAN.md b/docs/STEP-10-TEST-PLAN.md
+index 2f64398..d415048 100644
+--- a/docs/STEP-10-TEST-PLAN.md
++++ b/docs/STEP-10-TEST-PLAN.md
+@@ -13,7 +13,7 @@ other languages are translations of it. The automatic vocabulary check therefore
+ |---|-----------|--------|
+ | 1 | Routing: correct tool **and** correct argument (R1–R12, 3 runs each, fresh sessions) | ≥ 90% of runs |
+ | 2 | Relay: chat reply is identical to the tool's Result when a tool was called | 100% |
+-| 3 | English stories: pass = 0 out-of-vocabulary words, 4–8 sentences/lines, correct dialogue format, no leaked plan (≥ 20 passages) | ≥ 80% |
++| 3 | English stories: pass = **≤ 2 stray words** (see decision below), 4–8 sentences/lines, correct dialogue format, no leaked plan (≥ 20 passages) | ≥ 80% |
+ | 4 | Stories that fail to generate (fallback message, empty) | ≤ 10% |
+ | 5 | Non-English stories (5 per language, read by a person): right language, well-formed, uses vocabulary meanings | ≥ 90% |
+ | 6 | Empty-vocabulary guard (R13) | 3 of 3 |
+@@ -21,6 +21,21 @@ other languages are translations of it. The automatic vocabulary check therefore
+ 
+ If a target is missed, tune one thing, re-run the same set, and record it in the tuning log.
+ 
++### Decision change after the first baseline (owner's call, recorded so the target isn't moved silently)
++
++The first criterion was "0 words outside the vocabulary". The baseline showed that was unrealistic:
++the starter vocabulary is 12 words with almost no verbs, so even natural beginner stories need
++"eat", "drink" or "bring". The stray words found were ordinary everyday words, and the owner
++decided they are acceptable as long as stories stay short and suit a beginner. Criterion 3 now
++tolerates up to **2 stray words per story** (`--max-oov 2`, the default of the batch runner and the
++CLI). The strict rule (`--max-oov 0`) is still available and is recorded for comparison.
++Readability (words per sentence/line) is reported for every run; to enforce a limit use
++`--max-unit-words N`. Rescore any saved run under a different rule, without calling Groq:
++
++```
++docker compose exec langflow python /app/scripts/run_story_batch.py --rescore /app/scripts/step10_results_<time>.json
++```
++
+ ## Track A — Story quality (the prompt, Agent bypassed)
+ 
+ Uses `scripts/run_story_batch.py` and `scripts/vocab_adherence.py`. Don't use the Playground while
+@@ -100,7 +115,7 @@ rewritten: if the table already holds an un-normalized word (for example "Hello"
+ | Measure | Value |
+ |---------|-------|
+ | API cost | $0 (Groq free tier) |
+-| Story latency p50 / p90 (batch runner) | |
++| Story latency p50 / p90 (batch runner) | 1.1s / 2.1s (baseline, 20 English stories) |
+ | Agent turn latency (Playground "Finished in") | |
+ | Fallback / failure rate under spaced load | |
+ | Fallback / failure rate under back-to-back load | |
+@@ -116,4 +131,5 @@ rewritten: if the table already holds an un-normalized word (for example "Hello"
+ 
+ | # | Change (one thing at a time) | Why | Before | After |
+ |---|------------------------------|-----|--------|-------|
+-| 0 | Baseline, no change | | | |
++| 0 | Baseline, no change (20 English stories, strict rule: 0 stray words) | | — | **7/20 pass (35%)**; 0 failures, 0 leaks, 0 off-length, 0 bad format; mean 1.30 stray words/story; top stray words: bring 5, drink 4, together 4, share 2, eat 2, sure 2, happily, offers, bake, shares |
++| 0b | Same baseline, re-scored with the relaxed rule (≤ 2 stray words) | The strict rule was unrealistic for a 12-word vocabulary; the stray words are everyday words | 35% | *run `--rescore` and record here* |
+diff --git a/scripts/run_story_batch.py b/scripts/run_story_batch.py
+index e62c283..3602dbb 100644
+--- a/scripts/run_story_batch.py
++++ b/scripts/run_story_batch.py
+@@ -16,6 +16,10 @@ Run from the project folder (Windows or Linux):
+     docker compose exec langflow python /app/scripts/run_story_batch.py --count 15
+     docker compose exec langflow python /app/scripts/run_story_batch.py --languages English,Spanish --count 8
+ 
++Re-score a saved run under different rules (instant, no Groq calls):
++
++    docker compose exec langflow python /app/scripts/run_story_batch.py --rescore /app/scripts/step10_results_<time>.json --max-oov 0
++
+ The vocabulary check only applies to English (the stored vocabulary is English); other
+ languages are checked for structure and latency only, and should also be read by a human.
+ Results are written to /app/scripts/step10_results_<timestamp>.json (visible in ./scripts).
+@@ -29,15 +33,16 @@ import time
+ sys.path.insert(0, "/app/custom_components")
+ sys.path.insert(0, "/app/scripts")
+ 
+-import story_tool  # noqa: E402
+-from vocab_adherence import check_passage, format_summary, summarize  # noqa: E402
++from vocab_adherence import check_passage, format_summary, rescore_results, summarize  # noqa: E402
+ 
+ 
+ def detect_style(prompt):
+     return "dialogue" if "short, simple dialogue" in prompt else "narration"
+ 
+ 
+-def run_language(language, count, delay, conn, words, max_oov, strict_verbs):
++def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max_unit_words=None):
++    import story_tool  # imported here so --rescore needs neither Langflow nor a database
++
+     results = []
+     for i in range(1, count + 1):
+         seen = {}
+@@ -55,7 +60,7 @@ def run_language(language, count, delay, conn, words, max_oov, strict_verbs):
+         )
+         result = check_passage(
+             text, words, check_vocab=(language.strip().lower() == "english"),
+-            max_oov=max_oov, strict_verbs=strict_verbs,
++            max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
+         )
+         result.update(language=language, latency=seen.get("latency"), style_requested=seen.get("style_requested"), text=text)
+         results.append(result)
+@@ -74,11 +79,30 @@ def main():
+     parser.add_argument("--languages", default="English", help="comma-separated, e.g. English,Spanish")
+     parser.add_argument("--count", type=int, default=15, help="stories per language")
+     parser.add_argument("--delay", type=float, default=20.0, help="seconds between calls (rate limit)")
+-    parser.add_argument("--max-oov", type=int, default=0, help="out-of-vocabulary words tolerated per story")
++    parser.add_argument("--max-oov", type=int, default=2,
++                        help="stray words tolerated per story (default 2: everyday words like 'eat' are fine; 0 = strict)")
+     parser.add_argument("--strict-verbs", action="store_true", help="only the prompt's six simple verbs are allowed")
++    parser.add_argument("--max-unit-words", type=int, default=None, help="fail any sentence/line longer than this")
++    parser.add_argument("--rescore", metavar="RESULTS_JSON",
++                        help="re-score a saved results file under the current rules; no generation, no Groq calls")
+     parser.add_argument("--out", default=None)
+     args = parser.parse_args()
+ 
++    if args.rescore:
++        with open(args.rescore, encoding="utf-8") as f:
++            data = json.load(f)
++        rescored = rescore_results(data, max_oov=args.max_oov, strict_verbs=args.strict_verbs,
++                                   max_unit_words=args.max_unit_words)
++        print(f"Re-scored {args.rescore} with max_oov={args.max_oov}, strict_verbs={args.strict_verbs}, "
++              f"max_unit_words={args.max_unit_words}\n")
++        for language, results in rescored.items():
++            print(f"=== {language} ===")
++            print(format_summary(summarize(results)))
++            print()
++        return 0
++
++    import story_tool
++
+     conn = story_tool.get_connection()
+     try:
+         words = story_tool.load_words(conn)
+@@ -91,7 +115,8 @@ def main():
+         try:
+             for language in [l.strip() for l in args.languages.split(",") if l.strip()]:
+                 all_results[language] = run_language(
+-                    language, args.count, args.delay, conn, words, args.max_oov, args.strict_verbs
++                    language, args.count, args.delay, conn, words, args.max_oov, args.strict_verbs,
++                    args.max_unit_words,
+                 )
+         except KeyboardInterrupt:
+             print("\nInterrupted: summarizing what was collected so far.")
+diff --git a/scripts/vocab_adherence.py b/scripts/vocab_adherence.py
+index e4498e3..c50f194 100644
+--- a/scripts/vocab_adherence.py
++++ b/scripts/vocab_adherence.py
+@@ -152,12 +152,18 @@ def _failure_result(reason):
+         "failure": True, "failure_reason": reason, "passed": False, "style": None, "units": 0,
+         "length_ok": False, "format_ok": False, "leaked_plan": False, "vocab_checked": False,
+         "oov_words": None, "oov_count": 0, "word_count": 0, "oov_rate": 0.0, "names": [],
++        "longest_unit_words": 0, "mean_unit_words": 0.0,
+     }
+ 
+ 
+ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 8),
+-                  strict_verbs=False, extra_allowed=(), names=()):
+-    """Score one passage. Returns a dict (see keys below); `passed` is the overall verdict."""
++                  strict_verbs=False, extra_allowed=(), names=(), max_unit_words=None):
++    """Score one passage. Returns a dict; `passed` is the overall verdict.
++
++    max_oov: words outside the vocabulary tolerated (0 = strict; the batch runner defaults to 2
++    so ordinary everyday words such as "eat" or "drink" don't fail a story).
++    max_unit_words: optional cap on the words in any one sentence/line (beginner readability);
++    the longest and mean lengths are always reported either way."""
+     text = _norm(text).strip()
+     if not text:
+         return _failure_result("empty")
+@@ -184,16 +190,20 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 8),
+ 
+     if style == "dialogue":
+         units = len(lines)
++        unit_texts = body_segments
+     else:
+-        sentences = [s for s in _SENTENCE_SPLIT.split(text) if re.search(r"[^\W\d_]", s)]
+-        units = len(sentences)
++        unit_texts = [s for s in _SENTENCE_SPLIT.split(text) if re.search(r"[^\W\d_]", s)]
++        units = len(unit_texts)
+     length_ok = length_range[0] <= units <= length_range[1]
++    unit_lengths = [len(_TOKEN.findall(u)) for u in unit_texts] or [0]
+ 
+     result = {
+         "failure": False, "failure_reason": None, "style": style, "units": units,
+         "length_ok": length_ok, "format_ok": format_ok, "leaked_plan": leaked,
+         "vocab_checked": bool(check_vocab), "oov_words": None, "oov_count": 0,
+         "word_count": 0, "oov_rate": 0.0, "names": [],
++        "longest_unit_words": max(unit_lengths),
++        "mean_unit_words": sum(unit_lengths) / len(unit_lengths),
+     }
+ 
+     if check_vocab:
+@@ -229,10 +239,29 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 8),
+         result["names"] = sorted(known_names)
+ 
+     vocab_ok = (not check_vocab) or result["oov_count"] <= max_oov
+-    result["passed"] = (not leaked) and length_ok and format_ok and vocab_ok
++    unit_ok = max_unit_words is None or result["longest_unit_words"] <= max_unit_words
++    result["passed"] = (not leaked) and length_ok and format_ok and vocab_ok and unit_ok
+     return result
+ 
+ 
++def rescore_results(data, max_oov=0, strict_verbs=False, max_unit_words=None):
++    """Re-score a saved batch (the JSON written by run_story_batch.py) under different rules,
++    without generating anything new. Returns {language: [result, ...]}."""
++    vocab = data.get("vocabulary", "")
++    rescored = {}
++    for language, items in data["results"].items():
++        rescored[language] = []
++        for item in items:
++            r = check_passage(
++                item.get("text", ""), vocab, check_vocab=(language.strip().lower() == "english"),
++                max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
++            )
++            r.update(language=language, latency=item.get("latency"),
++                     style_requested=item.get("style_requested"), text=item.get("text"))
++            rescored[language].append(r)
++    return rescored
++
++
+ def summarize(results):
+     """Aggregate a list of check_passage() results (optionally with a 'latency' key)."""
+     total = len(results)
+@@ -260,6 +289,8 @@ def summarize(results):
+         "format_bad": sum(1 for r in scored if not r["format_ok"]),
+         "latency_p50": percentile(0.5),
+         "latency_p90": percentile(0.9),
++        "mean_unit_words": (sum(r["mean_unit_words"] for r in scored) / len(scored)) if scored else None,
++        "longest_unit_words": max((r["longest_unit_words"] for r in scored), default=None),
+     }
+ 
+ 
+@@ -271,6 +302,8 @@ def format_summary(s):
+     if s["mean_oov_per_passage"] is not None:
+         lines.append(f"Mean out-of-vocabulary words per passage: {s['mean_oov_per_passage']:.2f}")
+         lines.append(f"Most common out-of-vocabulary words: {s['top_oov']}")
++    if s["mean_unit_words"] is not None:
++        lines.append(f"Words per sentence/line: mean {s['mean_unit_words']:.1f}, longest {s['longest_unit_words']}")
+     if s["latency_p50"] is not None:
+         lines.append(f"Latency p50 / p90: {s['latency_p50']:.1f}s / {s['latency_p90']:.1f}s")
+     return "\n".join(lines)
+@@ -281,8 +314,9 @@ def main(argv=None):
+     parser.add_argument("passages_file", help="text file; passages separated by a line with only ---")
+     parser.add_argument("--words", help="comma-separated vocabulary")
+     parser.add_argument("--words-file", help="file with one word (or phrase) per line")
+-    parser.add_argument("--max-oov", type=int, default=0)
++    parser.add_argument("--max-oov", type=int, default=2, help="stray words tolerated per passage (0 = strict)")
+     parser.add_argument("--strict-verbs", action="store_true")
++    parser.add_argument("--max-unit-words", type=int, default=None, help="fail sentences/lines longer than this")
+     args = parser.parse_args(argv)
+ 
+     vocab = args.words or ""
+@@ -297,7 +331,8 @@ def main(argv=None):
+ 
+     results = []
+     for i, passage in enumerate(passages, 1):
+-        r = check_passage(passage, vocab, max_oov=args.max_oov, strict_verbs=args.strict_verbs)
++        r = check_passage(passage, vocab, max_oov=args.max_oov, strict_verbs=args.strict_verbs,
++                          max_unit_words=args.max_unit_words)
+         results.append(r)
+         verdict = "PASS" if r["passed"] else "FAIL"
+         extras = []
+diff --git a/tests/test_vocab_adherence.py b/tests/test_vocab_adherence.py
+index ee24836..27d4c6d 100644
+--- a/tests/test_vocab_adherence.py
++++ b/tests/test_vocab_adherence.py
+@@ -23,6 +23,7 @@ sys.path.insert(0, "/app/scripts")
+ from vocab_adherence import (  # noqa: E402
+     check_passage,
+     parse_vocabulary,
++    rescore_results,
+     summarize,
+     word_forms,
+ )
+@@ -202,6 +203,54 @@ def test_summarize():
+     check("style counts are reported", s["styles"].get("dialogue") == 1 and s["styles"].get("narration", 0) >= 1)
+ 
+ 
++# --- beginner readability: how long are the sentences / lines? --------------------------------
++
++
++def test_unit_word_metrics():
++    r = check_passage(GOOD_DIALOGUE, VOCAB)
++    check("dialogue: longest line is 5 words (speaker labels not counted)", r["longest_unit_words"] == 5)
++    check("dialogue: mean line length is 4.6 words", abs(r["mean_unit_words"] - 4.6) < 1e-9)
++    r = check_passage(GOOD_NARRATION, VOCAB)
++    check("narration: longest sentence is 7 words", r["longest_unit_words"] == 7)
++    check("narration: mean sentence length is 5.5 words", abs(r["mean_unit_words"] - 5.5) < 1e-9)
++
++
++def test_max_unit_words_is_optional_and_enforced():
++    long_one = (
++        "Hello, I am Sam today and I want water and food at my house with my friend. "
++        "I see my friend. I say please. My friend says yes. I say thank you."
++    )
++    check("long sentences do not fail by default", check_passage(long_one, VOCAB)["passed"])
++    check("max_unit_words fails a passage with a too-long sentence", not check_passage(long_one, VOCAB, max_unit_words=10)["passed"])
++    check("max_unit_words passes a passage within the limit", check_passage(GOOD_NARRATION, VOCAB, max_unit_words=10)["passed"])
++
++
++# --- re-scoring a saved batch under a different rule (no new generation) ----------------------
++
++
++def test_rescore_results():
++    stray = "Hello, I see bread today. I want water. Yes. No. Thank you."
++    data = {
++        "vocabulary": "hello, goodbye, please, thank you, yes, no, water, food, friend, house, today, tomorrow",
++        "results": {
++            "English": [
++                {"text": GOOD_NARRATION, "latency": 1.5, "style_requested": "narration"},
++                {"text": stray, "latency": 2.5, "style_requested": "narration"},
++                {"text": "I'm having trouble generating a story right now — please try again in a moment.", "latency": 9.0},
++            ],
++            "Spanish": [{"text": "Hola. Quiero agua. Veo a mi amigo. Digo gracias. Adios.", "latency": 1.0}],
++        },
++    }
++    strict = rescore_results(data, max_oov=0)
++    relaxed = rescore_results(data, max_oov=2)
++    check("strict: the stray-word story fails", [r["passed"] for r in strict["English"]] == [True, False, False])
++    check("relaxed (max_oov=2): the stray-word story passes", [r["passed"] for r in relaxed["English"]] == [True, True, False])
++    check("latency and text are carried over", relaxed["English"][1]["latency"] == 2.5 and relaxed["English"][1]["text"] == stray)
++    check("a saved fallback message is still a failure", relaxed["English"][2]["failure"])
++    check("non-English results skip the vocabulary check", relaxed["Spanish"][0]["oov_words"] is None)
++    check("summarize works on rescored results", summarize(relaxed["English"])["passes"] == 2)
++
++
+ def main():
+     print("Running vocabulary adherence checker tests...\n")
+     test_parse_vocabulary()
+@@ -222,6 +271,9 @@ def main():
+     test_strict_verbs()
+     test_passed_flag()
+     test_summarize()
++    test_unit_word_metrics()
++    test_max_unit_words_is_optional_and_enforced()
++    test_rescore_results()
+ 
+     print()
+     if failures:
+-- 
+2.43.0
+

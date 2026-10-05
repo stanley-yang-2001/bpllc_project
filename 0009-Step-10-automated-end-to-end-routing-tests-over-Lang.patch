@@ -1,0 +1,1251 @@
+From e4450136a68555666f859d148311facb4e67eb79 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 4 Oct 2026 04:26:49 +0000
+Subject: [PATCH] Step 10: automated end-to-end routing tests over Langflow's
+ HTTP API
+
+- Add scripts/routing_checks.py (+ tests): parse a /api/v1/run response and
+  check each turn: right tool and argument, reply identical to the tool
+  output, add-word wording, story quality, empty-vocabulary guard
+- Add scripts/run_routing_tests.py: 12 cases (add word, duplicates, four
+  languages, language switching in one session, small talk, empty
+  vocabulary), fresh session per test, report + JSON; snapshots and
+  restores the vocabulary in a finally block, removes its throwaway word
+- Add tests/test_routing_runner_with_fake_langflow.py: runs the runner
+  against a fake Langflow server (healthy flow passes; Step 9 bugs caught;
+  database restored; leftover snapshot protection)
+- Update test plan (automated track), README, CHANGELOG, DEVELOPER-DIARY,
+  IMPLEMENTATION-GUIDE
+---
+ CHANGELOG.md                                  |  24 ++
+ DEVELOPER-DIARY.md                            |   7 +
+ README.md                                     |   8 +-
+ docs/IMPLEMENTATION-GUIDE.md                  |   5 +
+ docs/STEP-10-TEST-PLAN.md                     |  38 ++-
+ scripts/routing_checks.py                     | 254 ++++++++++++++
+ scripts/run_routing_tests.py                  | 317 ++++++++++++++++++
+ tests/test_routing_checks.py                  | 240 +++++++++++++
+ .../test_routing_runner_with_fake_langflow.py | 232 +++++++++++++
+ 9 files changed, 1123 insertions(+), 2 deletions(-)
+ create mode 100644 scripts/routing_checks.py
+ create mode 100644 scripts/run_routing_tests.py
+ create mode 100644 tests/test_routing_checks.py
+ create mode 100644 tests/test_routing_runner_with_fake_langflow.py
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 8e407fb..8730688 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,30 @@
+ 
+ Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
++## Unreleased — Step 10: automated routing tests
++
++**Added (tests first)**
++- `scripts/routing_checks.py` + `tests/test_routing_checks.py` (32 checks): parses a Langflow
++  `/api/v1/run` response (final reply, tool calls in any nesting) and checks each turn: right tool
++  (or none), right argument (case-insensitive, accepted alternatives such as "español"), reply
++  identical to the tool output, add-word reply wording, English story quality (vocabulary, length,
++  format) or structure only for other languages, and the empty-vocabulary guard.
++- `scripts/run_routing_tests.py`: runs 12 cases (add word, duplicate and case variant, English /
++  Spanish / French / Japanese stories, English→Spanish→English→French in one session, small talk,
++  an unrelated question, a story request without a language, the empty-vocabulary guard) through the
++  flow's HTTP API, with one fresh session per test, a report, and a JSON file of every reply.
++  It logs in with the superuser from `docker-compose.yml` and creates an API key (or takes
++  `--api-key`). It adds and removes a throwaway word and snapshots, empties and restores the
++  vocabulary in a `finally` block; a leftover snapshot stops the next run until
++  `--restore-leftover`. `--only`, `--repeat N`, `--delay`, `--list`, `--debug`.
++- `tests/test_routing_runner_with_fake_langflow.py` (15 checks): runs the runner against a fake
++  Langflow server on localhost. A healthy flow passes (exit 0); the Step 9 bugs (previous language
++  reused, reply differing from the tool output) are caught (exit 1); the database is restored even
++  after failing tests; a leftover snapshot is refused and can be restored.
++
++**Not verified against the real Langflow:** the response shape and the authentication calls were
++written from Langflow's documented API and a fake server. Run `--only N1,S1 --debug` first.
++
+ ## Unreleased — Step 10: baseline measured, pass rule relaxed
+ 
+ **Baseline (20 English stories, Groq `gpt-oss-120b`, strict rule of 0 stray words):** 7/20 passed
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index 1f24131..d420e99 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -102,6 +102,13 @@ hardly be met. Lesson: look at what the failing items actually are before tuning
+ the right fix was the measuring stick, not the model. The owner relaxed the rule to at most 2
+ stray words, and that decision is written into the test plan.
+ 
++Automated the Playground routing matrix: a runner drives the flow through Langflow's HTTP API and
++a pure checker scores each turn against the failures seen in Step 9 (wrong language reused, no tool
++call, reply differing from the tool output). The runner is tested against a fake Langflow server,
++so its mechanics (login, sessions, snapshot/restore) are proven, but whether the real response
++carries the tool calls where the parser looks is only known after a live `--debug` run; if it
++doesn't, the runner falls back to Langflow's stored messages for the session.
++
+ ## Current obstacle
+ 
+ **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace
+diff --git a/README.md b/README.md
+index 8b018c5..3d098c8 100644
+--- a/README.md
++++ b/README.md
+@@ -97,10 +97,14 @@ tests/
+ ├── test_final_passage_extractor.py
+ ├── test_tool_result_relay.py
+ ├── test_vocab_adherence.py
+-└── test_add_word_normalization.py
++├── test_add_word_normalization.py
++├── test_routing_checks.py
++└── test_routing_runner_with_fake_langflow.py
+ 
+ scripts/smoke_test.py            # Environment health check (Postgres + Groq)
+ scripts/vocab_adherence.py       # Step 10: scores a story against the vocabulary (pure functions + CLI)
++scripts/run_routing_tests.py      # Step 10: automated end-to-end routing tests over Langflow's HTTP API
++scripts/routing_checks.py        # Step 10: the pure checking logic behind run_routing_tests.py
+ scripts/run_story_batch.py       # Step 10: generates N stories through the production path and scores them (--rescore re-scores a saved run)
+ sample_data/starter_vocabulary.csv
+ 
+@@ -136,6 +140,8 @@ docker compose exec langflow python /app/tests/test_empty_response_handling.py
+ docker compose exec langflow python /app/tests/test_tool_result_relay.py
+ docker compose exec langflow python /app/tests/test_vocab_adherence.py
+ docker compose exec langflow python /app/tests/test_add_word_normalization.py
++docker compose exec langflow python /app/tests/test_routing_checks.py
++docker compose exec langflow python /app/tests/test_routing_runner_with_fake_langflow.py
+ docker compose exec langflow python /app/tests/test_final_passage_extractor.py
+ docker compose exec langflow python /app/tests/test_story_guard.py
+ docker compose exec langflow python /app/tests/test_story_prompt_builder.py
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+index b88de7b..3adf699 100644
+--- a/docs/IMPLEMENTATION-GUIDE.md
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -224,6 +224,11 @@ constraint wording (Step 7) until behavior is reliable.
+   failures) with `tests/test_vocab_adherence.py`; `scripts/run_story_batch.py` (N stories through
+   the production path, cache off, scored, with latency); and Add Word normalization (case,
+   whitespace, edge punctuation) with `tests/test_add_word_normalization.py`.
++- **Automated routing tests:** `scripts/run_routing_tests.py` drives the flow through Langflow's
++  HTTP API (one fresh session per test) and checks tool, argument, relay equality, story quality
++  and the empty-vocabulary guard, replacing most of the manual Playground matrix; its logic is in
++  `scripts/routing_checks.py`. Tested here against a fake Langflow server; the real response
++  shape is confirmed on the first live run (`--debug`).
+ - **Design decisions:** the stored vocabulary stays English, so the vocabulary check applies to
+   English stories only; other languages are checked for structure and read by a person. After the
+   first baseline (35% pass under a zero-stray-words rule, with only everyday words such as
+diff --git a/docs/STEP-10-TEST-PLAN.md b/docs/STEP-10-TEST-PLAN.md
+index d415048..0f1e9c6 100644
+--- a/docs/STEP-10-TEST-PLAN.md
++++ b/docs/STEP-10-TEST-PLAN.md
+@@ -63,7 +63,43 @@ Ideas to test, one at a time (hypotheses, not facts):
+    word against the list before the delimiter.
+ 4. `reasoning_effort` (`low` now) and `max_tokens` (1500): check whether stories get truncated.
+ 
+-## Track B — Routing and behavior (Playground, through the Agent)
++## Track B — Routing and behavior (through the Agent)
++
++### Automated (preferred): `scripts/run_routing_tests.py`
++
++Sends the messages to the flow over Langflow's HTTP API, one fresh session per test, and checks
++every response: right tool, right argument (the language in the **latest** message), reply identical
++to the tool output, story quality, and the empty-vocabulary guard. The flow id is the long id in
++the browser URL (`localhost:7860/flow/<flow-id>`).
++
++```
++# first time: confirm the response is parsed correctly (prints the raw response)
++docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id <flow-id> --only N1,S1 --debug
++
++# the full suite (about 4 minutes)
++docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id <flow-id>
++
++# three runs of every case, for an actual pass rate (about 12 minutes)
++docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id <flow-id> --repeat 3
++```
++
++| Automated case | Replaces manual row | What it checks |
++|---|---|---|
++| A1, A2, A3 | R1, R2, R3 | add a word; the same word again; a case variant (needs normalization) |
++| S1 | — | English story: tool, argument, relay, vocabulary/format rules |
++| S2, S3, S4 | R6, R7, R8 | Spanish / French / Japanese (asked by its own name) stories |
++| M1 | R10 | English → Spanish → English → French in one session |
++| N1, N2 | R11, R12 | greeting and unrelated question: no tool |
++| I1 | R9 | "Tell me a story" with no language (recorded, never fails) |
++| E1 | R13 | empty vocabulary returns the guard message, not an invented story |
++
++It temporarily changes the database and puts it back: a throwaway word (`autotestapple`) is added
++and removed, and for E1 the `words` table is snapshotted, emptied and restored in a `finally`
++block. If a run is killed hard, `--restore-leftover` restores it. Don't use the Playground while it
++runs (shared Groq rate limit). Not automated: R4, R5, R14, R15 (optional manual checks) and the
++quality of non-English stories, which a person must read.
++
++### Manual (optional): Playground
+ 
+ Fresh session for each run (**+** next to Sessions), wait about 60 seconds between runs, and
+ for every run expand the tool row and compare its Arguments and Result with the chat reply.
+diff --git a/scripts/routing_checks.py b/scripts/routing_checks.py
+new file mode 100644
+index 0000000..38418de
+--- /dev/null
++++ b/scripts/routing_checks.py
+@@ -0,0 +1,254 @@
++"""
++Routing checks — the pure logic behind the automated end-to-end tests (Step 10).
++
++run_routing_tests.py sends chat messages to the Langflow flow over its HTTP API and hands each
++JSON response to evaluate_turn(). Everything here is pure (no network, no database) so it can
++be unit-tested: tests/test_routing_checks.py.
++
++What gets checked, per turn (these are the failures actually seen during Step 9):
++  * the right tool was called (or none, for small talk),
++  * with the right argument (the language named in the LATEST message, the word to add),
++  * the chat reply is identical to the tool's output (the Tool Result Relay's job),
++  * story quality (English: vocabulary / length / format; other languages: structure only),
++  * the empty-vocabulary guard returns its message instead of an invented story.
++"""
++
++import json
++import re
++import sys
++
++sys.path.insert(0, "/app/custom_components")
++sys.path.insert(0, "/app/scripts")
++
++from tool_result_relay import output_to_text  # noqa: E402
++from vocab_adherence import check_passage  # noqa: E402
++
++GUARD_MARKER = "don't have any vocabulary yet"
++
++# ---------------------------------------------------------------------------------------------
++# Test cases. "say" is the chat message. "tool": "story" | "add_word" | None (no tool) |
++# "either" (record only). "arg" compares a tool argument to an accepted list (case-insensitive).
++# All story requests name a different language from the previous one where possible, because
++# the story tool caches per language for ~20 s.
++# ---------------------------------------------------------------------------------------------
++
++TEST_WORD = "autotestapple"  # removed from the vocabulary again after the run
++
++
++def _story(say, languages, kind):
++    return {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "story": kind}
++
++
++CASES = [
++    {"id": "A1", "name": "Add a new word", "turns": [
++        {"say": f"Add the word {TEST_WORD}", "tool": "add_word",
++         "arg": {"key": "word", "any_of": [TEST_WORD]}, "reply_any": ["added"]}]},
++    {"id": "A2", "name": "Adding the same word again is a duplicate", "turns": [
++        {"say": f"Add the word {TEST_WORD}", "tool": "add_word",
++         "arg": {"key": "word", "any_of": [TEST_WORD]}, "reply_any": ["already"]}]},
++    {"id": "A3", "name": "A case variant is a duplicate", "turns": [
++        {"say": "Add the word AutoTestApple", "tool": "add_word",
++         "arg": {"key": "word", "any_of": [TEST_WORD]}, "reply_any": ["already"]}]},
++    {"id": "S1", "name": "English story", "turns": [
++        _story("Tell me a story in English", ["english"], "english")]},
++    {"id": "S2", "name": "Spanish story", "turns": [
++        _story("Tell me a story in Spanish", ["spanish", "español", "espanol"], "other")]},
++    {"id": "S3", "name": "French story", "turns": [
++        _story("Write a short story in French", ["french", "français", "francais"], "other")]},
++    {"id": "S4", "name": "Story requested in the target language's own name", "turns": [
++        _story("Story in 日本語", ["japanese", "日本語"], "other")]},
++    {"id": "M1", "name": "Language switching in one session (English, Spanish, English, French)", "turns": [
++        _story("Create a story in English", ["english"], "english"),
++        _story("Create a story in Spanish", ["spanish", "español", "espanol"], "other"),
++        _story("Create a story in English", ["english"], "english"),
++        _story("Create a story in French", ["french", "français", "francais"], "other")]},
++    {"id": "N1", "name": "A greeting needs no tool", "turns": [{"say": "hi", "tool": None}]},
++    {"id": "N2", "name": "An unrelated question needs no tool", "turns": [
++        {"say": "What's the weather like today?", "tool": None}]},
++    {"id": "I1", "name": "Story request without a language (record only)", "turns": [
++        {"say": "Tell me a story", "tool": "either", "info": True}]},
++    {"id": "E1", "name": "Empty vocabulary returns the guard message", "needs_empty_vocab": True, "turns": [
++        {"say": "Tell me a story in English", "tool": "story", "expect_guard": True,
++         "arg": {"key": "language", "any_of": ["english"]}}]},
++]
++
++
++# --- parsing the Langflow /api/v1/run response -----------------------------------------------
++
++
++def _get(obj, *path):
++    for key in path:
++        if isinstance(obj, dict) and key in obj:
++            obj = obj[key]
++        elif isinstance(obj, list) and isinstance(key, int) and -len(obj) <= key < len(obj):
++            obj = obj[key]
++        else:
++            return None
++    return obj
++
++
++def _primary_message(resp):
++    for path in (("outputs", 0, "outputs", 0, "results", "message"),
++                 ("outputs", 0, "outputs", 0, "results", "message", "data")):
++        msg = _get(resp, *path)
++        if isinstance(msg, dict):
++            return msg
++    return None
++
++
++def final_text(resp):
++    """The text the learner sees in the chat, wherever this Langflow version puts it."""
++    if not isinstance(resp, dict):
++        return ""
++    for path in (
++        ("outputs", 0, "outputs", 0, "results", "message", "text"),
++        ("outputs", 0, "outputs", 0, "results", "message", "data", "text"),
++        ("outputs", 0, "outputs", 0, "outputs", "message", "message"),
++        ("outputs", 0, "outputs", 0, "messages", -1, "message"),
++    ):
++        value = _get(resp, *path)
++        if isinstance(value, str) and value:
++            return value
++    return ""
++
++
++def _walk_tool_dicts(obj, found):
++    if isinstance(obj, dict):
++        if obj.get("type") == "tool_use":
++            found.append(obj)
++            return
++        for value in obj.values():
++            _walk_tool_dicts(value, found)
++    elif isinstance(obj, list):
++        for value in obj:
++            _walk_tool_dicts(value, found)
++
++
++def find_tool_calls(resp):
++    """All tool calls in the response: [{name, args, output (text), error}, ...] in order."""
++    raw = []
++    primary = _primary_message(resp)
++    if primary is not None:
++        _walk_tool_dicts(primary, raw)
++    if not raw:  # shape not recognised: search everything and drop exact duplicates
++        _walk_tool_dicts(resp, raw)
++        seen, unique = set(), []
++        for item in raw:
++            key = json.dumps(item, sort_keys=True, default=str)
++            if key not in seen:
++                seen.add(key)
++                unique.append(item)
++        raw = unique
++    return [
++        {
++            "name": str(item.get("name") or ""),
++            "args": item.get("tool_input") if isinstance(item.get("tool_input"), dict) else {},
++            "output": output_to_text(item.get("output")),
++            "error": item.get("error"),
++        }
++        for item in raw
++    ]
++
++
++def with_tool_blocks(resp, blocks):
++    """Copy of `resp` whose primary message carries `blocks` as its content_blocks. Used when the
++    run response itself doesn't include the tool calls but Langflow's stored messages do."""
++    import copy
++
++    out = copy.deepcopy(resp) if isinstance(resp, dict) else {}
++    node = out
++    for key in ("outputs", 0, "outputs", 0, "results", "message"):
++        if isinstance(key, int):
++            if not isinstance(node, list) or not node:
++                return out
++            node = node[key]
++        else:
++            node = node.setdefault(key, {} if key != "outputs" else [])
++    if isinstance(node, dict):
++        node["content_blocks"] = list(blocks)
++    return out
++
++
++# --- evaluating a turn -------------------------------------------------------------------------
++
++
++def _norm(value):
++    return re.sub(r"[\s\"'“”‘’.,!?;:()]+", " ", str(value or "")).strip().lower()
++
++
++def _tool_matches(name, kind):
++    n = name.lower()
++    if kind == "story":
++        return "story" in n
++    if kind == "add_word":
++        return "add" in n and "word" in n
++    return False
++
++
++def _c(check, ok, detail="", info=False):
++    out = {"check": check, "ok": bool(ok), "detail": detail}
++    if info:
++        out["info"] = True
++    return out
++
++
++def evaluate_turn(spec, resp, vocab, error=None, max_oov=2):
++    """Return a list of {check, ok, detail} for one chat turn. Never raises."""
++    if error or resp is None:
++        return [_c("request", False, error or "no response")]
++
++    info = bool(spec.get("info"))
++    text = final_text(resp)
++    calls = find_tool_calls(resp)
++    good_calls = [c for c in calls if not c["error"] and c["output"].strip()]
++    last = good_calls[-1] if good_calls else (calls[-1] if calls else None)
++    expected = spec.get("tool")
++    checks = [_c("reply not empty", text.strip(), f"{len(text)} chars", info)]
++
++    # which tool(s) were called
++    names = [c["name"] for c in calls]
++    if expected == "either":
++        checks.append(_c("tool called", True, f"recorded: {names or 'no tool'}", info=True))
++    elif expected is None:
++        checks.append(_c("tool called", not calls, "no tool expected; called: " + (", ".join(names) or "none"), info))
++    else:
++        called = any(_tool_matches(n, expected) for n in names)
++        extra = f" ({len(calls)} call(s))" if len(calls) > 1 else ""
++        checks.append(_c("tool called", called, f"expected {expected}; called: {', '.join(names) or 'none'}{extra}", info))
++
++    # argument
++    arg = spec.get("arg")
++    if arg and expected not in (None, "either"):
++        match = [c for c in calls if _tool_matches(c["name"], expected)]
++        actual = _norm(match[-1]["args"].get(arg["key"])) if match else ""
++        accepted = [_norm(a) for a in arg["any_of"]]
++        checks.append(_c("tool argument", actual in accepted, f"{arg['key']}={actual!r}; accepted {accepted}", info))
++
++    # relay: the learner must see exactly what the tool returned
++    if good_calls:
++        checks.append(_c("reply equals tool output", text == last["output"],
++                         "identical" if text == last["output"] else f"reply {text[:60]!r} != tool {last['output'][:60]!r}", info))
++
++    # reply wording (add-word confirmations)
++    if spec.get("reply_any"):
++        hit = any(w.lower() in text.lower() for w in spec["reply_any"])
++        checks.append(_c("reply wording", hit, f"expected one of {spec['reply_any']}; got {text[:70]!r}", info))
++
++    # empty-vocabulary guard
++    if spec.get("expect_guard"):
++        is_guard = GUARD_MARKER in text.lower().replace("\u2019", "'")
++        checks.append(_c("empty-vocabulary guard", is_guard, text[:80] if text else "no reply", info))
++
++    # story quality
++    kind = spec.get("story")
++    if kind and not spec.get("expect_guard"):
++        result = check_passage(text, vocab, check_vocab=(kind == "english"), max_oov=max_oov)
++        if result["failure"]:
++            detail = f"no story: {result['failure_reason']}"
++        else:
++            detail = (f"{result['style']}, {result['units']} units"
++                      + (f", stray words {result['oov_words']}" if result["oov_words"] else "")
++                      + (", leaked plan" if result["leaked_plan"] else ""))
++        checks.append(_c("story quality", result["passed"], detail, info))
++
++    return checks
+diff --git a/scripts/run_routing_tests.py b/scripts/run_routing_tests.py
+new file mode 100644
+index 0000000..0bf5220
+--- /dev/null
++++ b/scripts/run_routing_tests.py
+@@ -0,0 +1,317 @@
++"""
++Automated end-to-end routing tests (Step 10) — the Playground matrix, without the clicking.
++
++Sends chat messages to your Langflow flow through its HTTP API, one fresh session per test
++(a multi-turn session for the language-switching case), and checks each response with
++routing_checks.py: right tool, right argument, reply identical to the tool output, story quality,
++and the empty-vocabulary guard. It writes a readable report and a JSON file with every reply.
++
++It changes your database only briefly and puts everything back:
++  * Add Word tests use a throwaway word ("autotestapple") that is deleted afterwards,
++  * the empty-vocabulary test snapshots the `words` table, empties it, and restores it in a
++    `finally` block (also on Ctrl+C). If the process is killed hard, run with --restore-leftover.
++
++Usage (flow id = the long id in the browser URL: localhost:7860/flow/<flow-id>):
++
++    docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id <flow-id>
++
++First time, check that the response is parsed correctly:
++
++    docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id <flow-id> --only N1,S1 --debug
++
++Useful options: --only A1,S2   --list   --repeat 3   --delay 20   --skip-empty-vocab
++Authentication: --api-key / $LANGFLOW_API_KEY, otherwise it logs in with $LANGFLOW_SUPERUSER /
++$LANGFLOW_SUPERUSER_PASSWORD (set in docker-compose.yml) and creates an API key named
++"step10-routing-tests" (delete old ones under Settings -> Langflow API Keys if they pile up).
++"""
++
++import argparse
++import json
++import os
++import sys
++import time
++import urllib.error
++import urllib.parse
++import urllib.request
++
++sys.path.insert(0, "/app/custom_components")
++sys.path.insert(0, "/app/scripts")
++
++from routing_checks import (  # noqa: E402
++    CASES,
++    TEST_WORD,
++    evaluate_turn,
++    final_text,
++    find_tool_calls,
++    with_tool_blocks,
++    _walk_tool_dicts,
++)
++
++
++# --- HTTP helpers ------------------------------------------------------------------------------
++
++
++class ApiError(Exception):
++    pass
++
++
++def _request(method, url, payload=None, headers=None, form=None, timeout=120):
++    data, hdrs = None, dict(headers or {})
++    if form is not None:
++        data = urllib.parse.urlencode(form).encode("utf-8")
++        hdrs["Content-Type"] = "application/x-www-form-urlencoded"
++    elif payload is not None:
++        data = json.dumps(payload).encode("utf-8")
++        hdrs["Content-Type"] = "application/json"
++    req = urllib.request.Request(url, data=data, headers=hdrs, method=method)
++    try:
++        with urllib.request.urlopen(req, timeout=timeout) as resp:
++            body = resp.read().decode("utf-8")
++            return json.loads(body) if body else {}
++    except urllib.error.HTTPError as e:
++        raise ApiError(f"HTTP {e.code} from {method} {url}: {e.read().decode('utf-8', 'replace')[:300]}")
++    except urllib.error.URLError as e:
++        raise ApiError(f"cannot reach {url}: {e.reason}")
++
++
++def get_api_key(base_url, explicit=None):
++    key = explicit or os.environ.get("LANGFLOW_API_KEY")
++    if key:
++        return key
++    token = None
++    try:
++        token = _request("GET", f"{base_url}/api/v1/auto_login").get("access_token")
++    except ApiError:
++        pass
++    if not token:
++        user = os.environ.get("LANGFLOW_SUPERUSER", "admin")
++        password = os.environ.get("LANGFLOW_SUPERUSER_PASSWORD", "admin123")
++        try:
++            token = _request("POST", f"{base_url}/api/v1/login", form={"username": user, "password": password})["access_token"]
++        except (ApiError, KeyError) as e:
++            raise ApiError(f"could not log in as {user!r} ({e}). Pass --api-key or set LANGFLOW_API_KEY "
++                           "(create one under Settings -> Langflow API Keys).")
++    created = _request("POST", f"{base_url}/api/v1/api_key/", payload={"name": "step10-routing-tests"},
++                       headers={"Authorization": f"Bearer {token}"})
++    if "api_key" not in created:
++        raise ApiError(f"unexpected response creating an API key: {str(created)[:200]}")
++    return created["api_key"]
++
++
++def run_flow(base_url, flow_id, api_key, message, session_id):
++    return _request(
++        "POST", f"{base_url}/api/v1/run/{flow_id}?stream=false",
++        payload={"input_value": message, "input_type": "chat", "output_type": "chat", "session_id": session_id},
++        headers={"x-api-key": api_key},
++    )
++
++
++def stored_tool_blocks(base_url, api_key, session_id):
++    """Best effort: tool calls from Langflow's stored messages for the session (the fallback when
++    the run response doesn't carry them). Returns [] on any problem."""
++    try:
++        msgs = _request("GET", f"{base_url}/api/v1/monitor/messages?session_id={urllib.parse.quote(session_id)}",
++                        headers={"x-api-key": api_key})
++    except ApiError:
++        return []
++    if not isinstance(msgs, list):
++        return []
++    machine = [m for m in msgs if str(m.get("sender", "")).lower() in ("machine", "ai")]
++    blocks = []
++    if machine:
++        _walk_tool_dicts(machine[-1], blocks)
++    return blocks
++
++
++# --- database (kept small so it can be faked in tests) -------------------------------------------
++
++
++class VocabDb:
++    def __init__(self):
++        import story_tool
++
++        self._st = story_tool
++
++    def _run(self, *statements, fetch=None):
++        conn = self._st.get_connection()
++        try:
++            with conn.cursor() as cur:
++                result = None
++                for sql, params in statements:
++                    cur.execute(sql, params)
++                if fetch:
++                    result = cur.fetchone()
++            conn.commit()
++            return result
++        finally:
++            conn.close()
++
++    def words(self):
++        conn = self._st.get_connection()
++        try:
++            return self._st.load_words(conn)
++        finally:
++            conn.close()
++
++    def snapshot_exists(self):
++        row = self._run(("SELECT to_regclass('words_snapshot') IS NOT NULL", None), fetch=True)
++        return bool(row and row[0])
++
++    def snapshot_and_empty(self):
++        self._run(("CREATE TABLE words_snapshot AS SELECT * FROM words", None), ("DELETE FROM words", None))
++
++    def restore(self):
++        self._run(("DELETE FROM words", None), ("INSERT INTO words SELECT * FROM words_snapshot", None),
++                  ("DROP TABLE words_snapshot", None))
++
++    def remove_test_word(self):
++        self._run(("DELETE FROM words WHERE word = %s", (TEST_WORD,)))
++
++
++# --- running ----------------------------------------------------------------------------------
++
++
++def run_case(case, args, api_key, vocab, repeat_index, debug_state):
++    session_id = f"autotest-{case['id']}-{repeat_index}-{int(time.time())}"
++    turn_results = []
++    for turn_no, spec in enumerate(case["turns"], 1):
++        error, resp = None, None
++        try:
++            resp = run_flow(args.base_url, args.flow_id, api_key, spec["say"], session_id)
++            if spec.get("tool") not in (None, "either") and not find_tool_calls(resp):
++                blocks = stored_tool_blocks(args.base_url, api_key, session_id)
++                if blocks:
++                    resp = with_tool_blocks(resp, blocks)
++        except ApiError as e:
++            error = str(e)
++
++        if args.debug and not debug_state["shown"] and resp is not None:
++            debug_state["shown"] = True
++            print("\n--- DEBUG: first raw response (truncated) ---")
++            print(json.dumps(resp, ensure_ascii=False, indent=2)[:3500])
++            print("--- DEBUG: parsed -> reply:", repr(final_text(resp))[:200])
++            print("--- DEBUG: parsed -> tool calls:", json.dumps(find_tool_calls(resp), ensure_ascii=False)[:600], "---\n")
++
++        checks = evaluate_turn(spec, resp, vocab, error=error, max_oov=args.max_oov)
++        turn_results.append({"turn": turn_no, "say": spec["say"], "reply": final_text(resp) if resp else "",
++                             "tool_calls": find_tool_calls(resp) if resp else [], "checks": checks})
++        report_turn(case, turn_no, len(case["turns"]), spec, checks)
++        story_turn = spec.get("tool") in ("story", "either")
++        time.sleep(args.delay if story_turn else min(2.0, args.delay))
++    return turn_results
++
++
++def report_turn(case, turn_no, n_turns, spec, checks):
++    label = f"{case['id']}" + (f".{turn_no}" if n_turns > 1 else "")
++    failed = [c for c in checks if not c["ok"] and not c.get("info")]
++    status = "FAIL" if failed else "PASS"
++    print(f"[{status}] {label:5} {case['name'] if n_turns == 1 else spec['say']}")
++    for c in checks:
++        if not c["ok"] or c.get("info"):
++            mark = "info" if c.get("info") else "  x "
++            print(f"         {mark} {c['check']}: {c['detail']}")
++
++
++def selected_cases(only):
++    if not only:
++        return list(CASES)
++    wanted = {x.strip().upper() for x in only.split(",") if x.strip()}
++    chosen = [c for c in CASES if c["id"].upper() in wanted]
++    unknown = wanted - {c["id"].upper() for c in CASES}
++    if unknown:
++        raise SystemExit(f"unknown case id(s): {sorted(unknown)}; use --list")
++    return chosen
++
++
++def main(argv=None, db_factory=VocabDb):
++    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    parser.add_argument("--flow-id")
++    parser.add_argument("--base-url", default="http://localhost:7860")
++    parser.add_argument("--api-key")
++    parser.add_argument("--only", help="comma-separated case ids, e.g. A1,S2")
++    parser.add_argument("--repeat", type=int, default=1, help="repeat every case N times (fresh sessions)")
++    parser.add_argument("--delay", type=float, default=15.0, help="seconds to wait after a story request (rate limit + cache)")
++    parser.add_argument("--max-oov", type=int, default=2)
++    parser.add_argument("--skip-empty-vocab", action="store_true")
++    parser.add_argument("--restore-leftover", action="store_true", help="restore words from a leftover snapshot and exit")
++    parser.add_argument("--debug", action="store_true", help="print the first raw response and how it was parsed")
++    parser.add_argument("--list", action="store_true")
++    parser.add_argument("--out", default=None)
++    args = parser.parse_args(argv)
++
++    if args.list:
++        for c in CASES:
++            print(f"{c['id']:4} {c['name']}  ({len(c['turns'])} turn{'s' if len(c['turns']) > 1 else ''})")
++        return 0
++    if not args.flow_id and not args.restore_leftover:
++        parser.error("--flow-id is required (the id in the browser URL: localhost:7860/flow/<flow-id>)")
++
++    db = db_factory()
++    if args.restore_leftover:
++        if db.snapshot_exists():
++            db.restore()
++            print("Restored the words table from words_snapshot.")
++        else:
++            print("No leftover snapshot; nothing to restore.")
++        return 0
++    if db.snapshot_exists():
++        print("A leftover `words_snapshot` table exists (a previous run was interrupted while the vocabulary was empty).\n"
++              "Run again with --restore-leftover first, so no words are lost.")
++        return 2
++
++    vocab = db.words()
++    if not vocab.strip():
++        print("The vocabulary is empty; seed it first (Upload Word File).")
++        return 2
++
++    try:
++        api_key = get_api_key(args.base_url, args.api_key)
++    except ApiError as e:
++        print(f"Authentication problem: {e}")
++        return 2
++
++    cases = selected_cases(args.only)
++    normal = [c for c in cases if not c.get("needs_empty_vocab")]
++    empty = [] if args.skip_empty_vocab else [c for c in cases if c.get("needs_empty_vocab")]
++    results, debug_state = [], {"shown": False}
++    print(f"Flow {args.flow_id} at {args.base_url}; vocabulary has {len(vocab.split(','))} entries.\n")
++
++    try:
++        db.remove_test_word()  # a clean start in case a previous run was interrupted
++        for repeat in range(1, args.repeat + 1):
++            for case in normal:
++                results.append({"case": case["id"], "name": case["name"], "repeat": repeat,
++                                "turns": run_case(case, args, api_key, vocab, repeat, debug_state)})
++    except KeyboardInterrupt:
++        print("\nInterrupted; cleaning up.")
++    finally:
++        db.remove_test_word()
++
++    if empty:
++        try:
++            db.snapshot_and_empty()
++            for case in empty:
++                for repeat in range(1, args.repeat + 1):
++                    results.append({"case": case["id"], "name": case["name"], "repeat": repeat,
++                                    "turns": run_case(case, args, api_key, "", repeat, debug_state)})
++        except KeyboardInterrupt:
++            print("\nInterrupted; restoring the vocabulary.")
++        finally:
++            if db.snapshot_exists():
++                db.restore()
++                print("(vocabulary restored)")
++
++    total_turns = sum(len(r["turns"]) for r in results)
++    failed_turns = sum(1 for r in results for t in r["turns"] if any(not c["ok"] and not c.get("info") for c in t["checks"]))
++    failed_cases = sorted({r["case"] for r in results for t in r["turns"] if any(not c["ok"] and not c.get("info") for c in t["checks"])})
++    print(f"\nTurns: {total_turns - failed_turns}/{total_turns} passed" + (f"   Failing cases: {', '.join(failed_cases)}" if failed_cases else ""))
++
++    out = args.out or f"/app/scripts/routing_results_{time.strftime('%Y%m%d_%H%M%S')}.json"
++    with open(out, "w", encoding="utf-8") as f:
++        json.dump({"flow_id": args.flow_id, "results": results}, f, ensure_ascii=False, indent=2)
++    print(f"Saved: {out}")
++    return 1 if failed_turns else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/test_routing_checks.py b/tests/test_routing_checks.py
+new file mode 100644
+index 0000000..545feb6
+--- /dev/null
++++ b/tests/test_routing_checks.py
+@@ -0,0 +1,240 @@
++"""
++Tests for scripts/routing_checks.py — the pure logic behind the automated routing tests
++(scripts/run_routing_tests.py), which replace most of the manual Playground matrix.
++
++The checks encode the failures actually seen in Step 9:
++  * the Agent passing the WRONG language (copying the previous turn's),
++  * the Agent refusing / answering without calling the tool,
++  * the reply differing from the tool's Result (the relay problem),
++  * a story that breaks the vocabulary / format rules,
++  * an invented story instead of the empty-vocabulary message.
++
++Written BEFORE the module. The synthetic responses below mimic Langflow's /api/v1/run output
++(a chat message whose content_blocks hold the tool calls); the REAL response shape is confirmed
++on the first live run (run_routing_tests.py --debug).
++
++Run from inside the langflow container:
++    docker compose exec langflow python /app/tests/test_routing_checks.py
++"""
++
++import sys
++
++sys.path.insert(0, "/app/custom_components")
++sys.path.insert(0, "/app/scripts")
++
++from routing_checks import (  # noqa: E402
++    CASES,
++    evaluate_turn,
++    final_text,
++    find_tool_calls,
++    with_tool_blocks,
++)
++
++PASS = "PASS"
++FAIL = "FAIL"
++failures = []
++
++VOCAB = "hello, goodbye, please, thank you, yes, no, water, food, friend, house, today, tomorrow"
++
++ENGLISH_STORY = (
++    "Hello, I am Sam today.\nI want water.\nI see my friend near the house.\n"
++    "I say please, can you give water?\nMy friend says yes and gives water.\nI say thank you."
++)
++SPANISH_STORY = (
++    "Hola, soy Ana y digo hola.\nHoy tengo sed y quiero agua.\nLe pregunto a mi amigo si me da agua.\n"
++    "Mi amigo dice si y me da agua.\nGracias, bebo y digo nos vemos manana."
++)
++
++
++def check(label, condition):
++    if condition:
++        print(f"[{PASS}] {label}")
++    else:
++        print(f"[{FAIL}] {label}")
++        failures.append(label)
++
++
++def tool_block(name, args, output, error=None):
++    return {"type": "tool_use", "name": name, "tool_input": args, "output": output, "error": error}
++
++
++def response(final, *tool_blocks, nested=False):
++    """A /api/v1/run style response. `nested` wraps tool calls in a ContentBlock-like dict."""
++    if nested and tool_blocks:
++        blocks = [{"title": "Agent Steps", "contents": list(tool_blocks)}]
++    else:
++        blocks = list(tool_blocks)
++    blocks.append({"type": "text", "text": final})
++    return {
++        "session_id": "s1",
++        "outputs": [{"outputs": [{"results": {"message": {"text": final, "content_blocks": blocks}}}]}],
++    }
++
++
++def results_by_name(checks):
++    return {c["check"]: c for c in checks}
++
++
++# --- parsing ---------------------------------------------------------------------------------
++
++
++def test_final_text_shapes():
++    check("final text from results.message.text", final_text(response("Hello there")) == "Hello there")
++    r = {"outputs": [{"outputs": [{"results": {"message": {"data": {"text": "From data"}}}}]}]}
++    check("final text from results.message.data.text", final_text(r) == "From data")
++    r = {"outputs": [{"outputs": [{"outputs": {"message": {"message": "From outputs"}}}]}]}
++    check("final text from outputs.message.message", final_text(r) == "From outputs")
++    check("garbage input gives an empty string", final_text({}) == "" and final_text(None) == "")
++
++
++def test_find_tool_calls():
++    calls = find_tool_calls(response("x", tool_block("story_generator_tool", {"language": "Spanish"}, SPANISH_STORY)))
++    check("a flat tool call is found with its name, args and output",
++          len(calls) == 1 and calls[0]["name"] == "story_generator_tool"
++          and calls[0]["args"] == {"language": "Spanish"} and calls[0]["output"] == SPANISH_STORY)
++    calls = find_tool_calls(response("x", tool_block("add_word", {"word": "bread"}, "Added", ), nested=True))
++    check("a tool call wrapped in a ContentBlock is found too", len(calls) == 1 and calls[0]["name"] == "add_word")
++    check("no tool call -> empty list", find_tool_calls(response("hi")) == [])
++    calls = find_tool_calls(response("x", tool_block("t", {}, {"text": "wrapped"})))
++    check("a structured output is unwrapped to text", calls[0]["output"] == "wrapped")
++
++
++def test_with_tool_blocks():
++    bare = response("Hola")
++    bare["outputs"][0]["outputs"][0]["results"]["message"]["content_blocks"] = []
++    fixed = with_tool_blocks(bare, [tool_block("story_generator_tool", {"language": "Spanish"}, "story")])
++    check("tool blocks can be injected into a response that lacked them", len(find_tool_calls(fixed)) == 1)
++    check("the original response is not modified", find_tool_calls(bare) == [])
++
++
++# --- evaluating one turn ---------------------------------------------------------------------
++
++
++STORY_SPEC = {"say": "Tell me a story in Spanish", "tool": "story",
++              "arg": {"key": "language", "any_of": ["spanish", "español"]}, "story": "other"}
++
++
++def test_a_good_story_turn_passes_every_check():
++    resp = response(SPANISH_STORY, tool_block("story_generator_tool", {"language": "Spanish"}, SPANISH_STORY))
++    checks = evaluate_turn(STORY_SPEC, resp, VOCAB)
++    check("every check passes for a correct story turn", all(c["ok"] for c in checks))
++
++
++def test_wrong_language_argument_is_caught():
++    resp = response(ENGLISH_STORY, tool_block("story_generator_tool", {"language": "English"}, ENGLISH_STORY))
++    c = results_by_name(evaluate_turn(STORY_SPEC, resp, VOCAB))
++    check("the Step 9 bug (previous language reused) fails the argument check", not c["tool argument"]["ok"])
++
++
++def test_no_tool_call_is_caught():
++    resp = response("I can only generate stories in languages other than English.")
++    c = results_by_name(evaluate_turn(STORY_SPEC, resp, VOCAB))
++    check("answering without calling the story tool fails", not c["tool called"]["ok"])
++
++
++def test_reply_that_differs_from_the_tool_output_is_caught():
++    resp = response("Hola, soy Ana ... (Note: short)", tool_block("story_generator_tool", {"language": "Spanish"}, SPANISH_STORY))
++    c = results_by_name(evaluate_turn(STORY_SPEC, resp, VOCAB))
++    check("the relay check fails when the reply is not the tool's output", not c["reply equals tool output"]["ok"])
++
++
++def test_english_story_quality_uses_the_vocabulary_rules():
++    spec = {"say": "Tell me a story in English", "tool": "story",
++            "arg": {"key": "language", "any_of": ["english"]}, "story": "english"}
++    good = response(ENGLISH_STORY, tool_block("story_generator_tool", {"language": "English"}, ENGLISH_STORY))
++    check("a clean English story passes the quality check", results_by_name(evaluate_turn(spec, good, VOCAB))["story quality"]["ok"])
++    bad_text = "Hello, I bake bread and share cake with neighbors at the market. I eat. I drink. Yes. No."
++    bad = response(bad_text, tool_block("story_generator_tool", {"language": "English"}, bad_text))
++    check("an English story full of stray words fails the quality check", not results_by_name(evaluate_turn(spec, bad, VOCAB))["story quality"]["ok"])
++
++
++def test_no_tool_expected():
++    spec = {"say": "hi", "tool": None}
++    check("a greeting answered without a tool passes",
++          all(c["ok"] for c in evaluate_turn(spec, response("Hi! Ask me for a story or add a word."), VOCAB)))
++    resp = response("Hello", tool_block("story_generator_tool", {"language": "English"}, "story text"))
++    check("calling a tool for a greeting fails", not results_by_name(evaluate_turn(spec, resp, VOCAB))["tool called"]["ok"])
++    check("an empty reply fails", not results_by_name(evaluate_turn(spec, response(""), VOCAB))["reply not empty"]["ok"])
++
++
++def test_add_word_turns():
++    spec = {"say": "Add the word autotestapple", "tool": "add_word",
++            "arg": {"key": "word", "any_of": ["autotestapple"]}, "reply_any": ["added"]}
++    ok = response("Added 'autotestapple' to your vocabulary.",
++                  tool_block("add_word", {"word": "autotestapple"}, "Added 'autotestapple' to your vocabulary."))
++    check("a correct add-word turn passes", all(c["ok"] for c in evaluate_turn(spec, ok, VOCAB)))
++    upper = response("'autotestapple' is already in your vocabulary.",
++                     tool_block("add_word", {"word": "AutoTestApple"}, "'autotestapple' is already in your vocabulary."))
++    spec2 = dict(spec, reply_any=["already"])
++    check("argument comparison ignores case", all(c["ok"] for c in evaluate_turn(spec2, upper, VOCAB)))
++    wrong = response("Added 'banana'.", tool_block("add_word", {"word": "banana"}, "Added 'banana'."))
++    check("the wrong word argument fails", not results_by_name(evaluate_turn(spec, wrong, VOCAB))["tool argument"]["ok"])
++    check("a reply missing the expected wording fails",
++          not results_by_name(evaluate_turn(dict(spec, reply_any=["already"]), ok, VOCAB))["reply wording"]["ok"])
++
++
++def test_empty_vocabulary_guard():
++    spec = {"say": "Tell me a story in English", "tool": "story", "expect_guard": True,
++            "arg": {"key": "language", "any_of": ["english"]}}
++    msg = "You don't have any vocabulary yet! Add some words first."
++    good = response(msg, tool_block("story_generator_tool", {"language": "English"}, msg))
++    check("the empty-vocabulary message passes the guard check", results_by_name(evaluate_turn(spec, good, ""))["empty-vocabulary guard"]["ok"])
++    invented = response(ENGLISH_STORY, tool_block("story_generator_tool", {"language": "English"}, msg))
++    check("an invented story instead of the message fails the guard check",
++          not results_by_name(evaluate_turn(spec, invented, ""))["empty-vocabulary guard"]["ok"])
++
++
++def test_info_cases_never_fail():
++    spec = {"say": "Tell me a story", "tool": "either", "info": True}
++    checks = evaluate_turn(spec, response("Which language would you like?"), VOCAB)
++    check("informational turns are marked and never counted as failures", all(c["ok"] or c.get("info") for c in checks))
++
++
++def test_request_error():
++    checks = evaluate_turn({"say": "hi", "tool": None}, None, VOCAB, error="HTTP 500")
++    check("a failed request is reported as a failed check, not an exception",
++          len(checks) == 1 and not checks[0]["ok"] and "HTTP 500" in checks[0]["detail"])
++
++
++# --- the case catalogue ----------------------------------------------------------------------
++
++
++def test_case_catalogue():
++    ids = [c["id"] for c in CASES]
++    check("case ids are unique", len(ids) == len(set(ids)))
++    check("every case has an id, a name and at least one turn with something to say",
++          all(c["id"] and c["name"] and c["turns"] and all(t["say"] for t in c["turns"]) for c in CASES))
++    check("the language-switching sequence is covered (4 turns, one session)",
++          any(len(c["turns"]) == 4 for c in CASES))
++    check("an empty-vocabulary case is flagged so the runner can set it up",
++          any(c.get("needs_empty_vocab") for c in CASES))
++    check("story, add-word and no-tool expectations are all represented",
++          {t.get("tool") for c in CASES for t in c["turns"]} >= {"story", "add_word", None})
++
++
++def main():
++    print("Running routing check tests...\n")
++    test_final_text_shapes()
++    test_find_tool_calls()
++    test_with_tool_blocks()
++    test_a_good_story_turn_passes_every_check()
++    test_wrong_language_argument_is_caught()
++    test_no_tool_call_is_caught()
++    test_reply_that_differs_from_the_tool_output_is_caught()
++    test_english_story_quality_uses_the_vocabulary_rules()
++    test_no_tool_expected()
++    test_add_word_turns()
++    test_empty_vocabulary_guard()
++    test_info_cases_never_fail()
++    test_request_error()
++    test_case_catalogue()
++    print()
++    if failures:
++        print(f"{len(failures)} test(s) failed: {failures}")
++        sys.exit(1)
++    print("All tests passed.")
++    sys.exit(0)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/test_routing_runner_with_fake_langflow.py b/tests/test_routing_runner_with_fake_langflow.py
+new file mode 100644
+index 0000000..c423879
+--- /dev/null
++++ b/tests/test_routing_runner_with_fake_langflow.py
+@@ -0,0 +1,232 @@
++"""
++Integration test for scripts/run_routing_tests.py against a FAKE Langflow server.
++
++Why: the runner's HTTP handling, authentication fallbacks, session handling, database set-up and
++clean-up can be tested without the real Langflow. This does NOT prove the real Langflow's response
++shape matches (that is confirmed on the first live run with --debug); it proves the runner:
++  * logs in and creates an API key when auto-login isn't available,
++  * reports a healthy flow as all-passing (exit code 0),
++  * catches the Step 9 bugs when the fake flow misbehaves (wrong language reused, a reply that
++    differs from the tool output) with a non-zero exit code,
++  * adds and removes its test word, empties and restores the vocabulary (even after a failure),
++  * refuses to run over a leftover snapshot, and can restore it.
++
++Everything stays on localhost; no Groq, no database.
++
++Run from inside the langflow container:
++    docker compose exec langflow python /app/tests/test_routing_runner_with_fake_langflow.py
++"""
++
++import io
++import json
++import re
++import sys
++import threading
++from contextlib import redirect_stdout
++from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
++
++sys.path.insert(0, "/app/custom_components")
++sys.path.insert(0, "/app/scripts")
++
++import run_routing_tests  # noqa: E402
++from routing_checks import TEST_WORD  # noqa: E402
++
++PASS = "PASS"
++FAIL = "FAIL"
++failures = []
++
++STORIES = {
++    "english": "Hello, I am Sam today.\nI want water.\nI see my friend near the house.\n"
++               "I say please, can you give water?\nMy friend says yes and gives water.\nI say thank you.",
++    "spanish": "Hola, soy Ana y digo hola.\nHoy tengo sed y quiero agua.\nLe pregunto a mi amigo si me da agua.\n"
++               "Mi amigo dice si y me da agua.\nGracias, bebo y digo nos vemos manana.",
++    "french": "Bonjour, je suis Marie et je dis bonjour.\nAujourd'hui j'ai soif et je veux de l'eau.\n"
++              "Je demande de l'eau a mon ami.\nMon ami dit oui et me donne de l'eau.\nMerci, je dis a demain.",
++    "japanese": "こんにちは、私はサムです。\n今日は水がほしいです。\n友達に会います。\n友達は水をくれます。\nありがとう、さようなら。",
++}
++GUARD = "You don't have any vocabulary yet! Add some words first."
++STATE = {"words": set(), "bug": None, "last_language": {}, "key_created": False}
++
++
++class FakeDb:
++    snapshot = None
++
++    def words(self):
++        return ", ".join(sorted(STATE["words"]))
++
++    def snapshot_exists(self):
++        return FakeDb.snapshot is not None
++
++    def snapshot_and_empty(self):
++        FakeDb.snapshot = set(STATE["words"])
++        STATE["words"].clear()
++
++    def restore(self):
++        STATE["words"] = set(FakeDb.snapshot)
++        FakeDb.snapshot = None
++
++    def remove_test_word(self):
++        STATE["words"].discard(TEST_WORD)
++
++
++def tool(name, args, output):
++    return {"type": "tool_use", "name": name, "tool_input": args, "output": output, "error": None}
++
++
++def build_response(text, blocks):
++    return {"outputs": [{"outputs": [{"results": {"message": {"text": text, "content_blocks": blocks + [{"type": "text", "text": text}]}}}]}]}
++
++
++def reply_for(message, session):
++    low = message.lower()
++    m = re.match(r"add the word (\S+)", low)
++    if m:
++        word = m.group(1)
++        out = f"'{word}' is already in your vocabulary." if word in STATE["words"] else f"Added '{word}' to your vocabulary."
++        STATE["words"].add(word)
++        return build_response(out, [tool("add_word", {"word": m.group(1)}, out)])
++    if "story" in low and ("in " in low):
++        lang = "japanese" if "日本語" in message else re.search(r"in (\w+)", low).group(1)
++        arg = lang.capitalize() if lang != "japanese" else "Japanese"
++        shown_arg = arg
++        if STATE["bug"] == "reuse_language" and STATE["last_language"].get(session):
++            shown_arg = STATE["last_language"][session]  # the Step 9 bug: previous language reused
++        STATE["last_language"][session] = arg
++        out = GUARD if not STATE["words"] else STORIES.get(shown_arg.lower(), STORIES["english"])
++        text = out
++        if STATE["bug"] == "rewrite_reply":
++            text = out.splitlines()[0] + " ... (Note: intentionally short)"
++        return build_response(text, [tool("story_generator_tool", {"language": shown_arg}, out)])
++    if "story" in low:
++        return build_response("Which language would you like?", [])
++    return build_response("Hi! Ask me for a story or add a word.", [])
++
++
++class Handler(BaseHTTPRequestHandler):
++    def log_message(self, *a):
++        pass
++
++    def _send(self, code, obj):
++        body = json.dumps(obj).encode("utf-8")
++        self.send_response(code)
++        self.send_header("Content-Type", "application/json")
++        self.send_header("Content-Length", str(len(body)))
++        self.end_headers()
++        self.wfile.write(body)
++
++    def do_GET(self):
++        if self.path.startswith("/api/v1/auto_login"):
++            self._send(404, {"detail": "auto login disabled"})
++        else:
++            self._send(404, {})
++
++    def do_POST(self):
++        length = int(self.headers.get("Content-Length", 0))
++        raw = self.rfile.read(length).decode("utf-8")
++        if self.path == "/api/v1/login":
++            ok = "username=admin" in raw and "password=admin123" in raw
++            return self._send(200, {"access_token": "jwt-test"}) if ok else self._send(401, {"detail": "bad login"})
++        if self.path == "/api/v1/api_key/":
++            if self.headers.get("Authorization") != "Bearer jwt-test":
++                return self._send(401, {})
++            STATE["key_created"] = True
++            return self._send(200, {"api_key": "sk-test"})
++        if self.path.startswith("/api/v1/run/"):
++            if self.headers.get("x-api-key") != "sk-test":
++                return self._send(403, {"detail": "invalid key"})
++            body = json.loads(raw)
++            return self._send(200, reply_for(body["input_value"], body["session_id"]))
++        self._send(404, {})
++
++
++def check(label, condition):
++    if condition:
++        print(f"[{PASS}] {label}")
++    else:
++        print(f"[{FAIL}] {label}")
++        failures.append(label)
++
++
++def run(argv):
++    buf = io.StringIO()
++    with redirect_stdout(buf):
++        code = run_routing_tests.main(argv, db_factory=FakeDb)
++    return code, buf.getvalue()
++
++
++def reset(bug=None):
++    STATE.update(words={"hello", "goodbye", "please", "thank you", "yes", "no", "water", "food", "friend", "house", "today", "tomorrow"},
++                 bug=bug, last_language={}, key_created=False)
++    FakeDb.snapshot = None
++
++
++def main():
++    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
++    threading.Thread(target=server.serve_forever, daemon=True).start()
++    base = f"http://127.0.0.1:{server.server_address[1]}"
++    common = ["--flow-id", "fake-flow", "--base-url", base, "--delay", "0", "--out", "/tmp/routing_test_out.json"]
++    original_words = None
++    try:
++        print("Running runner-vs-fake-Langflow tests...\n")
++
++        # healthy flow ------------------------------------------------------------------------
++        reset()
++        original_words = set(STATE["words"])
++        code, out = run(common)
++        check("a healthy flow passes every turn (exit code 0)", code == 0)
++        check("the runner logged in and created an API key (auto-login was unavailable)", STATE["key_created"])
++        check("the report lists all the cases' turns as PASS", "[FAIL]" not in out and out.count("[PASS]") >= 12)
++        check("the throwaway word is removed afterwards", TEST_WORD not in STATE["words"])
++        check("the vocabulary is restored after the empty-vocabulary test", STATE["words"] == original_words and FakeDb.snapshot is None)
++        saved = json.load(open("/tmp/routing_test_out.json"))
++        check("a JSON report is written with every reply", len(saved["results"]) >= 10 and saved["results"][0]["turns"][0]["reply"])
++
++        # the Step 9 bug: previous language reused ---------------------------------------------
++        reset("reuse_language")
++        code, out = run(common + ["--only", "M1"])
++        check("a reused language argument is caught (non-zero exit)", code == 1)
++        check("the report names the failing check", "tool argument" in out and "[FAIL]" in out)
++
++        # reply differs from tool output --------------------------------------------------------
++        reset("rewrite_reply")
++        code, out = run(common + ["--only", "S2"])
++        check("a reply that differs from the tool output is caught", code == 1 and "reply equals tool output" in out)
++
++        # cleanup survives failures ------------------------------------------------------------
++        reset("rewrite_reply")
++        original_words = set(STATE["words"])
++        code, out = run(common)
++        check("the database is still restored after failing tests", STATE["words"] == original_words and FakeDb.snapshot is None)
++
++        # leftover snapshot protection -----------------------------------------------------------
++        reset()
++        FakeDb.snapshot = {"water", "friend"}
++        STATE["words"] = set()
++        code, out = run(common)
++        check("a leftover snapshot stops the run (exit code 2) instead of risking data", code == 2 and "--restore-leftover" in out)
++        code, out = run(["--restore-leftover"])
++        check("--restore-leftover puts the words back", STATE["words"] == {"water", "friend"} and FakeDb.snapshot is None)
++
++        # misc options ---------------------------------------------------------------------------
++        reset()
++        code, out = run(["--list"])
++        check("--list prints the cases", code == 0 and "M1" in out and "E1" in out)
++        reset()
++        code, out = run(common + ["--only", "N1,S1", "--skip-empty-vocab"])
++        check("--only runs just the chosen cases", code == 0 and "N1" in out and "A1" not in out)
++        reset()
++        code, out = run(common + ["--api-key", "wrong", "--only", "N1"])
++        check("a rejected API key is reported as a failed request, not a crash", code == 1 and "request" in out)
++    finally:
++        server.shutdown()
++
++    print()
++    if failures:
++        print(f"{len(failures)} test(s) failed: {failures}")
++        sys.exit(1)
++    print("All tests passed.")
++    sys.exit(0)
++
++
++if __name__ == "__main__":
++    main()
+-- 
+2.43.0
+

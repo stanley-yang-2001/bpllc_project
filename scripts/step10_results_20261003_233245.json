@@ -1,0 +1,496 @@
+{
+  "vocabulary": "hello, goodbye, please, thank you, yes, no, water, food, friend, house, today, tomorrow, book, biscuit, bread, sunny",
+  "max_oov": 0,
+  "strict_verbs": false,
+  "results": {
+    "English": [
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 29,
+        "oov_rate": 0.0,
+        "names": [
+          "sam"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 2.091078758239746,
+        "style_requested": "narration",
+        "text": "Hello I am Sam today.  \nI want water now please.  \nMy friend is here today.  \nI want water please now.  \nFriend have water yes now.  \nThank you friend goodbye today."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "drink",
+          "together",
+          "happily"
+        ],
+        "oov_count": 3,
+        "word_count": 29,
+        "oov_rate": 0.10344827586206896,
+        "names": [
+          "sam"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.1085948944091797,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam today. I need water today please. My friend says yes please. I say thank you now. We drink water together happily. Goodbye and see you tomorrow."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 5,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "share",
+          "together"
+        ],
+        "oov_count": 2,
+        "word_count": 32,
+        "oov_rate": 0.0625,
+        "names": [
+          "maya"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 0.5801126956939697,
+        "style_requested": "narration",
+        "text": "Hello, I am Maya. I want a biscuit today. I ask my friend, \"Please, can I have a biscuit?\" My friend says yes. I say thank you. Tomorrow we will share bread together."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "offers",
+          "bake"
+        ],
+        "oov_count": 2,
+        "word_count": 27,
+        "oov_rate": 0.07407407407407407,
+        "names": [
+          "sam"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 0.9538512229919434,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam.  \nI want a biscuit today.  \nMy friend says no but offers water.  \nI say thank you for water.  \nTomorrow I will bake bread.  \nGoodbye."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "bring"
+        ],
+        "oov_count": 2,
+        "word_count": 27,
+        "oov_rate": 0.07407407407407407,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.6291043758392334,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, Ben, friend.\nBen: Hello, Anna, friend.\nAnna: Do you have water, please?\nBen: Yes, I have water today.\nAnna: Thank you! Can you bring water tomorrow?\nBen: Yes, I will bring water tomorrow."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 5,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "bring"
+        ],
+        "oov_count": 1,
+        "word_count": 24,
+        "oov_rate": 0.041666666666666664,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.0272223949432373,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?  \nBen: Yes, I have water today.  \nAnna: Please, can I have some?  \nBen: I will bring water tomorrow.  \nAnna: Thank you, friend. Goodbye."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "eat",
+          "share"
+        ],
+        "oov_count": 2,
+        "word_count": 31,
+        "oov_rate": 0.06451612903225806,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.543548345565796,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?  \nBen: Yes, I have water today.  \nAnna: Please give me some water.  \nBen: Here you are, thank you.  \nAnna: Thanks, friend. Tomorrow we eat biscuit.  \nBen: Yes, tomorrow we share biscuit."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 28,
+        "oov_rate": 0.0,
+        "names": [
+          "tom"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 1.386462688446045,
+        "style_requested": "narration",
+        "text": "Hello, I am Tom.  \nI want water today.  \nI see my friend.  \nI say please give water.  \nMy friend says yes and gives water.  \nThank you, I have water."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 32,
+        "oov_rate": 0.0,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 2.3881964683532715,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?  \nBen: Yes, I have water.  \nAnna: Please, can I have water today?  \nBen: No, today I need water.  \nAnna: Thank you, can I have water tomorrow?  \nBen: Yes, I have water tomorrow."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "shares",
+          "drink",
+          "bring"
+        ],
+        "oov_count": 3,
+        "word_count": 42,
+        "oov_rate": 0.07142857142857142,
+        "names": [
+          "sam"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.8530821800231934,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam and I want water. Today I see my friend near the house. I ask please for some water now. My friend says yes and shares water. We drink and say thank you. Tomorrow I will bring bread for friend."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "drink"
+        ],
+        "oov_count": 1,
+        "word_count": 32,
+        "oov_rate": 0.03125,
+        "names": [
+          "sam"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 0.9923582077026367,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam.  \nToday I want water.  \nI see my friend near the house.  \nI ask, please give me water.  \nMy friend says yes and gives water.  \nThank you, I drink water."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 24,
+        "oov_rate": 0.0,
+        "names": [
+          "ana",
+          "tom"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 1.0161454677581787,
+        "style_requested": "dialogue",
+        "text": "Tom: Hello, friend!\nAna: Do you have water?\nTom: Yes, I have water.\nAna: Please give me water today.\nTom: Here is water, thank you.\nAna: Thank you, friend. Goodbye!"
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "sure",
+          "bring"
+        ],
+        "oov_count": 2,
+        "word_count": 25,
+        "oov_rate": 0.08,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.061345100402832,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?\nBen: Yes, I have water today.\nAnna: Please, can I have some?\nBen: Sure, I will bring water tomorrow.\nAnna: Thank you, friend.\nBen: Goodbye."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "eat",
+          "together"
+        ],
+        "oov_count": 2,
+        "word_count": 32,
+        "oov_rate": 0.0625,
+        "names": [
+          "sam"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.2025954723358154,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam today.  \nI have water in my house.  \nMy friend asks for a biscuit.  \nI say please give water.  \nMy friend says thank you.  \nTomorrow we will eat bread together."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "sure",
+          "drink",
+          "together"
+        ],
+        "oov_count": 3,
+        "word_count": 31,
+        "oov_rate": 0.0967741935483871,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.1585564613342285,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, Ben, do you have water?\nBen: Yes, I have water today.\nAnna: Please, can I have some water?\nBen: Sure, you can have water now.\nAnna: Thank you, friend.\nBen: Tomorrow we will drink water together."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 29,
+        "oov_rate": 0.0,
+        "names": [
+          "sam"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 0.9012050628662109,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam today.  \nI want water.  \nI ask my friend, please give water.  \nMy friend says yes and gives water.  \nI say thank you.  \nGoodbye, see you tomorrow."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "okay"
+        ],
+        "oov_count": 1,
+        "word_count": 28,
+        "oov_rate": 0.03571428571428571,
+        "names": [
+          "anna",
+          "tom"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.038405179977417,
+        "style_requested": "dialogue",
+        "text": "Tom: Hello, Anna, do you have water?  \nAnna: Yes, I have water today.  \nTom: Please give me water now.  \nAnna: No, I need water tomorrow.  \nTom: Okay, I will come tomorrow.  \nAnna: Thank you, goodbye."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "bring"
+        ],
+        "oov_count": 2,
+        "word_count": 26,
+        "oov_rate": 0.07692307692307693,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 1.085585594177246,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?  \nBen: Yes, I have water today.  \nAnna: Please, can you bring water tomorrow?  \nBen: Yes, I will bring water tomorrow.  \nAnna: Thank you, friend.  \nBen: Goodbye."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "narration",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 31,
+        "oov_rate": 0.0,
+        "names": [
+          "sam"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 2.6416637897491455,
+        "style_requested": "narration",
+        "text": "Hello, I am Sam today. I want water today please. My friend has water now. I say please for water. He says yes and I have water. thank you friend for water."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 23,
+        "oov_rate": 0.0,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 1.903364658355713,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?\nBen: Yes, I have water today.\nAnna: Please, water?\nBen: Here is water, thank you.\nAnna: Tomorrow we have water.\nBen: Goodbye, friend."
+      }
+    ]
+  }
+}

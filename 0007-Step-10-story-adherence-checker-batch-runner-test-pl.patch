@@ -1,0 +1,1174 @@
+From dc6b2cb79b96e0232056175370e37329b346d7ad Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 3 Oct 2026 20:36:28 +0000
+Subject: [PATCH] Step 10: story adherence checker, batch runner, test plan;
+ fix Add Word duplicates
+
+- Add scripts/vocab_adherence.py (+ tests): scores a story against the
+  vocabulary (inflections, names, grammar words, length, dialogue format,
+  leaked plan, failures); English-only vocabulary check
+- Add scripts/run_story_batch.py: N stories through the production path,
+  cache off, scored with latency; wiring tested with fakes
+- Add docs/STEP-10-TEST-PLAN.md: pass criteria fixed before tuning,
+  routing matrix, edge cases, LO 8 write-up template, tuning log
+- Fix Add Word: normalize_word (lowercase, collapse whitespace, strip
+  edge punctuation) so 'Water' / 'water' / 'water.' are one entry
+- Update README, CHANGELOG, DEVELOPER-DIARY, IMPLEMENTATION-GUIDE
+---
+ CHANGELOG.md                         |  29 +++
+ DEVELOPER-DIARY.md                   |  14 ++
+ README.md                            |  11 +-
+ custom_components/add_word.py        |  23 +-
+ docs/IMPLEMENTATION-GUIDE.md         |  13 +-
+ docs/STEP-10-TEST-PLAN.md            | 119 ++++++++++
+ scripts/run_story_batch.py           | 118 ++++++++++
+ scripts/vocab_adherence.py           | 319 +++++++++++++++++++++++++++
+ tests/test_add_word_normalization.py | 124 +++++++++++
+ tests/test_vocab_adherence.py        | 236 ++++++++++++++++++++
+ 10 files changed, 1000 insertions(+), 6 deletions(-)
+ create mode 100644 docs/STEP-10-TEST-PLAN.md
+ create mode 100644 scripts/run_story_batch.py
+ create mode 100644 scripts/vocab_adherence.py
+ create mode 100644 tests/test_add_word_normalization.py
+ create mode 100644 tests/test_vocab_adherence.py
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 6ff6338..578ff2b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,35 @@
+ 
+ Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
++## Unreleased — Step 10 in progress: measuring tools and test plan
++
++**Added**
++- `scripts/vocab_adherence.py` + `tests/test_vocab_adherence.py` (45 checks): scores a passage
++  against the vocabulary. Handles inflections (plural, -ed, -ing, y→ies, doubled consonants),
++  phrase vocabulary ("thank you"), grammar words and simple verbs the prompt allows, character
++  names (speaker labels and capitalised mid-sentence words), contractions, sentence/line count
++  (4–8), dialogue format, leaked planning text, and failure/fallback messages. Non-English
++  passages skip the vocabulary check.
++- `scripts/run_story_batch.py`: generates N stories per language through the production path
++  (`generate_story_for_learner`, cache off), scores them, records latency, saves JSON. Wiring
++  tested with fakes; not yet run against Groq.
++- `docs/STEP-10-TEST-PLAN.md`: pass criteria fixed before tuning, a routing matrix (R1–R15),
++  edge cases, the LO 8 write-up template and a tuning log.
++
++**Fixed: Add Word created duplicate vocabulary.** The `words` column is `UNIQUE` but
++case-sensitive, and only the ends were stripped, so "Water", "water" and "water." were separate
++rows (and an Agent passing `'bread.'` stored the punctuation). `normalize_word` now lowercases,
++collapses whitespace and strips edge punctuation/quotes; the confirmation shows the stored form.
++Tests: `tests/test_add_word_normalization.py` (no database needed). Existing rows are not
++rewritten.
++
++**Findings so far (hypotheses to test, not conclusions)**
++- The story prompt's own tone example uses words outside its vocabulary rule ("hungry", "shop",
++  "bread", "eat", "happily").
++- Rule 3 lists six simple verbs, but the example also uses "say"; the checker allows a few basic
++  verbs by default and has a strict mode.
++- The tool has no `style` input, so a request for a "dialogue" may return a narration.
++
+ ## Unreleased — Step 9 complete
+ 
+ - **Fixed: language handling.** After a non-English story the Agent refused English ("I can only
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index bee40a8..8ce635a 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -81,6 +81,20 @@ reached `docker logs`) showed `content_blocks` held `ToolContent` directly, not
+ assumption of the data shape, so they passed while the real shape failed; capture one real
+ object before writing fixtures.
+ 
++## Step 10: measuring before tuning
++
++Built the instruments first: a vocabulary adherence checker (pure functions, test-first), a batch
++runner that goes through the same pipeline the tool uses, and a test plan with pass criteria
++fixed in advance. First real use of the checker, on stories copied from the Playground: the
++clean ones pass, and the prompt's own tone example fails its own vocabulary rule, which is the
++first tuning candidate. Design call: vocabulary stays English, so only English stories are
++vocabulary-checked; other languages need a human. Decision recorded in the plan.
++
++Add Word edge case found by reading the code, not by luck: the UNIQUE constraint is
++case-sensitive, so case/punctuation variants became separate rows. Fixed with normalization
++(lowercase is right for an English vocabulary; revisit if vocabulary is ever stored in a language
++where case carries meaning, such as German nouns).
++
+ ## Current obstacle
+ 
+ **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace
+diff --git a/README.md b/README.md
+index 948b7df..05e0d5e 100644
+--- a/README.md
++++ b/README.md
+@@ -9,7 +9,7 @@ tutorial, adapted to run entirely on free infrastructure.
+ 
+ Implementation Steps 1–9 are complete: the Language Agent (`gpt-oss-120b`) routes chat messages
+ to the Add Word and Story Generator tools, and a Tool Result Relay makes sure the learner sees
+-the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is next**; Step 11
++the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is in progress**: the measuring tools and test plan are built (`docs/STEP-10-TEST-PLAN.md`), the live runs are still to do. Step 11
+ (per-learner vocabulary) is not started. See
+ `docs/IMPLEMENTATION-GUIDE.md` for the full build order and per-step status, and
+ `DEVELOPER-DIARY.md` for the current obstacle and a list of known code issues deferred until all
+@@ -95,15 +95,20 @@ tests/
+ ├── test_story_prompt_builder.py
+ ├── test_story_guard.py
+ ├── test_final_passage_extractor.py
+-└── test_tool_result_relay.py
++├── test_tool_result_relay.py
++├── test_vocab_adherence.py
++└── test_add_word_normalization.py
+ 
+ scripts/smoke_test.py            # Environment health check (Postgres + Groq)
++scripts/vocab_adherence.py       # Step 10: scores a story against the vocabulary (pure functions + CLI)
++scripts/run_story_batch.py       # Step 10: generates N stories through the production path and scores them
+ sample_data/starter_vocabulary.csv
+ 
+ docs/
+ ├── OVERVIEW.md                  # Project overview, technology, components, user stories
+ ├── IMPLEMENTATION-GUIDE.md      # Build order (Steps 1–11 + bonus) with per-step status
+ ├── AGENT-INSTRUCTIONS.md        # The Language Agent's final instructions (canvas-only setting)
++├── STEP-10-TEST-PLAN.md         # Step 10 pass criteria, routing matrix, results and tuning log
+ ├── LEARNING-OBJECTIVES.md       # LO 1–8, with implementation notes
+ ├── architecture-diagram.md      # Deployment diagram
+ ├── class-diagram.md
+@@ -129,6 +134,8 @@ docker compose exec langflow python /app/tests/test_story_tool.py
+ docker compose exec langflow python /app/tests/test_call_groq_retry.py
+ docker compose exec langflow python /app/tests/test_empty_response_handling.py
+ docker compose exec langflow python /app/tests/test_tool_result_relay.py
++docker compose exec langflow python /app/tests/test_vocab_adherence.py
++docker compose exec langflow python /app/tests/test_add_word_normalization.py
+ docker compose exec langflow python /app/tests/test_final_passage_extractor.py
+ docker compose exec langflow python /app/tests/test_story_guard.py
+ docker compose exec langflow python /app/tests/test_story_prompt_builder.py
+diff --git a/custom_components/add_word.py b/custom_components/add_word.py
+index 7546e7c..7a2faa1 100644
+--- a/custom_components/add_word.py
++++ b/custom_components/add_word.py
+@@ -11,6 +11,8 @@ To use as a tool: after adding this component to the canvas, enable "Tool Mode"
+ attach it to an Agent node's Tools input. The LLM fills in `word` based on the chat message.
+ """
+ 
++import unicodedata
++
+ import psycopg2
+ from langflow.custom import Component
+ from langflow.io import MessageTextInput, Output
+@@ -28,9 +30,23 @@ def get_connection():
+     return psycopg2.connect(**DB_CONFIG)
+ 
+ 
++# Punctuation an Agent may wrap around or trail after a word ('bread.', '"bread"', '(bread)').
++_EDGE_CHARS = " \t\r\n.,!?;:\"'\u201c\u201d\u2018\u2019\u00ab\u00bb()[]{}\u2026" \
++              "\u3002\uff01\uff1f\u3001\uff0c\uff1b\uff1a\u300c\u300d\u300e\u300f\uff08\uff09"
++
++
++def normalize_word(word) -> str:
++    """Canonical form stored in the vocabulary: no edge punctuation or whitespace, single
++    spaces inside a phrase, lowercase. Without this, 'Water', 'water' and 'water.' became
++    separate rows (the UNIQUE constraint is case-sensitive) and skewed every story."""
++    text = unicodedata.normalize("NFC", word or "")
++    text = " ".join(text.split()).strip(_EDGE_CHARS)
++    return " ".join(text.split()).lower()
++
++
+ def insert_word(conn, word: str, table_name: str = "words") -> bool:
+     """Insert a single word if not already present. Returns True if newly inserted."""
+-    word = (word or "").strip()
++    word = normalize_word(word)
+     if not word:
+         raise ValueError("word must be a non-empty string")
+ 
+@@ -83,9 +99,10 @@ class AddWord(Component):
+             finally:
+                 conn.close()
+ 
++            shown = normalize_word(self.word)
+             if added:
+-                return f"Added '{self.word.strip()}' to your vocabulary."
+-            return f"'{self.word.strip()}' is already in your vocabulary."
++                return f"Added '{shown}' to your vocabulary."
++            return f"'{shown}' is already in your vocabulary."
+         except (ValueError, RuntimeError) as e:
+             return f"Couldn't add word: {e}"
+         except Exception as e:
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+index 2014603..7d26516 100644
+--- a/docs/IMPLEMENTATION-GUIDE.md
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -17,7 +17,7 @@ learning objective(s) it exercises (see `LEARNING-OBJECTIVES.md`, "LO 1–8").
+ | 7 — Story prompt template | Done (`story_prompt_builder.py`) |
+ | 8 — Story-generation pipeline | Done (consolidated into `story_tool.py`) |
+ | 9 — Top-level Language Agent | Done (120b orchestrator + Tool Result Relay) |
+-| 10 — End-to-end test and prompt tuning | **Next** |
++| 10 — End-to-end test and prompt tuning | **In progress** (tools and plan built; live runs to do) |
+ | 11 — Stretch: per-learner vocabulary | Not started |
+ | Bonus — Universal model-provider component | Not started |
+ 
+@@ -217,6 +217,17 @@ constraint wording (Step 7) until behavior is reliable.
+ - **Note:** Groq free-tier rate limits are shared by the orchestrator and the story tool (both
+   use `gpt-oss-120b`), so expect 429s during testing. Include a language-switching sequence in the
+   routing tests (English → Spanish → English → French in one session).
++- **Implemented so far:** `docs/STEP-10-TEST-PLAN.md` (pass criteria fixed before tuning, a
++  15-row routing matrix, edge cases, the LO 8 write-up template and a tuning log);
++  `scripts/vocab_adherence.py` (scores a story against the vocabulary: out-of-vocabulary words with
++  inflections, names and grammar words handled, sentence/line count, dialogue format, leaked plan,
++  failures) with `tests/test_vocab_adherence.py`; `scripts/run_story_batch.py` (N stories through
++  the production path, cache off, scored, with latency); and Add Word normalization (case,
++  whitespace, edge punctuation) with `tests/test_add_word_normalization.py`.
++- **Design decision:** the stored vocabulary stays English, so the vocabulary check applies to
++  English stories only; other languages are checked for structure and read by a person.
++- **To do:** run the batch and the Playground matrix, tune one thing at a time, fill in the
++  results and the tuning log, and write the trade-off verdict.
+ - **Satisfies:** Stories 5 and 6's acceptance criteria, holistically.
+ - **Covers:** **LO 7**, **LO 8** (the trade-off called out in the learning objective becomes
+   concrete here).
+diff --git a/docs/STEP-10-TEST-PLAN.md b/docs/STEP-10-TEST-PLAN.md
+new file mode 100644
+index 0000000..2f64398
+--- /dev/null
++++ b/docs/STEP-10-TEST-PLAN.md
+@@ -0,0 +1,119 @@
++# Step 10 — End-to-end test plan and tuning log
++
++Covers Stories 5 and 6 holistically, **LO 7** (iterate a constrained prompt against real output)
++and **LO 8** (the real cost/latency/quality trade-offs of free open-weight models).
++
++Design decision for this step: the stored vocabulary stays **English words**, and stories in
++other languages are translations of it. The automatic vocabulary check therefore applies to
++**English** stories only; other languages are checked for structure and read by a human.
++
++## Pass criteria (fixed before tuning, so the target doesn't move)
++
++| # | Criterion | Target |
++|---|-----------|--------|
++| 1 | Routing: correct tool **and** correct argument (R1–R12, 3 runs each, fresh sessions) | ≥ 90% of runs |
++| 2 | Relay: chat reply is identical to the tool's Result when a tool was called | 100% |
++| 3 | English stories: pass = 0 out-of-vocabulary words, 4–8 sentences/lines, correct dialogue format, no leaked plan (≥ 20 passages) | ≥ 80% |
++| 4 | Stories that fail to generate (fallback message, empty) | ≤ 10% |
++| 5 | Non-English stories (5 per language, read by a person): right language, well-formed, uses vocabulary meanings | ≥ 90% |
++| 6 | Empty-vocabulary guard (R13) | 3 of 3 |
++| 7 | Written verdict on cost, latency, quality, rate limits (section D) | done |
++
++If a target is missed, tune one thing, re-run the same set, and record it in the tuning log.
++
++## Track A — Story quality (the prompt, Agent bypassed)
++
++Uses `scripts/run_story_batch.py` and `scripts/vocab_adherence.py`. Don't use the Playground while
++it runs (shared rate limit).
++
++```
++docker compose exec langflow python /app/scripts/run_story_batch.py --languages English --count 20
++docker compose exec langflow python /app/scripts/run_story_batch.py --languages Spanish,French --count 5
++```
++
++It reports pass rate, failures, styles, off-length and bad-format counts, the most common
++out-of-vocabulary words, and latency p50/p90, and saves every passage to
++`scripts/step10_results_<time>.json`. To check a story copied from the Playground, put it in a
++text file (separate stories with a line containing only `---`) and run
++`python scripts/vocab_adherence.py stories.txt --words "hello, water, ..."`.
++
++Ideas to test, one at a time (hypotheses, not facts):
++1. The prompt's own **tone example** uses words outside the vocabulary rule ("hungry", "shop",
++   "fresh bread", "eat", "happily"), which may teach the model to break the rule. Replace it with
++   an example built only from the starter vocabulary.
++2. Rule 3 says the allowed simple verbs are "is, have, want, like, go, see" but the examples also
++   use "say". Decide whether the allowed verbs are a closed list; try `--strict-verbs` to see how
++   often the model breaks the closed list.
++3. Add the full list of verbs the model is allowed to use, and tell it to re-check each content
++   word against the list before the delimiter.
++4. `reasoning_effort` (`low` now) and `max_tokens` (1500): check whether stories get truncated.
++
++## Track B — Routing and behavior (Playground, through the Agent)
++
++Fresh session for each run (**+** next to Sessions), wait about 60 seconds between runs, and
++for every run expand the tool row and compare its Arguments and Result with the chat reply.
++Record 3 runs per row (✔ / ✘ and a note).
++
++| ID | Setup | Message | Expected | Run 1 | Run 2 | Run 3 |
++|----|-------|---------|----------|-------|-------|-------|
++| R1 | — | "Add the word bread" | Add Word once, `word` = bread; reply is the tool's confirmation | | | |
++| R2 | after R1 | "Add the word bread" | "'bread' is already in your vocabulary." | | | |
++| R3 | after R1 | "Add the word Bread" | already in vocabulary (case-folded) | | | |
++| R4 | — | "Teach me the word gato" | Add Word with `gato` | | | |
++| R5 | — | "Add thank you very much" | Add Word with the phrase, stored as one entry | | | |
++| R6 | — | "Tell me a story in Spanish" | story tool, `language` = Spanish, passage in Spanish | | | |
++| R7 | — | "Write a dialogue in French" | story tool, `language` = French, passage in French (see limitation below) | | | |
++| R8 | — | "Story in 日本語" | story tool, language Japanese (or 日本語), passage in Japanese | | | |
++| R9 | — | "Tell me a story" | acceptable: asks which language, or an English story; record which | | | |
++| R10 | one session | English → Spanish → English → French (separate messages) | each `language` argument matches the latest message | | | |
++| R11 | — | "hi" | no tool, brief reply | | | |
++| R12 | — | "What's the weather like?" | no tool, brief reply | | | |
++| R13 | empty vocabulary (below) | "Tell me a story in English" | the empty-vocabulary message, no invented story | | | |
++| R14 | — | "Tell me a story in Klingon" | no crash; either an attempt or a graceful reply | | | |
++| R15 | — | "Add the word" (no word) | does not add an empty word; asks or reports | | | |
++
++**Emptying the vocabulary safely for R13** (a backup is kept; restore afterwards):
++
++```
++docker compose exec postgres psql -U langflow -d langflow -c "CREATE TABLE words_backup AS SELECT * FROM words; DELETE FROM words;"
++-- run R13 --
++docker compose exec postgres psql -U langflow -d langflow -c "INSERT INTO words SELECT * FROM words_backup ON CONFLICT DO NOTHING; DROP TABLE words_backup;"
++```
++
++**Known limitation (found while planning):** the Story Generator Tool has no `style` input; it
++picks narration or dialogue at random, so "write a dialogue" may return a narration. If R7
++shows this matters, add an optional `style` input to the tool (a small, test-first change).
++
++## Track C — Edge cases (Add Word)
++
++Unit-tested without a database in `tests/test_add_word_normalization.py`: case, whitespace, edge
++punctuation, quotes, phrases, empty input. Live checks: R3, R5, R15. Existing rows are **not**
++rewritten: if the table already holds an un-normalized word (for example "Hello"), adding
++"hello" will create a second row until the table is cleaned up.
++
++## Track D — Performance, rate limits and the LO 8 write-up
++
++1. Send 5 story requests back to back, with no waiting. Record how many returned the fallback
++   message, and the "Finished in" time of each.
++2. Fill in the table from the batch runs and the Playground:
++
++| Measure | Value |
++|---------|-------|
++| API cost | $0 (Groq free tier) |
++| Story latency p50 / p90 (batch runner) | |
++| Agent turn latency (Playground "Finished in") | |
++| Fallback / failure rate under spaced load | |
++| Fallback / failure rate under back-to-back load | |
++| Routing pass rate (Track B) | |
++| English story pass rate (Track A) | |
++| Times the relay changed the Agent's reply | |
++
++3. Write a short verdict (a paragraph each): **cost** (what free costs you), **latency**,
++   **quality/consistency** (what the small model could and couldn't do reliably, and what the
++   relay and cache had to compensate for), and **rate limits** (what they allowed in practice).
++
++## Tuning log
++
++| # | Change (one thing at a time) | Why | Before | After |
++|---|------------------------------|-----|--------|-------|
++| 0 | Baseline, no change | | | |
+diff --git a/scripts/run_story_batch.py b/scripts/run_story_batch.py
+new file mode 100644
+index 0000000..e62c283
+--- /dev/null
++++ b/scripts/run_story_batch.py
+@@ -0,0 +1,118 @@
++"""
++Step 10 story batch runner — measures the story prompt, with the Agent out of the loop.
++
++Calls the SAME pipeline the Story Generator Tool uses (story_tool.generate_story_for_learner:
++load vocabulary -> guard -> build prompt -> Groq -> extract passage), N times per language with
++the cache off, then scores every result with vocab_adherence.py and records latency.
++
++Why: a prompt change is only an improvement if a number moves. Run this before and after each
++change to the story templates and compare the summaries.
++
++Groq's free tier is rate limited (~8K tokens/minute per model, shared with the Language Agent),
++so calls are spaced out by --delay seconds. Don't use the Playground at the same time.
++
++Run from the project folder (Windows or Linux):
++
++    docker compose exec langflow python /app/scripts/run_story_batch.py --count 15
++    docker compose exec langflow python /app/scripts/run_story_batch.py --languages English,Spanish --count 8
++
++The vocabulary check only applies to English (the stored vocabulary is English); other
++languages are checked for structure and latency only, and should also be read by a human.
++Results are written to /app/scripts/step10_results_<timestamp>.json (visible in ./scripts).
++"""
++
++import argparse
++import json
++import sys
++import time
++
++sys.path.insert(0, "/app/custom_components")
++sys.path.insert(0, "/app/scripts")
++
++import story_tool  # noqa: E402
++from vocab_adherence import check_passage, format_summary, summarize  # noqa: E402
++
++
++def detect_style(prompt):
++    return "dialogue" if "short, simple dialogue" in prompt else "narration"
++
++
++def run_language(language, count, delay, conn, words, max_oov, strict_verbs):
++    results = []
++    for i in range(1, count + 1):
++        seen = {}
++
++        def timed_call_groq(prompt):
++            started = time.time()
++            try:
++                return story_tool.call_groq(prompt)
++            finally:
++                seen["latency"] = time.time() - started
++                seen["style_requested"] = detect_style(prompt)
++
++        text = story_tool.generate_story_for_learner(
++            language, conn=conn, call_groq_fn=timed_call_groq, use_cache=False
++        )
++        result = check_passage(
++            text, words, check_vocab=(language.strip().lower() == "english"),
++            max_oov=max_oov, strict_verbs=strict_verbs,
++        )
++        result.update(language=language, latency=seen.get("latency"), style_requested=seen.get("style_requested"), text=text)
++        results.append(result)
++
++        status = "PASS" if result["passed"] else "FAIL"
++        detail = result["oov_words"] if result["oov_words"] else ""
++        latency = f"{result['latency']:.1f}s" if result["latency"] is not None else "n/a"
++        print(f"[{language} {i}/{count}] {status} {result['style'] or 'failure'} {latency} {detail}", flush=True)
++        if i < count:
++            time.sleep(delay)
++    return results
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    parser.add_argument("--languages", default="English", help="comma-separated, e.g. English,Spanish")
++    parser.add_argument("--count", type=int, default=15, help="stories per language")
++    parser.add_argument("--delay", type=float, default=20.0, help="seconds between calls (rate limit)")
++    parser.add_argument("--max-oov", type=int, default=0, help="out-of-vocabulary words tolerated per story")
++    parser.add_argument("--strict-verbs", action="store_true", help="only the prompt's six simple verbs are allowed")
++    parser.add_argument("--out", default=None)
++    args = parser.parse_args()
++
++    conn = story_tool.get_connection()
++    try:
++        words = story_tool.load_words(conn)
++        if not words.strip():
++            print("The vocabulary is empty; add words first (or seed with Upload Word File).")
++            return 1
++        print(f"Vocabulary ({len(words.split(','))} entries): {words}\n")
++
++        all_results = {}
++        try:
++            for language in [l.strip() for l in args.languages.split(",") if l.strip()]:
++                all_results[language] = run_language(
++                    language, args.count, args.delay, conn, words, args.max_oov, args.strict_verbs
++                )
++        except KeyboardInterrupt:
++            print("\nInterrupted: summarizing what was collected so far.")
++    finally:
++        conn.close()
++
++    print()
++    for language, results in all_results.items():
++        print(f"=== {language} ===")
++        print(format_summary(summarize(results)))
++        print()
++
++    out = args.out or f"/app/scripts/step10_results_{time.strftime('%Y%m%d_%H%M%S')}.json"
++    with open(out, "w", encoding="utf-8") as f:
++        json.dump(
++            {"vocabulary": words, "max_oov": args.max_oov, "strict_verbs": args.strict_verbs, "results": all_results},
++            f, ensure_ascii=False, indent=2,
++        )
++    print(f"Saved: {out}")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/scripts/vocab_adherence.py b/scripts/vocab_adherence.py
+new file mode 100644
+index 0000000..e4498e3
+--- /dev/null
++++ b/scripts/vocab_adherence.py
+@@ -0,0 +1,319 @@
++"""
++Vocabulary adherence checker — Step 10 (LO 7: write and iterate on a constrained prompt).
++
++Scores a generated story/dialogue against the learner's vocabulary so that prompt changes can
++be measured instead of guessed at. It encodes the rules the story prompt itself states:
++
++  * words must come from the vocabulary (inflections of a word are fine: same root),
++  * basic grammar words and simple verbs are allowed ("is, have, want, like, go, see"),
++  * character names are allowed,
++  * 5-6 short sentences (narration) or lines (dialogue), dialogue lines as "Name: line",
++  * no leaked planning text, and never an empty passage.
++
++The vocabulary check only makes sense for English passages, because the stored vocabulary is
++English. For other languages call check_passage(..., check_vocab=False): structure is still
++checked and the vocabulary check is skipped.
++
++Pure functions only (no database, no network) so they can be tested directly — see
++tests/test_vocab_adherence.py. The CLI at the bottom checks passages pasted into a text file:
++
++    python scripts/vocab_adherence.py passages.txt --words "hello, water, friend"
++
++(passages are separated by a line containing only ---).
++"""
++
++import argparse
++import math
++import re
++import sys
++from collections import Counter
++
++# Messages the story tool returns instead of a story. Matched loosely, after apostrophe
++# normalization, so small wording changes in story_tool.py don't break the checker.
++FAILURE_MARKERS = (
++    "having trouble generating a story",
++    "don't have any vocabulary yet",
++)
++
++LEAK_PATTERN = re.compile(r"===\s*story\s*===|^\s*(character|characters|want|event|resolution)\s*:", re.I | re.M)
++
++# --- allowed non-vocabulary words ------------------------------------------------------------
++
++GRAMMAR_WORDS = set(
++    """
++    a an the
++    i me my mine myself you your yours yourself he him his she her hers it its we us our ours
++    they them their theirs this that these those who whom whose what which
++    someone something anyone anything everyone everything nothing nobody
++    in on at to of for with without from by about near under over into out up down after before
++    between behind through around next beside inside outside
++    and but or so because then if than as
++    is am are was were be been being have has had having do does did done doing
++    can could will would should may might must shall not
++    here there now very too also just some any much many more most all each every again still
++    where when why how
++    """.split()
++)
++
++# The prompt names six simple verbs; the prompt's own tone example also uses "say" and the
++# like, so a few very basic verbs are allowed by default. strict_verbs=True keeps only the six.
++PROMPT_VERBS = ("want", "like", "go", "see")  # is/have are in GRAMMAR_WORDS
++EXTRA_BASIC_VERBS = ("say", "give", "get", "take", "come", "need", "ask")
++
++IRREGULAR = {
++    "go": {"goes", "went", "gone", "going"},
++    "see": {"sees", "saw", "seen", "seeing"},
++    "say": {"says", "said", "saying"},
++    "give": {"gives", "gave", "given", "giving"},
++    "get": {"gets", "got", "gotten", "getting"},
++    "take": {"takes", "took", "taken", "taking"},
++    "come": {"comes", "came", "coming"},
++}
++
++CONTRACTIONS = {
++    "i'm", "i'll", "i'd", "i've", "you're", "you'll", "you've", "you'd", "he's", "she's", "it's",
++    "we're", "we'll", "we've", "they're", "they'll", "they've", "that's", "there's", "here's",
++    "what's", "who's", "let's", "don't", "doesn't", "didn't", "can't", "won't", "isn't",
++    "aren't", "wasn't", "weren't", "haven't", "hasn't", "couldn't", "wouldn't", "shouldn't",
++}
++
++_TOKEN = re.compile(r"[^\W\d_]+(?:['\-][^\W\d_]+)*")
++_LABEL = re.compile(r"^\s*([^\W\d_][^\W\d_'\-]*(?:\s[^\W\d_][^\W\d_'\-]*)?)\s*:\s+\S")
++_SENTENCE_SPLIT = re.compile(r"(?<=[.!?…。！？])\s+|\n+")
++
++_VOWELS = set("aeiou")
++
++
++def _norm(text):
++    return (text or "").replace("\u2019", "'").replace("\u2018", "'").replace("\u02bc", "'")
++
++
++def word_forms(word):
++    """The word plus its regular inflections (plural, -ed, -ing, ...). Same root only."""
++    w = _norm(word).strip().lower()
++    if not w:
++        return set()
++    forms = {w, w + "s", w + "es", w + "ed", w + "d", w + "ing"}
++    if len(w) > 1 and w.endswith("y") and w[-2] not in _VOWELS:
++        forms |= {w[:-1] + "ies", w[:-1] + "ied"}
++    if w.endswith("e"):
++        forms.add(w[:-1] + "ing")
++    if len(w) >= 2 and w[-1] not in _VOWELS | {"w", "x", "y"} and w[-2] in _VOWELS:
++        forms |= {w + w[-1] + "ed", w + w[-1] + "ing"}
++    forms |= IRREGULAR.get(w, set())
++    return forms
++
++
++def _allowed_words(strict_verbs=False, extra=()):
++    allowed = set(GRAMMAR_WORDS) | set(CONTRACTIONS)
++    verbs = list(PROMPT_VERBS) + ([] if strict_verbs else list(EXTRA_BASIC_VERBS))
++    for verb in verbs:
++        allowed |= word_forms(verb)
++    for w in extra:
++        allowed |= word_forms(w)
++    for w in ("is", "have", "do", "be"):
++        allowed |= word_forms(w)
++    return allowed
++
++
++def parse_vocabulary(vocab):
++    """Accepts 'a, b, thank you' or a list. Returns the set of single lowercase words
++    (a phrase contributes each of its words)."""
++    if vocab is None:
++        return set()
++    items = re.split(r"[,\n]", vocab) if isinstance(vocab, str) else list(vocab)
++    words = set()
++    for item in items:
++        for token in _TOKEN.findall(_norm(str(item)).lower()):
++            words.add(token)
++    return words
++
++
++def _vocab_forms(vocab_words):
++    forms = set()
++    for w in vocab_words:
++        forms |= word_forms(w)
++    return forms
++
++
++def _is_known(token, vocab_forms, allowed):
++    """token is lowercase."""
++    if token in allowed or token in vocab_forms:
++        return True
++    if token.endswith("'s") and (token[:-2] in vocab_forms or token[:-2] in allowed):
++        return True
++    if "-" in token:
++        return all(_is_known(part, vocab_forms, allowed) for part in token.split("-") if part)
++    return False
++
++
++def _failure_result(reason):
++    return {
++        "failure": True, "failure_reason": reason, "passed": False, "style": None, "units": 0,
++        "length_ok": False, "format_ok": False, "leaked_plan": False, "vocab_checked": False,
++        "oov_words": None, "oov_count": 0, "word_count": 0, "oov_rate": 0.0, "names": [],
++    }
++
++
++def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 8),
++                  strict_verbs=False, extra_allowed=(), names=()):
++    """Score one passage. Returns a dict (see keys below); `passed` is the overall verdict."""
++    text = _norm(text).strip()
++    if not text:
++        return _failure_result("empty")
++    lowered = text.lower()
++    for marker in FAILURE_MARKERS:
++        if marker in lowered:
++            return _failure_result("fallback or guard message")
++
++    leaked = bool(LEAK_PATTERN.search(text))
++    lines = [ln for ln in text.splitlines() if ln.strip()]
++    labelled = [bool(_LABEL.match(ln)) for ln in lines]
++    style = "dialogue" if sum(labelled) * 2 >= len(lines) and any(labelled) else "narration"
++    format_ok = all(labelled) if style == "dialogue" else not any(labelled)
++
++    body_segments = []  # text with speaker labels removed
++    label_names = set()
++    for ln, is_label in zip(lines, labelled):
++        if is_label:
++            label, _, rest = ln.partition(":")
++            label_names.update(t.lower() for t in _TOKEN.findall(label))
++            body_segments.append(rest.strip())
++        else:
++            body_segments.append(ln.strip())
++
++    if style == "dialogue":
++        units = len(lines)
++    else:
++        sentences = [s for s in _SENTENCE_SPLIT.split(text) if re.search(r"[^\W\d_]", s)]
++        units = len(sentences)
++    length_ok = length_range[0] <= units <= length_range[1]
++
++    result = {
++        "failure": False, "failure_reason": None, "style": style, "units": units,
++        "length_ok": length_ok, "format_ok": format_ok, "leaked_plan": leaked,
++        "vocab_checked": bool(check_vocab), "oov_words": None, "oov_count": 0,
++        "word_count": 0, "oov_rate": 0.0, "names": [],
++    }
++
++    if check_vocab:
++        allowed = _allowed_words(strict_verbs, extra_allowed)
++        vocab_forms = _vocab_forms(parse_vocabulary(vocab))
++        known_names = set(label_names) | {n.lower() for n in names}
++
++        # Capitalised words in the middle of a sentence that are neither vocabulary nor
++        # grammar are character names ("I am Sam").
++        for segment in body_segments:
++            for sentence in _SENTENCE_SPLIT.split(segment):
++                tokens = _TOKEN.findall(sentence)
++                for token in tokens[1:]:
++                    low = token.lower()
++                    if token[0].isupper() and token != "I" and not _is_known(low, vocab_forms, allowed):
++                        known_names.add(low)
++
++        word_count = 0
++        oov_occurrences = []
++        for segment in body_segments:
++            for token in _TOKEN.findall(segment):
++                low = token.lower()
++                if low in known_names:
++                    continue
++                word_count += 1
++                if not _is_known(low, vocab_forms, allowed):
++                    oov_occurrences.append(low)
++
++        result["oov_words"] = list(dict.fromkeys(oov_occurrences))
++        result["oov_count"] = len(oov_occurrences)
++        result["word_count"] = word_count
++        result["oov_rate"] = len(oov_occurrences) / word_count if word_count else 0.0
++        result["names"] = sorted(known_names)
++
++    vocab_ok = (not check_vocab) or result["oov_count"] <= max_oov
++    result["passed"] = (not leaked) and length_ok and format_ok and vocab_ok
++    return result
++
++
++def summarize(results):
++    """Aggregate a list of check_passage() results (optionally with a 'latency' key)."""
++    total = len(results)
++    failures = sum(1 for r in results if r["failure"])
++    scored = [r for r in results if not r["failure"]]
++    passes = sum(1 for r in results if r["passed"])
++    vocab_scored = [r for r in scored if r["oov_words"] is not None]
++    latencies = sorted(r["latency"] for r in results if r.get("latency") is not None)
++
++    def percentile(p):
++        if not latencies:
++            return None
++        return latencies[min(len(latencies) - 1, math.ceil(p * len(latencies)) - 1)]
++
++    return {
++        "total": total,
++        "failures": failures,
++        "passes": passes,
++        "pass_rate": passes / total if total else 0.0,
++        "mean_oov_per_passage": (sum(r["oov_count"] for r in vocab_scored) / len(vocab_scored)) if vocab_scored else None,
++        "top_oov": Counter(w for r in vocab_scored for w in r["oov_words"]).most_common(10),
++        "styles": dict(Counter(r["style"] for r in scored)),
++        "leaks": sum(1 for r in scored if r["leaked_plan"]),
++        "length_off": sum(1 for r in scored if not r["length_ok"]),
++        "format_bad": sum(1 for r in scored if not r["format_ok"]),
++        "latency_p50": percentile(0.5),
++        "latency_p90": percentile(0.9),
++    }
++
++
++def format_summary(s):
++    lines = [
++        f"Attempts: {s['total']}   Passed: {s['passes']} ({s['pass_rate']:.0%})   Failures (no story): {s['failures']}",
++        f"Styles: {s['styles']}   Leaked plan: {s['leaks']}   Off-length: {s['length_off']}   Bad format: {s['format_bad']}",
++    ]
++    if s["mean_oov_per_passage"] is not None:
++        lines.append(f"Mean out-of-vocabulary words per passage: {s['mean_oov_per_passage']:.2f}")
++        lines.append(f"Most common out-of-vocabulary words: {s['top_oov']}")
++    if s["latency_p50"] is not None:
++        lines.append(f"Latency p50 / p90: {s['latency_p50']:.1f}s / {s['latency_p90']:.1f}s")
++    return "\n".join(lines)
++
++
++def main(argv=None):
++    parser = argparse.ArgumentParser(description="Check pasted passages against a vocabulary.")
++    parser.add_argument("passages_file", help="text file; passages separated by a line with only ---")
++    parser.add_argument("--words", help="comma-separated vocabulary")
++    parser.add_argument("--words-file", help="file with one word (or phrase) per line")
++    parser.add_argument("--max-oov", type=int, default=0)
++    parser.add_argument("--strict-verbs", action="store_true")
++    args = parser.parse_args(argv)
++
++    vocab = args.words or ""
++    if args.words_file:
++        with open(args.words_file, encoding="utf-8") as f:
++            vocab += "," + f.read().replace("\n", ",")
++    if not vocab.strip():
++        parser.error("provide --words or --words-file")
++
++    with open(args.passages_file, encoding="utf-8") as f:
++        passages = [p.strip() for p in re.split(r"^\s*---\s*$", f.read(), flags=re.M) if p.strip()]
++
++    results = []
++    for i, passage in enumerate(passages, 1):
++        r = check_passage(passage, vocab, max_oov=args.max_oov, strict_verbs=args.strict_verbs)
++        results.append(r)
++        verdict = "PASS" if r["passed"] else "FAIL"
++        extras = []
++        if r["oov_words"]:
++            extras.append(f"out-of-vocabulary: {r['oov_words']}")
++        if not r["length_ok"]:
++            extras.append(f"length {r['units']}")
++        if not r["format_ok"]:
++            extras.append("bad format")
++        if r["leaked_plan"]:
++            extras.append("leaked plan")
++        print(f"#{i} [{verdict}] {r['style'] or 'failure'} {'; '.join(extras)}")
++    print()
++    print(format_summary(summarize(results)))
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/test_add_word_normalization.py b/tests/test_add_word_normalization.py
+new file mode 100644
+index 0000000..a493d40
+--- /dev/null
++++ b/tests/test_add_word_normalization.py
+@@ -0,0 +1,124 @@
++"""
++Tests for Add Word input normalization (Step 10 edge cases).
++
++Problem: the `words` column is UNIQUE but case-sensitive, and Add Word only stripped the ends,
++so "Water", "water" and " water " could become three separate rows, and an Agent passing
++'bread.' or '"bread"' stored the punctuation. A duplicate vocabulary entry silently skews
++every story.
++
++Written BEFORE the fix. Uses a fake connection, so no Postgres is needed.
++
++Run from inside the langflow container:
++    docker compose exec langflow python /app/tests/test_add_word_normalization.py
++"""
++
++import sys
++
++sys.path.insert(0, "/app/custom_components")
++
++from add_word import insert_word, normalize_word  # noqa: E402
++
++PASS = "PASS"
++FAIL = "FAIL"
++failures = []
++
++
++def check(label, condition):
++    if condition:
++        print(f"[{PASS}] {label}")
++    else:
++        print(f"[{FAIL}] {label}")
++        failures.append(label)
++
++
++class FakeCursor:
++    def __init__(self, store):
++        self.store = store
++        self.rowcount = 0
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, *exc):
++        return False
++
++    def execute(self, sql, params=None):
++        if "information_schema" in sql:
++            self._fetch = (True,)
++        elif sql.strip().upper().startswith("INSERT"):
++            word = params[0]
++            if word in self.store:  # ON CONFLICT (word) DO NOTHING (case-sensitive, like Postgres)
++                self.rowcount = 0
++            else:
++                self.store.append(word)
++                self.rowcount = 1
++
++    def fetchone(self):
++        return self._fetch
++
++
++class FakeConnection:
++    def __init__(self):
++        self.words = []
++
++    def cursor(self):
++        return FakeCursor(self.words)
++
++    def commit(self):
++        pass
++
++
++def test_normalize_word():
++    check("plain word unchanged", normalize_word("water") == "water")
++    check("surrounding whitespace removed", normalize_word("  water \n") == "water")
++    check("case folded", normalize_word("Water") == "water")
++    check("internal whitespace collapsed", normalize_word("thank   you") == "thank you")
++    check("trailing punctuation removed", normalize_word("bread.") == "bread")
++    check("surrounding quotes removed", normalize_word('"bread"') == "bread")
++    check("curly quotes and brackets removed", normalize_word("“bread”") == "bread" and normalize_word("(bread)") == "bread")
++    check("an inner apostrophe is kept", normalize_word("Don't") == "don't")
++    check("a hyphenated word is kept", normalize_word("well-known") == "well-known")
++    check("non-English letters are kept", normalize_word("Ñandú") == "ñandú" and normalize_word("日本語") == "日本語")
++
++
++def test_empty_after_normalizing_is_rejected():
++    for raw in ["", "   ", "...", '""', None]:
++        try:
++            insert_word(FakeConnection(), raw)
++            check(f"{raw!r} is rejected", False)
++        except ValueError:
++            check(f"{raw!r} is rejected", True)
++
++
++def test_case_variants_are_one_word():
++    conn = FakeConnection()
++    first = insert_word(conn, "Water")
++    second = insert_word(conn, "water")
++    third = insert_word(conn, "  WATER. ")
++    check("first insert succeeds", first is True)
++    check("a case/whitespace/punctuation variant is a duplicate", second is False and third is False)
++    check("only one row is stored, in normalized form", conn.words == ["water"])
++
++
++def test_phrase_is_stored_normalized():
++    conn = FakeConnection()
++    insert_word(conn, "Thank   You")
++    check("a phrase is stored lowercased with single spaces", conn.words == ["thank you"])
++
++
++def main():
++    print("Running Add Word normalization tests...\n")
++    test_normalize_word()
++    test_empty_after_normalizing_is_rejected()
++    test_case_variants_are_one_word()
++    test_phrase_is_stored_normalized()
++    print()
++    if failures:
++        print(f"{len(failures)} test(s) failed: {failures}")
++        sys.exit(1)
++    print("All tests passed.")
++    sys.exit(0)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/test_vocab_adherence.py b/tests/test_vocab_adherence.py
+new file mode 100644
+index 0000000..ee24836
+--- /dev/null
++++ b/tests/test_vocab_adherence.py
+@@ -0,0 +1,236 @@
++"""
++Tests for scripts/vocab_adherence.py — the Step 10 story-quality checker (LO 7).
++
++The checker scores a generated passage against the learner's vocabulary so prompt changes can
++be measured instead of guessed at. It encodes the rules the story prompt itself states:
++  * words must come from the vocabulary (inflections allowed, same root),
++  * basic grammar words and simple verbs (is, have, want, like, go, see) are allowed,
++  * character names are allowed,
++  * 5-6 short sentences or lines, dialogue lines formatted as "Name: line",
++  * no leaked planning text, and never an empty passage.
++
++Written BEFORE the checker. Run now and expect an ImportError; re-run after to confirm green.
++No database, no network.
++
++Run from inside the langflow container:
++    docker compose exec langflow python /app/tests/test_vocab_adherence.py
++"""
++
++import sys
++
++sys.path.insert(0, "/app/scripts")
++
++from vocab_adherence import (  # noqa: E402
++    check_passage,
++    parse_vocabulary,
++    summarize,
++    word_forms,
++)
++
++PASS = "PASS"
++FAIL = "FAIL"
++failures = []
++
++VOCAB = parse_vocabulary(
++    "hello, goodbye, please, thank you, yes, no, water, food, friend, house, today, tomorrow"
++)
++
++GOOD_NARRATION = (
++    "Hello, I am Sam today. I want water. I see my friend near the house. "
++    "I say please, can you give water? My friend says yes and gives water. "
++    "I say thank you."
++)
++
++GOOD_DIALOGUE = (
++    "Anna: Hello, do you have water?\n"
++    "Ben: Yes, I have water today.\n"
++    "Anna: Please give me water.\n"
++    "Ben: Here is water, thank you.\n"
++    "Anna: Thank you, goodbye friend."
++)
++
++
++def check(label, condition):
++    if condition:
++        print(f"[{PASS}] {label}")
++    else:
++        print(f"[{FAIL}] {label}")
++        failures.append(label)
++
++
++# --- vocabulary parsing and word forms -------------------------------------------------------
++
++
++def test_parse_vocabulary():
++    check("comma-separated string is parsed", "water" in parse_vocabulary("hello, water"))
++    check("a list is accepted too", "water" in parse_vocabulary(["hello", "Water"]))
++    check("case is folded", "water" in parse_vocabulary("Water"))
++    check("a phrase contributes each of its words", {"thank", "you"} <= parse_vocabulary("thank you"))
++    check("blank entries are ignored", "" not in parse_vocabulary("hello, , water,"))
++
++
++def test_word_forms():
++    forms = word_forms("friend")
++    check("plural accepted", "friends" in forms)
++    forms = word_forms("want")
++    check("-ed and -ing accepted", {"wanted", "wanting", "wants"} <= forms)
++    check("consonant-final y -> ies / ied", {"studies", "studied"} <= word_forms("study"))
++    check("e-final: -ing and -ed", {"making", "maked"} & word_forms("make") == {"making", "maked"})
++    check("doubled final consonant", "stopped" in word_forms("stop") and "running" in word_forms("run"))
++    check("the word itself is included", "water" in word_forms("water"))
++
++
++# --- vocabulary adherence --------------------------------------------------------------------
++
++
++def test_good_passages_pass():
++    r = check_passage(GOOD_NARRATION, VOCAB)
++    check("a clean narration has no out-of-vocabulary words", r["oov_words"] == [])
++    r = check_passage(GOOD_DIALOGUE, VOCAB)
++    check("a clean dialogue has no out-of-vocabulary words", r["oov_words"] == [])
++
++
++def test_flags_words_outside_the_vocabulary():
++    r = check_passage("Hello, I am hungry today. I see a shop with fresh bread.", VOCAB)
++    check("content words outside the list are flagged", {"hungry", "shop", "fresh", "bread"} <= set(r["oov_words"]))
++    check("vocabulary and grammar words are not flagged", not ({"hello", "today", "i", "am", "see", "a", "with"} & set(r["oov_words"])))
++
++
++def test_allows_basic_grammar_and_simple_verbs():
++    r = check_passage("I want it. We like the house. They go to the house and see my friend.", VOCAB)
++    check("articles, pronouns, prepositions, conjunctions, simple verbs are allowed", r["oov_words"] == [])
++
++
++def test_inflections_are_accepted():
++    r = check_passage("My friends wanted houses. I thank my friend.", VOCAB)
++    check("plural/-ed forms of vocabulary and simple verbs pass; 'thank' comes from 'thank you'", r["oov_words"] == [])
++
++
++def test_names_are_ignored():
++    r = check_passage("Hello, I am Sam. Sam wants water.", VOCAB)
++    check("a name introduced mid-sentence is ignored everywhere in the passage", r["oov_words"] == [])
++    r = check_passage(GOOD_DIALOGUE.replace("Anna", "Priya").replace("Ben", "Marcus"), VOCAB)
++    check("speaker labels are never counted as words", r["oov_words"] == [])
++
++
++def test_contractions_and_curly_apostrophes():
++    r = check_passage("I’m here. I don't have water. It's my friend's house.", VOCAB)
++    check("common contractions and possessives are handled", r["oov_words"] == [])
++
++
++def test_oov_rate():
++    r = check_passage("Hello, I see bread today.", VOCAB)
++    check("oov_rate is out-of-vocabulary words / checked words", abs(r["oov_rate"] - 1 / 5) < 1e-9 and r["oov_words"] == ["bread"])
++
++
++# --- structure -------------------------------------------------------------------------------
++
++
++def test_style_detection():
++    check("dialogue is detected", check_passage(GOOD_DIALOGUE, VOCAB)["style"] == "dialogue")
++    check("narration is detected", check_passage(GOOD_NARRATION, VOCAB)["style"] == "narration")
++
++
++def test_length():
++    r = check_passage(GOOD_DIALOGUE, VOCAB)
++    check("dialogue unit count = number of lines", r["units"] == 5 and r["length_ok"])
++    r = check_passage("Hello. I want water.", VOCAB)
++    check("a two-sentence passage is flagged as off-length", r["units"] == 2 and not r["length_ok"])
++
++
++def test_dialogue_format():
++    bad = "Anna: Hello, do you have water?\nYes, I have water today.\nAnna: Please give me water.\nBen: Thank you.\nAnna: Goodbye."
++    r = check_passage(bad, VOCAB)
++    check("a dialogue line without 'Name:' fails the format check", r["style"] == "dialogue" and not r["format_ok"])
++    check("a well-formed dialogue passes the format check", check_passage(GOOD_DIALOGUE, VOCAB)["format_ok"])
++
++
++def test_leaks():
++    leaked = "Character: Sam\nWant: water\n===STORY===\n" + GOOD_NARRATION
++    check("planning text / delimiter is flagged as a leak", check_passage(leaked, VOCAB)["leaked_plan"])
++    check("a clean passage has no leak", not check_passage(GOOD_NARRATION, VOCAB)["leaked_plan"])
++
++
++def test_failures_are_classified():
++    for text, label in [
++        ("", "empty text"),
++        ("   \n ", "whitespace"),
++        ("I'm having trouble generating a story right now — please try again in a moment.", "fallback message"),
++        ("You don't have any vocabulary yet! Add some words first.", "empty-vocabulary message"),
++    ]:
++        r = check_passage(text, VOCAB)
++        check(f"{label} is classified as a failure, not scored as a story", r["failure"] and not r["passed"])
++
++
++def test_non_english_skips_the_vocabulary_check():
++    spanish = (
++        "Hola, soy Ana y digo hola.\nHoy tengo sed y quiero agua.\n"
++        "Le pregunto a mi amigo si me da agua.\nMi amigo dice si y me da agua.\n"
++        "Gracias, bebo y digo nos vemos manana."
++    )
++    r = check_passage(spanish, VOCAB, check_vocab=False)
++    check("vocabulary check is skipped (None) for non-English", r["oov_words"] is None and r["vocab_checked"] is False)
++    check("structure is still checked, and a well-formed passage passes", r["units"] == 5 and r["passed"])
++
++
++def test_strict_verbs():
++    check("'give' is allowed by default", check_passage("I give water.", VOCAB)["oov_words"] == [])
++    check("strict_verbs keeps only the prompt's own verbs", check_passage("I give water.", VOCAB, strict_verbs=True)["oov_words"] == ["give"])
++
++
++def test_passed_flag():
++    check("clean passage passes overall", check_passage(GOOD_NARRATION, VOCAB)["passed"])
++    check("an out-of-vocabulary word fails by default", not check_passage("Hello, I see bread today. I want water. Yes. No. Thank you.", VOCAB)["passed"])
++    check("max_oov=1 tolerates a single stray word", check_passage("Hello, I see bread today. I want water. Yes. No. Thank you.", VOCAB, max_oov=1)["passed"])
++
++
++# --- aggregate summary -----------------------------------------------------------------------
++
++
++def test_summarize():
++    results = [
++        check_passage(GOOD_NARRATION, VOCAB),
++        check_passage(GOOD_DIALOGUE, VOCAB),
++        check_passage("Hello, I see bread today. I want water. Yes. No. Thank you.", VOCAB),
++        check_passage("", VOCAB),
++    ]
++    s = summarize(results)
++    check("total counts every attempt", s["total"] == 4)
++    check("failures counted separately", s["failures"] == 1)
++    check("pass rate is passes / total attempts", abs(s["pass_rate"] - 2 / 4) < 1e-9)
++    check("top out-of-vocabulary words are listed", s["top_oov"][0][0] == "bread")
++    check("style counts are reported", s["styles"].get("dialogue") == 1 and s["styles"].get("narration", 0) >= 1)
++
++
++def main():
++    print("Running vocabulary adherence checker tests...\n")
++    test_parse_vocabulary()
++    test_word_forms()
++    test_good_passages_pass()
++    test_flags_words_outside_the_vocabulary()
++    test_allows_basic_grammar_and_simple_verbs()
++    test_inflections_are_accepted()
++    test_names_are_ignored()
++    test_contractions_and_curly_apostrophes()
++    test_oov_rate()
++    test_style_detection()
++    test_length()
++    test_dialogue_format()
++    test_leaks()
++    test_failures_are_classified()
++    test_non_english_skips_the_vocabulary_check()
++    test_strict_verbs()
++    test_passed_flag()
++    test_summarize()
++
++    print()
++    if failures:
++        print(f"{len(failures)} test(s) failed: {failures}")
++        sys.exit(1)
++    else:
++        print("All tests passed.")
++        sys.exit(0)
++
++
++if __name__ == "__main__":
++    main()
+-- 
+2.43.0
+

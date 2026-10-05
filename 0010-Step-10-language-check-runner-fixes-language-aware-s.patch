@@ -1,0 +1,1556 @@
+From 1538b826a79d9e081cb8eb7a5959b9fa03560397 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 4 Oct 2026 20:12:06 +0000
+Subject: [PATCH] Step 10: language check, runner fixes, language-aware story
+ prompt; web app design
+
+First live routing run (45 turns): routing solid (tool 42/42, argument
+36/36, relay 36/36, language switching 12/12, guard 3/3), but only 5/15
+non-English stories were written in the requested language; the
+structure-only check had passed the rest.
+
+Detection and test harness
+- Add language_check (script ratio for non-Latin languages, English-word
+  share for the rest) and wire it into check_passage, the batch runner,
+  --rescore and the routing tests; tested on the real outputs
+- Routing cases for non-English stories name their language
+- Runner: remove the throwaway word before every repeat (case-insensitive),
+  collapse tool calls listed twice (keep ids), record per-turn latency
+- Runner: own snapshot table name (words_autotest_snapshot) and a merging
+  restore that deletes nothing
+
+Tuning change 1: language-aware story prompt (story_tool.py)
+- For languages other than English the prompt opens with a language rule
+  (the list holds English meanings to express in the language; no English
+  words left in), ends with a final-check reminder, and omits the English
+  tone example
+- normalize_language maps names given in the language itself to English
+  names; used in the prompt and the cache key
+- English prompts are unchanged, pinned by SHA-256 in the tests
+- Add tests/test_story_prompt_language.py (no database)
+
+Web app design
+- Add docs/WEB-APP-DESIGN.md: local demo web app with React + TypeScript,
+  a FastAPI backend, the Langflow flow as the AI layer, login, per-user
+  and per-language vocabulary; diagrams, API table, wireframes, testing
+  and milestones
+
+Docs: record results, findings, the before/after procedure and the
+deferred story_prompt_builder.py drift in the test plan, CHANGELOG,
+DEVELOPER-DIARY and IMPLEMENTATION-GUIDE
+---
+ CHANGELOG.md                                  |  76 ++++
+ DEVELOPER-DIARY.md                            |  14 +
+ README.md                                     |   3 +
+ custom_components/story_tool.py               |  83 ++++-
+ docs/IMPLEMENTATION-GUIDE.md                  |   9 +
+ docs/STEP-10-TEST-PLAN.md                     |  58 ++-
+ docs/WEB-APP-DESIGN.md                        | 333 ++++++++++++++++++
+ scripts/routing_checks.py                     |  34 +-
+ scripts/run_routing_tests.py                  |  34 +-
+ scripts/run_story_batch.py                    |   1 +
+ scripts/vocab_adherence.py                    |  92 ++++-
+ tests/test_routing_checks.py                  |  32 ++
+ .../test_routing_runner_with_fake_langflow.py |  69 +++-
+ tests/test_story_prompt_language.py           | 186 ++++++++++
+ tests/test_vocab_adherence.py                 |  86 +++++
+ 15 files changed, 1078 insertions(+), 32 deletions(-)
+ create mode 100644 docs/WEB-APP-DESIGN.md
+ create mode 100644 tests/test_story_prompt_language.py
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 8730688..a1813fe 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,82 @@
+ 
+ Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
++## Unreleased — Web app design (React)
++
++Added `docs/WEB-APP-DESIGN.md`: a design for a local demo web app (not hosted) around the tutor.
++- **Stack:** React + TypeScript (Vite, React Router, TanStack Query, Tailwind), a small FastAPI
++  backend, the existing Langflow flow as the AI layer, Postgres, Groq. React cannot hold the Groq or
++  Langflow keys or reach Postgres, so it talks only to the API.
++- **Two backend paths:** chat goes through the Langflow Agent (exact output via the Tool Result
++  Relay); vocabulary, stories and practice call shared Python (`tutor_core`) directly.
++- **Login:** local accounts, bcrypt, JWT in an httpOnly cookie; every query filtered by the user.
++- **Target-language vocabulary:** `words` gains `user_id` and `language` (unique per user,
++  language and word); stories use the words directly.
++- Includes architecture, auth and chat sequence diagrams, an ER diagram, an API table, wireframes,
++  code structure, testing strategy, milestones and risks. Streamlit was considered and dropped.
++- Open items it depends on: exporting the Langflow flow into the repo, extracting `tutor_core`,
++  passing the user id to Langflow tools (verify Langflow `tweaks` with Agent Tool Mode).
++
++## Unreleased — Step 10: language-aware story prompt (tuning change #1)
++
++**Why:** only 5/15 non-English stories were written in the requested language. Two probable
++causes: the vocabulary list is English and "use words from this list" keeps the model in English;
++and the tone examples in the prompt are English, which primes English output.
++
++**Changed (`story_tool.py`, tests first):**
++- For any language other than English, the prompt opens with a language rule (write the entire
++  story in the language; the list is English *meanings* to express in it; no English words left in;
++  names excepted), ends with a final-check reminder, and the English tone example is left out.
++- `normalize_language`: a language given by its own name is mapped to its English name
++  ("日本語" → Japanese, "español" → Spanish, "français" → French, ...), used in the prompt and as
++  the cache key (so "日本語" and "Japanese" share one cached story).
++- **English prompts are unchanged**, pinned by SHA-256 of both templates in the tests, so the
++  English baseline (85%) is not put at risk.
++
++**Tests:** `tests/test_story_prompt_language.py` (no database). The existing database-free story
++tests still pass.
++
++**Not measured yet.** Run the baseline batch before applying, the same batch after, and record both
++in the tuning log in `docs/STEP-10-TEST-PLAN.md`.
++
++**Not changed:** `story_prompt_builder.py` (Step 8 canvas pipeline) keeps the old templates;
++its drift from `story_tool.py` is on the deferred list.
++
++## Unreleased — Step 10: first live routing run, language check, runner fixes
++
++**Live result (45 turns on the real flow):** right tool 42/42, right argument 36/36, reply
++identical to the tool output 36/36 (the Relay), language switching 12/12, empty-vocabulary guard
++3/3, English story quality 8/9. The harness, the Relay and the language-switching fix all work.
++
++**Found: non-English stories were mostly not in the requested language.** The structure-only
++check passed them. Reading the replies: 2/3 "Spanish" and 3/3 "Japanese" stories were English, and
++all French stories had English words left in. Re-scored, only 5/15 were in the right language.
++
++**Added (tests first)**
++- `language_check` in `scripts/vocab_adherence.py`: non-Latin languages must be mostly in their
++  script; other languages must have a low share of English words (grammar words plus the
++  vocabulary; ambiguous ones like "no", "a", "me" excluded): ≥ 50% English = "english", ≥ 20% =
++  "mixed". Used by `check_passage(language=...)`, the batch runner (`--languages Spanish,French`),
++  `--rescore` and the routing tests; the summary reports "written in the requested language".
++  Tested on the real outputs from the run. Thresholds separate real data cleanly (good Spanish and
++  French 0.00–0.05, mixed French 0.25–0.29, English 0.66–0.72).
++- Routing cases for non-English stories now name their language.
++
++**Fixed in the runner**
++- `--repeat`: the throwaway word is removed before every repeat (it only was at the end, so A1
++  failed from the second repeat on) and case-insensitively.
++- Tool calls listed twice in the response are collapsed by id; the id is saved in the results.
++- Per-turn latency is saved and summarized.
++- The runner's snapshot table is now `words_autotest_snapshot` (a manual `words_snapshot`
++  backup no longer blocks a run), and restoring **merges** missing words back (`INSERT ... ON
++  CONFLICT (word) DO NOTHING`) instead of replacing the table, so nothing added meanwhile is lost.
++
++**Tests:** 74 checks in `test_vocab_adherence.py`, 40 in `test_routing_checks.py`, 23 in
++`test_routing_runner_with_fake_langflow.py`.
++
++**Config, not code:** the Add Word node on the canvas must be replaced with a fresh copy for the
++normalization fix to apply (the first run showed "AutoTestApple" stored as a separate word).
++
+ ## Unreleased — Step 10: automated routing tests
+ 
+ **Added (tests first)**
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index d420e99..ca00eb7 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -109,6 +109,20 @@ so its mechanics (login, sessions, snapshot/restore) are proven, but whether the
+ carries the tool calls where the parser looks is only known after a live `--debug` run; if it
+ doesn't, the runner falls back to Langflow's stored messages for the session.
+ 
++First live routing run: routing was solid, but reading the actual replies (not just the
++pass/fail table) showed that most non-English stories were in English or half-English, which the
++structure-only check had passed. Lesson: a check that can't fail isn't a check; a test passing
++across 45 turns said nothing about the thing a language tutor exists to do. The language check was
++built from the real outputs. The run also showed my runner had its own bugs (cleanup between
++repeats, every tool call listed twice), so the harness needs the same scepticism as the product.
++
++Tuning change #1 targets the language problem the checker exposed. Reading the prompt with that
++problem in mind, the English tone examples stood out: a request for a Spanish story was shown an
++English example. So the fix has two parts (translate-the-meanings rule, no English example for
++other languages) and the English prompt is pinned by checksum so it cannot regress. Both are
++hypotheses until the before/after batches are compared. New deferred item:
++`story_prompt_builder.py` (Step 8 canvas pipeline) now differs from `story_tool.py`.
++
+ ## Current obstacle
+ 
+ **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace
+diff --git a/README.md b/README.md
+index 3d098c8..5af9848 100644
+--- a/README.md
++++ b/README.md
+@@ -99,6 +99,7 @@ tests/
+ ├── test_vocab_adherence.py
+ ├── test_add_word_normalization.py
+ ├── test_routing_checks.py
++├── test_story_prompt_language.py
+ └── test_routing_runner_with_fake_langflow.py
+ 
+ scripts/smoke_test.py            # Environment health check (Postgres + Groq)
+@@ -113,6 +114,7 @@ docs/
+ ├── IMPLEMENTATION-GUIDE.md      # Build order (Steps 1–11 + bonus) with per-step status
+ ├── AGENT-INSTRUCTIONS.md        # The Language Agent's final instructions (canvas-only setting)
+ ├── STEP-10-TEST-PLAN.md         # Step 10 pass criteria, routing matrix, results and tuning log
++├── WEB-APP-DESIGN.md            # Design of a local React + FastAPI web app (login, per-language vocabulary) around the Langflow flow
+ ├── LEARNING-OBJECTIVES.md       # LO 1–8, with implementation notes
+ ├── architecture-diagram.md      # Deployment diagram
+ ├── class-diagram.md
+@@ -141,6 +143,7 @@ docker compose exec langflow python /app/tests/test_tool_result_relay.py
+ docker compose exec langflow python /app/tests/test_vocab_adherence.py
+ docker compose exec langflow python /app/tests/test_add_word_normalization.py
+ docker compose exec langflow python /app/tests/test_routing_checks.py
++docker compose exec langflow python /app/tests/test_story_prompt_language.py
+ docker compose exec langflow python /app/tests/test_routing_runner_with_fake_langflow.py
+ docker compose exec langflow python /app/tests/test_final_passage_extractor.py
+ docker compose exec langflow python /app/tests/test_story_guard.py
+diff --git a/custom_components/story_tool.py b/custom_components/story_tool.py
+index 7a51f81..83f2d0c 100644
+--- a/custom_components/story_tool.py
++++ b/custom_components/story_tool.py
+@@ -168,8 +168,84 @@ def load_words(conn, table_name: str = "words") -> str:
+     return ", ".join(row[0] for row in rows)
+ 
+ 
++# --- language handling -------------------------------------------------------------------------
++# Found in the first live routing run: only 5 of 15 non-English stories were actually written in
++# the requested language. Two causes are addressed here:
++#   1. The vocabulary list is English, and "use words from this list" keeps the model in English.
++#      For other languages the prompt now says the list holds English MEANINGS to be expressed in
++#      the target language, with no English left in.
++#   2. The tone examples in the templates are written in English, which primes English output.
++#      For other languages the English example is left out.
++# The English prompt is untouched (the two templates above are used exactly as written).
++
++_NATIVE_LANGUAGE_NAMES = {
++    "\u65e5\u672c\u8a9e": "Japanese", "\u306b\u307b\u3093\u3054": "Japanese", "nihongo": "Japanese",
++    "\u4e2d\u6587": "Chinese", "\u6c49\u8bed": "Chinese", "\u6f22\u8a9e": "Chinese",
++    "\u666e\u901a\u8bdd": "Chinese", "\u56fd\u8bed": "Chinese", "\u570b\u8a9e": "Chinese",
++    "\ud55c\uad6d\uc5b4": "Korean",
++    "espa\u00f1ol": "Spanish", "espanol": "Spanish", "castellano": "Spanish",
++    "fran\u00e7ais": "French", "francais": "French",
++    "deutsch": "German", "italiano": "Italian",
++    "portugu\u00eas": "Portuguese", "portugues": "Portuguese",
++    "\u0440\u0443\u0441\u0441\u043a\u0438\u0439": "Russian",
++    "\u0627\u0644\u0639\u0631\u0628\u064a\u0629": "Arabic",
++    "\u0939\u093f\u0928\u094d\u0926\u0940": "Hindi",
++    "\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac": "Greek",
++    "\u0e44\u0e17\u0e22": "Thai", "\u05e2\u05d1\u05e8\u05d9\u05ea": "Hebrew",
++    "nederlands": "Dutch", "svenska": "Swedish", "t\u00fcrk\u00e7e": "Turkish", "polski": "Polish",
++    "ti\u1ebfng vi\u1ec7t": "Vietnamese", "bahasa indonesia": "Indonesian",
++    "ingl\u00e9s": "English", "ingles": "English", "anglais": "English", "englisch": "English",
++    "\u82f1\u8a9e": "English", "\u82f1\u8bed": "English",
++}
++
++
++def normalize_language(language) -> str:
++    """The English name of a language, whatever the learner typed: "\u65e5\u672c\u8a9e" -> "Japanese",
++    "fran\u00e7ais" -> "French", " spanish " -> "Spanish". Unknown names are only tidied up."""
++    text = " ".join((language or "").split())
++    if not text:
++        return ""
++    known = _NATIVE_LANGUAGE_NAMES.get(text.casefold())
++    if known:
++        return known
++    if text.isascii():
++        return " ".join(word.capitalize() for word in text.split(" "))
++    return text
++
++
++def is_english(language) -> bool:
++    return normalize_language(language) == "English"
++
++
++_LANGUAGE_BLOCK = (
++    "LANGUAGE RULE (most important): write the ENTIRE passage or dialogue (everything after "
++    "the ===STORY=== line) in {language}, and nothing in English. The vocabulary list below is "
++    "written in English: treat each entry as a MEANING and use its natural {language} word for "
++    "it (if the list has \"water\", write the {language} word for water). Do not leave any "
++    "English word in the story; only character names may stay as they are.\n\n"
++)
++_LANGUAGE_REMINDER = (
++    "Final check before you write: every word of the story is in {language} \u2014 each one the "
++    "{language} equivalent of a word from the list, or a basic grammar word or simple verb. "
++    "No English.\n\n"
++)
++
++
++def _template_for_other_languages(template: str) -> str:
++    """The same template with the language rule added after the intro, the English tone example
++    removed, and a final reminder before 'Begin:'."""
++    intro_end = template.index("\n\n") + 2
++    example_start = template.index("Tone example only")
++    begin = template.index("Begin:")
++    return (template[:intro_end] + _LANGUAGE_BLOCK + template[intro_end:example_start]
++            + _LANGUAGE_REMINDER + template[begin:])
++
++
++_OTHER_LANGUAGE_STYLES = {style: _template_for_other_languages(t) for style, t in VALID_STYLES.items()}
++
++
+ def build_story_prompt(language: str, words: str, style: Optional[str] = None) -> str:
+-    language = (language or "").strip()
++    language = normalize_language(language)
+     words = (words or "").strip()
+     if not language:
+         raise ValueError("language must be a non-empty string")
+@@ -179,7 +255,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None) -
+         style = random.choice(list(VALID_STYLES.keys()))
+     if style not in VALID_STYLES:
+         raise ValueError(f"style must be one of {list(VALID_STYLES.keys())}, got {style!r}")
+-    return VALID_STYLES[style].format(language=language, words=words)
++    templates = VALID_STYLES if is_english(language) else _OTHER_LANGUAGE_STYLES
++    return templates[style].format(language=language, words=words)
+ 
+ 
+ def extract_final_passage(raw_text, delimiter: str = DELIMITER) -> str:
+@@ -270,7 +347,7 @@ def generate_story_for_learner(
+     if owns_connection:
+         conn = get_connection()
+ 
+-    cache_key = (language or "").strip().lower()
++    cache_key = normalize_language(language).lower()
+ 
+     try:
+         if use_cache and cache_key in _STORY_CACHE:
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+index 3adf699..5d89e7b 100644
+--- a/docs/IMPLEMENTATION-GUIDE.md
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -229,6 +229,15 @@ constraint wording (Step 7) until behavior is reliable.
+   and the empty-vocabulary guard, replacing most of the manual Playground matrix; its logic is in
+   `scripts/routing_checks.py`. Tested here against a fake Langflow server; the real response
+   shape is confirmed on the first live run (`--debug`).
++- **First live routing run (45 turns):** routing is solid (right tool 42/42, right argument 36/36,
++  reply identical to the tool output 36/36, language switching 12/12, empty-vocabulary guard 3/3).
++  The run also showed that non-English stories were mostly **not in the requested language** (5/15
++  once checked), which the structure-only check had missed. A language-correctness check now
++  covers it; fixing the prompt is the next tuning step. Details in `docs/STEP-10-TEST-PLAN.md`.
++- **Tuning change #1 (language-aware prompt):** for non-English stories the prompt says the
++  vocabulary list holds English meanings to be expressed in the target language, leaves out the
++  English tone examples, and normalizes the language name. English prompts are unchanged. Measure
++  with `run_story_batch.py --languages Spanish,French,Japanese --count 10` before and after.
+ - **Design decisions:** the stored vocabulary stays English, so the vocabulary check applies to
+   English stories only; other languages are checked for structure and read by a person. After the
+   first baseline (35% pass under a zero-stray-words rule, with only everyday words such as
+diff --git a/docs/STEP-10-TEST-PLAN.md b/docs/STEP-10-TEST-PLAN.md
+index 0f1e9c6..1062b0d 100644
+--- a/docs/STEP-10-TEST-PLAN.md
++++ b/docs/STEP-10-TEST-PLAN.md
+@@ -15,7 +15,7 @@ other languages are translations of it. The automatic vocabulary check therefore
+ | 2 | Relay: chat reply is identical to the tool's Result when a tool was called | 100% |
+ | 3 | English stories: pass = **≤ 2 stray words** (see decision below), 4–8 sentences/lines, correct dialogue format, no leaked plan (≥ 20 passages) | ≥ 80% |
+ | 4 | Stories that fail to generate (fallback message, empty) | ≤ 10% |
+-| 5 | Non-English stories (5 per language, read by a person): right language, well-formed, uses vocabulary meanings | ≥ 90% |
++| 5 | Non-English stories: **actually written in the requested language** (automatic language check, `--count 10` per language) and read by a person for naturalness | ≥ 90% |
+ | 6 | Empty-vocabulary guard (R13) | 3 of 3 |
+ | 7 | Written verdict on cost, latency, quality, rate limits (section D) | done |
+ 
+@@ -163,9 +163,65 @@ rewritten: if the table already holds an un-normalized word (for example "Hello"
+    **quality/consistency** (what the small model could and couldn't do reliably, and what the
+    relay and cache had to compensate for), and **rate limits** (what they allowed in practice).
+ 
++## Results so far
++
++### First live routing run (automated, 3 repeats of 12 cases = 45 turns, `gpt-oss-120b`)
++
++| Measure | Result |
++|---|---|
++| Right tool called (small talk: none) | 42/42 |
++| Right argument (the language in the latest message / the word) | 36/36 |
++| Chat reply identical to the tool's output (the Relay) | 36/36 |
++| Language switching, English → Spanish → English → French in one session (M1) | 12/12 turns |
++| Empty-vocabulary guard (E1) | 3/3 |
++| English story quality (≤ 2 stray words, length, format) | 8/9 |
++| Add Word reply wording | 6/9, none of them a routing failure (below) |
++| **Non-English stories actually in the requested language** (re-scored with the new language check) | **5/15** |
++
++Routing criteria (1, 2, 6) are met. Criterion 3 is met for English (8/9, and 17/20 in the batch).
++**Criterion 5 is not met**, and the original structure-only check hid it. Reading the replies:
++2 of 3 "Spanish" stories and all 3 "Japanese" stories were written in English, and every
++French story had English words left in ("je veux water", "Thank you", "Tomorrow je aiderai").
++Good Spanish and French did appear (5/15 overall), so the model can do it; the prompt doesn't
++make it reliable. Likely cause (hypothesis): the vocabulary is a list of English words and the
++prompt tells the model to use those words, which pulls the story back into English.
++
++Things the run exposed that were not product bugs:
++- **A3 failed because the Add Word node on the canvas was still the old version** (case-sensitive,
++  so "AutoTestApple" was added as a new row). Replacing the node fixes it.
++- **A1 failed in repeats 2 and 3: a runner bug.** The throwaway word was cleaned up only at the
++  end. Fixed: every repeat starts clean, case-insensitively.
++- **Every tool-using turn listed two identical tool calls.** Probably the parser reading one call
++  twice; calls are now collapsed by id and the id is saved, so the true count will show next run.
++
++### Tuning change #1 (implemented): a language-aware prompt for non-English stories
++
++Order matters, so the effect is measurable: **run the baseline before applying the change**, then
++apply it and run the identical batch.
++
++```
++docker compose exec langflow python /app/scripts/run_story_batch.py --languages Spanish,French,Japanese --count 10
++```
++
++The summary reports "Written in the requested language" for each language. The change, in
++`story_tool.py` (English prompts are untouched, pinned by checksum in the tests):
++1. For any language other than English the prompt now opens with a language rule: write the entire
++   story in that language; the vocabulary list is English *meanings* to be expressed in it; no English
++   words may remain (names excepted); plus a final-check reminder before "Begin:".
++2. The English tone examples ("I am hungry today...", "Mia: Hello! Do you have any bread?") are
++   left out of non-English prompts, because an English example primes English output.
++3. A language given by its own name is normalized ("日本語" → Japanese, "español" → Spanish) before
++   it goes into the prompt and the cache key.
++
++Not changed: `story_prompt_builder.py` (the Step 8 canvas pipeline, kept for debugging) still has
++the old templates, so it will differ from the production path until the duplicated logic is cleaned
++up (deferred list).
++
+ ## Tuning log
+ 
+ | # | Change (one thing at a time) | Why | Before | After |
+ |---|------------------------------|-----|--------|-------|
+ | 0 | Baseline, no change (20 English stories, strict rule: 0 stray words) | | — | **7/20 pass (35%)**; 0 failures, 0 leaks, 0 off-length, 0 bad format; mean 1.30 stray words/story; top stray words: bring 5, drink 4, together 4, share 2, eat 2, sure 2, happily, offers, bake, shares |
++| 0c | Routing run: non-English stories re-scored with the language check | The structure-only check passed stories written in English | 15 passed on structure | **5/15 in the requested language** (Spanish 3/6, French 2/6, Japanese 0/3) |
++| 1 | Language-aware prompt for non-English stories (translate-the-meanings rule, no English example, normalized language name) | Only 5/15 non-English stories were in the requested language; the English vocabulary list and English examples pull stories back to English | *run the baseline batch first and record it here* | *run the same batch after applying and record it here* |
+ | 0b | Same baseline, re-scored with the relaxed rule (≤ 2 stray words) | The strict rule was unrealistic for a 12-word vocabulary; the stray words are everyday words | 35% | *run `--rescore` and record here* |
+diff --git a/docs/WEB-APP-DESIGN.md b/docs/WEB-APP-DESIGN.md
+new file mode 100644
+index 0000000..c276ccc
+--- /dev/null
++++ b/docs/WEB-APP-DESIGN.md
+@@ -0,0 +1,333 @@
++# Language Tutor Web App — Design (React)
++
++**Status:** Draft v3 · **Date:** 2026-10-04 · **Runs:** locally with Docker Compose (a demo, not hosted) · **Stack:** React + TypeScript, FastAPI, Langflow, Postgres, Groq
++
++## 1. Purpose and scope
++A local demo web app for the language tutor. One `docker compose up` starts the React site, a FastAPI backend, Langflow and Postgres. A learner creates an account, logs in, studies in a **target language** (vocabulary is stored in that language), chats with the tutor, manages words, and generates stories with a quality report.
++
++**Langflow stays the AI layer.** The Agent, tools and Tool Result Relay do the chat work; the web app is a client of the flow, so the project's learning objectives stay intact.
++
++**In scope:** accounts and login, per-user and per-language vocabulary, chat tutor, vocabulary manager, story studio with quality report, saved stories, simple practice, diagnostics.
++**Out of scope:** public hosting, payments, password reset by email, voice, real-time collaboration.
++
++## 2. Users and stories
++| # | As a learner I want to... | Page |
++|---|---|---|
++| U1 | chat naturally ("add the word bread", "story in Spanish") | Chat |
++| U2 | see and edit my words, upload a CSV, add a word | Vocabulary |
++| U3 | pick a language and style (narration or dialogue) and get a story | Story Studio |
++| U4 | see which words in a story are outside my vocabulary | Story Studio |
++| U5 | keep stories I liked and reread them | Library |
++| U6 | quiz myself on my words | Practice |
++| U7 | (admin) check that Postgres, Groq and Langflow are healthy | Settings |
++| U8 | create an account and log in so my words are private | Login |
++| U9 | keep a separate word list for each language I study | Vocabulary |
++
++## 3. Architecture
++A browser cannot hold the Groq or Langflow keys or reach Postgres, so React talks only to a small **FastAPI backend** (`tutor-api`). Two backend paths coexist on purpose:
++
++- **Agent path (`POST /chat`):** the API calls the Langflow flow. The Agent picks the tool; the Tool Result Relay returns its exact output. The learner's id and language are passed per request (Langflow `tweaks`).
++- **Direct path (vocabulary, stories, practice):** the API calls shared Python (`tutor_core`). Faster, deterministic, and it can offer controls the Agent tool lacks (narration or dialogue).
++
++```mermaid
++flowchart LR
++  U["Learner browser, localhost:8080"] --> W
++  subgraph FE["Front end"]
++    W["React app: Login, Home, Chat, Vocabulary, Story Studio, Library, Practice, Settings"]
++  end
++  subgraph BE["tutor-api, FastAPI"]
++    R["Routes and auth, JWT in httpOnly cookie"]
++    SV["Services: auth, vocab, story, quality, langflow_client"]
++    R --> SV
++  end
++  W -->|"REST JSON, same origin /api"| R
++  SV -->|"HTTP run, user_id and language in tweaks"| LF["Langflow flow: Agent, tools, Tool Result Relay"]
++  SV -->|"SQL"| DB[("Postgres: users, words, stories")]
++  SV -->|"HTTPS direct"| GQ["Groq API"]
++  LF -->|"SQL, filtered by user and language"| DB
++  LF --> GQ
++```
++
++## 3A. Tech stack
++| Layer | Choice | Notes |
++|---|---|---|
++| Front end | **React + TypeScript**, built with **Vite** | SPA served by nginx |
++| Routing and data | **React Router**, **TanStack Query** | server state, caching, retries |
++| Styling | **Tailwind CSS** | component library (for example shadcn/ui) is optional |
++| Forms | **React Hook Form** + **Zod** | validation shared by form and API types |
++| API client | types generated from the FastAPI **OpenAPI** schema (`openapi-typescript`) | keeps the two codebases in sync |
++| Backend | **FastAPI** (Python 3.12), Pydantic, uvicorn | thin routes over services |
++| AI orchestration | **Langflow** (existing flow) | Agent, Add Word, Story Generator, Tool Result Relay |
++| LLM | **Groq**, `openai/gpt-oss-120b` | free tier; shared rate limit |
++| Database | **PostgreSQL 16**, `psycopg2` | tables: users, words, stories |
++| Auth | **bcrypt** + **JWT** in an httpOnly cookie | local accounts, no external provider |
++| Shared logic | **`tutor_core`** Python package | prompts, normalization, checks; used by Langflow and the API |
++| Target-language tokenizing | `simplemma`, `jieba`, `fugashi` + `unidic-lite`, `kiwipiepy` | optional per language; verify each installs |
++| Tests | `pytest`, Vitest + React Testing Library, Playwright | plus the existing fake-Langflow tests |
++| Packaging | **Docker Compose**, nginx, `.env` | new services: `web`, `api` |
++
++## 3B. Login and authentication
++Local accounts, deliberately simple.
++
++```mermaid
++sequenceDiagram
++  actor L as Learner
++  participant W as React app
++  participant A as tutor-api
++  participant DB as Postgres
++  L->>W: submit login form
++  W->>A: POST /auth/login
++  A->>DB: look up user by username
++  DB-->>A: password hash
++  A->>A: bcrypt verify
++  A-->>W: set httpOnly cookie with JWT
++  W->>A: GET /me
++  A-->>W: user, language list
++  W-->>L: Home; every API call carries the cookie
++```
++
++- Passwords are stored only as bcrypt hashes; failed logins are rate-limited per username.
++- The API reads `user_id` from the verified token, never from the request body; services take it as an argument.
++- React keeps only the user profile in an auth context; the token is not readable by JavaScript.
++
++## 3C. API surface
++
++| Method and path | Purpose |
++|---|---|
++| `POST /auth/register`, `/auth/login`, `/auth/logout`; `GET /me` | accounts and session |
++| `GET /words?language=`, `POST /words`, `DELETE /words/{id}`, `POST /words/upload` | vocabulary |
++| `POST /chat` (message, session id) | Agent path through Langflow; returns reply and tool calls |
++| `POST /stories/generate` (language, style) | direct path; returns story and quality report |
++| `GET /stories`, `POST /stories`, `DELETE /stories/{id}` | library |
++| `GET /health` | Postgres, Groq and Langflow status for Settings |
++
++## 4. Navigation and pages
++```mermaid
++flowchart TD
++  LG["Login or register"] --> H
++  H["Home dashboard"] --> C["Chat"]
++  H --> V["Vocabulary"]
++  H --> S["Story Studio"]
++  H --> L["Library"]
++  H --> PR["Practice"]
++  H --> ST["Settings"]
++  V -->|"make a story from these words"| S
++  S -->|"save"| L
++  L -->|"reread or regenerate"| S
++  L -->|"quiz on a story"| PR
++```
++
++| Route | Purpose | API | Main components |
++|---|---|---|---|
++| `/login` | register, log in | `/auth/*` | `LoginForm` |
++| `/` Home | word count, recent stories, shortcuts | `/words`, `/stories` | `StatCard` |
++| `/chat` | talk to the tutor; show the tool used | `/chat` | `ChatPanel`, `ToolTrace` |
++| `/vocabulary` | list, search, add, delete, CSV upload | `/words` | `WordTable`, `CsvUpload` |
++| `/studio` | generate a story, quality report | `/stories/generate` | `StoryCard`, `ReportPanel` |
++| `/library` | saved stories | `/stories` | `StoryList` |
++| `/practice` | flashcards, cloze from stories | `/words`, `/stories` | `Flashcard` |
++| `/settings` | health checks, model, account | `/health`, `/me` | `StatusList` |
++
++## 5. Wireframes
++**Chat**
++```
+++--------------------------------------------------------------+
++| Language Tutor      [Home] [Chat] [Vocab] [Studio] [Library] |
+++--------------------------------------------------------------+
++| You:  Tell me a story in Spanish                             |
++| Tutor: Ana: Hola, tienes agua?                               |
++|        Luis: Si, tengo agua en mi casa.   ...                |
++|        > Tool used: Story Generator (language = Spanish)     |
++|                                                              |
++| [ Type a message...                                  ] [Send]|
++| Sidebar:  Words: 16   Language: Spanish   [New session]      |
+++--------------------------------------------------------------+
++```
++
++**Vocabulary**
++```
+++--------------------------------------------------------------+
++| Vocabulary  Language [Spanish v]  (16)  [Search] [CSV] [Add]  |
+++--------------------------------------------------------------+
++|  word        meaning        |  [x] select    [Delete]        |
++|  hola        hello          |                                |
++|  agua        water          |  Add a word:  [ bread     ] [+]|
++|  gracias     thank you      |  Words are stored lowercase;   |
++|  ...                        |  duplicates are ignored.       |
++|             [ Make a story from my words -> ]                |
+++--------------------------------------------------------------+
++```
++
++**Story Studio**
++```
+++--------------------------------------------------------------+
++| Language [Spanish v]  Style (o) Narration ( ) Dialogue ( ) Any|
++|                                        [ Generate story ]    |
+++--------------------------------------------------------------+
++| Story                         | Quality report               |
++| Ana: Hola, tienes agua?       | Language: ok (0% English)    |
++| Luis: Si, tengo agua.         | Length: 6 lines   Format: ok |
++| ...                           | Outside your words: bring    |
++|                               | Read time: 20 s              |
++| [Save] [Regenerate] [Practice this story]                    |
+++--------------------------------------------------------------+
++```
++
++## 6. Key flows
++**Chat turn (Agent path)**
++
++```mermaid
++sequenceDiagram
++  actor L as Learner
++  participant W as React Chat route
++  participant A as tutor-api
++  participant LF as Langflow API
++  participant AG as Agent and tools
++  participant R as Tool Result Relay
++  L->>W: types a message
++  W->>A: POST /chat
++  A->>LF: run flow, session id and tweaks
++  LF->>AG: message
++  AG->>AG: tool call, then tool output
++  AG-->>R: reply plus tool call
++  R-->>LF: reply replaced by the exact tool output
++  LF-->>A: JSON response
++  A->>A: parse reply and tool calls
++  A-->>W: reply and tool trace
++  W-->>L: message bubble and expandable trace
++```
++
++**Story Studio (direct path):** `POST /stories/generate` runs `story_service.generate(user, language, style)`, which loads the learner's words in that language, builds the prompt, calls Groq, strips the planning text, then `quality.check(...)` scores it. If Groq rate-limits or fails, the API returns a typed error and the UI shows a retry message with a cooldown.
++
++## 7. Data model
++Vocabulary is stored **in the target language**, per learner. Today's `words` table (`id, word, created_at`, `word` unique) gains `user_id` and `language`, and uniqueness becomes `(user_id, language, word)`. `meaning_en` is optional (shown in tables and quizzes).
++
++```mermaid
++erDiagram
++  USERS ||--o{ WORDS : owns
++  USERS ||--o{ STORIES : saves
++  USERS {
++    int id PK
++    text username UK
++    text password_hash
++    text display_name
++    text native_language
++    timestamp created_at
++  }
++  WORDS {
++    int id PK
++    int user_id FK
++    text language
++    text word
++    text meaning_en
++    timestamp created_at
++  }
++  STORIES {
++    int id PK
++    int user_id FK
++    text language
++    text style
++    text body
++    bool passed
++    text report_json
++    timestamp created_at
++  }
++```
++
++**Consequences:** stories use the learner's words directly, so the "translate the English meanings" prompt rule (patch 0010) is only needed for any English-vocabulary mode; the no-English-example rule still helps. The adherence check works on lemmas of the target language, so inflections count as the same word. Migration: existing rows get `language = 'English'` and the demo user.
++
++## 8. Code structure and a shared core
++```
++web/                       # React app (Vite)
++  src/routes/              # one file per route
++  src/components/          # ChatPanel, WordTable, StoryCard, ReportPanel...
++  src/api/                 # generated types and a small fetch wrapper
++  src/auth/                # auth context, protected-route wrapper
++api/                       # FastAPI
++  main.py, routes/, services/ (auth, vocab, story, quality, langflow_client)
++  config.py                # env vars only
++tutor_core/                # pure Python shared with the Langflow components
++```
++
++**Key decision:** `story_tool.py` and `add_word.py` import Langflow at the top, so the API cannot import them cheaply. Move the pure logic (`normalize_word`, `normalize_language`, `build_story_prompt`, `call_groq`, `load_words`, the checks) into `tutor_core/`, used by both Langflow and the API. This also clears the deferred items (duplicated logic, hardcoded credentials and model names). Langflow's component scanner has been unreliable with cross-file imports, so install `tutor_core` as a package or put it on `PYTHONPATH`.
++
++## 9. State and caching
++| Item | Where | Notes |
++|---|---|---|
++| Logged-in user | auth context, fed by `GET /me` | protected routes redirect to `/login` |
++| Words, stories, health | TanStack Query cache | invalidated after add, delete, upload, save |
++| Chat messages, session id | component state in the Chat route | new session = new Langflow `session_id` |
++| Selected language, style | context, remembered in `localStorage` | per learner |
++| Generated story | component state until saved | avoids regenerating on re-render |
++
++Mutations that are cheap and safe (add or delete a word) update the cache optimistically; calls to Groq or Langflow never retry automatically, to protect the shared rate limit.
++
++## 10. Errors and rate limits
++Groq's free tier is shared by everyone using the app, so limits will show up with more than one learner.
++
++| Situation | What the learner sees |
++|---|---|
++| Groq 429 or the fallback message | "The tutor is busy. Try again in a moment", button disabled for 15 s |
++| Empty vocabulary | the guard message plus a link to Vocabulary |
++| Langflow unreachable | banner on Chat; other pages keep working (direct path) |
++| Story not in the requested language | quality report flags it; "Regenerate" offered |
++| Duplicate or empty word | inline message, nothing stored |
++| Unexpected error | friendly message; details in the log and Settings |
++
++## 11. Security and configuration
++- Secrets (`GROQ_API_KEY`, `LANGFLOW_API_KEY`, database URL, JWT secret) live in `.env`, git-ignored, and are only read by the API.
++- JWT in an httpOnly, SameSite=Lax cookie; state-changing requests also need a custom header (CSRF defence). nginx serves the app and proxies `/api`, so the browser sees one origin and CORS stays closed.
++- Parameterized SQL only; Pydantic validates every request; words normalized before storing; every query filtered by the token's `user_id`.
++- React escapes text by default; render stories as text, never as raw HTML.
++- Per-user separation is enforced in the services layer, so test it: user A must never read user B's words or stories.
++
++## 12. Deployment
++Local only. `docker-compose.yml` gains two services next to Langflow and Postgres:
++
++```yaml
++  web:
++    build: ./web            # builds the React app, serves it with nginx
++    ports: ["8080:80"]      # nginx proxies /api to the api service
++    depends_on: [api]
++  api:
++    build: ./api
++    environment:
++      - LANGFLOW_URL=http://langflow:7860
++      - LANGFLOW_FLOW_ID=${LANGFLOW_FLOW_ID}
++      - LANGFLOW_API_KEY=${LANGFLOW_API_KEY}
++      - DATABASE_URL=postgresql://langflow:langflow@postgres:5432/langflow
++      - GROQ_API_KEY=${GROQ_API_KEY}
++      - JWT_SECRET=${JWT_SECRET}
++    volumes: ["./tutor_core:/app/tutor_core"]
++    depends_on: [langflow, postgres]
++```
++
++**First run:** `docker compose up`; import the exported flow JSON into Langflow (export it into the repo first); create a Langflow API key; fill `.env`; run the seed script (demo user, sample words in two languages); open `localhost:8080`. For development run `npm run dev` (Vite proxies `/api` to the API).
++
++## 13. Testing
++- **API and services:** `pytest` with FastAPI's `TestClient` and fake connections, in the style of the current tests; the fake Langflow server already in the suite covers the chat path.
++- **Auth and isolation:** register, wrong password, duplicate username, expired token, and a cross-user test (user A cannot read user B's words or stories).
++- **Front end:** Vitest + React Testing Library for components and hooks, with the API mocked.
++- **End to end:** Playwright: register, log in, add a word, generate a story, see the quality report (with Groq and Langflow stubbed in the API).
++- **Contract:** the generated TypeScript client is rebuilt from the OpenAPI schema in CI, so a breaking API change fails the front-end build.
++- **Quality:** the adherence and language checks double as a runtime feature (the quality report) and a regression test.
++
++## 14. Milestones
++| M | Deliverable | Depends on |
++|---|---|---|
++| 1 | API skeleton with `/health`, React shell and routing, compose services | none |
++| 2 | Accounts and login (API and UI), `users` table | M1 |
++| 3 | `tutor_core` extraction; schema migration (`user_id`, `language`) | existing tests |
++| 4 | Vocabulary API and page, per language | M2, M3 |
++| 5 | Chat route over the Langflow API with per-user tweaks | M3, flow exported, API key |
++| 6 | Story Studio with quality report (target-language lemmas) | M4 |
++| 7 | Library, Practice, seed script, end-to-end tests, demo walkthrough | M6 |
++
++## 15. Risks and open questions
++1. **Two codebases (TypeScript and Python)** double the surface to test. The generated API client and contract tests are the guard.
++2. **Passing the user to Langflow tools.** The plan is Langflow `tweaks` setting hidden `user_id` and `language` inputs on Add Word and the Story tool per request. Verify in M5; the fallback is encoding the user in the `session_id`.
++3. **`tutor_core` extraction** touches working components; keep the existing tests as the safety net.
++4. **Tokenizers:** `fugashi`, `kiwipiepy` and `jieba` can be fiddly to install. Start with space-delimited languages (Spanish, French).
++5. **Non-English story quality:** only 5 of 15 non-English stories were in the right language in the last measurement. Measure the prompt change before Story Studio offers those languages.
++6. **Chat reliability depends on the Agent**; the direct pages are the safe fallback.
++7. **Open decisions:** plain Tailwind or a component library; stream chat replies (SSE) or return them whole; keep an English-vocabulary mode as well as target-language.
+diff --git a/scripts/routing_checks.py b/scripts/routing_checks.py
+index 38418de..3c15bcf 100644
+--- a/scripts/routing_checks.py
++++ b/scripts/routing_checks.py
+@@ -36,7 +36,10 @@ TEST_WORD = "autotestapple"  # removed from the vocabulary again after the run
+ 
+ 
+ def _story(say, languages, kind):
+-    return {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "story": kind}
++    turn = {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "story": kind}
++    if kind == "other":
++        turn["language"] = languages[0].capitalize()  # the story must really be written in it
++    return turn
+ 
+ 
+ CASES = [
+@@ -130,23 +133,25 @@ def find_tool_calls(resp):
+     primary = _primary_message(resp)
+     if primary is not None:
+         _walk_tool_dicts(primary, raw)
+-    if not raw:  # shape not recognised: search everything and drop exact duplicates
++    if not raw:  # shape not recognised: search everything
+         _walk_tool_dicts(resp, raw)
+-        seen, unique = set(), []
+-        for item in raw:
+-            key = json.dumps(item, sort_keys=True, default=str)
+-            if key not in seen:
+-                seen.add(key)
+-                unique.append(item)
+-        raw = unique
++    # The first live run listed every call twice. Collapse the same call (same id, or, with no
++    # id, an identical dict); genuine repeated calls have different ids and are kept.
++    seen, unique = set(), []
++    for item in raw:
++        key = ("id", item["id"]) if item.get("id") else ("dict", json.dumps(item, sort_keys=True, default=str))
++        if key not in seen:
++            seen.add(key)
++            unique.append(item)
+     return [
+         {
++            "id": item.get("id"),
+             "name": str(item.get("name") or ""),
+             "args": item.get("tool_input") if isinstance(item.get("tool_input"), dict) else {},
+             "output": output_to_text(item.get("output")),
+             "error": item.get("error"),
+         }
+-        for item in raw
++        for item in unique
+     ]
+ 
+ 
+@@ -242,13 +247,18 @@ def evaluate_turn(spec, resp, vocab, error=None, max_oov=2):
+     # story quality
+     kind = spec.get("story")
+     if kind and not spec.get("expect_guard"):
+-        result = check_passage(text, vocab, check_vocab=(kind == "english"), max_oov=max_oov)
++        result = check_passage(text, vocab, check_vocab=(kind == "english"), max_oov=max_oov,
++                               language=spec.get("language"))
+         if result["failure"]:
+             detail = f"no story: {result['failure_reason']}"
+         else:
++            lc = result.get("language_check")
+             detail = (f"{result['style']}, {result['units']} units"
+                       + (f", stray words {result['oov_words']}" if result["oov_words"] else "")
+-                      + (", leaked plan" if result["leaked_plan"] else ""))
++                      + (", leaked plan" if result["leaked_plan"] else "")
++                      + (f", language: written in {lc['verdict']} (English share {lc['english_ratio']:.0%})"
++                         if lc and not lc["ok"] and lc["english_ratio"] is not None else "")
++                      + (f", language: {lc['verdict']}" if lc and not lc["ok"] and lc["english_ratio"] is None else ""))
+         checks.append(_c("story quality", result["passed"], detail, info))
+ 
+     return checks
+diff --git a/scripts/run_routing_tests.py b/scripts/run_routing_tests.py
+index 0bf5220..f4ed126 100644
+--- a/scripts/run_routing_tests.py
++++ b/scripts/run_routing_tests.py
+@@ -125,6 +125,9 @@ def stored_tool_blocks(base_url, api_key, session_id):
+ 
+ # --- database (kept small so it can be faked in tests) -------------------------------------------
+ 
++# Its own name, so a manual backup called `words_snapshot` never blocks (or is mistaken for) a run.
++SNAPSHOT_TABLE = "words_autotest_snapshot"
++
+ 
+ class VocabDb:
+     def __init__(self):
+@@ -154,18 +157,22 @@ class VocabDb:
+             conn.close()
+ 
+     def snapshot_exists(self):
+-        row = self._run(("SELECT to_regclass('words_snapshot') IS NOT NULL", None), fetch=True)
++        row = self._run((f"SELECT to_regclass('{SNAPSHOT_TABLE}') IS NOT NULL", None), fetch=True)
+         return bool(row and row[0])
+ 
+     def snapshot_and_empty(self):
+-        self._run(("CREATE TABLE words_snapshot AS SELECT * FROM words", None), ("DELETE FROM words", None))
++        self._run((f"CREATE TABLE {SNAPSHOT_TABLE} AS SELECT * FROM words", None), ("DELETE FROM words", None))
+ 
+     def restore(self):
+-        self._run(("DELETE FROM words", None), ("INSERT INTO words SELECT * FROM words_snapshot", None),
+-                  ("DROP TABLE words_snapshot", None))
++        """Merge the snapshot back. Nothing is deleted, so a word added since the snapshot
++        survives, and no snapshot row can collide with a newer row's id."""
++        self._run((f"INSERT INTO words (word, created_at) SELECT word, created_at FROM {SNAPSHOT_TABLE} "
++                   "ON CONFLICT (word) DO NOTHING", None),
++                  (f"DROP TABLE {SNAPSHOT_TABLE}", None))
+ 
+     def remove_test_word(self):
+-        self._run(("DELETE FROM words WHERE word = %s", (TEST_WORD,)))
++        # case-insensitive: an older Add Word kept the original case ("AutoTestApple")
++        self._run(("DELETE FROM words WHERE lower(word) = %s", (TEST_WORD,)))
+ 
+ 
+ # --- running ----------------------------------------------------------------------------------
+@@ -176,14 +183,17 @@ def run_case(case, args, api_key, vocab, repeat_index, debug_state):
+     turn_results = []
+     for turn_no, spec in enumerate(case["turns"], 1):
+         error, resp = None, None
++        started = time.time()
+         try:
+             resp = run_flow(args.base_url, args.flow_id, api_key, spec["say"], session_id)
++            latency = time.time() - started
+             if spec.get("tool") not in (None, "either") and not find_tool_calls(resp):
+                 blocks = stored_tool_blocks(args.base_url, api_key, session_id)
+                 if blocks:
+                     resp = with_tool_blocks(resp, blocks)
+         except ApiError as e:
+             error = str(e)
++            latency = time.time() - started
+ 
+         if args.debug and not debug_state["shown"] and resp is not None:
+             debug_state["shown"] = True
+@@ -193,7 +203,7 @@ def run_case(case, args, api_key, vocab, repeat_index, debug_state):
+             print("--- DEBUG: parsed -> tool calls:", json.dumps(find_tool_calls(resp), ensure_ascii=False)[:600], "---\n")
+ 
+         checks = evaluate_turn(spec, resp, vocab, error=error, max_oov=args.max_oov)
+-        turn_results.append({"turn": turn_no, "say": spec["say"], "reply": final_text(resp) if resp else "",
++        turn_results.append({"turn": turn_no, "say": spec["say"], "latency": latency, "reply": final_text(resp) if resp else "",
+                              "tool_calls": find_tool_calls(resp) if resp else [], "checks": checks})
+         report_turn(case, turn_no, len(case["turns"]), spec, checks)
+         story_turn = spec.get("tool") in ("story", "either")
+@@ -250,13 +260,14 @@ def main(argv=None, db_factory=VocabDb):
+     if args.restore_leftover:
+         if db.snapshot_exists():
+             db.restore()
+-            print("Restored the words table from words_snapshot.")
++            print(f"Merged the saved words back into `words` from {SNAPSHOT_TABLE} (nothing was deleted).")
+         else:
+             print("No leftover snapshot; nothing to restore.")
+         return 0
+     if db.snapshot_exists():
+-        print("A leftover `words_snapshot` table exists (a previous run was interrupted while the vocabulary was empty).\n"
+-              "Run again with --restore-leftover first, so no words are lost.")
++        print(f"A leftover `{SNAPSHOT_TABLE}` table exists: a previous run was interrupted while the vocabulary was empty.\n"
++              "Run again with --restore-leftover first. It merges the saved words back and deletes nothing,\n"
++              "so words added since are kept. (A manual backup named `words_snapshot` is not touched.)")
+         return 2
+ 
+     vocab = db.words()
+@@ -279,6 +290,7 @@ def main(argv=None, db_factory=VocabDb):
+     try:
+         db.remove_test_word()  # a clean start in case a previous run was interrupted
+         for repeat in range(1, args.repeat + 1):
++            db.remove_test_word()  # every repeat starts clean, so A1 can add the word again
+             for case in normal:
+                 results.append({"case": case["id"], "name": case["name"], "repeat": repeat,
+                                 "turns": run_case(case, args, api_key, vocab, repeat, debug_state)})
+@@ -305,6 +317,10 @@ def main(argv=None, db_factory=VocabDb):
+     failed_turns = sum(1 for r in results for t in r["turns"] if any(not c["ok"] and not c.get("info") for c in t["checks"]))
+     failed_cases = sorted({r["case"] for r in results for t in r["turns"] if any(not c["ok"] and not c.get("info") for c in t["checks"])})
+     print(f"\nTurns: {total_turns - failed_turns}/{total_turns} passed" + (f"   Failing cases: {', '.join(failed_cases)}" if failed_cases else ""))
++    lat = sorted(t["latency"] for r in results for t in r["turns"] if t.get("latency") is not None)
++    if lat:
++        print(f"Turn latency (Agent + tool + relay), {len(lat)} turns: p50 {lat[len(lat) // 2]:.1f}s, "
++              f"p90 {lat[min(len(lat) - 1, int(len(lat) * 0.9))]:.1f}s")
+ 
+     out = args.out or f"/app/scripts/routing_results_{time.strftime('%Y%m%d_%H%M%S')}.json"
+     with open(out, "w", encoding="utf-8") as f:
+diff --git a/scripts/run_story_batch.py b/scripts/run_story_batch.py
+index 3602dbb..63fb500 100644
+--- a/scripts/run_story_batch.py
++++ b/scripts/run_story_batch.py
+@@ -61,6 +61,7 @@ def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max
+         result = check_passage(
+             text, words, check_vocab=(language.strip().lower() == "english"),
+             max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
++            language=language,
+         )
+         result.update(language=language, latency=seen.get("latency"), style_requested=seen.get("style_requested"), text=text)
+         results.append(result)
+diff --git a/scripts/vocab_adherence.py b/scripts/vocab_adherence.py
+index c50f194..3def05e 100644
+--- a/scripts/vocab_adherence.py
++++ b/scripts/vocab_adherence.py
+@@ -147,23 +147,95 @@ def _is_known(token, vocab_forms, allowed):
+     return False
+ 
+ 
++# --- is the passage actually written in the requested language? --------------------------------
++# Found in the first automated run: a "Spanish" story written in English, a "Japanese" story in
++# English, French with English words left in. Checking structure alone passed all of them.
++
++_SCRIPT_RANGES = {
++    "kana": "\u3040-\u30ff", "cjk": "\u3400-\u4dbf\u4e00-\u9fff", "hangul": "\uac00-\ud7af\u1100-\u11ff",
++    "cyrillic": "\u0400-\u04ff", "arabic": "\u0600-\u06ff", "devanagari": "\u0900-\u097f",
++    "greek": "\u0370-\u03ff", "thai": "\u0e00-\u0e7f", "hebrew": "\u0590-\u05ff",
++}
++_LANGUAGE_SCRIPTS = {}
++for _names, _scripts in (
++    (("japanese", "nihongo", "\u65e5\u672c\u8a9e"), ("kana", "cjk")),
++    (("chinese", "mandarin", "cantonese", "\u4e2d\u6587", "\u6c49\u8bed", "\u6f22\u8a9e", "\u666e\u901a\u8bdd"), ("cjk",)),
++    (("korean", "\ud55c\uad6d\uc5b4"), ("hangul",)),
++    (("russian", "ukrainian", "bulgarian", "\u0440\u0443\u0441\u0441\u043a\u0438\u0439"), ("cyrillic",)),
++    (("arabic", "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"), ("arabic",)),
++    (("hindi", "\u0939\u093f\u0928\u094d\u0926\u0940"), ("devanagari",)),
++    (("greek", "\u03b5\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac"), ("greek",)),
++    (("thai", "\u0e44\u0e17\u0e22"), ("thai",)),
++    (("hebrew", "\u05e2\u05d1\u05e8\u05d9\u05ea"), ("hebrew",)),
++):
++    for _n in _names:
++        _LANGUAGE_SCRIPTS[_n] = _scripts
++
++# Short English words that are also ordinary words in Spanish/French/Italian/Portuguese/German
++# ("no", "a", "me", "on"...) must not make a Romance-language story look English.
++_AMBIGUOUS_WITH_ENGLISH = {"a", "as", "me", "no", "on", "do", "in", "an", "he", "so", "all", "here",
++                           "is", "be", "was", "had", "son", "des", "the", "per"}
++_ENGLISH_MARKERS = GRAMMAR_WORDS - _AMBIGUOUS_WITH_ENGLISH
++
++ENGLISH_VERDICT_RATIO = 0.5  # at least this share of English words: the story is in English
++MIXED_VERDICT_RATIO = 0.2    # at least this share: English words left in a story in another language
++SCRIPT_MIN_RATIO = 0.5       # at least this share of letters must be in the language's own script
++
++
++def language_check(text, language, vocab=""):
++    """Is `text` plausibly written in `language`? English is never checked here.
++
++    Non-Latin languages (Japanese, Chinese, Korean, Russian, ...): most letters must be in the
++    language's own script. Other languages: the share of English words (grammar words plus the
++    learner's English vocabulary) must be low; a story in English, or with English words left in
++    ("je veux water"), fails. A heuristic, not a language detector: ok/verdict only."""
++    name = _norm(language).strip().lower()
++    base = {"ok": True, "verdict": "not_checked", "english_ratio": None, "script_ratio": None}
++    if not name or name in ("english", "en", "ingles", "inglés", "anglais", "englisch"):
++        return base
++
++    letters = [ch for ch in _norm(text) if ch.isalpha()]
++    scripts = _LANGUAGE_SCRIPTS.get(name)
++    if scripts:
++        pattern = re.compile("[" + "".join(_SCRIPT_RANGES[sc] for sc in scripts) + "]")
++        ratio = (sum(1 for ch in letters if pattern.match(ch)) / len(letters)) if letters else 0.0
++        ok = ratio >= SCRIPT_MIN_RATIO
++        return {"ok": ok, "verdict": "ok" if ok else "wrong_script", "english_ratio": None, "script_ratio": ratio}
++
++    markers = _ENGLISH_MARKERS | (parse_vocabulary(vocab) - _AMBIGUOUS_WITH_ENGLISH)
++    markers |= {f for w in parse_vocabulary(vocab) for f in word_forms(w)} - _AMBIGUOUS_WITH_ENGLISH
++    tokens = [t.lower() for t in _TOKEN.findall(_norm(text))]
++    if not tokens:
++        return {"ok": False, "verdict": "no_text", "english_ratio": 0.0, "script_ratio": None}
++    ratio = sum(1 for t in tokens if t in markers) / len(tokens)
++    if ratio >= ENGLISH_VERDICT_RATIO:
++        verdict = "english"
++    elif ratio >= MIXED_VERDICT_RATIO:
++        verdict = "mixed"
++    else:
++        verdict = "ok"
++    return {"ok": verdict == "ok", "verdict": verdict, "english_ratio": ratio, "script_ratio": None}
++
++
+ def _failure_result(reason):
+     return {
+         "failure": True, "failure_reason": reason, "passed": False, "style": None, "units": 0,
+         "length_ok": False, "format_ok": False, "leaked_plan": False, "vocab_checked": False,
+         "oov_words": None, "oov_count": 0, "word_count": 0, "oov_rate": 0.0, "names": [],
+-        "longest_unit_words": 0, "mean_unit_words": 0.0,
++        "longest_unit_words": 0, "mean_unit_words": 0.0, "language_check": None,
+     }
+ 
+ 
+ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 8),
+-                  strict_verbs=False, extra_allowed=(), names=(), max_unit_words=None):
++                  strict_verbs=False, extra_allowed=(), names=(), max_unit_words=None, language=None):
+     """Score one passage. Returns a dict; `passed` is the overall verdict.
+ 
+     max_oov: words outside the vocabulary tolerated (0 = strict; the batch runner defaults to 2
+     so ordinary everyday words such as "eat" or "drink" don't fail a story).
+     max_unit_words: optional cap on the words in any one sentence/line (beginner readability);
+-    the longest and mean lengths are always reported either way."""
++    the longest and mean lengths are always reported either way.
++    language: the language the story was requested in. For anything other than English the
++    passage must actually be written in it (see language_check); None skips that check."""
+     text = _norm(text).strip()
+     if not text:
+         return _failure_result("empty")
+@@ -240,7 +312,13 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 8),
+ 
+     vocab_ok = (not check_vocab) or result["oov_count"] <= max_oov
+     unit_ok = max_unit_words is None or result["longest_unit_words"] <= max_unit_words
+-    result["passed"] = (not leaked) and length_ok and format_ok and vocab_ok and unit_ok
++    language_ok = True
++    if language:
++        result["language_check"] = language_check(text, language, vocab)
++        language_ok = result["language_check"]["ok"]
++    else:
++        result["language_check"] = None
++    result["passed"] = (not leaked) and length_ok and format_ok and vocab_ok and unit_ok and language_ok
+     return result
+ 
+ 
+@@ -255,6 +333,7 @@ def rescore_results(data, max_oov=0, strict_verbs=False, max_unit_words=None):
+             r = check_passage(
+                 item.get("text", ""), vocab, check_vocab=(language.strip().lower() == "english"),
+                 max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
++                language=language,
+             )
+             r.update(language=language, latency=item.get("latency"),
+                      style_requested=item.get("style_requested"), text=item.get("text"))
+@@ -289,6 +368,8 @@ def summarize(results):
+         "format_bad": sum(1 for r in scored if not r["format_ok"]),
+         "latency_p50": percentile(0.5),
+         "latency_p90": percentile(0.9),
++        "language_bad": sum(1 for r in scored if r.get("language_check") and not r["language_check"]["ok"]),
++        "language_verdicts": dict(Counter(r["language_check"]["verdict"] for r in scored if r.get("language_check"))),
+         "mean_unit_words": (sum(r["mean_unit_words"] for r in scored) / len(scored)) if scored else None,
+         "longest_unit_words": max((r["longest_unit_words"] for r in scored), default=None),
+     }
+@@ -302,6 +383,9 @@ def format_summary(s):
+     if s["mean_oov_per_passage"] is not None:
+         lines.append(f"Mean out-of-vocabulary words per passage: {s['mean_oov_per_passage']:.2f}")
+         lines.append(f"Most common out-of-vocabulary words: {s['top_oov']}")
++    if s["language_verdicts"]:
++        lines.append(f"Written in the requested language: {s['total'] - s['failures'] - s['language_bad']}/{s['total'] - s['failures']}"
++                     f"   Language verdicts: {s['language_verdicts']}")
+     if s["mean_unit_words"] is not None:
+         lines.append(f"Words per sentence/line: mean {s['mean_unit_words']:.1f}, longest {s['longest_unit_words']}")
+     if s["latency_p50"] is not None:
+diff --git a/tests/test_routing_checks.py b/tests/test_routing_checks.py
+index 545feb6..3238c9c 100644
+--- a/tests/test_routing_checks.py
++++ b/tests/test_routing_checks.py
+@@ -196,6 +196,34 @@ def test_request_error():
+           len(checks) == 1 and not checks[0]["ok"] and "HTTP 500" in checks[0]["detail"])
+ 
+ 
++# --- language correctness and duplicate tool calls (both found in the first live run) -----------
++
++
++def test_story_must_be_in_the_requested_language():
++    spec = dict(STORY_SPEC, language="Spanish")
++    english_for_spanish = response(ENGLISH_STORY, tool_block("story_generator_tool", {"language": "Spanish"}, ENGLISH_STORY))
++    c = results_by_name(evaluate_turn(spec, english_for_spanish, VOCAB))
++    check("an English story returned for a Spanish request fails the quality check",
++          not c["story quality"]["ok"] and "english" in c["story quality"]["detail"].lower())
++    good = response(SPANISH_STORY, tool_block("story_generator_tool", {"language": "Spanish"}, SPANISH_STORY))
++    check("a real Spanish story passes", results_by_name(evaluate_turn(spec, good, VOCAB))["story quality"]["ok"])
++    mixed = "Bonjour, je suis L\u00e9a today.\nJ'ai soif et je veux water.\nJe demande \u00e0 ami please water.\nIl dit oui et me donne water.\nJe dis thank you et bois water.\nTomorrow je aiderai ami gentil."
++    spec_fr = {"say": "Story in French", "tool": "story", "language": "French",
++               "arg": {"key": "language", "any_of": ["french"]}, "story": "other"}
++    resp = response(mixed, tool_block("story_generator_tool", {"language": "French"}, mixed))
++    check("French with English words left in fails", not results_by_name(evaluate_turn(spec_fr, resp, VOCAB))["story quality"]["ok"])
++
++
++def test_duplicate_tool_calls_are_collapsed():
++    block = dict(tool_block("story_generator_tool", {"language": "Spanish"}, "story"), id="call-1")
++    check("the same call (same id) appearing twice counts once", len(find_tool_calls(response("x", block, dict(block)))) == 1)
++    other = dict(block, id="call-2")
++    check("two genuine calls (different ids) are both kept", len(find_tool_calls(response("x", block, other))) == 2)
++    plain = tool_block("story_generator_tool", {"language": "Spanish"}, "story")
++    check("identical calls without ids are collapsed too", len(find_tool_calls(response("x", plain, dict(plain)))) == 1)
++    check("the call id is reported", find_tool_calls(response("x", block))[0]["id"] == "call-1")
++
++
+ # --- the case catalogue ----------------------------------------------------------------------
+ 
+ 
+@@ -208,6 +236,8 @@ def test_case_catalogue():
+           any(len(c["turns"]) == 4 for c in CASES))
+     check("an empty-vocabulary case is flagged so the runner can set it up",
+           any(c.get("needs_empty_vocab") for c in CASES))
++    check("every non-English story case names its language, so the language check runs",
++          all(t.get("language") for c in CASES for t in c["turns"] if t.get("story") == "other"))
+     check("story, add-word and no-tool expectations are all represented",
+           {t.get("tool") for c in CASES for t in c["turns"]} >= {"story", "add_word", None})
+ 
+@@ -226,6 +256,8 @@ def main():
+     test_add_word_turns()
+     test_empty_vocabulary_guard()
+     test_info_cases_never_fail()
++    test_story_must_be_in_the_requested_language()
++    test_duplicate_tool_calls_are_collapsed()
+     test_request_error()
+     test_case_catalogue()
+     print()
+diff --git a/tests/test_routing_runner_with_fake_langflow.py b/tests/test_routing_runner_with_fake_langflow.py
+index c423879..3de11fc 100644
+--- a/tests/test_routing_runner_with_fake_langflow.py
++++ b/tests/test_routing_runner_with_fake_langflow.py
+@@ -61,19 +61,25 @@ class FakeDb:
+         FakeDb.snapshot = set(STATE["words"])
+         STATE["words"].clear()
+ 
+-    def restore(self):
+-        STATE["words"] = set(FakeDb.snapshot)
++    def restore(self):  # merge: words added meanwhile are kept
++        STATE["words"] |= FakeDb.snapshot
+         FakeDb.snapshot = None
+ 
+     def remove_test_word(self):
+         STATE["words"].discard(TEST_WORD)
+ 
+ 
++CALLS = {"n": 0}
++
++
+ def tool(name, args, output):
+-    return {"type": "tool_use", "name": name, "tool_input": args, "output": output, "error": None}
++    CALLS["n"] += 1
++    return {"type": "tool_use", "id": f"call-{CALLS['n']}", "name": name, "tool_input": args, "output": output, "error": None}
+ 
+ 
+ def build_response(text, blocks):
++    if STATE["bug"] == "duplicate_blocks":  # Langflow showed each tool call twice in the response
++        blocks = [b for blk in blocks for b in (blk, dict(blk))]
+     return {"outputs": [{"outputs": [{"results": {"message": {"text": text, "content_blocks": blocks + [{"type": "text", "text": text}]}}}]}]}
+ 
+ 
+@@ -93,6 +99,8 @@ def reply_for(message, session):
+             shown_arg = STATE["last_language"][session]  # the Step 9 bug: previous language reused
+         STATE["last_language"][session] = arg
+         out = GUARD if not STATE["words"] else STORIES.get(shown_arg.lower(), STORIES["english"])
++        if STATE["bug"] == "english_in_spanish" and arg == "Spanish" and STATE["words"]:
++            out = STORIES["english"]  # the model ignored the language
+         text = out
+         if STATE["bug"] == "rewrite_reply":
+             text = out.splitlines()[0] + " ... (Note: intentionally short)"
+@@ -206,6 +214,10 @@ def main():
+         check("a leftover snapshot stops the run (exit code 2) instead of risking data", code == 2 and "--restore-leftover" in out)
+         code, out = run(["--restore-leftover"])
+         check("--restore-leftover puts the words back", STATE["words"] == {"water", "friend"} and FakeDb.snapshot is None)
++        FakeDb.snapshot = {"water"}
++        STATE["words"] = {"newword"}
++        run(["--restore-leftover"])
++        check("--restore-leftover keeps words added since the snapshot (it merges)", STATE["words"] == {"newword", "water"})
+ 
+         # misc options ---------------------------------------------------------------------------
+         reset()
+@@ -217,6 +229,57 @@ def main():
+         reset()
+         code, out = run(common + ["--api-key", "wrong", "--only", "N1"])
+         check("a rejected API key is reported as a failed request, not a crash", code == 1 and "request" in out)
++
++        # --repeat: the throwaway word must be cleaned up between repeats (found in the first live run)
++        reset()
++        code, out = run(common + ["--repeat", "2", "--only", "A1,A2,A3", "--skip-empty-vocab"])
++        check("--repeat 2 passes on a healthy flow (A1 sees a clean state each repeat)", code == 0)
++
++        # a story in the wrong language is caught (found in the first live run)
++        reset("english_in_spanish")
++        code, out = run(common + ["--only", "S2"])
++        check("an English story for a Spanish request fails the run", code == 1 and "story quality" in out and "english" in out.lower())
++
++        # the response listed every tool call twice
++        reset("duplicate_blocks")
++        code, out = run(common + ["--only", "S2", "--skip-empty-vocab"])
++        saved = json.load(open("/tmp/routing_test_out.json"))
++        check("duplicate tool calls in the response are recorded once", code == 0 and len(saved["results"][0]["turns"][0]["tool_calls"]) == 1)
++
++        # latency is recorded per turn
++        reset()
++        run(common + ["--only", "N1", "--skip-empty-vocab"])
++        saved = json.load(open("/tmp/routing_test_out.json"))
++        check("each turn's latency is saved", isinstance(saved["results"][0]["turns"][0]["latency"], float))
++
++        # the real database helper: names and SQL (a manual `words_snapshot` backup must not interfere)
++        executed = []
++
++        class Cur:
++            def __enter__(self): return self
++            def __exit__(self, *a): return False
++            def execute(self, sql, params=None): executed.append((" ".join(sql.split()), params))
++            def fetchone(self): return (False,)
++
++        class Conn:
++            def cursor(self): return Cur()
++            def commit(self): pass
++            def close(self): pass
++
++        fake_story_tool = type("ST", (), {"get_connection": staticmethod(lambda: Conn())})
++        real_db = object.__new__(run_routing_tests.VocabDb)
++        real_db._st = fake_story_tool
++        real_db.snapshot_and_empty()
++        executed_before_restore = len(executed)
++        real_db.restore()
++        restore_sql = " | ".join(q for q, _ in executed[executed_before_restore:])
++        real_db.remove_test_word(); real_db.snapshot_exists()
++        sql = " | ".join(q for q, _ in executed)
++        check("the runner's snapshot has its own table name, not the manual words_snapshot", "words_autotest_snapshot" in sql and "words_snapshot" not in sql.replace("words_autotest_snapshot", ""))
++        check("restoring merges missing words back instead of replacing the table (nothing added meanwhile is lost)",
++              "INSERT INTO words (word, created_at) SELECT word, created_at FROM words_autotest_snapshot ON CONFLICT (word) DO NOTHING" in sql
++              and "DELETE" not in restore_sql.upper().replace("ON CONFLICT (WORD) DO NOTHING", ""))
++        check("the throwaway word is removed case-insensitively", any("lower(word) = %s" in q for q, _ in executed))
+     finally:
+         server.shutdown()
+ 
+diff --git a/tests/test_story_prompt_language.py b/tests/test_story_prompt_language.py
+new file mode 100644
+index 0000000..634b132
+--- /dev/null
++++ b/tests/test_story_prompt_language.py
+@@ -0,0 +1,186 @@
++"""
++Tests for the language-aware story prompt (Step 10, LO 7).
++
++Found in the first live routing run: only 5 of 15 non-English stories were actually written in
++the requested language (stories "in Spanish" came back in English, "in Japanese" in English,
++French with English words left in). Two likely causes, both fixed here:
++  1. the vocabulary list is English, and the prompt just says "use words from this list", so the
++     model stays in English  -> for non-English languages the prompt now says the list holds
++     English MEANINGS to be expressed in the target language, with no English left in;
++  2. the prompt's tone examples are written in English, which primes English output  -> for
++     non-English languages the English example is left out.
++The English prompt must stay EXACTLY as it was (English stories already pass ~85-89%), so the
++original templates are pinned by checksum. Also: a language given by its own name ("日本語",
++"español") is normalized to the English name, which is what the prompt and the cache key use.
++
++Written BEFORE the change. No database or network (a fake connection stands in).
++
++Run from inside the langflow container:
++    docker compose exec langflow python /app/tests/test_story_prompt_language.py
++"""
++
++import hashlib
++import sys
++
++sys.path.insert(0, "/app/custom_components")
++
++import story_tool  # noqa: E402
++from story_tool import (  # noqa: E402
++    DIALOGUE_TEMPLATE,
++    NARRATION_TEMPLATE,
++    build_story_prompt,
++    generate_story_for_learner,
++    normalize_language,
++)
++
++PASS = "PASS"
++FAIL = "FAIL"
++failures = []
++
++# sha256 of the English templates BEFORE this change (do not edit these to make a test pass)
++ORIGINAL_NARRATION_SHA256 = "02eeeae82e165e122f0db6d8f516c19b70666f67a41a1ed4fe148cd7b0bb0776"
++ORIGINAL_DIALOGUE_SHA256 = "a77dac64f9c45a1a1d7bd94ed06574b1cad825d98c0ea7083be7f65935dd518e"
++
++WORDS = "hello, water, friend, house, thank you"
++ENGLISH_NARRATION_EXAMPLE = "I am hungry today. I see a small shop with fresh bread"
++ENGLISH_DIALOGUE_EXAMPLE = "Mia: Hello! Do you have any bread?"
++
++
++def check(label, condition):
++    if condition:
++        print(f"[{PASS}] {label}")
++    else:
++        print(f"[{FAIL}] {label}")
++        failures.append(label)
++
++
++class FakeCursor:
++    def __init__(self, words):
++        self._words = words
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, *exc):
++        return False
++
++    def execute(self, sql, params=None):
++        pass
++
++    def fetchone(self):
++        return (True,)
++
++    def fetchall(self):
++        return [(w.strip(),) for w in self._words.split(",")]
++
++
++class FakeConnection:
++    def cursor(self):
++        return FakeCursor(WORDS)
++
++
++# --- English is untouched ---------------------------------------------------------------------
++
++
++def test_english_templates_are_unchanged():
++    check("the narration template is byte-for-byte the original",
++          hashlib.sha256(NARRATION_TEMPLATE.encode()).hexdigest() == ORIGINAL_NARRATION_SHA256)
++    check("the dialogue template is byte-for-byte the original",
++          hashlib.sha256(DIALOGUE_TEMPLATE.encode()).hexdigest() == ORIGINAL_DIALOGUE_SHA256)
++
++
++def test_english_prompts_are_unchanged():
++    for style, template in (("narration", NARRATION_TEMPLATE), ("dialogue", DIALOGUE_TEMPLATE)):
++        expected = template.format(language="English", words=WORDS)
++        check(f"English {style} prompt is exactly the original", build_story_prompt("English", WORDS, style) == expected)
++        check(f"'english' / ' English ' give the same {style} prompt",
++              build_story_prompt("english", WORDS, style) == expected and build_story_prompt(" English ", WORDS, style) == expected)
++
++
++# --- other languages: translate, and no English example ---------------------------------------
++
++
++def test_non_english_prompt_asks_for_translation():
++    for style in ("narration", "dialogue"):
++        p = build_story_prompt("Spanish", WORDS, style)
++        check(f"[{style}] names the language", "Spanish" in p)
++        check(f"[{style}] still contains the vocabulary", WORDS in p)
++        check(f"[{style}] says the whole passage must be in the language", "ENTIRE" in p and "Spanish" in p)
++        check(f"[{style}] says the list holds English meanings to be translated", "English" in p and "meaning" in p.lower())
++        check(f"[{style}] forbids leftover English words", "no English" in p.lower() or "do not leave any english" in p.lower())
++        check(f"[{style}] keeps the planning/delimiter protocol", "===STORY===" in p and "Begin:" in p)
++
++
++def test_non_english_prompt_drops_the_english_example():
++    n = build_story_prompt("French", WORDS, "narration")
++    d = build_story_prompt("French", WORDS, "dialogue")
++    check("narration: the English tone example is left out", ENGLISH_NARRATION_EXAMPLE not in n and "Tone example" not in n)
++    check("dialogue: the English tone example is left out", ENGLISH_DIALOGUE_EXAMPLE not in d and "Tone example" not in d)
++    check("dialogue: the 'Name: line' format rule is kept", "Name: line" in d)
++    check("the English prompt still has its example", ENGLISH_NARRATION_EXAMPLE in build_story_prompt("English", WORDS, "narration"))
++
++
++def test_non_english_prompt_has_no_unfilled_placeholders():
++    for style in ("narration", "dialogue"):
++        p = build_story_prompt("German", WORDS, style)
++        check(f"[{style}] no '{{language}}' / '{{words}}' left unfilled", "{language}" not in p and "{words}" not in p)
++
++
++# --- language names ---------------------------------------------------------------------------
++
++
++def test_normalize_language():
++    cases = {
++        "\u65e5\u672c\u8a9e": "Japanese", "\u4e2d\u6587": "Chinese", "\u6c49\u8bed": "Chinese",
++        "\ud55c\uad6d\uc5b4": "Korean", "espa\u00f1ol": "Spanish", "Espa\u00f1ol": "Spanish",
++        "fran\u00e7ais": "French", "FRAN\u00c7AIS": "French", "deutsch": "German", "italiano": "Italian",
++        "portugu\u00eas": "Portuguese", "\u0440\u0443\u0441\u0441\u043a\u0438\u0439": "Russian",
++        "spanish": "Spanish", " Spanish ": "Spanish", "Spanish": "Spanish", "english": "English",
++        "Klingon": "Klingon", "": "", None: "",
++    }
++    for given, expected in cases.items():
++        check(f"normalize_language({given!r}) == {expected!r}", normalize_language(given) == expected)
++
++
++def test_prompt_uses_the_normalized_language():
++    p = build_story_prompt("\u65e5\u672c\u8a9e", WORDS, "narration")
++    check("a request for '日本語' puts 'Japanese' in the prompt", "Japanese" in p and "\u65e5\u672c\u8a9e" not in p)
++
++
++def test_cache_key_is_the_normalized_language():
++    story_tool._STORY_CACHE.clear()
++    calls = []
++    prompts = []
++
++    def fake_groq(prompt):
++        calls.append(1)
++        prompts.append(prompt)
++        return "plan\n===STORY===\n\u3053\u3093\u306b\u3061\u306f\u3002"
++
++    a = generate_story_for_learner("\u65e5\u672c\u8a9e", conn=FakeConnection(), call_groq_fn=fake_groq, use_cache=True)
++    b = generate_story_for_learner("Japanese", conn=FakeConnection(), call_groq_fn=fake_groq, use_cache=True)
++    check("'日本語' and 'Japanese' share one cache entry (Groq called once)", len(calls) == 1 and a == b)
++    check("the prompt sent to Groq says Japanese", "Japanese" in prompts[0])
++    story_tool._STORY_CACHE.clear()
++
++
++def main():
++    print("Running language-aware story prompt tests...\n")
++    test_english_templates_are_unchanged()
++    test_english_prompts_are_unchanged()
++    test_non_english_prompt_asks_for_translation()
++    test_non_english_prompt_drops_the_english_example()
++    test_non_english_prompt_has_no_unfilled_placeholders()
++    test_normalize_language()
++    test_prompt_uses_the_normalized_language()
++    test_cache_key_is_the_normalized_language()
++    print()
++    if failures:
++        print(f"{len(failures)} test(s) failed: {failures}")
++        sys.exit(1)
++    print("All tests passed.")
++    sys.exit(0)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/test_vocab_adherence.py b/tests/test_vocab_adherence.py
+index 27d4c6d..04e1c7e 100644
+--- a/tests/test_vocab_adherence.py
++++ b/tests/test_vocab_adherence.py
+@@ -22,6 +22,7 @@ sys.path.insert(0, "/app/scripts")
+ 
+ from vocab_adherence import (  # noqa: E402
+     check_passage,
++    language_check,
+     parse_vocabulary,
+     rescore_results,
+     summarize,
+@@ -251,6 +252,86 @@ def test_rescore_results():
+     check("summarize works on rescored results", summarize(relaxed["English"])["passes"] == 2)
+ 
+ 
++# --- is the passage actually IN the requested language? (found in the first automated run) -----
++# These passages are real outputs from the Step 10 routing run: a "Spanish" story that is English,
++# French with English words left in, and a "Japanese" story in English. The structure-only check
++# passed all of them.
++
++REAL_VOCAB = "hello, goodbye, please, thank you, yes, no, water, food, friend, house, today, tomorrow, book, biscuit, bread, sunny"
++
++REAL_SPANISH_OK = (
++    "Ana: Hola, \u00bftienes agua, por favor?  \nLuis: S\u00ed, tengo agua en mi casa.  \n"
++    "Ana: \u00bfPodemos beber agua hoy?  \nLuis: No, hoy no.  \nAna: Entonces ma\u00f1ana, s\u00ed?  \nLuis: S\u00ed, ma\u00f1ana, gracias."
++)
++REAL_SPANISH_IS_ENGLISH = (
++    "Ana: hello, do you have water?  \nLuis: yes, I have water.  \nAna: please, I want water today.  \n"
++    "Luis: no, I need water today.  \nAna: okay, tomorrow then?  \nLuis: yes, I bring water tomorrow, thank you."
++)
++REAL_FRENCH_MIXED = (
++    "Bonjour, je suis L\u00e9a today.  \nJ'ai soif et je veux water.  \nJe demande \u00e0 ami please water.  \n"
++    "Il dit oui et me donne water.  \nJe dis thank you et bois water.  \nTomorrow je aiderai ami gentil."
++)
++REAL_JAPANESE_IS_ENGLISH = (
++    "Hello, I am Taro today. I want water. My friend is nearby. I say, please water. "
++    "Friend says yes and has water. Thank you, we will drink tomorrow."
++)
++GOOD_FRENCH = (
++    "Bonjour, je suis L\u00e9a.\nJ'ai soif et je veux de l'eau.\nJe demande de l'eau \u00e0 mon ami.\n"
++    "Il dit oui et me donne de l'eau.\nMerci, je bois et je dis \u00e0 demain."
++)
++GOOD_JAPANESE = "\u3053\u3093\u306b\u3061\u306f\u3001\u79c1\u306f\u30b5\u30e0\u3067\u3059\u3002\n\u4eca\u65e5\u306f\u6c34\u304c\u307b\u3057\u3044\u3067\u3059\u3002\n\u53cb\u9054\u306b\u4f1a\u3044\u307e\u3059\u3002\n\u53cb\u9054\u306f\u6c34\u3092\u304f\u308c\u307e\u3059\u3002\n\u3042\u308a\u304c\u3068\u3046\u3001\u3055\u3088\u3046\u306a\u3089\u3002"
++
++
++def test_language_check_real_outputs():
++    check("a real Spanish story passes", language_check(REAL_SPANISH_OK, "Spanish", REAL_VOCAB)["ok"])
++    r = language_check(REAL_SPANISH_IS_ENGLISH, "Spanish", REAL_VOCAB)
++    check("a 'Spanish' story written in English is caught", not r["ok"] and r["verdict"] == "english")
++    r = language_check(REAL_FRENCH_MIXED, "French", REAL_VOCAB)
++    check("French with English words left in is caught as mixed", not r["ok"] and r["verdict"] in ("mixed", "english"))
++    check("fully French text passes", language_check(GOOD_FRENCH, "French", REAL_VOCAB)["ok"])
++    r = language_check(REAL_JAPANESE_IS_ENGLISH, "\u65e5\u672c\u8a9e", REAL_VOCAB)
++    check("a 'Japanese' story written in English is caught (wrong script)", not r["ok"] and r["verdict"] == "wrong_script")
++    check("real Japanese passes, whether asked for as 'Japanese' or by its own name",
++          language_check(GOOD_JAPANESE, "Japanese", REAL_VOCAB)["ok"] and language_check(GOOD_JAPANESE, "\u65e5\u672c\u8a9e", REAL_VOCAB)["ok"])
++
++
++def test_language_check_edge_cases():
++    check("English is never language-checked", language_check(REAL_SPANISH_IS_ENGLISH, "English", REAL_VOCAB)["verdict"] == "not_checked")
++    check("a language with no script rule is still caught when the story is just English",
++          language_check(REAL_SPANISH_IS_ENGLISH, "Klingon", REAL_VOCAB)["verdict"] == "english")
++    check("language names are matched case-insensitively", language_check(REAL_SPANISH_OK, " spanish ", REAL_VOCAB)["ok"])
++    check("ambiguous short words (no, a, me) alone don't count as English",
++          language_check("No, a mi me gusta. Vamos a casa. No hay agua. Es mi amigo. Hasta ma\u00f1ana.", "Spanish", "no, water")["ok"])
++
++
++def test_check_passage_uses_the_language():
++    r = check_passage(REAL_SPANISH_IS_ENGLISH, REAL_VOCAB, check_vocab=False, language="Spanish")
++    check("an English story requested in Spanish fails overall", not r["passed"] and r["language_check"]["verdict"] == "english")
++    r = check_passage(REAL_SPANISH_OK, REAL_VOCAB, check_vocab=False, language="Spanish")
++    check("a real Spanish story passes overall", r["passed"])
++    r = check_passage(REAL_SPANISH_IS_ENGLISH, REAL_VOCAB, check_vocab=False)
++    check("without a language the old behavior is unchanged", r["passed"] and r["language_check"] is None)
++
++
++def test_summarize_reports_language_problems():
++    results = [
++        check_passage(REAL_SPANISH_OK, REAL_VOCAB, check_vocab=False, language="Spanish"),
++        check_passage(REAL_SPANISH_IS_ENGLISH, REAL_VOCAB, check_vocab=False, language="Spanish"),
++        check_passage(REAL_FRENCH_MIXED, REAL_VOCAB, check_vocab=False, language="French"),
++    ]
++    s = summarize(results)
++    check("summary counts wrong-language passages", s["language_bad"] == 2)
++    check("summary breaks the verdicts down", s["language_verdicts"].get("english") == 1)
++
++
++def test_rescore_applies_the_language_check():
++    data = {"vocabulary": REAL_VOCAB, "results": {"Spanish": [
++        {"text": REAL_SPANISH_OK, "latency": 1.0}, {"text": REAL_SPANISH_IS_ENGLISH, "latency": 1.0}]}}
++    r = rescore_results(data)
++    check("re-scoring a saved non-English run now catches stories in the wrong language",
++          [x["passed"] for x in r["Spanish"]] == [True, False])
++
++
+ def main():
+     print("Running vocabulary adherence checker tests...\n")
+     test_parse_vocabulary()
+@@ -274,6 +355,11 @@ def main():
+     test_unit_word_metrics()
+     test_max_unit_words_is_optional_and_enforced()
+     test_rescore_results()
++    test_language_check_real_outputs()
++    test_language_check_edge_cases()
++    test_check_passage_uses_the_language()
++    test_summarize_reports_language_problems()
++    test_rescore_applies_the_language_check()
+ 
+     print()
+     if failures:
+-- 
+2.43.0
+

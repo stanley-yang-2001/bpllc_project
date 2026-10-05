@@ -11,6 +11,8 @@ To use as a tool: after adding this component to the canvas, enable "Tool Mode" 
 attach it to an Agent node's Tools input. The LLM fills in `word` based on the chat message.
 """
 
+import unicodedata
+
 import psycopg2
 from langflow.custom import Component
 from langflow.io import MessageTextInput, Output
@@ -28,9 +30,23 @@ def get_connection():
     return psycopg2.connect(**DB_CONFIG)
 
 
+# Punctuation an Agent may wrap around or trail after a word ('bread.', '"bread"', '(bread)').
+_EDGE_CHARS = " \t\r\n.,!?;:\"'\u201c\u201d\u2018\u2019\u00ab\u00bb()[]{}\u2026" \
+              "\u3002\uff01\uff1f\u3001\uff0c\uff1b\uff1a\u300c\u300d\u300e\u300f\uff08\uff09"
+
+
+def normalize_word(word) -> str:
+    """Canonical form stored in the vocabulary: no edge punctuation or whitespace, single
+    spaces inside a phrase, lowercase. Without this, 'Water', 'water' and 'water.' became
+    separate rows (the UNIQUE constraint is case-sensitive) and skewed every story."""
+    text = unicodedata.normalize("NFC", word or "")
+    text = " ".join(text.split()).strip(_EDGE_CHARS)
+    return " ".join(text.split()).lower()
+
+
 def insert_word(conn, word: str, table_name: str = "words") -> bool:
     """Insert a single word if not already present. Returns True if newly inserted."""
-    word = (word or "").strip()
+    word = normalize_word(word)
     if not word:
         raise ValueError("word must be a non-empty string")
 
@@ -83,9 +99,10 @@ class AddWord(Component):
             finally:
                 conn.close()
 
+            shown = normalize_word(self.word)
             if added:
-                return f"Added '{self.word.strip()}' to your vocabulary."
-            return f"'{self.word.strip()}' is already in your vocabulary."
+                return f"Added '{shown}' to your vocabulary."
+            return f"'{shown}' is already in your vocabulary."
         except (ValueError, RuntimeError) as e:
             return f"Couldn't add word: {e}"
         except Exception as e:

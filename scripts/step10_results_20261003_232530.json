@@ -1,0 +1,81 @@
+{
+  "vocabulary": "hello, goodbye, please, thank you, yes, no, water, food, friend, house, today, tomorrow, book, biscuit, bread, sunny",
+  "max_oov": 0,
+  "strict_verbs": false,
+  "results": {
+    "English": [
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 27,
+        "oov_rate": 0.0,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 1.917574167251587,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello friend, do you have water?\nBen: Yes, I have water today.\nAnna: Please give me water.\nBen: Here is water, please.\nAnna: Thank you, friend!\nBen: Tomorrow we will have bread."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 6,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [
+          "drink",
+          "day"
+        ],
+        "oov_count": 2,
+        "word_count": 28,
+        "oov_rate": 0.07142857142857142,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": false,
+        "language": "English",
+        "latency": 0.8704714775085449,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, do you have water?  \nBen: Yes, I have water.  \nAnna: Please give me water.  \nBen: Here is water, thank you.  \nAnna: We will drink water tomorrow.  \nBen: Goodbye, see you sunny day."
+      },
+      {
+        "failure": false,
+        "failure_reason": null,
+        "style": "dialogue",
+        "units": 5,
+        "length_ok": true,
+        "format_ok": true,
+        "leaked_plan": false,
+        "vocab_checked": true,
+        "oov_words": [],
+        "oov_count": 0,
+        "word_count": 23,
+        "oov_rate": 0.0,
+        "names": [
+          "anna",
+          "ben"
+        ],
+        "passed": true,
+        "language": "English",
+        "latency": 0.9657282829284668,
+        "style_requested": "dialogue",
+        "text": "Anna: Hello, Ben. I want water today.\nBen: Yes, I have water.\nAnna: Please give me some water.\nBen: Here is water, thank you.\nAnna: Thank you, friend. Goodbye."
+      }
+    ]
+  }
+}

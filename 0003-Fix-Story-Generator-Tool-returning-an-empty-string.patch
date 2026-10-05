@@ -1,0 +1,366 @@
+From d5f795714a7055d137c0879cdc8a39e4d4985c64 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 2 Oct 2026 23:25:26 +0000
+Subject: [PATCH] Fix Story Generator Tool returning an empty string
+
+gpt-oss-20b is a reasoning model; with max_tokens=400 nearly all tokens
+went to hidden reasoning, so Groq returned finish_reason=length with
+content="". The empty passage was cached as a success and the Agent
+invented its own answer.
+
+- Raise max_tokens to 1500 and set reasoning_effort=low in call_groq
+- Treat an empty/whitespace passage as a failure (fallback message,
+  short-TTL failure cache) instead of returning/caching an empty string
+- Add tests/test_empty_response_handling.py (no Postgres required)
+- Update README, CHANGELOG, DEVELOPER-DIARY and IMPLEMENTATION-GUIDE
+---
+ CHANGELOG.md                          |  24 ++++
+ DEVELOPER-DIARY.md                    |   9 ++
+ README.md                             |   2 +
+ custom_components/story_tool.py       |  19 ++-
+ docs/IMPLEMENTATION-GUIDE.md          |   3 +
+ tests/test_empty_response_handling.py | 199 ++++++++++++++++++++++++++
+ 6 files changed, 255 insertions(+), 1 deletion(-)
+ create mode 100644 tests/test_empty_response_handling.py
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index d8eae94..bc8acdb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,6 +2,30 @@
+ 
+ Entries are newest first. Dates come from the git history; the project has no versioned releases.
+ 
++## Unreleased — Fix: Story Generator Tool returned an empty string
++
++**Symptom (Step 9 Playground):** the tool ran, but its output (Result) was empty. The Agent
++then filled the gap itself: a made-up story, or a made-up error ("Invalid language specified.
++Please provide a supported language.") that exists nowhere in the code.
++
++**Root cause:** `openai/gpt-oss-20b` is a reasoning model, and hidden reasoning tokens count
++against `max_tokens`. With `max_tokens=400`, 398 tokens went to reasoning, so Groq returned
++`finish_reason: "length"` with `content: ""`. The empty passage was then cached as a *success*
++for 20 seconds, so repeat calls got the same empty answer.
++
++**Fixed in `story_tool.py`:**
++- `max_tokens` 400 → 1500, and `reasoning_effort: "low"`, so the plan and passage fit after the
++  model's reasoning.
++- An empty or whitespace-only passage (including an empty passage after `===STORY===`) is now
++  treated as a failure: the fallback message is returned and cached briefly, never an empty
++  string.
++
++**Tests:** `tests/test_empty_response_handling.py` (new; no Postgres needed).
++
++**Note:** this is separate from the relay problem documented below. Earlier traces show the
++Agent also discarding *successful* tool output, so that investigation continues. Re-run the
++Step 9 test set now that the tool no longer returns empty results.
++
+ ## Unreleased — Step 9 in progress: agent-based orchestration with a 120b orchestrator
+ 
+ **Why:** the deterministic keyword router (prototyped, not included in this repo) solved the reliability problem
+diff --git a/DEVELOPER-DIARY.md b/DEVELOPER-DIARY.md
+index 82c7d12..caa1c55 100644
+--- a/DEVELOPER-DIARY.md
++++ b/DEVELOPER-DIARY.md
+@@ -57,6 +57,15 @@ a self-contained custom component once the OpenAI-component UI proved unreliable
+   successes — meaning a rate-limited burst caused every repeat call to independently run
+   its own full retry cycle, compounding the exhaustion rather than absorbing it.
+ 
++## Step 9 bug found and fixed: empty tool output
++
++During Step 9 testing, the tool's Result was sometimes **empty**, and the Agent invented its
++own answer (including a fake "Invalid language specified" error). Cause: `gpt-oss-20b` spends
++hidden reasoning tokens against `max_tokens`; at 400, nearly all were used, so Groq returned
++`finish_reason: "length"` and `content: ""`. Fixed by raising the budget, lowering reasoning
++effort, and treating empty output as a failure. Lesson: when the Agent says something the code
++could never produce, expand the tool row and read the actual Result before blaming the model.
++
+ ## Current obstacle
+ 
+ **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace
+diff --git a/README.md b/README.md
+index adac06c..9b03be9 100644
+--- a/README.md
++++ b/README.md
+@@ -89,6 +89,7 @@ tests/
+ ├── test_word_loader.py
+ ├── test_story_tool.py
+ ├── test_call_groq_retry.py
++├── test_empty_response_handling.py
+ ├── test_story_prompt_builder.py
+ ├── test_story_guard.py
+ └── test_final_passage_extractor.py
+@@ -122,6 +123,7 @@ docker compose exec langflow python /app/tests/test_add_word.py
+ docker compose exec langflow python /app/tests/test_word_loader.py
+ docker compose exec langflow python /app/tests/test_story_tool.py
+ docker compose exec langflow python /app/tests/test_call_groq_retry.py
++docker compose exec langflow python /app/tests/test_empty_response_handling.py
+ docker compose exec langflow python /app/tests/test_final_passage_extractor.py
+ docker compose exec langflow python /app/tests/test_story_guard.py
+ docker compose exec langflow python /app/tests/test_story_prompt_builder.py
+diff --git a/custom_components/story_tool.py b/custom_components/story_tool.py
+index fa948fc..7a51f81 100644
+--- a/custom_components/story_tool.py
++++ b/custom_components/story_tool.py
+@@ -136,6 +136,13 @@ _STORY_CACHE = {}
+ _SUCCESS_CACHE_TTL_SECONDS = 20
+ _FAILURE_CACHE_TTL_SECONDS = 15
+ 
++# openai/gpt-oss-20b is a reasoning model: hidden "reasoning" tokens count against max_tokens.
++# With max_tokens=400, nearly the whole budget (398 tokens) was spent reasoning, so Groq
++# returned finish_reason="length" with content="" — an empty story. A larger budget plus a
++# low reasoning effort leaves room for the plan and the passage itself.
++_MAX_COMPLETION_TOKENS = 1500
++_REASONING_EFFORT = "low"
++
+ FAILURE_FALLBACK_MESSAGE = (
+     "I'm having trouble generating a story right now — please try again in a moment."
+ )
+@@ -208,7 +215,8 @@ def call_groq(prompt: str) -> str:
+         {
+             "model": "openai/gpt-oss-20b",
+             "messages": [{"role": "user", "content": prompt}],
+-            "max_tokens": 400,
++            "max_tokens": _MAX_COMPLETION_TOKENS,
++            "reasoning_effort": _REASONING_EFFORT,
+         }
+     ).encode("utf-8")
+ 
+@@ -289,6 +297,15 @@ def generate_story_for_learner(
+ 
+         result = extract_final_passage(raw_response)
+ 
++        # An empty passage (the model ran out of tokens, or returned nothing after the
++        # delimiter) must never reach the Agent as an empty string: the Agent fills the gap
++        # by inventing its own story or error. Treat it as a failure instead — cached
++        # briefly, like any other failure.
++        if not result.strip():
++            if use_cache:
++                _STORY_CACHE[cache_key] = (time.time(), FAILURE_FALLBACK_MESSAGE, "failure")
++            return FAILURE_FALLBACK_MESSAGE
++
+         if use_cache:
+             _STORY_CACHE[cache_key] = (time.time(), result, "success")
+ 
+diff --git a/docs/IMPLEMENTATION-GUIDE.md b/docs/IMPLEMENTATION-GUIDE.md
+index aba7801..a76e3b8 100644
+--- a/docs/IMPLEMENTATION-GUIDE.md
++++ b/docs/IMPLEMENTATION-GUIDE.md
+@@ -183,6 +183,9 @@ and just return the tool's result without extra commentary.
+   Story Generator Tool (both in Tool Mode) attached as tools, and a "Groq Orchestrator — 120b"
+   node as the Agent's Language Model. Instructions follow the tutorial's wording. A disconnected
+   20b node stays on the canvas for A/B comparison.
++- **Bug found and fixed during this step:** the story tool sometimes returned an *empty* result
++  (reasoning tokens exhausted `max_tokens`), and the Agent invented its own answer. See
++  `CHANGELOG.md`. Re-run the test set after this fix before judging the orchestrator model.
+ - **Open problem:** with the 20b orchestrator, the Agent sometimes sent an empty `language`
+   argument, called the tool 3–5 times per request, and discarded the tool's result in favor of its
+   own story. The tutorial's reliability comes from `gpt-4.1`, not a prompt technique. The
+diff --git a/tests/test_empty_response_handling.py b/tests/test_empty_response_handling.py
+new file mode 100644
+index 0000000..c408948
+--- /dev/null
++++ b/tests/test_empty_response_handling.py
+@@ -0,0 +1,199 @@
++"""
++Tests for the "Groq returned nothing usable" bug found during Step 9.
++
++Symptom: the Story Generator Tool's output was an EMPTY string, so the Agent filled the gap
++by inventing its own answer (a made-up story, or a made-up "Invalid language specified"
++error). Root cause: openai/gpt-oss-20b is a reasoning model, and with max_tokens=400 nearly
++all of the budget was spent on hidden reasoning (398 reasoning tokens), so Groq returned
++finish_reason="length" with content="". An empty passage was then cached as a *success*.
++
++Written BEFORE the fix. Run now and expect failures; re-run after the fix to confirm green.
++
++These tests do not need Postgres: a tiny fake connection stands in for it. The real Groq
++call is not made either; call_groq's request payload is checked by intercepting urlopen.
++
++Run from inside the langflow container:
++    docker compose exec langflow python /app/tests/test_empty_response_handling.py
++"""
++
++import json
++import sys
++from unittest.mock import MagicMock, patch
++
++sys.path.insert(0, "/app/custom_components")
++
++import story_tool  # noqa: E402
++from story_tool import FAILURE_FALLBACK_MESSAGE, generate_story_for_learner  # noqa: E402
++
++PASS = "PASS"
++FAIL = "FAIL"
++failures = []
++
++
++def check(label, condition):
++    if condition:
++        print(f"[{PASS}] {label}")
++    else:
++        print(f"[{FAIL}] {label}")
++        failures.append(label)
++
++
++class FakeCursor:
++    def __init__(self, words):
++        self._words = words
++        self._last = None
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, *exc):
++        return False
++
++    def execute(self, sql, params=None):
++        self._last = sql
++
++    def fetchone(self):
++        return (True,)  # the table "exists"
++
++    def fetchall(self):
++        return [(w,) for w in self._words]
++
++
++class FakeConnection:
++    def __init__(self, words):
++        self._words = words
++
++    def cursor(self):
++        return FakeCursor(self._words)
++
++
++def fresh_conn():
++    return FakeConnection(["hello", "friend", "water"])
++
++
++# --- Empty / unusable model output must never reach the Agent as an empty string ---------
++
++
++def test_empty_response_returns_fallback_message():
++    story_tool._STORY_CACHE.clear()
++    result = generate_story_for_learner(
++        "English", conn=fresh_conn(), call_groq_fn=lambda p: "", use_cache=False
++    )
++    check("empty model response returns the fallback message", result == FAILURE_FALLBACK_MESSAGE)
++
++
++def test_none_response_returns_fallback_message():
++    story_tool._STORY_CACHE.clear()
++    result = generate_story_for_learner(
++        "English", conn=fresh_conn(), call_groq_fn=lambda p: None, use_cache=False
++    )
++    check("None model response returns the fallback message", result == FAILURE_FALLBACK_MESSAGE)
++
++
++def test_whitespace_only_response_returns_fallback_message():
++    story_tool._STORY_CACHE.clear()
++    result = generate_story_for_learner(
++        "English", conn=fresh_conn(), call_groq_fn=lambda p: "  \n\t ", use_cache=False
++    )
++    check("whitespace-only response returns the fallback message", result == FAILURE_FALLBACK_MESSAGE)
++
++
++def test_empty_passage_after_delimiter_returns_fallback_message():
++    story_tool._STORY_CACHE.clear()
++    raw = "Character: Anna\nWant: bread\n===STORY===\n   \n"
++    result = generate_story_for_learner(
++        "English", conn=fresh_conn(), call_groq_fn=lambda p: raw, use_cache=False
++    )
++    check("a plan with an empty passage after ===STORY=== returns the fallback", result == FAILURE_FALLBACK_MESSAGE)
++
++
++def test_empty_response_is_cached_as_a_failure_not_a_success():
++    story_tool._STORY_CACHE.clear()
++    calls = []
++
++    def empty_groq(prompt):
++        calls.append(1)
++        return ""
++
++    r1 = generate_story_for_learner("English", conn=fresh_conn(), call_groq_fn=empty_groq, use_cache=True)
++    r2 = generate_story_for_learner("English", conn=fresh_conn(), call_groq_fn=empty_groq, use_cache=True)
++    kind = story_tool._STORY_CACHE.get("english", (None, None, None))[2]
++    check("empty response is cached as a failure (short TTL)", kind == "failure")
++    check("both calls return the fallback, never an empty string", r1 == r2 == FAILURE_FALLBACK_MESSAGE)
++    check("the repeat call reuses the cached failure (Groq called once)", len(calls) == 1)
++
++
++def test_good_response_still_returns_the_passage():
++    story_tool._STORY_CACHE.clear()
++    raw = "Character: Anna\n===STORY===\nHello, my friend. I like water."
++    result = generate_story_for_learner(
++        "English", conn=fresh_conn(), call_groq_fn=lambda p: raw, use_cache=False
++    )
++    check("a normal response is unaffected by the fix", result == "Hello, my friend. I like water.")
++
++
++# --- call_groq must leave room for the answer after the model's hidden reasoning ---------
++
++
++def make_groq_response(content="ok"):
++    body = json.dumps({"choices": [{"message": {"content": content}, "finish_reason": "stop"}]})
++    cm = MagicMock()
++    cm.__enter__.return_value.read.return_value = body.encode("utf-8")
++    return cm
++
++
++def capture_payload():
++    captured = {}
++
++    def fake_urlopen(req, timeout=30):
++        captured["payload"] = json.loads(req.data.decode("utf-8"))
++        return make_groq_response()
++
++    with patch.dict("os.environ", {"GROQ_API_KEY": "test-key"}):
++        with patch("story_tool.urllib.request.urlopen", side_effect=fake_urlopen):
++            story_tool.call_groq("hello")
++    return captured["payload"]
++
++
++def test_call_groq_leaves_room_for_the_answer_after_reasoning():
++    payload = capture_payload()
++    check(
++        "max_tokens is large enough that reasoning cannot consume the whole budget (>= 1500)",
++        payload.get("max_tokens", 0) >= 1500,
++    )
++
++
++def test_call_groq_requests_low_reasoning_effort():
++    payload = capture_payload()
++    check("request asks for reasoning_effort='low'", payload.get("reasoning_effort") == "low")
++
++
++def test_call_groq_still_targets_the_story_model_and_prompt():
++    payload = capture_payload()
++    check("model is unchanged (openai/gpt-oss-20b)", payload.get("model") == "openai/gpt-oss-20b")
++    check("prompt is sent as the user message", payload["messages"] == [{"role": "user", "content": "hello"}])
++
++
++def main():
++    print("Running empty-response handling tests...\n")
++    test_empty_response_returns_fallback_message()
++    test_none_response_returns_fallback_message()
++    test_whitespace_only_response_returns_fallback_message()
++    test_empty_passage_after_delimiter_returns_fallback_message()
++    test_empty_response_is_cached_as_a_failure_not_a_success()
++    test_good_response_still_returns_the_passage()
++    test_call_groq_leaves_room_for_the_answer_after_reasoning()
++    test_call_groq_requests_low_reasoning_effort()
++    test_call_groq_still_targets_the_story_model_and_prompt()
++
++    print()
++    if failures:
++        print(f"{len(failures)} test(s) failed: {failures}")
++        sys.exit(1)
++    else:
++        print("All tests passed.")
++        sys.exit(0)
++
++
++if __name__ == "__main__":
++    main()
+-- 
+2.43.0
+
