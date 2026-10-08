@@ -1,1 +1,11 @@
+# Patch files shared during development
+*.patch
+*.diff
+
+# Python caches, secrets, generated test output
+__pycache__/
+*.pyc
 .env
+scripts/*.json
+custom_components/relay_debug.log
+commit-msg.txt
