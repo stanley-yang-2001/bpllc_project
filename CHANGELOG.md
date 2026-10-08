@@ -2,6 +2,112 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — Web app adapted to the Step 10 results
+
+The remote moved while the web app was being built (`eace656`: patch files and caches untracked, `.gitignore`;
+`3c67c80`: Step 10 complete, story variety). The web app commits were rebased onto it (conflicts only in `.gitignore`,
+`README.md` and this changelog) and adapted:
+- **Languages:** stories are now enabled for Spanish, French and Japanese (measured 30/30 in the requested language;
+  15/15 through the Agent). German, Italian, Portuguese, Chinese and Korean stay off until measured. The flag is in
+  `tutor_core/languages.py` with the evidence in a comment, and the tests changed accordingly.
+- **Story types:** the design's `style` (narration/dialogue) became `story_type` (eight types) plus `topic`, matching
+  `story_tool.py`; the quality report rules follow the owner's decision (≤ 5 strays, 4–10 sentences).
+- **Seed:** the demo account now also loads `sample_data/suggested_words.csv` (the owner's remedy for samey stories).
+- **Docs:** design section 18 lists every change and why; Step 11 is described as delivered by the web app.
+Verified after the rebase: 32 core + 90 API + 56 web tests and the API-types check. The Langflow-container test scripts
+under `tests/` cannot run outside the Langflow image (they import `langflow`), so they were not run; no web app commit
+touches them.
+
+## Unreleased — Email sign-up, privacy policy, Settings, dark mode, dialogs
+
+- **Accounts are now identified by name and email** (the separate username is gone, so the policy's "only name and email"
+  is true). Sign-up needs an explicit privacy-policy checkbox; the date and policy version are stored. Migration 0003
+  gives existing development accounts a placeholder `<name>@legacy.invalid` address and no consent record.
+- **Privacy Policy** page (`/privacy`, public) written to match what the code does; design section 12B maps each claim to
+  the code and test that keep it true, lists the operator's checklist, and says plainly that it is a template, not legal advice.
+- **Settings:** edit name and native language; change email and password (current password required; wrong guesses share
+  the login lockout; a password change logs out other devices); Light/Dark/System; **Download my data** (JSON of
+  everything held, a test fails if a future table is left out); **Delete account** (password required, permanent,
+  every table cascades; other tabs are logged out; the email can be reused).
+- **Dark mode** with no white flash (script before first paint), following the OS or an explicit choice.
+- **Styled confirmation dialogs** on the browser's `<dialog>` (replaces the plain `confirm` box); Cancel is focused first.
+- Verification: 90 API tests, 56 web tests, 27 real-browser tests (including an axe accessibility scan of every screen and
+  dialog in both themes), and 16 deliberate breakages: 14 were caught at once, 2 survived until their tests were rewritten.
+
+Bugs found by the new tests: sign-up **without** the `accept_privacy` field created an account with no consent (a Pydantic
+default skips the validator; the field is now required); the dialog's "focus Cancel first" never worked (React `autoFocus`
+runs while the dialog is closed), now focused after opening; light-theme muted text was 4.43:1 and 4.46:1 on tinted
+backgrounds; two tests proved nothing until rewritten (the "no flash" test could not see a flash, and "Cancel cancels" was
+untested).
+Not done: forgot-password (no email sending), non-ASCII email addresses, re-accepting the policy when its version changes,
+and the check that names/emails never reach the AI prompts (chat and stories do not exist yet; required for M5/M6).
+
+## Unreleased — User separation hardening and UI polish
+
+**Security (audit found 6 gaps beyond the per-user query filters; all fixed, each with a test):**
+- Logout only deleted the browser cookie; the token stayed valid for 8 hours. Sessions are now server-side
+  (`tutor.sessions`, migration 0002): logout, "Log out everywhere" (`POST /auth/logout-all`), a new login over an old
+  one, and user deletion all revoke immediately.
+- API responses had no cache headers: now `no-store`, `Vary: Cookie`, `nosniff`, `X-Frame-Options: DENY` on every response,
+  including errors and CSRF refusals.
+- Two tabs share one cookie: a tab showing A could act as B after B logged in elsewhere. Requests now carry
+  `X-Expected-User`; a mismatch is refused (`401 session_changed`) and the tab drops A's data and adopts the real user.
+  Tabs also notify each other of login/logout.
+- Cached queries are keyed by user id; logout/user change/401 empties the cache first-thing; Back after logout reloads.
+- nginx serves a strict CSP (no inline scripts or styles) and clickjacking protection.
+- A test now fails automatically if any new route is added without a login check.
+- Verification: 53 API tests (11 deliberate breakages, each caught), 31 web tests (6 breakages, each caught; one survivor
+  led to an extra test), and 9 real-browser (Playwright + Chromium) tests against real nginx + API + Postgres, with
+  3 more breakages confirmed to fail them. See design section 12A for the threat table and the known limits.
+
+**Style:** new design tokens, Inter font (self-hosted), icons, two-row header, polished login/home/vocabulary/settings,
+toasts, skeletons, empty states. Seeing the real render found and fixed black table borders, a pink "disabled" delete
+button, a header that wrapped badly at 1280 px, and light-grey icons below 3:1 contrast. Details: `docs/STYLE-GUIDE.md`.
+
+Found while testing: `app.routes` no longer lists included routers in current FastAPI (route enumeration now uses the
+OpenAPI schema); TypeScript 7 still unusable with `openapi-typescript`. Playwright specs run here against a Chromium
+bundled in an npm package, not the usual `playwright install` build.
+
+## Unreleased — Web app, first slice (M1, M2, M4; M0 and M3 not started)
+
+Built: `tutor_core/` (language codes, one word-validation rule), `api/` (FastAPI, Alembic schema `tutor`, accounts,
+vocabulary, CSV upload, typed errors, CSRF guard, login lockout, seed script), `web/` (React + TypeScript + Tailwind:
+login/register, protected routes, per-user language, Vocabulary page, Settings), Dockerfiles, nginx, compose,
+`.env.example`, `Makefile`. Verified here: 32 core + 36 API (real Postgres 16) + 20 web tests, API-types drift
+check, and a curl session through the real nginx config. **Not verified:** Docker builds, the compose file, any
+Langflow behaviour, any browser rendering (no browser available).
+
+Found while testing (and fixed):
+- Logout kept showing the previous user: `queryClient.clear()` detaches the `me` query from its observer.
+- The word validator does not stop a short letters-only prompt-injection phrase (design wording corrected).
+- `openapi-typescript` crashes on TypeScript 7; pinned to 5.x.
+- Isolation tests were mutation-checked: removing the per-user filter from list, delete or edit makes them fail.
+
+Left as they were: Langflow still on `:latest` with `admin123` (defaults overridable from `.env`, port now bound to
+localhost) and the `../shared-components` mount. Postgres password defaults stay `langflow` so an existing volume
+keeps working. Root `*.patch` files remain tracked (now git-ignored for future ones); `__pycache__` and
+`relay_debug.log` were untracked.
+
+## Unreleased — Web app design v4 (hardening pass)
+
+Revised `docs/WEB-APP-DESIGN.md` (v3 to v4) before any code is written; section 17 of the doc has the full
+34-row list of what changed and why. The most important fixes:
+- **Data leaks:** the story cache is keyed by (user, language, style) and used only on the Agent path (it was
+  keyed by language alone); Langflow tools fail closed when no `user_id` arrives; the client no longer supplies the
+  quality report; query cache and storage are cleared per user on logout.
+- **Unverified Langflow assumptions** are now an explicit **Milestone 0** (tweaks with a parallel two-user test,
+  endpoint-name runs, flow auto-load via `LANGFLOW_LOAD_FLOWS_PATH`, real-response fixtures), with a written fallback.
+- **Model:** ISO language codes instead of free text, a per-language "stories enabled" gate tied to measurement,
+  schema `tutor` with Alembic, one word-validation rule (limits prompt injection, does not eliminate it), `meaning` instead of
+  `meaning_en`, German keeps capitals.
+- **Quality report** states which checks apply per language (strict for English only) and moves to `tutor_core`.
+- **Operations:** pinned Langflow, Postgres healthcheck, root build context for `tutor_core`, localhost-only ports,
+  `.env.example`, nginx timeout above the 60 s AI deadline, an AI gate for the shared Groq limit.
+- The duplicate root copy of the design doc was removed; the canonical file is `docs/WEB-APP-DESIGN.md`.
+- Research note: Langflow tweaks (by component ID or name), `LANGFLOW_LOAD_FLOWS_PATH` and the 1.12.x
+  `LANGFLOW_TWEAKS_POLICY` were checked against Langflow's docs; behavior with this project's Agent Tool Mode is
+  still untested and is the first thing M0 settles.
+
 ## Unreleased — Story variety measured; measurement fixes
 
 **Measured (20 English stories, 10 each Spanish/French/Japanese, `--delay 3`):**
@@ -95,6 +201,7 @@ counts only those (test first).
 **Docs:** results, criteria status, the filled tuning-log row, and a draft LO 8 verdict (cost,
 latency, quality, rate limits) in `docs/STEP-10-TEST-PLAN.md`. Remaining for Step 10: replace the
 Add Word and Story Generator Tool canvas nodes and re-run the routing suite once through the Agent.
+
 
 ## Unreleased — Web app design (React)
 

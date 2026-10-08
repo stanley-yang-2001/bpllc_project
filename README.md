@@ -9,7 +9,9 @@ tutorial, adapted to run entirely on free infrastructure.
 
 Implementation Steps 1–10 are complete: the Language Agent (`gpt-oss-120b`) routes chat messages
 to the Add Word and Story Generator tools, and a Tool Result Relay makes sure the learner sees
-the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is complete**: results, tuning log and the LO 8 verdict are in `docs/STEP-10-TEST-PLAN.md`. **Step 11 (per-learner vocabulary) is next.** See
+the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is complete**: results, tuning log and the LO 8 verdict are in `docs/STEP-10-TEST-PLAN.md`. Step 11 (per-learner vocabulary) is being delivered by the web app (`docs/WEB-APP-DESIGN.md`), whose first
+slice is built: accounts, per-language vocabulary and the React shell (`api/`, `web/`, `tutor_core/`);
+chat, Story Studio, Library and Practice are not built yet. See
 `docs/IMPLEMENTATION-GUIDE.md` for the full build order and per-step status, and
 `DEVELOPER-DIARY.md` for the current obstacle and a list of known code issues deferred until all
 steps are done.
@@ -53,12 +55,26 @@ seen yet.
 ## Quick start
 
 ```bash
-# edit .env with your real GROQ_API_KEY and a fixed LANGFLOW_SECRET_KEY (there is no
-# .env.example — .env already exists in this directory with placeholder values to replace)
+cp .env.example .env     # then fill in GROQ_API_KEY, JWT_SECRET (>= 32 chars), LANGFLOW_SECRET_KEY, ...
 docker compose up -d
 docker compose exec langflow python /app/scripts/smoke_test.py   # confirm Postgres + Groq are reachable
 ```
 Open `http://localhost:7860`, log in with the superuser credentials set in `docker-compose.yml`.
+
+### Web app (accounts + vocabulary)
+
+```bash
+docker compose up --build -d                       # starts postgres, langflow, api, web
+docker compose exec api python -m app.seed         # optional demo account demo@example.com (needs DEMO_PASSWORD in .env)
+docker compose exec api python -m app.seed --import-legacy   # also copy the old single-user words table
+```
+Open `http://localhost:8080`. Development without Docker: `make dev-api` and `make dev-web` (Vite proxies
+`/api` to port 8000). `make check` runs every test suite and the API-types drift check; it needs a Postgres
+reachable at `TEST_DATABASE_URL` (default `postgresql://langflow:testpw@localhost:5432/langflow`).
+`make e2e` runs the real-browser tests (user separation, sessions, CSP) against a running stack; first install a
+browser once with `cd web && npx playwright install chromium`. The look of the app is described in
+`docs/STYLE-GUIDE.md` (including dark mode). Before letting anyone else sign up, set `PRIVACY_CONTACT` in `.env`
+and read the operator checklist in `docs/WEB-APP-DESIGN.md` section 12B: the privacy policy is a template, not legal advice. The Docker builds and the new compose services have not been run yet (see the changelog).
 
 ## Project structure
 
@@ -116,6 +132,8 @@ docs/
 ├── IMPLEMENTATION-GUIDE.md      # Build order (Steps 1–11 + bonus) with per-step status
 ├── AGENT-INSTRUCTIONS.md        # The Language Agent's final instructions (canvas-only setting)
 ├── STEP-10-TEST-PLAN.md         # Step 10 pass criteria, routing matrix, results and tuning log
+├── STYLE-GUIDE.md               # Visual style of the web app: tokens, components, contrast, known gaps
+├── SITE-AND-AI-INTEGRATION.md   # How the site works, how it talks to the API, and how Chat/Studio will connect to Langflow
 ├── WEB-APP-DESIGN.md            # Design of a local React + FastAPI web app (login, per-language vocabulary) around the Langflow flow
 ├── LEARNING-OBJECTIVES.md       # LO 1–8, with implementation notes
 ├── architecture-diagram.md      # Deployment diagram

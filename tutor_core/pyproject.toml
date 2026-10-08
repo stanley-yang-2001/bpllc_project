@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tutor_core"
+version = "0.1.0"
+description = "Shared, framework-free logic for the language tutor (used by Langflow and the web API)"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+# Tier-1 lemma matching for the quality report (added in a later milestone)
+lemmas = ["simplemma"]
+
+[tool.setuptools.packages.find]
+include = ["tutor_core*"]

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/* Dark mode is a class on <html> (set by theme-init.js and ThemeProvider), not just the OS setting, so people can
+   choose Light / Dark / System. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- Design tokens (see docs/STYLE-GUIDE.md) --------------------------------------------------------------
+   One brand colour (indigo), one warm accent (amber, used sparingly), slate neutrals, Inter for text.
+   Components use these names (bg-brand-600, text-accent-700), never raw hex values. */
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+
+  --color-surface: #ffffff;           /* cards, inputs, header: "white" that can become dark */
+
+  --color-accent-50: #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-600: #d97706;
+  --color-accent-800: #92400e;
+}
+
+/* Dark palette. Every neutral in the app is a slate-* utility, so re-pointing the slate scale flips the whole UI at
+   once. Brand and status tints can't be remapped this way (brand-700 is text in one place and a button background in
+   another), so those carry explicit dark: classes in the components. */
+.dark {
+  color-scheme: dark;                  /* native scrollbars, selects, checkboxes follow */
+  --color-surface: #0f172a;
+  --color-slate-50: #020617;           /* page */
+  --color-slate-100: #1e293b;          /* subtle fills, hovers */
+  --color-slate-200: #2a374d;          /* borders */
+  --color-slate-300: #3d4b63;          /* input borders */
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;          /* hints, placeholders */
+  --color-slate-600: #cbd5e1;          /* descriptions */
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #f8fafc;          /* headings and body */
+}
+
+@layer base {
+  /* Tailwind v4 draws borders in currentColor (black) unless told otherwise. */
+  *, ::before, ::after { border-color: var(--color-slate-200); }
+  body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss03"; }
+  :focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: var(--color-brand-100); }
+  button:not(:disabled), [role="tab"], select { cursor: pointer; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

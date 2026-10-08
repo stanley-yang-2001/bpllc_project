@@ -2,12 +2,12 @@ services:
   langflow:
     image: langflowai/langflow:latest
     ports:
-      - "7860:7860"
+      - "127.0.0.1:7860:7860"   # localhost only: the tools trust the user_id they are given (design section 3)
     environment:
-      - LANGFLOW_DATABASE_URL=postgresql://langflow:langflow@postgres:5432/langflow
+      - LANGFLOW_DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
       - LANGFLOW_COMPONENTS_PATH=/app/custom_components:/app/shared_components
       - LANGFLOW_SUPERUSER=admin
-      - LANGFLOW_SUPERUSER_PASSWORD=admin123
+      - LANGFLOW_SUPERUSER_PASSWORD=${LANGFLOW_SUPERUSER_PASSWORD:-admin123}
       - GROQ_API_KEY=${GROQ_API_KEY}
     volumes:
       - ./custom_components:/app/custom_components
@@ -15,16 +15,57 @@ services:
       - ./scripts:/app/scripts
       - ./tests:/app/tests
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    # TODO(M0): pin the image to an exact version (not :latest) and build it with tutor_core installed.
 
   postgres:
     image: postgres:16
     environment:
       - POSTGRES_USER=langflow
-      - POSTGRES_PASSWORD=langflow
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-langflow}
       - POSTGRES_DB=langflow
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langflow -d langflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .                  # repo root, so tutor_core can be copied in
+      dockerfile: api/Dockerfile
+    expose:
+      - "8000"                    # reachable by nginx only, not published to the host
+    environment:
+      - DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
+      - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env (at least 32 characters)}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - AI_MODE=${AI_MODE:-live}
+      - MAX_PROMPT_WORDS=${MAX_PROMPT_WORDS:-150}
+      - COOKIE_SECURE=${COOKIE_SECURE:-0}
+      - DEMO_EMAIL=${DEMO_EMAIL:-demo@example.com}
+      - PRIVACY_CONTACT=${PRIVACY_CONTACT:-}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/api/health/live', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  web:
+    build: ./web
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:
