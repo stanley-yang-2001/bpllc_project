@@ -33,14 +33,17 @@ import time
 sys.path.insert(0, "/app/custom_components")
 sys.path.insert(0, "/app/scripts")
 
-from vocab_adherence import check_passage, format_summary, rescore_results, summarize  # noqa: E402
+from vocab_adherence import (  # noqa: E402
+    check_passage,
+    format_summary,
+    format_variety,
+    rescore_results,
+    summarize,
+    variety_report,
+)
 
 
-def detect_style(prompt):
-    return "dialogue" if "short, simple dialogue" in prompt else "narration"
-
-
-def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max_unit_words=None):
+def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max_unit_words=None, story_type=None):
     import story_tool  # imported here so --rescore needs neither Langflow nor a database
 
     results = []
@@ -50,26 +53,36 @@ def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max
         def timed_call_groq(prompt):
             started = time.time()
             try:
-                return story_tool.call_groq(prompt)
+                out = story_tool.call_groq(prompt)
+                if not (out or "").strip():
+                    seen["error"] = "empty response from the model"
+                return out
+            except Exception as exc:  # the story pipeline turns this into the fallback message
+                seen["error"] = f"{type(exc).__name__}: {exc}"
+                raise
             finally:
                 seen["latency"] = time.time() - started
-                seen["style_requested"] = detect_style(prompt)
+                seen["story_type"], seen["topic"] = story_tool.describe_prompt(prompt)
 
         text = story_tool.generate_story_for_learner(
-            language, conn=conn, call_groq_fn=timed_call_groq, use_cache=False
+            language, conn=conn, call_groq_fn=timed_call_groq, use_cache=False, story_type=story_type
         )
         result = check_passage(
             text, words, check_vocab=(language.strip().lower() == "english"),
             max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
             language=language,
         )
-        result.update(language=language, latency=seen.get("latency"), style_requested=seen.get("style_requested"), text=text)
+        result.update(language=language, latency=seen.get("latency"), style_requested=seen.get("story_type"),
+                      story_type=seen.get("story_type"), topic=seen.get("topic"), text=text,
+                      error=seen.get("error"))
         results.append(result)
 
         status = "PASS" if result["passed"] else "FAIL"
         detail = result["oov_words"] if result["oov_words"] else ""
         latency = f"{result['latency']:.1f}s" if result["latency"] is not None else "n/a"
-        print(f"[{language} {i}/{count}] {status} {result['style'] or 'failure'} {latency} {detail}", flush=True)
+        kind = result.get("story_type") or result["style"] or "failure"
+        why = f"  <- {result['error'][:90]}" if result.get("error") else ""
+        print(f"[{language} {i}/{count}] {status} {kind} / {result.get('topic') or '-'} {latency} {detail}{why}", flush=True)
         if i < count:
             time.sleep(delay)
     return results
@@ -80,8 +93,11 @@ def main():
     parser.add_argument("--languages", default="English", help="comma-separated, e.g. English,Spanish")
     parser.add_argument("--count", type=int, default=15, help="stories per language")
     parser.add_argument("--delay", type=float, default=20.0, help="seconds between calls (rate limit)")
-    parser.add_argument("--max-oov", type=int, default=2,
-                        help="stray words tolerated per story (default 2: everyday words like 'eat' are fine; 0 = strict)")
+    parser.add_argument("--max-oov", type=int, default=5,
+                        help="stray words tolerated per story (default 5, matching the prompt's 'at most 5 everyday "
+                             "words'; earlier runs used 2; 0 = strict)")
+    parser.add_argument("--story-type", default=None,
+                        help="force one type (narration, dialogue, story, diary, letter, place, routine, anecdote); default random")
     parser.add_argument("--strict-verbs", action="store_true", help="only the prompt's six simple verbs are allowed")
     parser.add_argument("--max-unit-words", type=int, default=None, help="fail any sentence/line longer than this")
     parser.add_argument("--rescore", metavar="RESULTS_JSON",
@@ -99,6 +115,7 @@ def main():
         for language, results in rescored.items():
             print(f"=== {language} ===")
             print(format_summary(summarize(results)))
+            print(format_variety(variety_report(results, data.get("vocabulary", ""), english=language.strip().lower() == "english")))
             print()
         return 0
 
@@ -117,7 +134,7 @@ def main():
             for language in [l.strip() for l in args.languages.split(",") if l.strip()]:
                 all_results[language] = run_language(
                     language, args.count, args.delay, conn, words, args.max_oov, args.strict_verbs,
-                    args.max_unit_words,
+                    args.max_unit_words, args.story_type,
                 )
         except KeyboardInterrupt:
             print("\nInterrupted: summarizing what was collected so far.")
@@ -128,6 +145,7 @@ def main():
     for language, results in all_results.items():
         print(f"=== {language} ===")
         print(format_summary(summarize(results)))
+        print(format_variety(variety_report(results, words, english=language.strip().lower() == "english")))
         print()
 
     out = args.out or f"/app/scripts/step10_results_{time.strftime('%Y%m%d_%H%M%S')}.json"

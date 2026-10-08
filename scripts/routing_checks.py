@@ -197,7 +197,7 @@ def _c(check, ok, detail="", info=False):
     return out
 
 
-def evaluate_turn(spec, resp, vocab, error=None, max_oov=2):
+def evaluate_turn(spec, resp, vocab, error=None, max_oov=5):
     """Return a list of {check, ok, detail} for one chat turn. Never raises."""
     if error or resp is None:
         return [_c("request", False, error or "no response")]

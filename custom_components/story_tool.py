@@ -22,7 +22,9 @@ request with an HTTP 1010).
 
 import json
 import random
+import re
 import time
+from collections import deque
 import urllib.error
 import urllib.request
 from typing import Optional
@@ -233,18 +235,117 @@ _LANGUAGE_REMINDER = (
 
 def _template_for_other_languages(template: str) -> str:
     """The same template with the language rule added after the intro, the English tone example
-    removed, and a final reminder before 'Begin:'."""
+    removed (if it has one), and a final reminder before 'Begin:'."""
     intro_end = template.index("\n\n") + 2
-    example_start = template.index("Tone example only")
     begin = template.index("Begin:")
-    return (template[:intro_end] + _LANGUAGE_BLOCK + template[intro_end:example_start]
+    example_start = template.find("Tone example only")
+    middle_end = example_start if example_start != -1 else begin
+    return (template[:intro_end] + _LANGUAGE_BLOCK + template[intro_end:middle_end]
             + _LANGUAGE_REMINDER + template[begin:])
 
 
 _OTHER_LANGUAGE_STYLES = {style: _template_for_other_languages(t) for style, t in VALID_STYLES.items()}
 
 
-def build_story_prompt(language: str, words: str, style: Optional[str] = None) -> str:
+# --- story variety (Step 10, tuning change #2) ---------------------------------------------------
+# Reading 48 generated stories showed 81% mentioned water and ~75% were somebody asking for or
+# receiving something. The classic prompts define the story's "Event" as a question or request
+# needing a response, offer only two forms (narration, dialogue), cap stories at 5-6 short
+# sentences, and nothing in the code varies the topic. So, in addition to the two classic styles
+# (left exactly as they were), there are more story TYPES, a TOPIC seed chosen in code without
+# repeating recent topics, a looser word rule (the vocabulary stays central, a few very common
+# everyday words are allowed) and longer, more flexible lengths.
+
+STORY_TYPES = {
+    "story": {
+        "form": "a short story with a beginning, a small problem, and a happy or surprising ending",
+        "length": "Aim for 7 to 9 short sentences (up to 12 words each), each following logically from the last.",
+        "rule": "Use a named character, and show what happens (actions and small events), not only talking.",
+    },
+    "diary": {
+        "form": "a diary entry about someone's day",
+        "length": "Aim for 6 to 8 short sentences (up to 12 words each).",
+        "rule": "Write in the first person and start with a day or a time (for example, Monday morning). Say what happened and how the writer felt.",
+    },
+    "letter": {
+        "form": "a short, friendly letter to a friend",
+        "length": "Aim for 6 to 8 short lines (up to 12 words each).",
+        "rule": "Start with a greeting to a named friend, and end with a sign-off and your name.",
+    },
+    "place": {
+        "form": "a description of a place (what you can see, hear and do there)",
+        "length": "Aim for 6 to 8 short sentences (up to 12 words each).",
+        "rule": "Describe the place; do not tell a plot. Use phrases like 'there is' and 'there are'.",
+    },
+    "routine": {
+        "form": "a description of a typical day, in order (morning, afternoon, evening)",
+        "length": "Aim for 6 to 8 short sentences (up to 12 words each).",
+        "rule": "Write in the first person with simple present tense, and put the parts of the day in order.",
+    },
+    "anecdote": {
+        "form": "a funny or surprising little anecdote (something that went wrong in an amusing way)",
+        "length": "Aim for 7 to 9 short sentences (up to 12 words each).",
+        "rule": "Build up to the funny or surprising moment, then end quickly.",
+    },
+}
+
+ALL_STORY_TYPES = tuple(VALID_STYLES) + tuple(STORY_TYPES)  # classic first: narration, dialogue
+
+# Conversations and classic narration stay available, but are only part of the mix (3/16).
+_TYPE_WEIGHTS = {"narration": 1, "dialogue": 2, "story": 3, "diary": 2, "letter": 2,
+                 "place": 2, "routine": 2, "anecdote": 2}
+
+TOPICS = (
+    "a market day", "a birthday party", "a rainy day", "a lost key", "a new pet",
+    "a trip by train", "cooking dinner", "a day at school", "a visit to a friend's house",
+    "a walk in the park", "a surprise gift", "a busy morning", "a day at the beach",
+    "fixing something at home", "a quiet evening at home", "a bus ride", "a picnic",
+    "a snowy morning", "a small garden", "a new neighbor", "a long walk home",
+)
+_RECENT_TOPICS = deque(maxlen=8)
+
+_VARIETY_TEMPLATE = (
+    "You are a creative writer crafting a short, interesting reading text for a "
+    "language-learning beginner in {language}.\n\n"
+    "Form: {form}.\n"
+    "Topic: {topic}.\n\n"
+    "First, silently plan (do not show this): who or what the text is about, what happens or "
+    "what is described, and how it ends or what stands out. Write a 1-2 sentence summary of "
+    "your plan, then the line ===STORY=== alone, then the text.\n\n"
+    "Text rules:\n"
+    "1. {length}\n"
+    "2. {rule}\n"
+    "3. Build the text around the learner's vocabulary words wherever they fit naturally: "
+    "{words}. You don't need every one, and never force a word that breaks the flow. You may "
+    "inflect a word's form (tense, plural) while keeping the same root word.\n"
+    "4. You may also use basic grammar words, simple verbs, and at most 5 other very common "
+    "everyday words that a beginner would already know (like eat, drink, buy, read, school, "
+    "rain). No rare or difficult words.\n"
+    "5. Keep the language simple and natural: short sentences, simple tenses, no semicolons.\n"
+    "6. Output ONLY the ===STORY=== line and the text \u2014 no title, no explanation, no "
+    "planning notes.\n\n"
+    "Begin: planning, then delimiter, then the text."
+)
+_OTHER_LANGUAGE_VARIETY = _template_for_other_languages(_VARIETY_TEMPLATE)
+
+
+def choose_story_type(rng=None) -> str:
+    rng = rng or random
+    return rng.choices(ALL_STORY_TYPES, weights=[_TYPE_WEIGHTS[t] for t in ALL_STORY_TYPES])[0]
+
+
+def choose_topic(rng=None, recent=None) -> str:
+    """A topic that is not in `recent` (if any are left), so consecutive stories differ."""
+    rng = rng or random
+    recent = set(recent or ())
+    candidates = [t for t in TOPICS if t not in recent] or list(TOPICS)
+    return rng.choice(candidates)
+
+
+def build_story_prompt(language: str, words: str, style: Optional[str] = None,
+                       topic: Optional[str] = None, rng=None) -> str:
+    """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
+    applies to the new story types; when omitted it is chosen at random, avoiding recent topics."""
     language = normalize_language(language)
     words = (words or "").strip()
     if not language:
@@ -252,11 +353,33 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None) -
     if not words:
         raise ValueError("words must be a non-empty string")
     if not style or style == "random":
-        style = random.choice(list(VALID_STYLES.keys()))
-    if style not in VALID_STYLES:
-        raise ValueError(f"style must be one of {list(VALID_STYLES.keys())}, got {style!r}")
-    templates = VALID_STYLES if is_english(language) else _OTHER_LANGUAGE_STYLES
-    return templates[style].format(language=language, words=words)
+        style = choose_story_type(rng)
+    english = is_english(language)
+
+    if style in VALID_STYLES:  # the two classic prompts, unchanged
+        templates = VALID_STYLES if english else _OTHER_LANGUAGE_STYLES
+        return templates[style].format(language=language, words=words)
+    if style in STORY_TYPES:
+        if not topic:
+            topic = choose_topic(rng, recent=_RECENT_TOPICS)
+            _RECENT_TOPICS.append(topic)
+        template = _VARIETY_TEMPLATE if english else _OTHER_LANGUAGE_VARIETY
+        return template.format(language=language, words=words, topic=topic, **STORY_TYPES[style])
+    raise ValueError(f"style must be one of {list(ALL_STORY_TYPES)}, got {style!r}")
+
+
+def describe_prompt(prompt: str):
+    """(story type, topic) of a prompt built by build_story_prompt; ("unknown", None) otherwise."""
+    prompt = prompt or ""
+    if "short, simple dialogue" in prompt:
+        return "dialogue", None
+    if "simple reading passage" in prompt:
+        return "narration", None
+    for story_type, spec in STORY_TYPES.items():
+        if f"Form: {spec['form']}." in prompt:
+            match = re.search(r"Topic: (.*?)\.\n", prompt)
+            return story_type, (match.group(1) if match else None)
+    return "unknown", None
 
 
 def extract_final_passage(raw_text, delimiter: str = DELIMITER) -> str:
@@ -331,6 +454,8 @@ def generate_story_for_learner(
     table_name: str = "words",
     call_groq_fn=call_groq,
     use_cache: bool = True,
+    story_type: Optional[str] = None,
+    topic: Optional[str] = None,
 ) -> str:
     """Full pipeline: load vocabulary, guard against empty vocab, build the prompt, call
     Groq, and return only the cleaned final passage.
@@ -348,6 +473,8 @@ def generate_story_for_learner(
         conn = get_connection()
 
     cache_key = normalize_language(language).lower()
+    if story_type or topic:  # an explicit request is cached separately from the random default
+        cache_key = f"{cache_key}|{story_type or ''}|{topic or ''}"
 
     try:
         if use_cache and cache_key in _STORY_CACHE:
@@ -364,7 +491,7 @@ def generate_story_for_learner(
         if not words.strip():
             return EMPTY_VOCABULARY_MESSAGE
 
-        prompt = build_story_prompt(language, words)
+        prompt = build_story_prompt(language, words, story_type, topic)
         try:
             raw_response = call_groq_fn(prompt)
         except Exception:

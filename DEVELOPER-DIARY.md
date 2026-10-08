@@ -123,6 +123,39 @@ other languages) and the English prompt is pinned by checksum so it cannot regre
 hypotheses until the before/after batches are compared. New deferred item:
 `story_prompt_builder.py` (Step 8 canvas pipeline) now differs from `story_tool.py`.
 
+Tuning change #1 worked: 5/15 → 30/30 non-English stories in the requested language, 0 failures in
+60 generations. Two honest notes. First, three things changed at once, so the result supports the
+hypothesis (English vocabulary list and English examples pulled stories toward English) without
+isolating the cause. Second, my own summary line printed a meaningless "10/10" for English runs,
+a reminder that the instruments need the same suspicion as the product.
+
+Step 10 closed. Through the Agent: 43 of 45 turns passed, all routing and relay checks were
+100%, and 15/15 non-English stories were in the right language, so the change that fixed the batch
+also fixed the chat path once the canvas nodes were replaced (their stale copy of the code was the
+last obstacle, as predicted). Small follow-ups worth remembering, not blockers: a request for a
+"dialogue" is not honored (no style input on the tool); "Tell me a story" with no language
+sometimes asks and sometimes defaults to English.
+
+Story variety: the owner said stories felt the same, so before changing anything I counted: 81% of
+48 stories mention water, ~75% are a request-and-reply, mean overlap 0.44. The prompt explains it
+(the plan's Event is defined as a request needing a response; two forms; a 5–6 sentence cap; no
+topic variation in code), and so does the data (a 14-word vocabulary with almost no verbs). The fix
+has three parts that live in code, not in hoping the model varies on its own: more types, a topic
+seed that avoids recent topics, and a looser word rule. Targets were fixed before measuring, and
+the stray-word tolerance moved from 2 to 5 as an explicit owner decision. The biggest remaining
+lever needs no code: add the verbs and nouns in `sample_data/suggested_words.csv`.
+
+Story variety, measured: overlap 0.44 → 0.24 and six types, but the new stories carry 29% unknown words
+(classic: 3%) and one vocabulary word is in 100% of them. Reading the stories explained the numbers:
+the model stuffs every word of the list into the story ("He says hello to his house"), the topic
+seeds ("a bus ride") demand nouns the learner doesn't know, and it ignores a numeric cap ("at most
+5 words"); and the vocabulary has almost no verbs, so most strays were "read", "drink", "eat".
+Lessons: (1) a good variety number can hide a worse learner experience, so read stories next to
+the metrics; (2) models follow category rules better than counts; (3) my own instruments had bugs
+again (Japanese sentence split, a French colon, names), found only by reading the saved stories;
+(4) don't suggest a pacing change (`--delay 3`) without saying it might make the free tier fail,
+which it probably did for 3 Japanese stories.
+
 ## Current obstacle
 
 **The orchestrating Agent doesn't reliably relay tool output.** Confirmed via trace

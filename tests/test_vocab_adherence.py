@@ -22,10 +22,13 @@ sys.path.insert(0, "/app/scripts")
 
 from vocab_adherence import (  # noqa: E402
     check_passage,
+    format_summary,
     language_check,
     parse_vocabulary,
     rescore_results,
     summarize,
+    variety_report,
+    format_variety,
     word_forms,
 )
 
@@ -332,6 +335,126 @@ def test_rescore_applies_the_language_check():
           [x["passed"] for x in r["Spanish"]] == [True, False])
 
 
+def test_summary_only_reports_language_when_something_was_checked():
+    english = [check_passage(GOOD_NARRATION, VOCAB, language="English") for _ in range(3)]
+    text = format_summary(summarize(english))
+    check("an English-only run prints no 'written in the requested language' line", "requested language" not in text)
+    mixed = [
+        check_passage(REAL_SPANISH_OK, REAL_VOCAB, check_vocab=False, language="Spanish"),
+        check_passage(REAL_SPANISH_IS_ENGLISH, REAL_VOCAB, check_vocab=False, language="Spanish"),
+        check_passage(GOOD_NARRATION, VOCAB, language="English"),
+    ]
+    s = summarize(mixed)
+    check("only passages whose language was checked are counted", s["language_checked"] == 2 and s["language_bad"] == 1)
+    check("the line shows ok / checked, not ok / everything", "Written in the requested language: 1/2" in format_summary(s))
+
+
+# --- variety: are the stories different from one another? (Step 10, tuning change #2) ----------
+# Found by reading 48 stories: 81% mentioned water and ~75% were somebody asking for something.
+
+
+def _res(text, kind=None, failure=False):
+    return {"text": text, "story_type": kind, "failure": failure}
+
+
+SAME = "Hello, I am Sam today. I want water. I see my friend near the house. I say please. My friend gives water."
+DIVERSE = [
+    _res("Dear Anna, the market was busy today. I bought bread and a new book. My friend laughed at the hat.", "letter"),
+    _res("Monday. Rain came early, so we stayed in the house. Tom read a book and I cooked a big soup.", "diary"),
+    _res("There is a small park near my house. Children play with a red ball. Old men sit and talk.", "place"),
+    _res("A dog stole my bread! It ran to the garden and hid. My friend found it asleep with the bread.", "anecdote"),
+]
+
+
+def test_variety_report_repetitive_set():
+    rep = variety_report([_res(SAME, "narration") for _ in range(4)], REAL_VOCAB)
+    check("identical stories overlap completely", abs(rep["mean_overlap"] - 1.0) < 1e-9)
+    check("the most used vocabulary word is in every story",
+          rep["top_vocab_word"][1] == 1.0 and rep["top_vocab_word"][0] in ("water", "friend", "house", "today"))
+    check("one type only", rep["distinct_types"] == 1 and rep["types"] == {"narration": 4})
+    check("one opening used by everything", rep["top_opening"][1] == 1.0)
+
+
+def test_variety_report_diverse_set():
+    rep = variety_report(DIVERSE, REAL_VOCAB)
+    check("different stories overlap little (< 0.2)", rep["mean_overlap"] < 0.2)
+    check("no vocabulary word is in more than half of the stories", rep["top_vocab_word"][1] <= 0.5)
+    check("four distinct types", rep["distinct_types"] == 4)
+    check("no repeated opening", rep["top_opening"][1] <= 0.25)
+
+
+def test_variety_report_details():
+    greet = [dict(t, text="Hello! " + t["text"]) for t in DIVERSE]
+    rep = variety_report(greet, REAL_VOCAB)
+    check("greetings and politeness words ('hello', 'please', 'thank you') are not counted as the repeated word",
+          rep["top_vocab_word"][0] not in ("hello", "please", "thank", "you", "yes", "no", "goodbye"))
+    mixed = DIVERSE + [_res("I'm having trouble generating a story right now — please try again in a moment.", None, failure=True)]
+    check("failed generations are left out", variety_report(mixed, REAL_VOCAB)["n"] == 4)
+    check("one story cannot be compared with another (overlap is None)", variety_report(DIVERSE[:1], REAL_VOCAB)["mean_overlap"] is None)
+    check("with no stories nothing breaks", variety_report([], REAL_VOCAB)["n"] == 0)
+    rep = variety_report([_res(SAME, "story") for _ in range(2)], REAL_VOCAB, english=False)
+    check("for non-English runs the English-vocabulary word metric is skipped", rep["top_vocab_word"] is None)
+    check("results without a recorded type are still scored (older saved runs)", variety_report([_res(SAME), _res(SAME)], REAL_VOCAB)["distinct_types"] == 0)
+
+
+def test_format_variety():
+    text = format_variety(variety_report(DIVERSE, REAL_VOCAB))
+    check("the summary line reports types, overlap and the repeated word", "distinct" in text and "overlap" in text and "vocabulary word" in text)
+    check("an empty report prints a short note", "no stories" in format_variety(variety_report([], REAL_VOCAB)).lower())
+
+
+def test_rescore_keeps_the_story_type():
+    data = {"vocabulary": REAL_VOCAB, "results": {"English": [{"text": SAME, "latency": 1.0, "story_type": "diary"}]}}
+    check("a saved story type survives re-scoring", rescore_results(data)["English"][0]["story_type"] == "diary")
+
+
+# --- three measurement bugs found by reading the saved variety run -----------------------------
+
+JAPANESE_ONE_LINE = (
+    "\u4eca\u65e5\u306f\u6674\u308c\u3067\u3059\u3002\u65b0\u3057\u3044\u30da\u30c3\u30c8\u306e\u3046\u3055\u304e\u304c\u5bb6\u306b\u3044\u307e\u3059\u3002"
+    "\u3046\u3055\u304e\u306f\u6c34\u3092\u98f2\u307f\u307e\u3059\u3002\u98df\u3079\u7269\u306f\u30d3\u30b9\u30b1\u30c3\u30c8\u3068\u30d1\u30f3\u3067\u3059\u3002"
+    "\u53cb\u9054\u304c\u672c\u3092\u8aad\u3093\u3067\u3044\u307e\u3059\u3002\u3042\u308a\u304c\u3068\u3046\u3001\u3055\u3088\u3046\u306a\u3089\u3002"
+)
+
+
+def test_cjk_sentences_without_spaces_are_counted():
+    r = check_passage(JAPANESE_ONE_LINE, REAL_VOCAB, check_vocab=False, language="Japanese")
+    check("a Japanese story written on one line counts its 6 sentences (was counted as 1)", r["units"] == 6 and r["length_ok"])
+    r = check_passage("\u3053\u3093\u306b\u3061\u306f\u3002\u79c1\u306f\u30b5\u30e0\u3067\u3059\u3002\n\u4eca\u65e5\u306f\u6c34\u304c\u6b32\u3057\u3044\u3067\u3059\u3002", REAL_VOCAB, check_vocab=False)
+    check("sentences are counted per line and per terminator", r["units"] == 3)
+    r = check_passage("Hello. I am Sam. I want water. Thank you. Goodbye.", REAL_VOCAB)
+    check("English sentence counting is unchanged", r["units"] == 5)
+
+
+FRENCH_NARRATION_WITH_COLON = (
+    "Bonjour, je m'appelle L\u00e9a et je rentre \u00e0 la maison.\nAujourd'hui il fait beau et je marche.\n"
+    "Je rencontre mon ami Marc sur le chemin.\nMarc dit : \u00ab Veux\u2011tu un biscuit ? \u00bb\n"
+    "Oui, il me donne un biscuit et du pain.\nNous parlons, puis je continue vers la maison."
+)
+
+
+def test_a_colon_after_a_verb_is_not_a_speaker_label():
+    r = check_passage(FRENCH_NARRATION_WITH_COLON, REAL_VOCAB, check_vocab=False, language="French")
+    check("'Marc dit : ...' inside a narration is not a speaker label", r["style"] == "narration" and r["format_ok"])
+    r = check_passage("Marie : Bonjour, as-tu de l'eau ?\nPaul : Oui, j'ai de l'eau.\nMarie : Merci.\nPaul : De rien.\nMarie : Au revoir.", REAL_VOCAB, check_vocab=False)
+    check("real French-style labels ('Marie : ...') are still recognised", r["style"] == "dialogue" and r["format_ok"])
+    r = check_passage(GOOD_DIALOGUE, REAL_VOCAB)
+    check("normal 'Name: line' dialogue still passes the format check", r["format_ok"])
+    r = check_passage("\u30bf\u30ed\u30a6: \u3053\u3093\u306b\u3061\u306f\u3002\n\u30b8\u30ed\u30a6: \u3053\u3093\u306b\u3061\u306f\u3002\n\u30bf\u30ed\u30a6: \u6c34\u304c\u6b32\u3057\u3044\u3067\u3059\u3002\n\u30b8\u30ed\u30a6: \u306f\u3044\u3002\n\u30bf\u30ed\u30a6: \u3042\u308a\u304c\u3068\u3046\u3002", REAL_VOCAB, check_vocab=False)
+    check("labels in scripts without letter case (katakana names) are still recognised", r["style"] == "dialogue" and r["format_ok"])
+
+
+def test_names_that_only_start_sentences_are_not_stray_words():
+    story = ("Sam wakes up and sees rain outside.\nSam looks out and says hello.\n"
+             "Sam feels bored because there is no sunny day.\nSam shares bread with his friend.")
+    r = check_passage(story, REAL_VOCAB)
+    check("a name that only ever starts sentences is recognised as a name", "sam" not in r["oov_words"] and "sam" in r["names"])
+    r = check_passage("Today I eat bread. Today I read a book. Today I drink water.", REAL_VOCAB)
+    check("a vocabulary word that starts sentences ('Today') is not mistaken for a name", "today" not in r["names"])
+    r = check_passage("I read a book. I read it today. I like to read. Read with me.", REAL_VOCAB)
+    check("an ordinary word that also appears in lower case is not a name", "read" in r["oov_words"])
+
+
 def main():
     print("Running vocabulary adherence checker tests...\n")
     test_parse_vocabulary()
@@ -360,6 +483,15 @@ def main():
     test_check_passage_uses_the_language()
     test_summarize_reports_language_problems()
     test_rescore_applies_the_language_check()
+    test_summary_only_reports_language_when_something_was_checked()
+    test_variety_report_repetitive_set()
+    test_variety_report_diverse_set()
+    test_variety_report_details()
+    test_format_variety()
+    test_rescore_keeps_the_story_type()
+    test_cjk_sentences_without_spaces_are_counted()
+    test_a_colon_after_a_verb_is_not_a_speaker_label()
+    test_names_that_only_start_sentences_are_not_stray_words()
 
     print()
     if failures:

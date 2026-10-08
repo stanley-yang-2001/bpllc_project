@@ -241,7 +241,7 @@ def main(argv=None, db_factory=VocabDb):
     parser.add_argument("--only", help="comma-separated case ids, e.g. A1,S2")
     parser.add_argument("--repeat", type=int, default=1, help="repeat every case N times (fresh sessions)")
     parser.add_argument("--delay", type=float, default=15.0, help="seconds to wait after a story request (rate limit + cache)")
-    parser.add_argument("--max-oov", type=int, default=2)
+    parser.add_argument("--max-oov", type=int, default=5)
     parser.add_argument("--skip-empty-vocab", action="store_true")
     parser.add_argument("--restore-leftover", action="store_true", help="restore words from a leftover snapshot and exit")
     parser.add_argument("--debug", action="store_true", help="print the first raw response and how it was parsed")

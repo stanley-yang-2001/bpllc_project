@@ -17,7 +17,7 @@ learning objective(s) it exercises (see `LEARNING-OBJECTIVES.md`, "LO 1–8").
 | 7 — Story prompt template | Done (`story_prompt_builder.py`) |
 | 8 — Story-generation pipeline | Done (consolidated into `story_tool.py`) |
 | 9 — Top-level Language Agent | Done (120b orchestrator + Tool Result Relay) |
-| 10 — End-to-end test and prompt tuning | **In progress** (tools and plan built; live runs to do) |
+| 10 — End-to-end test and prompt tuning | Done (all seven criteria met; verdict written) |
 | 11 — Stretch: per-learner vocabulary | Not started |
 | Bonus — Universal model-provider component | Not started |
 
@@ -238,13 +238,24 @@ constraint wording (Step 7) until behavior is reliable.
   vocabulary list holds English meanings to be expressed in the target language, leaves out the
   English tone examples, and normalizes the language name. English prompts are unchanged. Measure
   with `run_story_batch.py --languages Spanish,French,Japanese --count 10` before and after.
+- **Language fix measured:** non-English stories in the requested language went from 5/15 to 30/30
+  (Spanish, French, Japanese, 10 each) after tuning change #1; English stories pass 87% (34/39) at
+  ≤ 2 stray words; 0 of 60 story generations failed, including a 10-story back-to-back burst.
+  Through the Agent (final routing run, 45 turns): 43 passed, tool 42/42, argument 36/36, relay
+  36/36, non-English 15/15 in the requested language, empty-vocabulary guard 3/3; the 2 failures were
+  English stories with 3–4 everyday stray words. The LO 8 verdict is in `docs/STEP-10-TEST-PLAN.md`.
+- **Follow-up (story variety, tuning change #2):** more story types, a topic seed and a looser word
+  rule, with variety measurements and targets fixed before measuring. Implemented and tested;
+  measured: variety up (overlap 0.44 → 0.24, 6 types), vocabulary fit down (29% of words outside the
+  list; pass rate 2/20 at ≤ 5 strays), non-English language still correct. Next step is data: add the
+  suggested words, re-run, then focus-word sampling if needed (see `docs/STEP-10-TEST-PLAN.md`).
 - **Design decisions:** the stored vocabulary stays English, so the vocabulary check applies to
   English stories only; other languages are checked for structure and read by a person. After the
   first baseline (35% pass under a zero-stray-words rule, with only everyday words such as
   "eat" and "drink" as strays), the pass rule was relaxed to at most 2 stray words per story.
   Baseline and the decision are in `docs/STEP-10-TEST-PLAN.md`.
-- **To do:** run the batch and the Playground matrix, tune one thing at a time, fill in the
-  results and the tuning log, and write the trade-off verdict.
+- **Done:** batch and routing runs measured, one tuning change applied and measured, results,
+  tuning log and trade-off verdict written (see the test plan).
 - **Satisfies:** Stories 5 and 6's acceptance criteria, holistically.
 - **Covers:** **LO 7**, **LO 8** (the trade-off called out in the learning objective becomes
   concrete here).

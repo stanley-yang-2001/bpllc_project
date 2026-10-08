@@ -7,10 +7,9 @@ tutorial, adapted to run entirely on free infrastructure.
 
 ## Current status
 
-Implementation Steps 1–9 are complete: the Language Agent (`gpt-oss-120b`) routes chat messages
+Implementation Steps 1–10 are complete: the Language Agent (`gpt-oss-120b`) routes chat messages
 to the Add Word and Story Generator tools, and a Tool Result Relay makes sure the learner sees
-the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is in progress**: the measuring tools and test plan are built (`docs/STEP-10-TEST-PLAN.md`), the live runs are still to do. Step 11
-(per-learner vocabulary) is not started. See
+the tool's exact output. **Step 10 (end-to-end testing and prompt tuning) is complete**: results, tuning log and the LO 8 verdict are in `docs/STEP-10-TEST-PLAN.md`. **Step 11 (per-learner vocabulary) is next.** See
 `docs/IMPLEMENTATION-GUIDE.md` for the full build order and per-step status, and
 `DEVELOPER-DIARY.md` for the current obstacle and a list of known code issues deferred until all
 steps are done.
@@ -100,6 +99,8 @@ tests/
 ├── test_add_word_normalization.py
 ├── test_routing_checks.py
 ├── test_story_prompt_language.py
+├── test_story_variety.py
+├── test_run_story_batch.py
 └── test_routing_runner_with_fake_langflow.py
 
 scripts/smoke_test.py            # Environment health check (Postgres + Groq)
@@ -108,6 +109,7 @@ scripts/run_routing_tests.py      # Step 10: automated end-to-end routing tests 
 scripts/routing_checks.py        # Step 10: the pure checking logic behind run_routing_tests.py
 scripts/run_story_batch.py       # Step 10: generates N stories through the production path and scores them (--rescore re-scores a saved run)
 sample_data/starter_vocabulary.csv
+sample_data/suggested_words.csv   # ~50 verbs, nouns and adjectives to add, for more varied stories
 
 docs/
 ├── OVERVIEW.md                  # Project overview, technology, components, user stories
@@ -144,6 +146,8 @@ docker compose exec langflow python /app/tests/test_vocab_adherence.py
 docker compose exec langflow python /app/tests/test_add_word_normalization.py
 docker compose exec langflow python /app/tests/test_routing_checks.py
 docker compose exec langflow python /app/tests/test_story_prompt_language.py
+docker compose exec langflow python /app/tests/test_story_variety.py
+docker compose exec langflow python /app/tests/test_run_story_batch.py
 docker compose exec langflow python /app/tests/test_routing_runner_with_fake_langflow.py
 docker compose exec langflow python /app/tests/test_final_passage_extractor.py
 docker compose exec langflow python /app/tests/test_story_guard.py

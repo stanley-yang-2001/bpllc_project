@@ -2,6 +2,100 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — Story variety measured; measurement fixes
+
+**Measured (20 English stories, 10 each Spanish/French/Japanese, `--delay 3`):**
+- Variety: mean overlap **0.24** (target ≤ 0.30, was 0.44), **6** distinct types (target ≥ 6),
+  most common opening **20%** (target ≤ 20%, was 44%).
+- **Not met:** the most repeated vocabulary word is still in **100%** of stories ("water"; the model
+  stuffs the whole word list into every story), and the English pass rate is **2/20** at ≤ 5 stray
+  words. New-type stories have 29% of their words outside the vocabulary (classic: 3%); the topic
+  seeds force new nouns, and the model ignored "at most 5 everyday words". Most strays are verbs the
+  starter vocabulary lacks.
+- Non-English language stays correct (27/27 generated); the Spanish and French samples are the most
+  natural stories so far. Latency p50 0.8–2.6s.
+- 3 of 10 Japanese stories failed to generate (about 3.4s each), probably rate-limit retries running
+  out under `--delay 3`; **cause unconfirmed**.
+
+**Fixed (tests first):**
+- Japanese/Chinese sentences ending in 。！？ with no space were counted as one (false "off-length").
+- A narration line like "Marc dit : ..." was taken for a speaker label (false "bad format").
+- Names that only start sentences (Sam, Maya, Anna) were counted as stray words.
+- The batch runner now records the model's error (type and message, or "empty response") on every
+  failed generation, so the next failure can be diagnosed.
+Corrected scores: French 10/10 (was 9/10), Japanese 7/10 generated (was 6/10), English strays
+14.25 → 13.65 per story.
+
+**Next (in the test plan):** add `sample_data/suggested_words.csv` and re-run the English batch with
+`--delay 10`; if one word still dominates, sample focus words per story; then vocabulary-fit topics.
+
+## Unreleased — Story variety (tuning change #2)
+
+**Why:** the owner found stories too alike: mostly conversations, the same words, the same shape.
+Measured on 48 stories: 81% mention water, about 75% are somebody asking for something, mean
+overlap 0.44 between English stories, "today" in 100%, 44% opening "Hello, I am...".
+
+**Changed (`story_tool.py`, tests first):**
+- Six new story types (a story with a problem and an ending, diary, letter, place description,
+  daily routine, funny anecdote) next to the two classic styles, drawn at random with
+  conversations about 19% of the mix. The classic templates are untouched (checksum pins still pass).
+- A topic seed from 21 topics, chosen in code, never repeating the last 8.
+- A looser word rule for the new types: the vocabulary stays central, plus grammar words, simple
+  verbs and at most 5 very common everyday words; 6–9 short sentences of up to 12 words.
+- `generate_story_for_learner(..., story_type=None, topic=None)`; explicit requests are cached
+  separately, the random default keeps the plain language key. `describe_prompt` recovers the type
+  and topic from a prompt.
+
+**Measuring (`scripts/`):** `variety_report` / `format_variety` (distinct types, mean overlap of
+content words, most repeated vocabulary word, most common opening); the batch runner records each
+story's type and topic, prints the variety line (also for `--rescore`) and has `--story-type`.
+
+**Decision change (owner's request):** pass rule is now ≤ 5 stray words (was 2) and 4–10 sentences
+(was 4–8); `--max-oov` defaults to 5 in the batch runner, checker CLI and routing tests. Earlier
+runs can be re-scored with `--max-oov 2`.
+
+**Added:** `sample_data/suggested_words.csv` (50 verbs, nouns and adjectives to add for more
+varied stories) and `tests/test_story_variety.py`. Targets and the before/after procedure are in
+`docs/STEP-10-TEST-PLAN.md` (tuning change #2).
+
+**Not measured yet. Not changed:** the Agent-facing tool still takes only `language` (exposing a
+type and topic is a separate change that needs a routing re-run); `story_prompt_builder.py` (Step 8
+canvas pipeline) keeps the old templates.
+
+## Unreleased — Step 10 complete
+
+**Final routing run through the Agent (45 turns, after replacing the canvas nodes):** 43 passed.
+Tool 42/42, argument 36/36, relay 36/36, empty-vocabulary guard 3/3, Add Word wording 9/9 (the
+case-variant case A3 now passes), language switching passed in all 3 repeats, and **15/15
+non-English story turns were in the requested language** (Spanish, French and Japanese, plus the
+Spanish and French turns of the switching sequence). The 2 failures were English stories with 3–4
+everyday stray words (the rule tolerates 2). Turn latency p50 3.0s, p90 5.0s, max 8.7s.
+
+**Confirmed:** every tool call used to appear twice in the saved results because of the parser; 37
+of 38 tool turns now show one call. English stories 41/48 (85%) overall.
+
+**Result:** all seven criteria in `docs/STEP-10-TEST-PLAN.md` are met, and the LO 8 verdict (cost,
+latency, quality, rate limits) is final. Step 10 is done; Step 11 (per-learner vocabulary) is next.
+
+## Unreleased — Step 10: language fix measured, LO 8 verdict drafted
+
+**Measured (Groq `gpt-oss-120b`):**
+- **Non-English stories in the requested language: 5/15 → 30/30** (Spanish 10/10, French 10/10,
+  Japanese 10/10) after tuning change #1. Structure was also 30/30 and the read samples were
+  natural. The prompt change did three things at once (translate-the-meanings rule, no English
+  example, normalized language name), so the run cannot attribute the gain to one of them.
+- **English: 9/10** in a back-to-back burst (`--delay 0`), 34/39 (87%) across all English runs.
+- **No failures in 60 story generations; no rate-limit effect in a 10-story burst** (p50 1.4s,
+  p90 2.0s, same as spaced runs).
+
+**Fixed:** the batch summary printed "Written in the requested language: 10/10" for English runs,
+which are not language-checked. The line now appears only when some passages were checked and
+counts only those (test first).
+
+**Docs:** results, criteria status, the filled tuning-log row, and a draft LO 8 verdict (cost,
+latency, quality, rate limits) in `docs/STEP-10-TEST-PLAN.md`. Remaining for Step 10: replace the
+Add Word and Story Generator Tool canvas nodes and re-run the routing suite once through the Agent.
+
 ## Unreleased — Web app design (React)
 
 Added `docs/WEB-APP-DESIGN.md`: a design for a local demo web app (not hosted) around the tutor.
