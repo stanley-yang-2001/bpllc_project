@@ -1,9 +1,9 @@
 """
 Step 10 story batch runner — measures the story prompt, with the Agent out of the loop.
 
-Calls the SAME pipeline the Story Generator Tool uses (story_tool.generate_story_for_learner:
-load vocabulary -> guard -> build prompt -> Groq -> extract passage), N times per language with
-the cache off, then scores every result with vocab_adherence.py and records latency.
+Calls the SAME pipeline the Story Generator Tool uses (tutor_core.story.generate_story:
+load the learner's words in that language -> guard -> build prompt -> Groq -> extract passage), N times per language
+with the cache off, for ONE learner (--learner-id, default $TUTOR_DEV_USER_ID) using that learner's own list for each language, then scores every result with vocab_adherence.py and records latency.
 
 Why: a prompt change is only an improvement if a number moves. Run this before and after each
 change to the story templates and compare the summaries.
@@ -13,8 +13,8 @@ so calls are spaced out by --delay seconds. Don't use the Playground at the same
 
 Run from the project folder (Windows or Linux):
 
-    docker compose exec langflow python /app/scripts/run_story_batch.py --count 15
-    docker compose exec langflow python /app/scripts/run_story_batch.py --languages English,Spanish --count 8
+    docker compose exec langflow python /app/scripts/run_story_batch.py --learner-id 1 --count 15
+    docker compose exec langflow python /app/scripts/run_story_batch.py --learner-id 1 --languages English,Spanish --count 8
 
 Re-score a saved run under different rules (instant, no Groq calls):
 
@@ -43,8 +43,13 @@ from vocab_adherence import (  # noqa: E402
 )
 
 
-def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max_unit_words=None, story_type=None):
-    import story_tool  # imported here so --rescore needs neither Langflow nor a database
+def run_language(language, count, delay, conn, learner_id, words, max_oov, strict_verbs, max_unit_words=None, story_type=None):
+    from tutor_core import groq as tc_groq, prompts as tc_prompts, story as tc_story  # imported here so --rescore needs neither Langflow nor a database
+    from tutor_core.languages import normalize_language
+
+    code = normalize_language(language)
+    if code is None:
+        raise ValueError(f"unknown language {language!r}")
 
     results = []
     for i in range(1, count + 1):
@@ -53,7 +58,7 @@ def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max
         def timed_call_groq(prompt):
             started = time.time()
             try:
-                out = story_tool.call_groq(prompt)
+                out = tc_groq.call_groq(prompt)
                 if not (out or "").strip():
                     seen["error"] = "empty response from the model"
                 return out
@@ -62,11 +67,11 @@ def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max
                 raise
             finally:
                 seen["latency"] = time.time() - started
-                seen["story_type"], seen["topic"] = story_tool.describe_prompt(prompt)
+                seen["story_type"], seen["topic"] = tc_prompts.describe_prompt(prompt)
 
-        text = story_tool.generate_story_for_learner(
-            language, conn=conn, call_groq_fn=timed_call_groq, use_cache=False, story_type=story_type
-        )
+        text = tc_story.generate_story(
+            conn, learner_id, code, call_groq_fn=timed_call_groq, use_cache=False, story_type=story_type
+        ).text
         result = check_passage(
             text, words, check_vocab=(language.strip().lower() == "english"),
             max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
@@ -90,7 +95,9 @@ def run_language(language, count, delay, conn, words, max_oov, strict_verbs, max
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--languages", default="English", help="comma-separated, e.g. English,Spanish")
+    parser.add_argument("--learner-id", type=int, default=None,
+                        help="whose vocabulary to use (default: $TUTOR_DEV_USER_ID). Each language uses that learner's own list for it")
+    parser.add_argument("--languages", default="English", help="comma-separated names or codes, e.g. English,Spanish or en,es")
     parser.add_argument("--count", type=int, default=15, help="stories per language")
     parser.add_argument("--delay", type=float, default=20.0, help="seconds between calls (rate limit)")
     parser.add_argument("--max-oov", type=int, default=5,
@@ -115,43 +122,62 @@ def main():
         for language, results in rescored.items():
             print(f"=== {language} ===")
             print(format_summary(summarize(results)))
-            print(format_variety(variety_report(results, data.get("vocabulary", ""), english=language.strip().lower() == "english")))
+            print(format_variety(variety_report(results, (data.get("vocabularies") or {}).get(language) or data.get("vocabulary", ""), english=language.strip().lower() == "english")))
             print()
         return 0
 
-    import story_tool
+    import os
 
-    conn = story_tool.get_connection()
+    from tutor_core import db as tc_db, vocab as tc_vocab
+    from tutor_core.languages import normalize_language
+
+    learner_id = args.learner_id
+    if learner_id is None and (os.environ.get("TUTOR_DEV_USER_ID") or "").strip().isdigit():
+        learner_id = int(os.environ["TUTOR_DEV_USER_ID"])
+    if not learner_id:
+        print("Say whose vocabulary to use: --learner-id N (or set TUTOR_DEV_USER_ID).")
+        return 2
+    os.environ.setdefault("STORY_ALLOW_UNMEASURED", "1")        # this is the measurement script: it may test any language
+
+    conn = tc_db.connect()
+    all_results, vocabularies = {}, {}
     try:
-        words = story_tool.load_words(conn)
-        if not words.strip():
-            print("The vocabulary is empty; add words first (or seed with Upload Word File).")
-            return 1
-        print(f"Vocabulary ({len(words.split(','))} entries): {words}\n")
-
-        all_results = {}
         try:
             for language in [l.strip() for l in args.languages.split(",") if l.strip()]:
+                code = normalize_language(language)
+                if code is None:
+                    print(f"Skipping {language!r}: not a supported language.")
+                    continue
+                words_list = tc_vocab.load_words(conn, learner_id, code)
+                if not words_list:
+                    print(f"Skipping {language}: learner {learner_id} has no {code} words yet (add some in the app, or through the Add Word tool).")
+                    continue
+                words = ", ".join(words_list)
+                vocabularies[language] = words
+                print(f"{language} vocabulary ({len(words_list)} entries): {words}\n")
                 all_results[language] = run_language(
-                    language, args.count, args.delay, conn, words, args.max_oov, args.strict_verbs,
+                    language, args.count, args.delay, conn, learner_id, words, args.max_oov, args.strict_verbs,
                     args.max_unit_words, args.story_type,
                 )
         except KeyboardInterrupt:
             print("\nInterrupted: summarizing what was collected so far.")
     finally:
         conn.close()
+    if not all_results:
+        print("Nothing was measured.")
+        return 1
 
     print()
     for language, results in all_results.items():
         print(f"=== {language} ===")
         print(format_summary(summarize(results)))
-        print(format_variety(variety_report(results, words, english=language.strip().lower() == "english")))
+        print(format_variety(variety_report(results, vocabularies.get(language, ""), english=language.strip().lower() == "english")))
         print()
 
     out = args.out or f"/app/scripts/step10_results_{time.strftime('%Y%m%d_%H%M%S')}.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(
-            {"vocabulary": words, "max_oov": args.max_oov, "strict_verbs": args.strict_verbs, "results": all_results},
+            {"vocabularies": vocabularies, "vocabulary": next(iter(vocabularies.values()), ""), "learner_id": learner_id, "max_oov": args.max_oov, "strict_verbs": args.strict_verbs, "results": all_results},
             f, ensure_ascii=False, indent=2,
         )
     print(f"Saved: {out}")

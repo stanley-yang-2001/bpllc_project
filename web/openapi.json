@@ -20,6 +20,55 @@
         "title": "Body_upload_api_words_upload_post",
         "type": "object"
       },
+      "ChatIn": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "language",
+          "session_id"
+        ],
+        "title": "ChatIn",
+        "type": "object"
+      },
+      "ChatOut": {
+        "properties": {
+          "reply": {
+            "title": "Reply",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCallOut"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reply",
+          "tool_calls",
+          "session_id"
+        ],
+        "title": "ChatOut",
+        "type": "object"
+      },
       "DeleteBody": {
         "properties": {
           "ids": {
@@ -356,6 +405,35 @@
           "status"
         ],
         "title": "StatusOut",
+        "type": "object"
+      },
+      "ToolCallOut": {
+        "properties": {
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "failed": {
+            "default": false,
+            "title": "Failed",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "args",
+          "output"
+        ],
+        "title": "ToolCallOut",
         "type": "object"
       },
       "UploadResult": {
@@ -711,6 +789,48 @@
         "summary": "Register",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/chat": {
+      "post": {
+        "description": "One chat turn. Made as the logged-in user and nobody else: the id comes from the session cookie, never\nfrom the body, and the Langflow session id is built from it here.",
+        "operationId": "chat_api_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat",
+        "tags": [
+          "chat"
         ]
       }
     },

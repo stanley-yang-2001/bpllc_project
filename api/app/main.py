@@ -10,8 +10,10 @@ from .config import Settings, load_settings
 from .db import make_pool
 from .errors import install_error_handlers
 from .migrate import run_migrations
-from .routes import auth, health, me, words
+from .routes import auth, chat, health, me, words
 from .security import LoginGuard, make_dummy_hash
+from .services.ai_gate import AiGate
+from .services.chat import make_chat_client
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 PRIVATE_HEADERS = {
@@ -41,6 +43,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.login_guard = LoginGuard()
     app.state.dummy_hash = make_dummy_hash(settings.bcrypt_rounds)
+    app.state.ai_gate = AiGate(settings.ai_gate_slots, settings.ai_gate_wait)
+    app.state.chat = make_chat_client(settings, lambda: app.state.pool)      # the pool exists once the app starts
     install_error_handlers(app)
 
     @app.middleware("http")
@@ -60,7 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers[name] = value
         return response
 
-    for module in (auth, me, words, health):
+    for module in (auth, me, words, chat, health):
         app.include_router(module.router, prefix="/api")
     return app
 

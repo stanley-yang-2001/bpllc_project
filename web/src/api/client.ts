@@ -8,6 +8,8 @@ export type UploadResult = Schemas["UploadResult"];
 export type LanguageInfo = Schemas["LanguageOut"];
 export type Health = Schemas["HealthOut"];
 export type Meta = Schemas["MetaOut"];
+export type ChatReply = Schemas["ChatOut"];
+export type ToolCall = Schemas["ToolCallOut"];
 
 /** Every non-2xx response from the API has the same body: {error: {code, message, retry_after?}}. */
 export class ApiError extends Error {
@@ -82,5 +84,6 @@ export const api = {
     form.set("file", file);
     return request<UploadResult>("POST", "/words/upload", { form });
   },
+  chat: (b: { message: string; language: string; session_id: string }) => request<ChatReply>("POST", "/chat", { json: b }),
   health: () => request<Health>("GET", "/health"),
 };

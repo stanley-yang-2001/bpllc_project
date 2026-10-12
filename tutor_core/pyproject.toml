@@ -10,6 +10,9 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
+# tutor_core.db and tutor_core.vocab talk to Postgres. Not a hard dependency: the Langflow image and the API image
+# both already provide psycopg2, and the pure modules (languages, words, prompts, groq) need nothing at all.
+db = ["psycopg2-binary"]
 # Tier-1 lemma matching for the quality report (added in a later milestone)
 lemmas = ["simplemma"]
 

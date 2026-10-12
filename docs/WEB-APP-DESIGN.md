@@ -133,12 +133,12 @@ Free-text language names create junk (`"Spanish"`, `"español"`, `"spanish "` as
 ## 3D. Passing the learner to Langflow tools
 Today's components read one global `words` table. For the web app, `user_id` and the active `language` must arrive per request, and the model must never be able to choose or change them.
 
-**Plan A (preferred) [verify in M0].** Add two hidden inputs, `user_id` and `language`, to Add Word and to Story Generator Tool, with `tool_mode=False` so the Agent does not see them. The API sets them per run through Langflow `tweaks`, which are keyed by component ID or component name. Langflow's docs confirm tweaks are one-time per-request overrides.
+**Plan A (verified in M0).** Add two hidden inputs, `learner_id` and `active_language` (`active_language`, not `language`, because the story tool already has a visible `language` argument that the Agent fills in; the name `user_id` is reserved by Langflow: every component has a read-only `user_id` property returning the Langflow *account's* UUID, which silently shadows an input of that name; found by the first M0 spike run; send the id as a **string**, because Langflow's text-field handling silently drops any value that is not a string, list or Data object, so an integer `learner_id` never arrived while the string `language` did (second run), and the tool converts it back with `int()` and refuses anything else), to Add Word and to Story Generator Tool, with `tool_mode=False` so the Agent does not see them. The API sets them per run through Langflow `tweaks`, which are keyed by component ID or component name. Langflow's docs confirm tweaks are one-time per-request overrides.
 - Key tweaks by the component's **name**, not an auto-generated ID that changes if the flow is re-imported; confirm name keys work in the pinned version.
 - Recent Langflow versions (the 1.12.x docs) offer `LANGFLOW_TWEAKS_POLICY` (`permissive` by default, `declared` accepts only fields marked "API" on the canvas). If the pinned version has it, use `declared` and mark exactly these fields; otherwise stay permissive and rely on the network rules in section 3.
-- **Fail closed.** If `user_id` is missing, the tools return an error message and touch no data. They must never fall back to a shared list. A dev fallback exists only when `TUTOR_DEV_USER_ID` is set in the Langflow container, so the Playground and `run_routing_tests.py` keep working during development.
-- **Which language each tool uses.** Add Word always stores into the active language (the hidden `language` input); the reply names the language ("Added 'bread' to your Spanish vocabulary") so a mix-up is visible immediately. The story tool keeps its Agent-supplied `language` argument (the learner may say "story in French" while Spanish is active); the hidden `language` input is only its default when the message names none.
-- **Concurrency check.** The spike must run parallel requests for different users against the same flow and prove each tool call saw its own `user_id`. Sequential success does not prove isolation.
+- **Fail closed.** If `learner_id` is missing, the tools return an error message and touch no data. They must never fall back to a shared list. A dev fallback exists only when `TUTOR_DEV_USER_ID` is set in the Langflow container, so the Playground and `run_routing_tests.py` keep working during development.
+- **Which language each tool uses.** Add Word always stores into the active language (the hidden `active_language` input); the reply names the language ("Added 'bread' to your Spanish vocabulary") so a mix-up is visible immediately. The story tool keeps its Agent-supplied `language` argument (the learner may say "story in French" while Spanish is active); the hidden `language` input is only its default when the message names none.
+- **Concurrency check.** The spike must run parallel requests for different users against the same flow and prove each tool call saw its own `learner_id`. Sequential success does not prove isolation.
 
 **Plan B (fallback).** Build `session_id` as `u{user_id}-{uuid}` and have the tools read it from the running graph (`self.graph.session_id`, **verify**). Add Word then needs the language as an Agent argument. Use B only if A fails the concurrency check; the decision and the evidence get written into the changelog.
 
@@ -554,12 +554,13 @@ volumes:
 ### Implementation status (updated as work lands)
 | M | Status | Notes |
 |---|---|---|
-| 0 | **not started** | needs a running Langflow and Groq; nothing below depends on its result except M3 and M5 |
+| 0 | **Plan A verified** | tweaks reach the tool per request and stay separate under concurrency on Langflow 1.12.2 (node-id key; hidden input `learner_id` sent as a string). Still open: display-name key, the chat-deletion probe, the first real greeting/story fixtures, which model answers. See changelog |
 | 1 | built, partly verified | `make check` green; real nginx + API + Postgres exercised with curl. **Dockerfiles and compose were not run** (no Docker where this was built) |
 | 2 | built | schema migration, register / login / logout / me, lockout, CSRF, isolation tests (mutation-checked) |
-| 3 | **not started** | `tutor_core` so far holds only new code (`languages`, `words`); existing components still carry their own copies until the extraction |
+| 3 | **built, partly verified** | extraction done in two commits (pure move, then behaviour); tools are thin wrappers over `tutor_core.tools`, per learner, fail closed, `TUTOR_DEV_USER_ID` fallback; `tutor.words`; cache keyed by (learner, language, type, topic); word cap; credentials and model from the environment; flow synced by `scripts/sync_flow_nodes.py`. Verified here against real Postgres. **Not yet run:** the image build (`langflow/Dockerfile`), the container-side tests under Python 3.14.7, `scripts/m3_check.py` and the routing matrix against the live flow. See changelog |
 | 4 | built | vocabulary API and page (list, search, add, edit, bulk delete, CSV upload, add language) |
-| 5-7 | not started | the pages exist as "coming soon" placeholders |
+| 5 | **partly built** | the parts that do not depend on M0's answer: `POST /api/chat`, the AI gate (2 at once, 1 per learner), `langflow_client` (payload, parsing, error mapping), a stub tutor (`AI_MODE=stub`), the Chat page with tool trace. **Live chat is deliberately OFF** until `LANGFLOW_PER_USER_TOOLS=1` (the tools must read the learner's own words first: M0 and M3). Still to do: pass `user_id` per the M0 result, save-to-library, the `/health` Langflow check, privacy wording and policy version for live chat, per-user deletion of Langflow's stored chat (from `scripts/capture_fixtures.py --probe-delete`), the real-fixture tests (skipped until captured), browser and accessibility specs for `/chat` |
+| 6-7 | not started | the pages exist as "coming soon" placeholders |
 | hardening | built | server-side sessions, `no-store` and security headers, CSP, expected-user check, per-user cache keys, cross-tab sync, back-cache guard (section 12A); 53 API + 31 web tests + 9 real-browser tests |
 | style | built | see `docs/STYLE-GUIDE.md` (tokens, components, measured contrast, honest gap list) |
 | accounts and privacy | built | email sign-up with consent, privacy policy page, Settings (profile, email, password, appearance, data download, account deletion), dark mode, styled dialogs; section 12B |
@@ -589,6 +590,17 @@ Deviations from this document: the `stories` table is not in migration 0001 (it 
 | 7 | Stories offered in languages measured at 5/15 correct | Per-language "stories enabled" flag, switched on only after measurement (since measured: Spanish, French and Japanese 30/30, now enabled) |
 | 8 | Quality report claimed lemma checks everywhere, but the checker is English-only | Three modes (strict, informational, unavailable), stated in the report |
 | 9 | Checker lived in `scripts/`, which neither the API nor Langflow can import | Moved to `tutor_core.quality` |
+
+### 17A. Findings from building M0 and M3 (for the next revision of this document)
+1. **Hidden tool inputs are named `learner_id` and `active_language`, never `user_id`**: Langflow reserves `user_id` (and `graph`, `flow_id`, `flow_name`, `trace_name`, `tracing_service`, `tree`, `template_config`, `enabled_tools`, `ctx`) on every component and silently shadows an input of that name (M0).
+2. **The id is sent as a string**: Langflow silently drops a non-string value sent to a text field (M0). The tool turns it back into an integer and refuses anything else.
+3. **Langflow reports tools by their snake_case names** (`add_word`, `story_generator_tool`), not the canvas names; the API client maps them back (M0).
+4. **Tweaks are keyed by node id** (`AddWord-WhP5g`), the style that was verified; display-name keys are not yet verified.
+5. **The language gate lives in `tutor_core.story.generate_story`** (as designed), so chat and Story Studio obey it equally; the tool layer just relays its message.
+6. **OPEN, needs a decision and a measurement: the non-English story prompt calls the vocabulary list English.** Step 10 measured Spanish, French and Japanese at 30/30 with ONE English vocabulary and a prompt that says "the list below is written in English: treat each entry as a MEANING and use its natural Spanish word". With per-language lists (3C) a Spanish learner's list holds Spanish words, so that sentence is false for them. M3 deliberately did not change measured prompts. Before non-English stories are relied on: add a variant of the prompt for target-language vocabulary and re-measure it (`scripts/run_story_batch.py --learner-id N --languages Spanish` now uses the learner's own Spanish list), or decide that stories use the learner's English meanings.
+7. **The tools connect with the same database account as the API.** A least-privilege role for the Langflow tools (read/insert on `tutor.words` only) is a worthwhile hardening step, not done in M3.
+8. **The API's own add-word INSERT is still separate from `tutor_core.vocab.add_word`**; both share the one rule that matters (`tutor_core.words.validate_word`). Consolidating the INSERT is a small follow-up.
+9. **Legacy:** the Step 8 canvas components (`upload_word_file`, `story_prompt_builder`, `story_guard`, `final_passage_extractor`) still exist and still use the shared `public.words`; they are not wired into the flow and can be removed once nobody debugs with them.
 | 10 | Whole vocabulary pasted into the prompt: a large list would exceed the token budget | `MAX_PROMPT_WORDS` sampling; full list still used for checking |
 | 11 | No minimum vocabulary for a story | 5-word minimum with a friendly `not_enough_words` |
 | 12 | Uploaded "words" could carry prompt-injection text | One validation rule for all entry points (limits it; the prompt builder must also treat the list as data) |
@@ -628,3 +640,36 @@ The remote repository moved while this design was being built (`eace656`, `3c67c
 | Step 10 closed, "Step 11 is next" | Web app delivers Step 11 for the production path (section 1) |
 | Diary: no style input on the tool; no-language requests inconsistent | Open item for M5 (risk 9) |
 | Patch files and caches are no longer tracked; `.gitignore` added | `.gitignore` merged with the web app's rules |
+
+## 19. Progress log and next steps
+
+*This section records where the project stands. The changelog has the detail; this is the map.*
+
+### 19.1 Where each milestone stands
+| M | Status | Evidence | Still open |
+|---|---|---|---|
+| 0 | **Plan A verified** | live runs on Langflow 1.12.2: tweaks reach each tool per request and stay separate under concurrent calls (overlap 1.46 s of 1.50 s), the Agent cannot change a hidden input, no tweak means no learner | display-name tweak key unverified; chat-deletion probe and the greeting/story fixtures not yet captured; which model actually answers (Gemini named in the Agent node, Groq node wired in) |
+| 1, 2, 4 | built | API 397 tests, web 77, real Postgres | Docker builds of api and web never run |
+| 3 | **built, partly verified** | extraction in two commits (pure move proven byte-identical to the original; then behaviour); tools per learner and fail closed; 59 core tests, 16 root tests | the image build, the container-side tests on Python 3.14.7, `m3_check.py` and the routing matrix against the live Agent |
+| 5 | **groundwork built, live chat OFF** | `POST /api/chat`, AI gate, Langflow client with one real fixture, stub tutor, Chat page | switch live chat on (below), save-to-library, `/health` Langflow check, privacy wording and policy version, per-learner deletion of Langflow's stored chat, a token-per-minute limiter (Groq free tier allows about 8000 a minute; the gate limits concurrency only) |
+| 6, 7 | not started | pages exist as "coming soon" | needs M3 verified; Story Studio also needs decision 6 of 17A |
+
+### 19.2 Where things were verified
+- **In the build sandbox** (real Postgres 16, Python 3.12, Langflow's `lfx` library standing in for `langflow`): every automated suite, run test-first and mutation-checked. Fakes are used only for Langflow and the Agent, never for the database or `tutor_core`.
+- **On the author's machine** (Langflow 1.12.2, Python 3.14.7, Groq): the M0 spike runs only. Nothing from M3 or M5 has run there yet.
+- **Nowhere yet:** the Docker builds, anything on Python 3.14.7 other than Langflow itself, the live Agent calling the M3 tools.
+
+### 19.3 What to run next, in order
+1. Apply the patches, then `docker compose up -d --build`. If the langflow image fails to build, the Dockerfile prints which interpreter and user it assumed; `docker run --rm --entrypoint sh langflowai/langflow:1.12.2 -c 'id; command -v python; python --version'` shows the real values (set `LANGFLOW_RUN_AS_USER` in `.env` if the user is not `user`). Back up the canvas flow first: Langflow loads `flows/language-tutor.json` at startup and it has the same id as your canvas copy.
+2. `make test-langflow`: every container-side test under Python 3.14.7.
+3. `docker compose exec langflow python /app/scripts/sync_flow_nodes.py --check`: the loaded flow still matches the repo.
+4. `docker compose exec langflow python /app/scripts/m3_check.py --flow-id language-tutor --pause 30`: the live acceptance check. `TUTOR_DEV_USER_ID` must be empty for check 1 to be judged.
+5. `docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id language-tutor --delay 20`: the routing matrix as throwaway learners; compare with Step 10 (43 of 45 routing, 30 of 30 non-English). The Agent-facing tool text is unchanged, so routing should not move; if it does, that is a finding.
+6. If 4 and 5 pass: set `LANGFLOW_API_KEY` and `LANGFLOW_PER_USER_TOOLS=1` in `.env` (live chat then turns on), run `scripts/capture_fixtures.py --probe-delete`, and update the privacy page and policy version before real learners use chat.
+
+### 19.4 Decisions waiting for the author
+1. **Non-English story prompt** (17A item 6): variant for target-language vocabulary plus re-measurement, or stories from English meanings.
+2. **Token budget**: add a tokens-per-minute limiter to the AI gate, or move off Groq's free tier, before live chat.
+3. **Tools' database role** (17A item 7): worth a least-privilege account before real learners.
+4. Whether to delete the legacy Step 8 components (17A item 9).
+

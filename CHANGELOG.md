@@ -2,6 +2,200 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — M3: `tutor_core` extraction and per-learner, fail-closed tools
+
+Done as the design requires, in two commits so a regression can be blamed on the move or on the behaviour.
+
+**Baseline** (commit 22c8ed3, before touching anything): root tests 17/17 (run in a rebuilt container-like harness: `/app` paths, host
+`postgres`, `langflow.*` mapped to the real `lfx` library), API 191 passed + 3 skipped, `tutor_core` 32.
+
+**Commit 1, pure move** (86ed65c): the story prompts, language handling, Groq call, vocabulary access and story pipeline moved from the
+components into `tutor_core.prompts`, `.groq`, `.vocab`, `.story`; components became thin wrappers; tests and scripts changed only their
+import paths. After it: root 17/17, API and core unchanged. Equivalence was measured against the original `story_tool.py` taken from git:
+both classic templates byte-identical, 162 `build_story_prompt` combinations identical under identical randomness (an unseeded
+comparison showed 51 differences, which were the code's own random topic choice, not the move), and `describe_prompt`, `choose_topic`,
+`choose_story_type`, `extract_final_passage`, `normalize_language` identical.
+
+**Commit 2, behaviour:**
+- `tutor_core.vocab`: per learner and language on `tutor.words` (`add_word`, `load_words`, `sample_words` with the 150-word cap from `MAX_PROMPT_WORDS`);
+  an unknown learner or language is refused, never created; the one word rule is still `tutor_core.words` (newlines collapse, bounded).
+- `tutor_core.story.generate_story`: the cache key is (learner, language, type, topic) (it was the language alone: one learner's story could be served
+  to another); returns the type and topic used and how many words went in; the enabled-language gate is inside it (as designed), so Story Studio and chat obey it equally.
+- `tutor_core.tools`: what the tools do. **Fail closed**: without a usable `learner_id` the tool says so and touches nothing; ids are ASCII digits only; a
+  learner id that is sent but malformed is refused even in dev mode; only a request that sends NOTHING may use `TUTOR_DEV_USER_ID` (empty in compose by default).
+  Unexpected errors reach the learner as their type only, never connection details.
+- `tutor_core.db` and `.groq`: no credentials, host or model name left in the code (`DATABASE_URL`, `GROQ_API_KEY`, `GROQ_MODEL`).
+- Components: hidden `learner_id` and `active_language` inputs (text fields, advanced, not tool-mode), so the Agent still sees exactly one argument per tool;
+  the Agent-facing tool descriptions and argument definitions are byte-identical to the originals (checked against git), because Step 10 measured routing with them.
+  The reply now names the language ("Added 'bread' to your Spanish vocabulary").
+- API client: the language tweak is `active_language` (the story tool already has a visible `language` argument); the tools' own refusal messages are flagged as failures in the trace.
+- `flows/language-tutor.json` synced by the new `scripts/sync_flow_nodes.py` (code, hash, hidden field templates); `--check` and tests catch drift between canvas and repo.
+- `langflow/Dockerfile` (base pinned to 1.12.2; installs `tutor_core` into the interpreter Langflow runs on, then imports it as the runtime user so a bad build fails), compose builds it, passes
+  `DATABASE_URL`, `GROQ_MODEL`, `MAX_PROMPT_WORDS`, `TUTOR_DEV_*`, and makes langflow wait for the api (which runs the migrations that create the `tutor` schema).
+- `scripts/run_routing_tests.py` now runs as THROWAWAY learners (one seeded in English, Spanish, French and Japanese, one empty), sends each request through tweaks
+  (the production mechanism), and deletes them in a `finally`; the snapshot/restore of a real vocabulary is gone (`--cleanup-leftover` replaces `--restore-leftover`).
+  `scripts/run_story_batch.py` takes `--learner-id` and uses that learner's own list per language (old result files still re-score). `scripts/m3_check.py` is the new live acceptance check.
+
+**Where the removed tests went** (all cases kept): `test_add_word`, `test_add_word_normalization`, `test_word_loader` -> `api/tests/test_tutor_core_vocab.py`,
+`test_tutor_tools.py`, `tutor_core/tests/test_word_normalization_cases.py`; `test_story_tool`, `test_empty_response_handling` -> `api/tests/test_tutor_core_story.py`,
+`test_tutor_tools.py`, `tutor_core/tests/test_groq_request.py`; the two pipeline cases in `test_story_prompt_language` and `test_story_variety` -> the same files. Cases with no
+equivalent anymore: "the table does not exist" (the schema comes from migrations).
+
+**Verified here** (real Postgres 16, Python 3.12): root tests **16/16** (the 17 of the baseline, minus 5 replaced by per-learner tests, plus 4 new), API **397 passed + 3 skipped** (was 191), `tutor_core` **59** (was 32), host script tests 4/4, web 77 and type check unchanged. New tests were written first and mutation-checked: breaking each of these made a test fail
+(load ignoring the learner or the language, add writing to learner 1, cache key without the learner or without the language, word cap ignored, a malformed id falling back to the dev user, a
+learner id accepting unicode digits, a story for a missing learner, error detail leaking, the client sending integers or raw tool names). Gaps found and fixed by that process: dev-fallback behaviour for non-string ids.
+`scripts/m3_check.py` was itself tested as a command against a fake Langflow that runs the REAL tools on the REAL database: it passes a healthy flow and fails flows whose tools ignore the learner, whose Agent
+controls the learner, whose Agent never calls a tool, or that leave the developer fallback on; a failing request is an ERROR for its step only; it always cleans up. That test found a bug in the script (it
+judged a learner's whole list rather than what was added).
+
+**Not verified (needs your machine):** the image build; the container-side tests under Python 3.14.7; `m3_check.py` and the routing matrix against the live Agent; whether the Agent still routes as well with the unchanged tool text
+(the routing run answers that). **Open decisions** are in design section 17A, the important one being that the non-English story prompt still calls the vocabulary list English.
+
+## Unreleased — M0: PLAN A VERIFIED (node-id key) on Langflow 1.12.2
+
+**Third live run** (`SpikeWhoAmI-KuKYY`, 2 users, learner ids as strings): control PASS, parallel PASS, overlap PASS, override PASS,
+Plan B evidence PASS. The raw file confirms it: learners 101 and 102 ran their tool calls on different threads with windows
+overlapping 1.463 s of 1.500 s, and each tool call saw exactly its own `learner_id` and `language`; with no tweaks the tool saw
+`NONE`; the override attempt (asking the Agent to use user 999) still ran as learner 7, and the only argument the Agent could give
+the tool was `note`, since the hidden inputs are not in the tool's schema. The tool reported one call per request even though the
+response lists the tool block twice, so counting it once is right. The session id is readable from the graph, so Plan B stays
+available as a fallback.
+
+**Decision:** Plan A. The hidden inputs are `learner_id` (a string) and `language`, addressed by node id. `LANGFLOW_TWEAK_KEYS`
+now defaults to `AddWord-WhP5g,StoryGeneratorTool-RQpvc` (node ids in `flows/language-tutor.json`), the style that was verified; the
+display-name key (`"Who Am I (spike)"`) is not yet verified under the string-id fix. Node ids stay put while a flow is edited, but
+re-check them after re-exporting a flow.
+**Three things the spike taught us, all fixed or recorded:** (1) never name a hidden input `user_id` (Langflow reserves it); (2) send
+the id as a string (Langflow silently drops anything else on a text field); (3) Langflow reports tools by snake_case name
+(`spike_who_am_i`, so `add_word`), not the canvas name: `langflow_client.canonical_tool_name` maps `add_word`, `AddWord`, `Add Word`
+to "Add Word" and `story_generator_tool` to "Story Generator Tool", otherwise the page would have shown "Used add_word" and a
+successful word add would not have refreshed the vocabulary list. Reverting each of these makes tests fail.
+**First real fixture:** `api/tests/fixtures/langflow/whoami_run.json` (one edit: the Langflow account UUID zeroed), with a real-data
+test (reply path, one call from two blocks, name, arguments). Greeting, story and stored-messages fixtures are still to capture.
+**Still open in M0:** the display-name key under string ids; `scripts/capture_fixtures.py --probe-delete` (what Langflow stores, and
+whether a learner's chat can be deleted); which model actually answers (the Agent node names a Gemini model, the edge wires the Groq
+node; this response does not say; check Groq's usage page or Langflow's logs); then M3 (tools read `learner_id`, fail closed).
+
+## Unreleased — M0 second live run: Langflow silently drops a non-string tweak on a text field
+
+**Run:** `SpikeWhoAmI-KuKYY`, 2 users, `--pause 30`. The control passed (no tweaks: `learner_id=NONE`, so the canvas node has the
+`learner_id` code and the tool fails closed). The parallel and override checks failed: the tool saw `learner_id=NONE` while `language`
+arrived correctly **and differently per request**: users 101 and 102 ran at the same moment (tool windows overlapping by about 10 ms)
+and each got its own language (`es`, `fr`) on a different thread. No 429 this time (`--pause` worked).
+**Cause (from Langflow 1.12.5's source, `graph/vertex/param_handler.py`; your container is 1.12.2, so the string run confirms it):** for a
+`str` field the value is matched against a list, a string or a `Data` object only. Anything else, such as the integer
+`learner_id` we sent, matches no case and is silently dropped (no error, no warning). The component itself handles integers fine
+(checked by instantiating it under lfx), so the loss is in the graph, not in our code.
+**Fix:** learner ids are sent as strings (`"101"`): `spike_tweaks.py` (default; `--int-ids` reproduces the drop; `--string-ids` still
+accepted), and `langflow_client.build_tweaks`. The M3 tools take the string, convert with `int()` and refuse anything else.
+Tests: the fake Langflow now drops non-string tweaks the same way; a CLI test shows `--int-ids` failing and the default passing; an
+API test asserts every tweak value is a string (reverting the client to integers fails 6 tests).
+**Design note:** the drop is why the fail-closed rule matters: the tool saw nothing and acted as nobody, instead of guessing.
+**Plan A status:** still not proven for `learner_id`. Next run: strings, expecting PASS on control, parallel, overlap and override.
+
+## Unreleased — fix: `spike_tweaks.py --pause` was not registered
+
+**Bug (mine):** patch 3 documented and used `--pause` but never registered it with the argument parser (a search-and-replace
+silently matched nothing), so the first real run died with "unrecognized arguments" and, had it parsed, `args.pause` would have
+raised. The unit tests called `run_suite()` directly and never `main()`, so nothing saw it.
+**Fix:** the option is registered, plus `--out-dir`. **Gap closed:** `tests/fake_langflow.py` (a fake Langflow on a real local
+socket, with a switch that reproduces the first live run's shadowing bug) and `tests/test_cli_end_to_end.py`, which run
+`spike_tweaks.py` and `capture_fixtures.py` as subprocesses with the exact options a person types: parser, HTTP, API-key creation,
+output files, exit codes. Removing `--pause` again makes them fail. `make test-scripts` runs them (and is part of `make check`).
+
+## Unreleased — M0 first live spike run: the hidden input must not be called `user_id`
+
+**Found (first run against Langflow 1.12.2):** with no tweaks, and with tweaks, the tool reported a UUID where the learner id should
+be, while `language` arrived correctly. Langflow gives every component a read-only `user_id` property that returns the id of the
+Langflow **account** running the flow (the owner of the API key), and it shadows an input of the same name (confirmed in
+`lfx/custom/custom_component/custom_component.py`: `def user_id(self)`). Names reserved on a component: `trace_name`, `graph`,
+`user_id`, `flow_id`, `flow_name`, `tracing_service`, `tree`, `template_config`, `enabled_tools`, `ctx`.
+**Fix:** the hidden input is `learner_id` everywhere: `spike_whoami.py` (which also reports `langflow_user`, the shadowing value, as
+a diagnostic), `scripts/spike_tweaks.py`, and `langflow_client.build_tweaks`, which would otherwise have sent a field the real tools
+could never read. Live chat was off by default, so nothing leaked. The design's Plan A text and the M3 tool work use `learner_id`.
+Regression tests: the account id is never treated as a learner, and the client never sends `user_id`.
+
+**Evidence so far:** the `language` tweak reached the tool under both key styles (node id `SpikeWhoAmI-KuKYY` and display name
+`Who Am I (spike)`), so tweaks do arrive; and `self.graph.session_id` equalled the session id the API sent, so Plan B is possible.
+Plan A itself is **still unproven**: isolation under parallel load has not yet been seen to hold, because the first run tested the
+shadowed field and the second hit Groq's rate limit.
+
+**Found (Groq free tier):** `openai/gpt-oss-120b` allows about 8000 tokens per minute, and one Agent turn costs a couple of thousand,
+so roughly three or four chat turns a minute across ALL learners. The AI gate limits concurrency (2 at once) but not tokens per
+minute, so it cannot prevent 429s. A token-budget limiter, or a larger Groq tier, is needed before live chat; not built yet.
+`spike_tweaks.py` gained `--pause` (waits between phases and keys), defaults to 2 users, and explains a rate-limit failure instead
+of reporting it as an isolation result.
+
+## Unreleased — M5 groundwork: chat that does not depend on M0's answer
+
+**Added (API):**
+- `POST /api/chat` (`routes/chat.py`): login required; the learner's id comes from the session cookie and is never read from the
+  body; the Langflow session id is built on the server as `u<user id>-<32 hex from the browser>`, so a learner cannot name another
+  learner's conversation; messages are trimmed, 1 to 2000 characters; language must be supported.
+- `services/ai_gate.py`: at most `AI_GATE_SLOTS` (default 2) AI calls at once across all learners and one per learner; a caller who
+  cannot get a slot within `AI_GATE_WAIT` seconds gets `tutor_busy` (429, Retry-After). Tested with real threads.
+- `services/langflow_client.py`: builds the run payload (numeric user id, language and session id only; a test proves no email, name
+  or password can reach Langflow), reads the reply and tool calls from the run response and, if none, from the stored messages
+  (parsing ported from `scripts/routing_checks.py` and the relay), flags failed tools, maps failures to `langflow_unavailable` (503),
+  `ai_failed` (502) and `tutor_busy` (429) with learner-safe messages. Whether tweaks are sent is `LANGFLOW_TWEAK_KEYS` (empty = Plan B).
+- `services/chat_stub.py` (`AI_MODE=stub`): deterministic stand-in so the whole Chat path works without Langflow or Groq; its Add Word
+  really writes to the calling learner's own list.
+- Settings and compose variables: `LANGFLOW_URL`, `LANGFLOW_FLOW`, `LANGFLOW_API_KEY`, `LANGFLOW_TWEAK_KEYS`,
+  `LANGFLOW_PER_USER_TOOLS`, `AI_GATE_SLOTS`, `AI_GATE_WAIT`, `LANGFLOW_TIMEOUT`.
+- **Live chat is OFF by default.** Until `LANGFLOW_PER_USER_TOOLS=1`, `/api/chat` in live mode answers 503 "not switched on yet": the
+  flow's tools still read one shared word list, so answering would mix learners' vocabulary. The flag is the operator's statement
+  that M0 and M3 are done.
+- `.env.example` (it was referenced by the README and this changelog but missing from the repository).
+
+**Added (web):** the Chat page (`routes/Chat.tsx`), `chat/ChatContext.tsx` and `chat/ToolTrace.tsx`. The conversation is held in memory
+only (never localStorage, sessionStorage or the URL) under the per-user key, so the next person on the browser starts empty. The
+call goes through a React Query mutation so a 401 (`session_changed` after another tab logged in) reaches `AuthProvider`: found by
+a test that failed, then fixed. Enter sends, Shift+Enter is a new line, and Enter does not send while an input method is composing
+(Japanese, Chinese, Korean). One request at a time, a "still working" note after 8 s, Try again on a failed message, New chat starts
+a new session. A successful Add Word refreshes the vocabulary queries and the language list.
+
+**Verified:** API 176 passed and 3 skipped (the skips are the real-fixture tests, waiting for `scripts/capture_fixtures.py`); core 32;
+web 77 (was 56); type check and production build clean. Test-first, and mutation-checked: each of these broken on purpose made a
+test fail (user id from the body, session id without the user prefix, stub writing to user 1, email in the payload, user lock never
+released, conversation in localStorage, provider not keyed by user, failed Add Word refreshing, new session id every message). Two
+mutants first survived and showed real test gaps (a user-1 fixture coincidence; no test of the two-tabs path); both were fixed.
+
+**Not verified:** anything against a live Langflow or Groq; the browser (Playwright could not be installed in the build sandbox), so
+the end-to-end and accessibility scans of `/chat` have not run (white text on the brand-coloured bubble is the thing to watch); the
+privacy page still says chat is "not available yet", which is true while live chat is off and must change, with a policy version
+bump, before it is switched on.
+
+## Unreleased — M0 groundwork (spike built, not yet run against a live Langflow)
+
+**Facts recorded:** Langflow **1.12.2**, Python **3.14.7** inside the image (`langflow --version`, `python --version` in the
+container). `tutor_core` declares `requires-python >=3.10`, so it is compatible. The exported flow (`language tutor`, node ids
+`AddWord-WhP5g`, `StoryGeneratorTool-RQpvc`, `ToolResultRelay-G5PjB`, ...) matched the repo: every component's code on the canvas
+was identical to `custom_components/`, and the Agent instructions matched `docs/AGENT-INSTRUCTIONS.md`.
+
+**Found:** the exported flow contained a live Groq API key in the Groq model node. The key was rotated; the copy kept in the repo
+has the field empty. `endpoint_name` was empty, so the flow could not be run by name. The Agent node's own model field names a
+Gemini model while the edge wires in the Groq node (assumed to win; the first live run must show which model answers).
+
+**Added:**
+- `flows/language-tutor.json`: the flow, key removed, `endpoint_name` set to `language-tutor`.
+- `custom_components/groq_language_model.py`: an empty key field now falls back to `GROQ_API_KEY` (the flow file ships without a
+  key). The component code embedded in the flow file and its `code_hash` were updated to match. `tests/test_groq_language_model.py`.
+- `docker-compose.yml`: Langflow pinned to `1.12.2` (was `:latest`), `./flows` mounted, `LANGFLOW_LOAD_FLOWS_PATH=/app/flows`.
+- `custom_components/spike_whoami.py`: a throwaway tool with hidden `user_id` and `language` inputs (tool mode off) that reports what
+  it received, holds 1.5 s so parallel calls overlap, and reports the session id as the graph sees it (Plan B evidence).
+- `scripts/spike_tweaks.py`: control (no tweaks), parallel (several users at once), and override (the Agent is asked to use user 999)
+  for each tweaks key style; sequential success is reported INCONCLUSIVE, never PASS. `tests/test_spike_tweaks.py` drives it against
+  a fake Langflow in correct and deliberately broken forms (shared state, ignored tweaks, no overlap, Agent skips the tool, Agent
+  obeys the override, request errors).
+- `scripts/capture_fixtures.py`: saves real run and stored-message responses for the `langflow_client` fixtures (key-shaped values
+  redacted) and, with `--probe-delete`, tests whether a session's stored messages can be listed and deleted through Langflow's
+  monitor API. `tests/test_capture_fixtures.py`.
+
+**Verified here:** the three new test files and the Groq component test pass (standard library only). **Not verified:** everything
+that needs a live Langflow or Groq: that the `1.12.2` image tag exists, that `LANGFLOW_LOAD_FLOWS_PATH` loads the flow, that tweaks
+reach tool components (by id or by name, integer or string ids), that `self.graph.session_id` exists, and the monitor delete
+endpoints. Plan A or B is decided by running `scripts/spike_tweaks.py`; the result goes here.
+
 ## Unreleased — Web app adapted to the Step 10 results
 
 The remote moved while the web app was being built (`eace656`: patch files and caches untracked, `.gitignore`;

@@ -1,0 +1,6 @@
+.git
+**/__pycache__
+**/node_modules
+web/dist
+.env
+*.patch

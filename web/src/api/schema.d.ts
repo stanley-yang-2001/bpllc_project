@@ -78,6 +78,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat
+         * @description One chat turn. Made as the logged-in user and nobody else: the id comes from the session cookie, never
+         *     from the body, and the Langflow session id is built from it here.
+         */
+        post: operations["chat_api_chat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -341,6 +362,24 @@ export interface components {
             /** Language */
             language: string;
         };
+        /** ChatIn */
+        ChatIn: {
+            /** Language */
+            language: string;
+            /** Message */
+            message: string;
+            /** Session Id */
+            session_id: string;
+        };
+        /** ChatOut */
+        ChatOut: {
+            /** Reply */
+            reply: string;
+            /** Session Id */
+            session_id: string;
+            /** Tool Calls */
+            tool_calls: components["schemas"]["ToolCallOut"][];
+        };
         /** DeleteBody */
         DeleteBody: {
             /** Ids */
@@ -458,6 +497,22 @@ export interface components {
         StatusOut: {
             /** Status */
             status: string;
+        };
+        /** ToolCallOut */
+        ToolCallOut: {
+            /** Args */
+            args: {
+                [key: string]: unknown;
+            };
+            /**
+             * Failed
+             * @default false
+             */
+            failed: boolean;
+            /** Name */
+            name: string;
+            /** Output */
+            output: string;
         };
         /** UploadResult */
         UploadResult: {
@@ -637,6 +692,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_api_chat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
                 };
             };
             /** @description Validation Error */

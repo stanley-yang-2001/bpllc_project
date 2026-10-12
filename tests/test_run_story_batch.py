@@ -17,7 +17,8 @@ import sys
 sys.path.insert(0, "/app/custom_components")
 sys.path.insert(0, "/app/scripts")
 
-import story_tool  # noqa: E402
+from tutor_core import groq as tc_groq  # noqa: E402
+from tutor_core import story as tc_story  # noqa: E402
 import run_story_batch  # noqa: E402
 
 PASS = "PASS"
@@ -55,16 +56,19 @@ class FakeConnection:
     def cursor(self):
         return FakeCursor()
 
+    def commit(self):
+        pass
+
 
 def run(groq_fn, count=3, language="Spanish"):
-    original = story_tool.call_groq
-    story_tool.call_groq = groq_fn
-    story_tool._STORY_CACHE.clear()
+    original = tc_groq.call_groq
+    tc_groq.call_groq = groq_fn
+    tc_story._STORY_CACHE.clear()
     try:
-        return run_story_batch.run_language(language, count, 0, FakeConnection(), WORDS, 5, False)
+        return run_story_batch.run_language(language, count, 0, FakeConnection(), 1, WORDS, 5, False)
     finally:
-        story_tool.call_groq = original
-        story_tool._STORY_CACHE.clear()
+        tc_groq.call_groq = original
+        tc_story._STORY_CACHE.clear()
 
 
 def test_failures_record_the_error():

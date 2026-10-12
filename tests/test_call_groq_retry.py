@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, "/app/custom_components")
 
-import story_tool  # noqa: E402
+from tutor_core import groq as tc_groq  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -66,7 +66,7 @@ def test_retries_once_after_a_single_429_then_succeeds():
          patch("time.sleep", return_value=None):
         import os
         os.environ["GROQ_API_KEY"] = "fake-key-for-test"
-        result = story_tool.call_groq("a test prompt")
+        result = tc_groq.call_groq("a test prompt")
 
     check("retries after one 429 and succeeds on the second attempt", len(call_log) == 2)
     check("returns the successful response's content", result == "Hello, this is a real story.")
@@ -84,7 +84,7 @@ def test_gives_up_after_max_retries_and_raises_clear_error():
         import os
         os.environ["GROQ_API_KEY"] = "fake-key-for-test"
         try:
-            story_tool.call_groq("a test prompt")
+            tc_groq.call_groq("a test prompt")
             check("raises RuntimeError after exhausting retries", False)
         except RuntimeError as e:
             check(f"raises RuntimeError after exhausting retries ({e})", True)
@@ -115,7 +115,7 @@ def test_non_429_errors_are_not_retried():
         import os
         os.environ["GROQ_API_KEY"] = "fake-key-for-test"
         try:
-            story_tool.call_groq("a test prompt")
+            tc_groq.call_groq("a test prompt")
         except RuntimeError:
             pass
 

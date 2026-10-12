@@ -15,3 +15,7 @@ commit-msg.txt
 *.log
 node_modules/
 web/dist/
+
+
+# file for self use
+command.txt

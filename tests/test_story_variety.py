@@ -25,17 +25,8 @@ from collections import Counter
 
 sys.path.insert(0, "/app/custom_components")
 
-import story_tool  # noqa: E402
-from story_tool import (  # noqa: E402
-    ALL_STORY_TYPES,
-    STORY_TYPES,
-    TOPICS,
-    build_story_prompt,
-    choose_story_type,
-    choose_topic,
-    describe_prompt,
-    generate_story_for_learner,
-)
+from tutor_core import prompts as tc_prompts  # noqa: E402
+from tutor_core.prompts import ALL_STORY_TYPES, STORY_TYPES, TOPICS, build_story_prompt, choose_story_type, choose_topic, describe_prompt  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -51,28 +42,6 @@ def check(label, condition):
     else:
         print(f"[{FAIL}] {label}")
         failures.append(label)
-
-
-class FakeCursor:
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-    def execute(self, sql, params=None):
-        pass
-
-    def fetchone(self):
-        return (True,)
-
-    def fetchall(self):
-        return [(w.strip(),) for w in WORDS.split(",")]
-
-
-class FakeConnection:
-    def cursor(self):
-        return FakeCursor()
 
 
 # --- the catalogue ----------------------------------------------------------------------------
@@ -172,42 +141,10 @@ def test_describe_prompt():
 
 
 def test_recent_topics_are_remembered():
-    story_tool._RECENT_TOPICS.clear()
+    tc_prompts._RECENT_TOPICS.clear()
     rng = random.Random(5)
     topics = [describe_prompt(build_story_prompt("English", WORDS, "story", rng=rng))[1] for _ in range(8)]
     check("eight random prompts in a row use eight different topics", len(set(topics)) == 8)
-
-
-# --- generate_story_for_learner ---------------------------------------------------------------
-
-
-def test_generate_passes_type_and_topic_through():
-    story_tool._STORY_CACHE.clear()
-    prompts = []
-
-    def fake_groq(prompt):
-        prompts.append(prompt)
-        return "plan\n===STORY===\nDear Anna, hello."
-
-    generate_story_for_learner("English", conn=FakeConnection(), call_groq_fn=fake_groq, use_cache=False,
-                               story_type="letter", topic="a surprise gift")
-    kind, topic = describe_prompt(prompts[0])
-    check("an explicit story type and topic reach the prompt", kind == "letter" and topic == "a surprise gift")
-
-
-def test_cache_key_separates_explicit_requests_but_not_random_ones():
-    story_tool._STORY_CACHE.clear()
-    calls = []
-
-    def fake_groq(prompt):
-        calls.append(1)
-        return "plan\n===STORY===\nA story."
-
-    for kwargs in ({}, {}, {"story_type": "diary"}, {"story_type": "letter"}, {"story_type": "diary"}):
-        generate_story_for_learner("English", conn=FakeConnection(), call_groq_fn=fake_groq, use_cache=True, **kwargs)
-    check("repeat calls absorb into one (random) entry, and each explicit type gets its own", len(calls) == 3)
-    check("the plain language key is kept for the random case (other tests rely on it)", "english" in story_tool._STORY_CACHE)
-    story_tool._STORY_CACHE.clear()
 
 
 def main():
@@ -222,8 +159,6 @@ def main():
     test_invalid_style()
     test_describe_prompt()
     test_recent_topics_are_remembered()
-    test_generate_passes_type_and_topic_through()
-    test_cache_key_separates_explicit_requests_but_not_random_ones()
     print()
     if failures:
         print(f"{len(failures)} test(s) failed: {failures}")

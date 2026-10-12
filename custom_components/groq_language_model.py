@@ -1,3 +1,5 @@
+import os
+
 from langflow.custom import Component
 from langflow.io import SecretStrInput, StrInput, Output
 from langflow.field_typing import LanguageModel
@@ -17,8 +19,10 @@ class GroqLanguageModel(Component):
     ]
 
     def build_model(self) -> LanguageModel:
+        # The key field is left empty in the flow file kept in the repo (an exported flow once
+        # carried a live key). An empty field falls back to the container's GROQ_API_KEY.
         return ChatOpenAI(
-            api_key=self.api_key,
+            api_key=self.api_key or os.environ.get("GROQ_API_KEY", ""),
             base_url="https://api.groq.com/openai/v1",
             model=self.model_name,
         )

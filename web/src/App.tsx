@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedLayout } from "./auth/ProtectedRoute";
+import Chat from "./routes/Chat";
 import Home from "./routes/Home";
 import Login from "./routes/Login";
 import Privacy from "./routes/Privacy";
@@ -16,7 +17,7 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="vocabulary" element={<Vocabulary />} />
         <Route path="settings" element={<Settings />} />
-        <Route path="chat" element={<ComingSoon title="Chat" milestone="M5" note="Needs the Langflow per-user check (M0) first." />} />
+        <Route path="chat" element={<Chat />} />
         <Route path="studio" element={<ComingSoon title="Story Studio" milestone="M6" note="Needs tutor_core extraction (M3)." />} />
         <Route path="library" element={<ComingSoon title="Library" milestone="M7" note="Saved stories arrive with Story Studio." />} />
         <Route path="practice" element={<ComingSoon title="Practice" milestone="M7" note="Flashcards and cloze exercises." />} />

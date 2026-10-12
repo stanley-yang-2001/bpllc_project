@@ -1,11 +1,15 @@
 import json, sys, urllib.request, os
 sys.path.insert(0, "/app/custom_components")
-import story_tool
+from tutor_core import db as tc_db, prompts as tc_prompts, vocab as tc_vocab
 
-conn = story_tool.get_connection()
-words = story_tool.load_words(conn)
+# Shows the raw Groq choice for one learner's English words. Usage: TUTOR_DEV_USER_ID=<learner id> python debug_groq.py
+learner_id = int(os.environ.get("TUTOR_DEV_USER_ID") or sys.exit("Set TUTOR_DEV_USER_ID to the learner whose English words to use."))
+conn = tc_db.connect()
+words = ", ".join(tc_vocab.load_words(conn, learner_id, "en"))
 conn.close()
-prompt = story_tool.build_story_prompt("English", words, "narration")
+if not words:
+    sys.exit(f"Learner {learner_id} has no English words yet.")
+prompt = tc_prompts.build_story_prompt("English", words, "narration")
 
 payload = {"model": "openai/gpt-oss-20b",
            "messages": [{"role": "user", "content": prompt}],

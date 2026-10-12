@@ -102,26 +102,27 @@ custom_components/
 
 tests/
 ├── test_upload_word_file.py
-├── test_add_word.py
-├── test_word_loader.py
-├── test_story_tool.py
+├── test_tool_wrappers.py        # M3: what the Agent can see of each tool, and the hidden inputs
 ├── test_call_groq_retry.py
-├── test_empty_response_handling.py
 ├── test_story_prompt_builder.py
 ├── test_story_guard.py
 ├── test_final_passage_extractor.py
 ├── test_tool_result_relay.py
 ├── test_vocab_adherence.py
-├── test_add_word_normalization.py
 ├── test_routing_checks.py
 ├── test_story_prompt_language.py
 ├── test_story_variety.py
 ├── test_run_story_batch.py
-└── test_routing_runner_with_fake_langflow.py
+├── test_run_story_batch_cli.py  # M3: the batch script as a command, against the real database
+├── test_routing_runner_with_fake_langflow.py
+├── test_routing_learner_db.py   # M3: the runner's throwaway learners, against the real database
+└── test_m3_check.py             # M3: scripts/m3_check.py against a fake Langflow running the real tools
 
 scripts/smoke_test.py            # Environment health check (Postgres + Groq)
 scripts/vocab_adherence.py       # Step 10: scores a story against the vocabulary (pure functions + CLI)
-scripts/run_routing_tests.py      # Step 10: automated end-to-end routing tests over Langflow's HTTP API
+scripts/run_routing_tests.py      # Step 10: automated end-to-end routing tests over Langflow's HTTP API (as throwaway learners since M3)
+scripts/m3_check.py              # M3: live check that the real tools are per-learner and fail closed
+scripts/sync_flow_nodes.py       # M3: keeps the tool nodes in flows/language-tutor.json in step with custom_components/
 scripts/routing_checks.py        # Step 10: the pure checking logic behind run_routing_tests.py
 scripts/run_story_batch.py       # Step 10: generates N stories through the production path and scores them (--rescore re-scores a saved run)
 sample_data/starter_vocabulary.csv
@@ -153,21 +154,30 @@ For more information about this project, see the markdown files in the `docs` fo
 ## Running the tests
 
 ```bash
-docker compose exec langflow python /app/tests/test_upload_word_file.py
-docker compose exec langflow python /app/tests/test_add_word.py
-docker compose exec langflow python /app/tests/test_word_loader.py
-docker compose exec langflow python /app/tests/test_story_tool.py
-docker compose exec langflow python /app/tests/test_call_groq_retry.py
-docker compose exec langflow python /app/tests/test_empty_response_handling.py
-docker compose exec langflow python /app/tests/test_tool_result_relay.py
-docker compose exec langflow python /app/tests/test_vocab_adherence.py
-docker compose exec langflow python /app/tests/test_add_word_normalization.py
-docker compose exec langflow python /app/tests/test_routing_checks.py
-docker compose exec langflow python /app/tests/test_story_prompt_language.py
-docker compose exec langflow python /app/tests/test_story_variety.py
-docker compose exec langflow python /app/tests/test_run_story_batch.py
-docker compose exec langflow python /app/tests/test_routing_runner_with_fake_langflow.py
-docker compose exec langflow python /app/tests/test_final_passage_extractor.py
-docker compose exec langflow python /app/tests/test_story_guard.py
-docker compose exec langflow python /app/tests/test_story_prompt_builder.py
+# everything that runs inside the langflow container (needs Postgres and the api's migrations: `docker compose up -d` first)
+make test-langflow
+
+# the same, one file at a time, e.g.
+docker compose exec langflow python /app/tests/test_tool_wrappers.py
+docker compose exec langflow python /app/tests/test_m3_check.py
+
+# the shared logic (tutor_core) and the API run on the host against a Postgres, see `make check`
 ```
+
+The tests that used to cover the shared-table Add Word, Word Loader and story pipeline (`test_add_word.py`,
+`test_add_word_normalization.py`, `test_word_loader.py`, `test_story_tool.py`, `test_empty_response_handling.py`) were
+replaced in M3 by per-learner tests: `api/tests/test_tutor_core_vocab.py`, `test_tutor_core_story.py`,
+`test_tutor_tools.py`, and `tutor_core/tests/` (see the changelog for where each old case went).
+
+## M3: checking the tools against the real flow
+
+After `docker compose up -d --build` (the langflow image now has `tutor_core` installed):
+
+```bash
+docker compose exec langflow python /app/tests/test_tool_wrappers.py        # the Agent sees one argument per tool
+docker compose exec langflow python /app/scripts/m3_check.py --flow-id language-tutor --pause 30   # the live check
+docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id language-tutor --delay 20
+```
+
+`m3_check.py` is the acceptance check: throwaway learners, the real Agent, and it reads the database to see whether anything
+crossed between learners. `run_routing_tests.py` is the Step 10 routing matrix, now run as throwaway learners.

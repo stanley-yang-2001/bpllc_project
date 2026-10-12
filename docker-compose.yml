@@ -1,15 +1,30 @@
 services:
   langflow:
-    image: langflowai/langflow:latest
+    build:
+      context: ./tutor_core        # only the package is sent to the builder
+      dockerfile: ../langflow/Dockerfile
+      args:
+        RUN_AS_USER: ${LANGFLOW_RUN_AS_USER:-user}
+    image: language-tutor-langflow:1.12.2   # the base is langflowai/langflow:1.12.2 (pinned in langflow/Dockerfile); 1.12.2 runs Python 3.14.7
     ports:
-      - "127.0.0.1:7860:7860"   # localhost only: the tools trust the user_id they are given (design section 3)
+      - "127.0.0.1:7860:7860"   # localhost only: the tools trust the learner id they are given (design section 3)
     environment:
       - LANGFLOW_DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
       - LANGFLOW_COMPONENTS_PATH=/app/custom_components:/app/shared_components
       - LANGFLOW_SUPERUSER=admin
       - LANGFLOW_SUPERUSER_PASSWORD=${LANGFLOW_SUPERUSER_PASSWORD:-admin123}
       - GROQ_API_KEY=${GROQ_API_KEY}
+      - LANGFLOW_LOAD_FLOWS_PATH=/app/flows   # M0: flows in ./flows load at startup (verify in M0)
+      # M3: what the tools (tutor_core) read. No credentials, hosts or model names are written in the code.
+      - DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
+      - MAX_PROMPT_WORDS=${MAX_PROMPT_WORDS:-150}
+      # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
+      # Leave it empty in anything that is not your own machine; with it empty, a request without a learner is refused.
+      - TUTOR_DEV_USER_ID=${TUTOR_DEV_USER_ID:-}
+      - TUTOR_DEV_LANGUAGE=${TUTOR_DEV_LANGUAGE:-en}
     volumes:
+      - ./flows:/app/flows
       - ./custom_components:/app/custom_components
       - ../shared-components/universal-model-selector:/app/shared_components
       - ./scripts:/app/scripts
@@ -17,7 +32,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # TODO(M0): pin the image to an exact version (not :latest) and build it with tutor_core installed.
+      api:                       # the api runs the migrations that create the `tutor` schema the tools read
+        condition: service_healthy
 
   postgres:
     image: postgres:16
@@ -49,6 +65,14 @@ services:
       - DEMO_EMAIL=${DEMO_EMAIL:-demo@example.com}
       - PRIVACY_CONTACT=${PRIVACY_CONTACT:-}
       - DEMO_PASSWORD=${DEMO_PASSWORD:-}
+      # Chat (M5). Live chat stays OFF until LANGFLOW_PER_USER_TOOLS=1: the flow's tools must read the learner's own
+      # words first (milestones M0 and M3). AI_MODE=stub needs none of these.
+      - LANGFLOW_URL=http://langflow:7860
+      - LANGFLOW_FLOW=${LANGFLOW_FLOW:-language-tutor}
+      - LANGFLOW_API_KEY=${LANGFLOW_API_KEY:-}
+      - LANGFLOW_TWEAK_KEYS=${LANGFLOW_TWEAK_KEYS-AddWord-WhP5g,StoryGeneratorTool-RQpvc}
+      - LANGFLOW_PER_USER_TOOLS=${LANGFLOW_PER_USER_TOOLS:-0}
+      - AI_GATE_SLOTS=${AI_GATE_SLOTS:-2}
     depends_on:
       postgres:
         condition: service_healthy

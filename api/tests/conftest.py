@@ -61,3 +61,38 @@ def make_user(app):
         register(c, name, **extra)
         return c
     return _make
+
+
+# --- plain database access, for testing tutor_core (the code the Langflow tools share) ----------------------------
+
+@pytest.fixture
+def conn(app):
+    c = psycopg2.connect(DB_URL)
+    yield c
+    c.close()
+
+
+@pytest.fixture
+def make_learner(conn):
+    """Insert a learner straight into tutor.users (no HTTP) and return the id. Ids restart at 1 in every test, so a
+    test that needs to tell learners apart creates at least two."""
+    made = []
+
+    def _make(name="learner"):
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO tutor.users (email, password_hash, display_name) VALUES (%s, 'x', %s) RETURNING id",
+                        (f"{name}{len(made) + 1}@example.com", name))
+            made.append(cur.fetchone()[0])
+        conn.commit()
+        return made[-1]
+    return _make
+
+
+def words_of(conn, learner_id, language=None):
+    """What is stored for a learner (optionally one language), oldest first."""
+    with conn.cursor() as cur:
+        if language:
+            cur.execute("SELECT word FROM tutor.words WHERE user_id = %s AND language = %s ORDER BY id", (learner_id, language))
+        else:
+            cur.execute("SELECT word FROM tutor.words WHERE user_id = %s ORDER BY id", (learner_id,))
+        return [r[0] for r in cur.fetchall()]

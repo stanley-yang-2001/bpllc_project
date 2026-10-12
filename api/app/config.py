@@ -26,6 +26,19 @@ class Settings:
     upload_max_rows: int = 5000
     run_migrations: bool = True
     privacy_contact: str | None = None    # shown on the privacy page: who to ask about your data
+    # --- chat (M5). Langflow is reached over the Docker network; the tweak keys and the per-user switch are
+    # decided by milestone M0 (see docs/WEB-APP-DESIGN.md, section 3D).
+    langflow_url: str = "http://langflow:7860"
+    langflow_flow: str = "language-tutor"      # endpoint name of the flow (flows/language-tutor.json)
+    langflow_api_key: str = ""
+    langflow_timeout: int = 100                # seconds; the page shows its "taking longer" note well before this
+    langflow_tweak_keys: tuple = ("AddWord-WhP5g", "StoryGeneratorTool-RQpvc")   # node ids in flows/language-tutor.json (verified by the M0 spike); empty = no tweaks (Plan B)
+    # The operator's statement that the flow's tools read the learner's own words (not the shared list). Until it
+    # is "1", live chat refuses to run, because answering would mix learners' vocabulary. AI_MODE=stub is unaffected.
+    langflow_per_user_tools: bool = False
+    ai_gate_slots: int = 2
+    ai_gate_wait: float = 5.0
+    max_chat_chars: int = 2000
 
     def validate(self) -> "Settings":
         if not self.database_url:
@@ -35,6 +48,12 @@ class Settings:
             raise ConfigError("JWT_SECRET must be set to a random value of at least 32 characters")
         if self.ai_mode not in ("live", "stub"):
             raise ConfigError("AI_MODE must be 'live' or 'stub'")
+        if self.ai_gate_slots < 1:
+            raise ConfigError("AI_GATE_SLOTS must be at least 1")
+        if self.ai_gate_wait < 0 or self.langflow_timeout <= 0:
+            raise ConfigError("AI_GATE_WAIT must be 0 or more and LANGFLOW_TIMEOUT above 0")
+        if self.ai_mode == "live" and self.langflow_per_user_tools and not self.langflow_api_key.strip():
+            raise ConfigError("LANGFLOW_API_KEY must be set when LANGFLOW_PER_USER_TOOLS=1")
         return self
 
 
@@ -50,7 +69,16 @@ def load_settings(env=None) -> Settings:
         ai_mode=env.get("AI_MODE", "live"),
         max_prompt_words=int(env.get("MAX_PROMPT_WORDS", "150")),
         privacy_contact=(env.get("PRIVACY_CONTACT") or "").strip() or None,
+        langflow_url=env.get("LANGFLOW_URL", "http://langflow:7860").strip(),
+        langflow_flow=env.get("LANGFLOW_FLOW", "language-tutor").strip(),
+        langflow_api_key=env.get("LANGFLOW_API_KEY", "").strip(),
+        langflow_timeout=int(env.get("LANGFLOW_TIMEOUT", "100")),
+        langflow_per_user_tools=env.get("LANGFLOW_PER_USER_TOOLS", "0") == "1",
+        ai_gate_slots=int(env.get("AI_GATE_SLOTS", "2")),
+        ai_gate_wait=float(env.get("AI_GATE_WAIT", "5")),
     )
+    if "LANGFLOW_TWEAK_KEYS" in env:
+        s.langflow_tweak_keys = tuple(k.strip() for k in env["LANGFLOW_TWEAK_KEYS"].split(",") if k.strip())
     if origins:
         s.allowed_origins = {o.strip() for o in origins.split(",") if o.strip()}
     return s.validate()

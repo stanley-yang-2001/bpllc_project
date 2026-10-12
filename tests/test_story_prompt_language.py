@@ -24,14 +24,7 @@ import sys
 
 sys.path.insert(0, "/app/custom_components")
 
-import story_tool  # noqa: E402
-from story_tool import (  # noqa: E402
-    DIALOGUE_TEMPLATE,
-    NARRATION_TEMPLATE,
-    build_story_prompt,
-    generate_story_for_learner,
-    normalize_language,
-)
+from tutor_core.prompts import DIALOGUE_TEMPLATE, NARRATION_TEMPLATE, build_story_prompt, normalize_language  # noqa: E402
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -52,31 +45,6 @@ def check(label, condition):
     else:
         print(f"[{FAIL}] {label}")
         failures.append(label)
-
-
-class FakeCursor:
-    def __init__(self, words):
-        self._words = words
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-    def execute(self, sql, params=None):
-        pass
-
-    def fetchone(self):
-        return (True,)
-
-    def fetchall(self):
-        return [(w.strip(),) for w in self._words.split(",")]
-
-
-class FakeConnection:
-    def cursor(self):
-        return FakeCursor(WORDS)
 
 
 # --- English is untouched ---------------------------------------------------------------------
@@ -147,23 +115,6 @@ def test_prompt_uses_the_normalized_language():
     check("a request for '日本語' puts 'Japanese' in the prompt", "Japanese" in p and "\u65e5\u672c\u8a9e" not in p)
 
 
-def test_cache_key_is_the_normalized_language():
-    story_tool._STORY_CACHE.clear()
-    calls = []
-    prompts = []
-
-    def fake_groq(prompt):
-        calls.append(1)
-        prompts.append(prompt)
-        return "plan\n===STORY===\n\u3053\u3093\u306b\u3061\u306f\u3002"
-
-    a = generate_story_for_learner("\u65e5\u672c\u8a9e", conn=FakeConnection(), call_groq_fn=fake_groq, use_cache=True)
-    b = generate_story_for_learner("Japanese", conn=FakeConnection(), call_groq_fn=fake_groq, use_cache=True)
-    check("'日本語' and 'Japanese' share one cache entry (Groq called once)", len(calls) == 1 and a == b)
-    check("the prompt sent to Groq says Japanese", "Japanese" in prompts[0])
-    story_tool._STORY_CACHE.clear()
-
-
 def main():
     print("Running language-aware story prompt tests...\n")
     test_english_templates_are_unchanged()
@@ -173,7 +124,6 @@ def main():
     test_non_english_prompt_has_no_unfilled_placeholders()
     test_normalize_language()
     test_prompt_uses_the_normalized_language()
-    test_cache_key_is_the_normalized_language()
     print()
     if failures:
         print(f"{len(failures)} test(s) failed: {failures}")

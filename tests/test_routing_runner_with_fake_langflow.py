@@ -8,10 +8,13 @@ shape matches (that is confirmed on the first live run with --debug); it proves 
   * reports a healthy flow as all-passing (exit code 0),
   * catches the Step 9 bugs when the fake flow misbehaves (wrong language reused, a reply that
     differs from the tool output) with a non-zero exit code,
-  * adds and removes its test word, empties and restores the vocabulary (even after a failure),
-  * refuses to run over a leftover snapshot, and can restore it.
+  * works only as THROWAWAY learners (a seeded one and an empty one), sends each request as one of them through tweaks
+    (learner id as a string, the active language, on every tool node) and deletes them afterwards, even after failures,
+  * catches a flow that ignores the learner (the empty learner would then see the full learner's words),
+  * can remove learners left behind by an interrupted run (--cleanup-leftover) without touching anything else.
 
-Everything stays on localhost; no Groq, no database.
+Everything stays on localhost; no Groq, no database (the real database helper has its own test:
+tests/test_routing_learner_db.py).
 
 Run from inside the langflow container:
     docker compose exec langflow python /app/tests/test_routing_runner_with_fake_langflow.py
@@ -19,6 +22,7 @@ Run from inside the langflow container:
 
 import io
 import json
+import os
 import re
 import sys
 import threading
@@ -45,28 +49,46 @@ STORIES = {
     "japanese": "こんにちは、私はサムです。\n今日は水がほしいです。\n友達に会います。\n友達は水をくれます。\nありがとう、さようなら。",
 }
 GUARD = "You don't have any vocabulary yet! Add some words first."
-STATE = {"words": set(), "bug": None, "last_language": {}, "key_created": False}
+NAMES = {"en": "English", "es": "Spanish", "fr": "French", "ja": "Japanese"}
+CODES = {name.lower(): code for code, name in NAMES.items()}
+STATE = {"words": {}, "seeded": {}, "bug": None, "last_language": {}, "key_created": False, "tweaks_seen": [],
+         "next_id": 100, "created": set(), "created_ever": False, "leftover": set()}
 
 
 class FakeDb:
-    snapshot = None
+    """The same interface as run_routing_tests.LearnerDb, over the fake flow's own memory."""
 
-    def words(self):
-        return ", ".join(sorted(STATE["words"]))
+    def create(self, label):
+        STATE["next_id"] += 1
+        STATE["created"].add(STATE["next_id"])
+        STATE["created_ever"] = True
+        STATE["words"][STATE["next_id"]] = {}
+        return STATE["next_id"]
 
-    def snapshot_exists(self):
-        return FakeDb.snapshot is not None
+    def seed(self, learner_id, words_by_language):
+        STATE["words"][learner_id] = {lang: set(words) for lang, words in words_by_language.items()}
+        STATE["seeded"][learner_id] = {lang: list(words) for lang, words in words_by_language.items()}
 
-    def snapshot_and_empty(self):
-        FakeDb.snapshot = set(STATE["words"])
-        STATE["words"].clear()
+    def words(self, learner_id, language="en"):
+        return ", ".join(sorted(STATE["words"].get(learner_id, {}).get(language, set())))
 
-    def restore(self):  # merge: words added meanwhile are kept
-        STATE["words"] |= FakeDb.snapshot
-        FakeDb.snapshot = None
+    def remove_test_word(self, learner_id, language="en"):
+        STATE["words"].get(learner_id, {}).get(language, set()).discard(TEST_WORD)
 
-    def remove_test_word(self):
-        STATE["words"].discard(TEST_WORD)
+    def cleanup(self):
+        for learner_id in list(STATE["created"]):
+            STATE["words"].pop(learner_id, None)
+        STATE["created"].clear()
+
+    def leftover_ids(self):
+        return sorted(STATE["leftover"])
+
+    def cleanup_leftover(self):
+        n = len(STATE["leftover"])
+        for learner_id in STATE["leftover"]:
+            STATE["words"].pop(learner_id, None)
+        STATE["leftover"].clear()
+        return n
 
 
 CALLS = {"n": 0}
@@ -83,23 +105,36 @@ def build_response(text, blocks):
     return {"outputs": [{"outputs": [{"results": {"message": {"text": text, "content_blocks": blocks + [{"type": "text", "text": text}]}}}]}]}
 
 
-def reply_for(message, session):
+def reply_for(message, session, learner, language):
+    """The fake flow. `learner`/`language` are what the request's tweaks said (None when it sent none: fail closed)."""
     low = message.lower()
+    if STATE["bug"] == "ignore_tweaks" and STATE["seeded"]:
+        learner = min(STATE["seeded"])             # a flow that ignores the learner and reads one shared list
     m = re.match(r"add the word (\S+)", low)
     if m:
         word = m.group(1)
-        out = f"'{word}' is already in your vocabulary." if word in STATE["words"] else f"Added '{word}' to your vocabulary."
-        STATE["words"].add(word)
+        if learner is None:
+            out = "Couldn't add word: I don't know whose vocabulary this is."
+        else:
+            have = STATE["words"].setdefault(learner, {}).setdefault(language or "en", set())
+            name = NAMES.get(language or "en", "English")
+            out = f"'{word}' is already in your {name} vocabulary." if word in have else f"Added '{word}' to your {name} vocabulary."
+            have.add(word)
         return build_response(out, [tool("add_word", {"word": m.group(1)}, out)])
     if "story" in low and ("in " in low):
-        lang = "japanese" if "日本語" in message else re.search(r"in (\w+)", low).group(1)
+        lang = "japanese" if "\u65e5\u672c\u8a9e" in message else re.search(r"in (\w+)", low).group(1)
         arg = lang.capitalize() if lang != "japanese" else "Japanese"
         shown_arg = arg
         if STATE["bug"] == "reuse_language" and STATE["last_language"].get(session):
             shown_arg = STATE["last_language"][session]  # the Step 9 bug: previous language reused
         STATE["last_language"][session] = arg
-        out = GUARD if not STATE["words"] else STORIES.get(shown_arg.lower(), STORIES["english"])
-        if STATE["bug"] == "english_in_spanish" and arg == "Spanish" and STATE["words"]:
+        code = CODES.get(shown_arg.lower(), "en")
+        if learner is None:
+            out = "I can't write a story right now: I don't know whose vocabulary to use."
+        else:
+            words = STATE["words"].get(learner, {}).get(code, set())
+            out = GUARD if not words else STORIES.get(shown_arg.lower(), STORIES["english"])
+        if STATE["bug"] == "english_in_spanish" and arg == "Spanish" and learner is not None and out != GUARD:
             out = STORIES["english"]  # the model ignored the language
         text = out
         if STATE["bug"] == "rewrite_reply":
@@ -143,15 +178,21 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("x-api-key") != "sk-test":
                 return self._send(403, {"detail": "invalid key"})
             body = json.loads(raw)
-            return self._send(200, reply_for(body["input_value"], body["session_id"]))
+            tweaks = body.get("tweaks") or {}
+            cfg = next(iter(tweaks.values()), {})
+            learner = int(cfg["learner_id"]) if str(cfg.get("learner_id", "")).isdigit() else None
+            STATE["tweaks_seen"].append({"keys": sorted(tweaks), "learner_raw": cfg.get("learner_id"), "language": cfg.get("active_language"),
+                                         "same_in_every_node": len({json.dumps(v, sort_keys=True) for v in tweaks.values()}) <= 1,
+                                         "message": body["input_value"]})
+            return self._send(200, reply_for(body["input_value"], body["session_id"], learner, cfg.get("active_language")))
         self._send(404, {})
 
 
-def check(label, condition):
+def check(label, condition, detail=""):
     if condition:
         print(f"[{PASS}] {label}")
     else:
-        print(f"[{FAIL}] {label}")
+        print(f"[{FAIL}] {label} {detail}")
         failures.append(label)
 
 
@@ -163,9 +204,8 @@ def run(argv):
 
 
 def reset(bug=None):
-    STATE.update(words={"hello", "goodbye", "please", "thank you", "yes", "no", "water", "food", "friend", "house", "today", "tomorrow"},
-                 bug=bug, last_language={}, key_created=False)
-    FakeDb.snapshot = None
+    STATE.update(words={}, seeded={}, bug=bug, last_language={}, key_created=False, tweaks_seen=[], created=set(),
+                 created_ever=False, leftover=set())
 
 
 def main():
@@ -173,19 +213,27 @@ def main():
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_address[1]}"
     common = ["--flow-id", "fake-flow", "--base-url", base, "--delay", "0", "--out", "/tmp/routing_test_out.json"]
-    original_words = None
     try:
         print("Running runner-vs-fake-Langflow tests...\n")
 
         # healthy flow ------------------------------------------------------------------------
         reset()
-        original_words = set(STATE["words"])
         code, out = run(common)
-        check("a healthy flow passes every turn (exit code 0)", code == 0)
+        check("a healthy flow passes every turn (exit code 0)", code == 0, out[-400:])
         check("the runner logged in and created an API key (auto-login was unavailable)", STATE["key_created"])
         check("the report lists all the cases' turns as PASS", "[FAIL]" not in out and out.count("[PASS]") >= 12)
-        check("the throwaway word is removed afterwards", TEST_WORD not in STATE["words"])
-        check("the vocabulary is restored after the empty-vocabulary test", STATE["words"] == original_words and FakeDb.snapshot is None)
+        check("the throwaway learners are deleted afterwards", STATE["created"] == set() and STATE["words"] == {})
+        check("the run says it removed them", "(throwaway learners removed)" in out)
+        seeded = list(STATE["seeded"].values())
+        check("one learner was seeded, with words in English, Spanish, French and Japanese",
+              len(seeded) == 1 and set(seeded[0]) == {"en", "es", "fr", "ja"} and all(seeded[0].values()))
+        seen = STATE["tweaks_seen"]
+        check("every request carried tweaks for both tool nodes", seen and all(t["keys"] == ["AddWord-WhP5g", "StoryGeneratorTool-RQpvc"] for t in seen))
+        check("the learner id is sent as a STRING (Langflow drops other types)", all(isinstance(t["learner_raw"], str) and t["learner_raw"].isdigit() for t in seen))
+        check("the active language is sent, and the same values go to both nodes", all(t["language"] == "en" and t["same_in_every_node"] for t in seen))
+        by_message = {t["message"]: t["learner_raw"] for t in seen}
+        check("the empty-vocabulary case is asked as a DIFFERENT learner from every other case",
+              len({t["learner_raw"] for t in seen}) == 2 and sum(1 for t in seen if t["learner_raw"] != by_message["Add the word autotestapple"]) == 1)
         saved = json.load(open("/tmp/routing_test_out.json"))
         check("a JSON report is written with every reply", len(saved["results"]) >= 10 and saved["results"][0]["turns"][0]["reply"])
 
@@ -202,22 +250,55 @@ def main():
 
         # cleanup survives failures ------------------------------------------------------------
         reset("rewrite_reply")
-        original_words = set(STATE["words"])
         code, out = run(common)
-        check("the database is still restored after failing tests", STATE["words"] == original_words and FakeDb.snapshot is None)
+        check("the throwaway learners are still deleted after failing tests", code == 1 and STATE["created"] == set() and STATE["words"] == {})
 
-        # leftover snapshot protection -----------------------------------------------------------
-        reset()
-        FakeDb.snapshot = {"water", "friend"}
-        STATE["words"] = set()
+        # a flow that ignores the learner is caught ------------------------------------------------
+        reset("ignore_tweaks")
         code, out = run(common)
-        check("a leftover snapshot stops the run (exit code 2) instead of risking data", code == 2 and "--restore-leftover" in out)
-        code, out = run(["--restore-leftover"])
-        check("--restore-leftover puts the words back", STATE["words"] == {"water", "friend"} and FakeDb.snapshot is None)
-        FakeDb.snapshot = {"water"}
-        STATE["words"] = {"newword"}
-        run(["--restore-leftover"])
-        check("--restore-leftover keeps words added since the snapshot (it merges)", STATE["words"] == {"newword", "water"})
+        check("a flow that ignores the learner fails the run (the empty learner saw someone else's words)",
+              code == 1 and "empty-vocabulary guard" in out and "[FAIL]" in out, out[-500:])
+
+        # a flow that receives no tweaks refuses (fail closed) and is caught --------------------------
+        reset()
+        code, out = run(common + ["--only", "A1,S1", "--skip-empty-vocab"])
+        check("sanity: the same flow with tweaks passes A1 and S1", code == 0)
+
+        # leftovers from an interrupted run -------------------------------------------------------
+        reset()
+        STATE["leftover"] = {901, 902}
+        STATE["words"].update({901: {"en": {"keepme"}}, 902: {}})
+        code, out = run(common + ["--only", "N1", "--skip-empty-vocab"])
+        check("leftover throwaway learners are mentioned but a run still works and leaves them alone",
+              code == 0 and "2 throwaway routing learner(s)" in out and "--cleanup-leftover" in out and STATE["leftover"] == {901, 902})
+        code, out = run(["--cleanup-leftover"])
+        check("--cleanup-leftover removes them, and only them", code == 0 and "Removed 2" in out and STATE["leftover"] == set() and 901 not in STATE["words"])
+        code, out = run(["--cleanup-leftover"])
+        check("--cleanup-leftover with nothing left says so", code == 0 and "Removed 0" in out)
+
+        # tweak keys ---------------------------------------------------------------------------------
+        reset()
+        code, out = run(common + ["--only", "A1", "--skip-empty-vocab", "--tweak-keys", "NodeA, NodeB"])
+        check("--tweak-keys sets the keys the tweaks are sent under", code == 0 and all(t["keys"] == ["NodeA", "NodeB"] for t in STATE["tweaks_seen"]))
+        reset()
+        os.environ["LANGFLOW_TWEAK_KEYS"] = "FromEnv"
+        try:
+            code, out = run(common + ["--only", "A1", "--skip-empty-vocab"])
+        finally:
+            del os.environ["LANGFLOW_TWEAK_KEYS"]
+        check("$LANGFLOW_TWEAK_KEYS is the default", code == 0 and all(t["keys"] == ["FromEnv"] for t in STATE["tweaks_seen"]))
+        reset()
+        code, out = run(common + ["--tweak-keys", " , "])
+        check("no tweak keys at all is refused before anything is created", code == 2 and "No tweak keys" in out and not STATE["created_ever"])
+
+        # authentication problems create nothing --------------------------------------------------
+        reset()
+        os.environ["LANGFLOW_SUPERUSER_PASSWORD"] = "wrong"
+        try:
+            code, out = run(common + ["--only", "N1"])
+        finally:
+            del os.environ["LANGFLOW_SUPERUSER_PASSWORD"]
+        check("a login failure stops the run (exit code 2) before any learner is created", code == 2 and "Authentication problem" in out and not STATE["created_ever"])
 
         # misc options ---------------------------------------------------------------------------
         reset()
@@ -252,34 +333,7 @@ def main():
         saved = json.load(open("/tmp/routing_test_out.json"))
         check("each turn's latency is saved", isinstance(saved["results"][0]["turns"][0]["latency"], float))
 
-        # the real database helper: names and SQL (a manual `words_snapshot` backup must not interfere)
-        executed = []
-
-        class Cur:
-            def __enter__(self): return self
-            def __exit__(self, *a): return False
-            def execute(self, sql, params=None): executed.append((" ".join(sql.split()), params))
-            def fetchone(self): return (False,)
-
-        class Conn:
-            def cursor(self): return Cur()
-            def commit(self): pass
-            def close(self): pass
-
-        fake_story_tool = type("ST", (), {"get_connection": staticmethod(lambda: Conn())})
-        real_db = object.__new__(run_routing_tests.VocabDb)
-        real_db._st = fake_story_tool
-        real_db.snapshot_and_empty()
-        executed_before_restore = len(executed)
-        real_db.restore()
-        restore_sql = " | ".join(q for q, _ in executed[executed_before_restore:])
-        real_db.remove_test_word(); real_db.snapshot_exists()
-        sql = " | ".join(q for q, _ in executed)
-        check("the runner's snapshot has its own table name, not the manual words_snapshot", "words_autotest_snapshot" in sql and "words_snapshot" not in sql.replace("words_autotest_snapshot", ""))
-        check("restoring merges missing words back instead of replacing the table (nothing added meanwhile is lost)",
-              "INSERT INTO words (word, created_at) SELECT word, created_at FROM words_autotest_snapshot ON CONFLICT (word) DO NOTHING" in sql
-              and "DELETE" not in restore_sql.upper().replace("ON CONFLICT (WORD) DO NOTHING", ""))
-        check("the throwaway word is removed case-insensitively", any("lower(word) = %s" in q for q, _ in executed))
+        # (the real database helper is tested against a real database in tests/test_routing_learner_db.py)
     finally:
         server.shutdown()
 

@@ -1,76 +1,53 @@
 """
 Word Loader — Story 4.
 
-Reads every word from the vocabulary table and returns them as a single comma-separated
-string. Feeds the {words} variable in the story prompt template (Step 7) and is used by
-Add Word's dependency chain — requires the `words` table to already exist (Story 2, Step 4).
+Reads ONE learner's words in the active language and returns them as a single comma-separated string. Kept on the
+canvas for debugging only (it is not wired to the Agent). The learner and language arrive as hidden inputs set by the
+API; with no usable learner it refuses and reads nothing (fail closed). The logic is tutor_core.tools.vocabulary_for_agent.
 
-Core logic is a plain function (load_words) so it's testable directly — see
-tests/test_word_loader.py — without running this inside Langflow.
+
 """
 
-import psycopg2
+from tutor_core.tools import vocabulary_for_agent
 from langflow.custom import Component
-from langflow.io import Output
+from langflow.io import Output, StrInput
 from langflow.schema.message import Message
-
-DB_CONFIG = dict(
-    dbname="langflow",
-    user="langflow",
-    password="langflow",
-    host="postgres",
-    port=5432,
-)
-
-
-def get_connection():
-    return psycopg2.connect(**DB_CONFIG)
-
-
-def load_words(conn, table_name: str = "words") -> str:
-    """Return every word in the table as a comma-separated string, in insertion order.
-
-    Returns an empty string if the vocabulary is empty. Raises RuntimeError if the table
-    doesn't exist yet.
-    """
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = %s);",
-            (table_name,),
-        )
-        if not cur.fetchone()[0]:
-            raise RuntimeError(
-                f"Table '{table_name}' does not exist. Run Upload Word File at least once first."
-            )
-
-        cur.execute(f"SELECT word FROM {table_name} ORDER BY id;")
-        rows = cur.fetchall()
-
-    return ", ".join(row[0] for row in rows)
 
 
 class WordLoader(Component):
     display_name = "Word Loader"
     description = (
-        "Reads all known vocabulary and returns it as a comma-separated string, for use as "
-        "the {words} variable in the story prompt template."
+        "Reads one learner's vocabulary in the active language and returns it as a comma-separated string. "
+        "For debugging; not wired to the Agent."
     )
     icon = "BookOpen"
     name = "WordLoader"
 
-    inputs = []
+    inputs = [
+        StrInput(
+            name="learner_id",
+            display_name="Learner ID (hidden)",
+            info="Set per request by the API through tweaks, as a STRING. The Agent never sees this field. Never name it user_id: "
+                 "Langflow reserves that name on every component.",
+            value="",
+            advanced=True,
+            tool_mode=False,
+        ),
+        StrInput(
+            name="active_language",
+            display_name="Active language (hidden)",
+            info="Set per request by the API through tweaks: the learner's selected language, as an ISO code.",
+            value="",
+            advanced=True,
+            tool_mode=False,
+        ),
+    ]
 
     outputs = [
         Output(display_name="Words", name="words", method="run"),
     ]
 
     def run(self) -> Message:
-        conn = get_connection()
-        try:
-            result = load_words(conn)
-        finally:
-            conn.close()
-
-        message = Message(text=result)
+        message = Message(text=vocabulary_for_agent(self.learner_id, self.active_language))
         self.status = message  # shows the returned value in the node's UI preview
         return message

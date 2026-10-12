@@ -73,3 +73,16 @@ class HealthOut(BaseModel):
     langflow: ServiceCheck
     groq: ServiceCheck
     ai_mode: str
+
+
+class ToolCallOut(BaseModel):
+    name: str
+    args: dict
+    output: str
+    failed: bool = False
+
+
+class ChatOut(BaseModel):
+    reply: str
+    tool_calls: list[ToolCallOut]
+    session_id: str

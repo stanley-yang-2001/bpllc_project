@@ -1,0 +1,209 @@
+{
+  "session_id": "u101-23b3a4a3221c483c8c8f6f464aa9d1f0",
+  "outputs": [
+    {
+      "inputs": {
+        "input_value": "Use the Who Am I tool once with note x, then reply with exactly its result."
+      },
+      "outputs": [
+        {
+          "results": {
+            "message": {
+              "text_key": "text",
+              "data": {
+                "timestamp": "2026-10-10 18:06:30.299518 UTC",
+                "sender": "Machine",
+                "sender_name": "AI",
+                "session_id": "u101-23b3a4a3221c483c8c8f6f464aa9d1f0",
+                "context_id": "",
+                "text": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664",
+                "files": [],
+                "error": false,
+                "edit": false,
+                "properties": {
+                  "text_color": null,
+                  "background_color": null,
+                  "edited": false,
+                  "source": {
+                    "id": "ToolResultRelay-G5PjB",
+                    "display_name": "Tool Result Relay",
+                    "source": "Tool Result Relay"
+                  },
+                  "icon": "Bot",
+                  "allow_markdown": false,
+                  "positive_feedback": null,
+                  "state": "complete",
+                  "targets": [],
+                  "usage": {
+                    "input_tokens": 1495,
+                    "output_tokens": 467,
+                    "total_tokens": 1962
+                  },
+                  "build_duration": null
+                },
+                "category": "message",
+                "content_blocks": [
+                  {
+                    "title": "Agent Steps",
+                    "contents": [
+                      {
+                        "type": "tool_use",
+                        "duration": 1503,
+                        "header": {
+                          "title": "Executed **spike_who_am_i**",
+                          "icon": "Hammer"
+                        },
+                        "name": "spike_who_am_i",
+                        "tool_input": {
+                          "note": "x"
+                        },
+                        "output": {
+                          "content": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664",
+                          "additional_kwargs": {},
+                          "response_metadata": {},
+                          "type": "tool",
+                          "name": "spike_who_am_i",
+                          "id": "606ff4f8-fd8c-4894-af05-57a4fc13859c",
+                          "tool_call_id": "fc_5627e829-225f-4cf5-8c8e-7e742f7c90ae",
+                          "artifact": null,
+                          "status": "success"
+                        },
+                        "error": null
+                      },
+                      {
+                        "type": "text",
+                        "duration": null,
+                        "header": {},
+                        "text": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664"
+                      }
+                    ],
+                    "allow_markdown": true,
+                    "media_url": null
+                  }
+                ],
+                "session_metadata": {
+                  "graph_run_id": "86b2aa61-b1f3-45dd-8477-9573f415ab96"
+                },
+                "id": "691f3aa2-1a44-4583-b3e3-b6d450cc1502",
+                "flow_id": "ca6efe52-edeb-486f-ab44-f07692083b88",
+                "run_id": "86b2aa61-b1f3-45dd-8477-9573f415ab96",
+                "duration": null
+              },
+              "default_value": "",
+              "sender": "Machine",
+              "sender_name": "AI",
+              "files": [],
+              "session_id": "u101-23b3a4a3221c483c8c8f6f464aa9d1f0",
+              "context_id": "",
+              "run_id": "86b2aa61-b1f3-45dd-8477-9573f415ab96",
+              "timestamp": "2026-10-10 18:06:30.299518 UTC",
+              "flow_id": "ca6efe52-edeb-486f-ab44-f07692083b88",
+              "error": false,
+              "edit": false,
+              "properties": {
+                "text_color": null,
+                "background_color": null,
+                "edited": false,
+                "source": {
+                  "id": "ToolResultRelay-G5PjB",
+                  "display_name": "Tool Result Relay",
+                  "source": "Tool Result Relay"
+                },
+                "icon": "Bot",
+                "allow_markdown": false,
+                "positive_feedback": null,
+                "state": "complete",
+                "targets": [],
+                "usage": {
+                  "input_tokens": 1495,
+                  "output_tokens": 467,
+                  "total_tokens": 1962
+                },
+                "build_duration": null
+              },
+              "category": "message",
+              "content_blocks": [
+                {
+                  "title": "Agent Steps",
+                  "contents": [
+                    {
+                      "type": "tool_use",
+                      "duration": 1503,
+                      "header": {
+                        "title": "Executed **spike_who_am_i**",
+                        "icon": "Hammer"
+                      },
+                      "name": "spike_who_am_i",
+                      "tool_input": {
+                        "note": "x"
+                      },
+                      "output": {
+                        "content": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664",
+                        "additional_kwargs": {},
+                        "response_metadata": {},
+                        "type": "tool",
+                        "name": "spike_who_am_i",
+                        "id": "606ff4f8-fd8c-4894-af05-57a4fc13859c",
+                        "tool_call_id": "fc_5627e829-225f-4cf5-8c8e-7e742f7c90ae",
+                        "artifact": null,
+                        "status": "success"
+                      },
+                      "error": null
+                    },
+                    {
+                      "type": "text",
+                      "duration": null,
+                      "header": {},
+                      "text": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664"
+                    }
+                  ],
+                  "allow_markdown": true,
+                  "media_url": null
+                }
+              ],
+              "duration": null,
+              "session_metadata": {
+                "graph_run_id": "86b2aa61-b1f3-45dd-8477-9573f415ab96"
+              },
+              "text": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664"
+            }
+          },
+          "artifacts": {
+            "message": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664",
+            "sender": "Machine",
+            "sender_name": "AI",
+            "files": [],
+            "type": "object"
+          },
+          "outputs": {
+            "message": {
+              "message": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664",
+              "type": "text"
+            }
+          },
+          "logs": {
+            "message": []
+          },
+          "messages": [
+            {
+              "message": "WHOAMI learner_id=101 language=es langflow_user=00000000-0000-0000-0000-000000000000 session=UNAVAILABLE graph_session=u101-23b3a4a3221c483c8c8f6f464aa9d1f0 t0=1791655590.971 t1=1791655592.471 thread=137184157865664",
+              "sender": "Machine",
+              "sender_name": "AI",
+              "session_id": "u101-23b3a4a3221c483c8c8f6f464aa9d1f0",
+              "stream_url": null,
+              "component_id": "ChatOutput-CqBla",
+              "files": [],
+              "type": "text"
+            }
+          ],
+          "timedelta": null,
+          "duration": null,
+          "component_display_name": "Chat Output",
+          "component_id": "ChatOutput-CqBla",
+          "used_frozen_result": false,
+          "token_usage": null
+        }
+      ]
+    }
+  ]
+}
