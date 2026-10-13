@@ -126,6 +126,49 @@ otherwise, and says what is wrong instead of a traceback if neither exists. Thre
 first). The host test suite never saw this because it always runs from a checkout; the check was also run against a copy of
 `scripts/`, `flows/` and `custom_components/` with no `tutor_core/` folder, as in the container.
 
+## Unreleased — Design update: confirmed decisions; the policy as separate copies (no code)
+
+Owner decisions recorded in `docs/WEB-APP-DESIGN.md` (10 October 2026):
+- **Confirmed:** the active study language is stored on the account too (3H); the sign-in and sign-up pages stay English and
+  store nothing (3F); the seven preset themes are the starting set (3G).
+- **Changed:** the privacy policy is no longer translated. Section 3I now keeps **a separate, complete copy per language**.
+  Because the reason is risk, a copy is shown only when it is `approved` and its version equals `POLICY_VERSION`; drafts and
+  stale copies are never shown (learners see the English copy instead), every copy states which copy governs, and tests keep the
+  structure and versions of all copies in step. Milestone 8d, the privacy-claim map (12B), the operator checklist, the API rows
+  and risks 15 and 16 were updated to match.
+
+## Unreleased — Design revision: preferences on the account, translated policy (no code)
+
+Two decisions changed in `docs/WEB-APP-DESIGN.md`, and everything that depended on them was rewritten:
+- **Site-language and theme choices are stored on the account** (new section 3H), not just on the device: a `user_preferences`
+  table, `GET /me` returns it, `PATCH /me/preferences` changes it, and the existing guard tests force it into "Download my
+  data" and account deletion. The device keeps only a copy for first-paint speed, wiped on logout like every other per-user
+  item; sign-in pages ignore preferences. The active study language is recommended to move there too (owner to confirm).
+- **The privacy policy follows the language** (new section 3I): served by the API as one file per language, English
+  authoritative, each translation labelled `machine_translated_unreviewed` or `reviewed`, tests that keep all nine in step
+  with `POLICY_VERSION`. This reverses the earlier "legal text stays English" choice, so the trust risk is spelled out and a
+  review step is added to the operator checklist. One version bump covers all of M8.
+- Milestone M8 is now 8a, 8p (preferences), 8b, 8c, 8d (policy). Storage rows, the privacy-claim map (12B), the ER diagram,
+  the API list and the risks (14 to 16) were updated to match.
+
+## Unreleased — Design update: where we are, and three personalisation features (no code)
+
+Documentation only. `docs/WEB-APP-DESIGN.md` is now **v5**:
+- New "Where we are" block at the top: what is built and tested (32 core, 90 API, 56 web unit, 27 real-browser tests), what is
+  not (M0, M3, M5-M7), what is unverified (Docker never run, Langflow behaviour, other browsers) and the known gaps.
+- **3F, Language display and the site's own language:** every language shown by its own name (Chinese as 中文简体), and a
+  Settings checkbox that shows the site in the language being studied and follows switches. Typed nine-language message table,
+  locale provider, `lang` attributes, CJK fonts, what stays English (the policy text, some server messages) and why.
+- **3G, Themes and custom colors:** seven new presets plus a custom theme with a color wheel for five parts of the site
+  (page, cards, text, borders, buttons/links/menu), built on the existing CSS tokens so no class or id changes; readability
+  is guaranteed by derivation and shown in a panel; applied before first paint; CSP-safe.
+- Milestone **M8a-8c**, status rows, new local-storage keys (section 10), privacy-claim rows (12B: the policy text and version
+  must change when these ship), test plans and five new risks.
+Repository note: the web app was applied as commit `1d1406d`. It lacked `.env.example`, `.dockerignore` and
+`docs/SITE-AND-AI-INTEGRATION.md`, lost the executable bit of `scripts/check_api_types.sh`, and contained a Playwright output file
+(`web/test-results/`, a leak from the earlier patch, now ignored). A follow-up commit restores/fixes these; it is not yet in the remote.
+Parked, in no patch: branch `wip/i18n-themes` (first draft of the message table; the Chinese display-name change).
+
 ## Unreleased — M3: `tutor_core` extraction and per-learner, fail-closed tools
 
 Done as the design requires, in two commits so a regression can be blamed on the move or on the behaviour.
@@ -319,6 +362,7 @@ Gemini model while the edge wires in the Groq node (assumed to win; the first li
 that needs a live Langflow or Groq: that the `1.12.2` image tag exists, that `LANGFLOW_LOAD_FLOWS_PATH` loads the flow, that tweaks
 reach tool components (by id or by name, integer or string ids), that `self.graph.session_id` exists, and the monitor delete
 endpoints. Plan A or B is decided by running `scripts/spike_tweaks.py`; the result goes here.
+
 
 ## Unreleased — Web app adapted to the Step 10 results
 

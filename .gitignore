@@ -19,3 +19,7 @@ web/dist/
 
 # file for self use
 command.txt
+
+# Playwright output (regenerated on every run)
+web/test-results/
+web/playwright-report/
