@@ -19,8 +19,16 @@ import sys
 
 sys.path.insert(0, "/app/custom_components")
 
-from langflow.schema.content_block import ContentBlock  # noqa: E402
-from langflow.schema.content_types import ErrorContent, TextContent, ToolContent  # noqa: E402
+# Build the content objects from the SAME classes `Message` validates against. In Langflow 1.12.2 `Message` is
+# lfx.schema.message.Message, while langflow.schema.content_block / content_types are separate copies of the classes, so
+# a ContentBlock imported from `langflow.schema` is rejected by Message ("Input should be ... an instance of
+# ContentBlock"). Older images, where the two paths are the same objects, fall back to the langflow path.
+try:
+    from lfx.schema.content_block import ContentBlock  # noqa: E402
+    from lfx.schema.content_types import ErrorContent, TextContent, ToolContent  # noqa: E402
+except ImportError:  # pragma: no cover - an image without lfx
+    from langflow.schema.content_block import ContentBlock  # noqa: E402
+    from langflow.schema.content_types import ErrorContent, TextContent, ToolContent  # noqa: E402
 from langflow.schema.message import Message  # noqa: E402
 
 from tool_result_relay import (  # noqa: E402

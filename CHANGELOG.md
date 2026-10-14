@@ -20,7 +20,16 @@ Entries are newest first. Dates come from the git history; the project has no ve
   under identical randomness (see the M3 entry), and the type labels of all eight story types were re-checked. Two English story turns cannot say how often it
   happens: `run_story_batch.py --learner-id N --languages English --count 20` would.
 
-**Not reported yet:** `make test-langflow` (every container-side test under Python 3.14.7). **Still open for chat:** set `LANGFLOW_API_KEY` and
+- `make test-langflow` (every container-side test, Python 3.14.7): **15 of 16 test files passed**, including every M3 one (`test_tool_wrappers`, `test_m3_check`,
+  `test_routing_learner_db`, `test_run_story_batch_cli`, `test_story_prompt_language` with the English templates byte-identical, `test_story_variety`). The one failure,
+  `test_tool_result_relay.py`, was **a test-fixture problem that predates M3** (neither it nor `tool_result_relay.py` changed since Step 9; the live relay checks
+  passed): in the 1.12.2 image `Message` is `lfx.schema.message.Message`, but `langflow.schema.content_block` and `content_types` are separate copies of the
+  classes, so a `ContentBlock` imported from `langflow.schema` is refused by `Message` (confirmed with a one-line class-identity check in the container:
+  `ContentBlock same: False`, `Message same: True`, `ToolContent same: False`). **Fixed** by importing the content classes from `lfx.schema` (falling back to
+  `langflow.schema` where the two are the same), reproduced first in a harness with the same mismatch (same error, same test line), then 31 of 31 checks pass.
+  Re-run `make test-langflow` in the image to confirm all 16.
+
+**Still open for chat:** set `LANGFLOW_API_KEY` and
 `LANGFLOW_PER_USER_TOOLS=1`, run `capture_fixtures.py --probe-delete`, update the privacy page and policy version (design 19.3 step 6).
 
 ## Unreleased — fix: `sync_flow_nodes.py` failed inside the langflow container
