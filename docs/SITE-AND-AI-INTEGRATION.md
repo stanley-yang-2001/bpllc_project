@@ -118,7 +118,7 @@ The TypeScript types the React app uses are generated from the API’s own OpenA
 
 In use today: `validation_error` (422), `unauthorized` (401), `session_changed` (401), `login_failed` (401), `login_locked` (429, with `retry_after`), `wrong_password` (403), `forbidden` (403), `not_found` (404), `conflict` (409), `internal_error` (500).
 
-Planned for the AI features: `tutor_busy` (429, the shared Groq limit or too many requests at once), `not_enough_words` (422), `language_unavailable` (422), `langflow_unavailable` (503), `ai_failed` (502). Section 9 says what the learner sees for each.
+Planned for the AI features: `tutor_busy` (429, the shared Groq limit or too many requests at once), `not_enough_words` (422), `language_unavailable` (422), `langflow_unavailable` (503), `ai_failed` (502), `chat_cleanup_failed` (503, account deletion could not confirm the learner's stored chat was removed, so nothing is deleted). Section 9 says what the learner sees for each.
 
 ### 3.5 Inside the React app
 
@@ -386,10 +386,10 @@ What the learner sees when something goes wrong:
 
 ## 10. Data model additions
 
-- **`stories`** (migration 0004, with M6): id, user id (deleted with the user), language, story type and topic (both empty for stories saved from Chat, where they are unknown), body, passed, report as JSON, created time.
+- **`stories`** (migration 0006, with M6; 0004 is `chat_sessions`, 0005 is `password_salt`): id, user id (deleted with the user), language, story type and topic (both empty for stories saved from Chat, where they are unknown), body, passed, report as JSON, created time.
 - **Export and deletion stay honest automatically.** Two existing guard tests fail as soon as a table with a `user_id` exists that is missing from “Download my data”, or whose rows survive account deletion. Adding `stories` therefore forces it into both.
 - **Words:** the tools move from the old global table to `tutor.words`. The old table is left as a backup and can be imported into a demo account with the seed script.
-- **Chat history is a gap to close.** Langflow itself stores the messages of every session in its own database tables, under the session ids `u<user id>-...`. Our delete-account button does not remove those, and the privacy policy does not mention them yet. Before Chat ships, either deleting an account must also delete that user’s Langflow sessions (the API can list them by the id prefix, or record each session id in a small `chat_sessions` table so the same guard tests cover it), “Download my data” must include or explain them, and the policy text and version must change. This is an acceptance item for M5, not an afterthought.
+- **Chat history is a gap to close.** Langflow itself stores the messages of every session in its own database tables, under the session ids `u<user id>-...`. **Closed in code on 15 October 2026 (not yet run against the real Langflow):** the `chat_sessions` table, deletion before the user row, and the reworded policy. Original gap, kept for the record: our delete-account button did not remove those, and the privacy policy did not mention them. Before Chat ships, either deleting an account must also delete that user’s Langflow sessions (the API can list them by the id prefix, or record each session id in a small `chat_sessions` table so the same guard tests cover it), “Download my data” must include or explain them, and the policy text and version must change. This is an acceptance item for M5, not an afterthought. **Probe result (14 October 2026):** Langflow keeps both sides of each turn and the tool call per session; `GET /api/v1/monitor/messages/sessions` lists sessions (filtering by prefix worked); `DELETE /api/v1/monitor/messages/session/<session id>` removed a session's messages (2 before, 0 after, re-read). Not yet checked: any other place Langflow keeps run data (its build and transaction logs).
 
 ## 11. Rollout plan
 
@@ -418,7 +418,7 @@ M0 must come first because Chat depends on its answer. M5 and M6 can then procee
 | Risk or question | Why it matters | Plan |
 |---|---|---|
 | Langflow may not pass per-request inputs to tools in Agent mode | Chat cannot be made multi-user without it | M0 decides between Plan A and Plan B before any Chat code |
-| Langflow stores chat messages | Contradicts “delete removes everything” | Section 10 acceptance item for M5 |
+| Langflow stores chat messages | Contradicts “delete removes everything” | Section 10 acceptance item for M5; the probe shows per-session delete works through Langflow's monitor API |
 | Story quality in languages not yet measured (German, Italian, Portuguese, Chinese, Korean) | Would ship stories in the wrong language | Those languages stay off until a batch reaches 90%; Spanish, French and Japanese already did |
 | English variety versus vocabulary fit | The newer story types use many words the learner does not know | Owner’s next steps: larger word list, focus words per story; Studio shows the report honestly |
 | One shared Groq free-tier limit | Several learners at once will hit it | The AI gate smooths bursts; the UI is built for `tutor_busy` |

@@ -6,14 +6,17 @@ import logging
 from ..config import Settings
 from ..errors import AppError
 from .chat_stub import StubChat
-from .langflow_client import LangflowClient
+from .langflow_client import LangflowClient, NoStoredChat
 
 log = logging.getLogger("tutor.chat")
 
 
-class NotReadyChat:
+class NotReadyChat(NoStoredChat):
     """Live mode before the operator has confirmed the flow's tools are per-user (LANGFLOW_PER_USER_TOOLS=1).
     Running the flow now would let the shared word list leak between learners, so nothing is sent."""
+
+    def health(self) -> dict:
+        return {"ok": False, "status": "off", "detail": "not switched on"}
 
     def run(self, **_kwargs):
         raise AppError("langflow_unavailable", "The chat tutor isn't switched on yet.", 503)

@@ -18,7 +18,7 @@ from tutor_core.words import WordError, validate_meaning, validate_word
 from .db import SCHEMA
 from .migrate import run_migrations
 from .policy import POLICY_VERSION
-from .security import hash_password
+from .security import hash_password, new_salt
 
 _SAMPLES = Path(os.environ.get("SAMPLE_DIR", Path(__file__).resolve().parents[2] / "sample_data"))
 # The starter list is tiny with almost no verbs, which made stories samey (Step 10 findings); the suggested list
@@ -50,9 +50,10 @@ def seed(database_url: str, email: str, password: str, import_legacy: bool = Fal
         if row:
             user_id = row[0]
         else:
-            cur.execute(f"INSERT INTO {SCHEMA}.users (email, password_hash, display_name, privacy_accepted_at, privacy_version) "
-                        "VALUES (%s, %s, %s, now(), %s) RETURNING id",
-                        (email, hash_password(password, rounds), "Demo Learner", POLICY_VERSION))
+            salt = new_salt()
+            cur.execute(f"INSERT INTO {SCHEMA}.users (email, password_hash, password_salt, display_name, privacy_accepted_at, privacy_version) "
+                        "VALUES (%s, %s, %s, %s, now(), %s) RETURNING id",
+                        (email, hash_password(password, salt, rounds), salt, "Demo Learner", POLICY_VERSION))
             user_id = cur.fetchone()[0]
             out["user_created"] = True
         for lang in ("en", "es"):

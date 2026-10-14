@@ -87,6 +87,7 @@ class ToolCall:
 class ChatResult:
     reply: str
     tool_calls: list[ToolCall] = field(default_factory=list)
+    tokens: int | None = None            # what Langflow says the turn used (total tokens), if it said
 
 
 def _parse_structured_string(value: str):
@@ -193,6 +194,32 @@ def _machine_messages(stored) -> list:
     return machine[-1:] if machine else []
 
 
+def find_tokens(obj, _depth: int = 0) -> int | None:
+    """The token count Langflow reports in a message's `properties.usage` (total_tokens, else input + output).
+    Not found, or not a plain non-negative integer: None (the caller keeps its estimate)."""
+    if _depth > 30:
+        return None
+    if isinstance(obj, dict):
+        usage = obj.get("usage")
+        if isinstance(usage, dict):
+            total = usage.get("total_tokens")
+            if isinstance(total, int) and not isinstance(total, bool) and total >= 0:
+                return total
+            parts = [usage.get("input_tokens"), usage.get("output_tokens")]
+            if all(isinstance(p, int) and not isinstance(p, bool) and p >= 0 for p in parts):
+                return sum(parts)
+        children = obj.values()
+    elif isinstance(obj, list):
+        children = obj
+    else:
+        return None
+    for child in children:
+        found = find_tokens(child, _depth + 1)
+        if found is not None:
+            return found
+    return None
+
+
 def parse_run_response(resp, stored_messages=None) -> ChatResult:
     calls = find_tool_calls(resp)
     if not calls and stored_messages:
@@ -200,7 +227,7 @@ def parse_run_response(resp, stored_messages=None) -> ChatResult:
     reply = reply_text(resp)
     if not reply.strip() and calls:
         reply = calls[-1].output
-    return ChatResult(reply=reply, tool_calls=calls)
+    return ChatResult(reply=reply, tool_calls=calls, tokens=find_tokens(resp))
 
 
 # --- transport and the client ------------------------------------------------------------------------
@@ -255,7 +282,34 @@ def map_transport_error(error: TransportError) -> AppError:
 Transport = Callable[[str, str, Any, dict, float], Any]
 
 
+CLEANUP_FAILED = ("We couldn't remove your chat history just now, so your account has not been deleted. "
+                  "Please try again in a moment.")
+
+
+def cleanup_failed() -> AppError:
+    return AppError("chat_cleanup_failed", CLEANUP_FAILED, 503, retry_after=15)
+
+
+class NoStoredChat:
+    """For tutors that keep no conversation anywhere (the stub, or live mode that is switched off): there is
+    nothing to delete. If a learner nevertheless has recorded sessions, say so rather than pretend."""
+    stores_chat = False
+    calls_ai = False            # nothing reaches Groq, so nothing is charged to the token budget
+
+    def health(self) -> dict:
+        return {"ok": None, "status": "stub", "detail": None}
+
+    def delete_sessions(self, session_ids) -> None:
+        if list(session_ids):
+            log.error("cannot delete chat sessions: this deployment has no Langflow client")
+            raise cleanup_failed()
+
+
 class LangflowClient:
+    stores_chat = True
+    calls_ai = True
+    HEALTH_TIMEOUT = 3
+
     def __init__(self, base_url: str, flow: str, api_key: str, timeout: float = 100.0,
                  tweak_keys=(), transport: Transport | None = None, fallback_timeout: float = 10.0):
         self.base_url = base_url.rstrip("/")
@@ -289,3 +343,37 @@ class LangflowClient:
             log.warning("langflow returned no reply and no tool calls")
             raise AppError("ai_failed", "The tutor couldn't answer just now. Please try again.", 502)
         return result
+
+    def health(self) -> dict:
+        """Is Langflow answering? Only the kind of failure is reported, never its address or our key."""
+        try:
+            self._transport("GET", f"{self.base_url}/health", None, {}, self.HEALTH_TIMEOUT)
+        except TransportError as e:
+            log.warning("langflow health check failed: %s", e)
+            return {"ok": False, "status": "down", "detail": e.kind}
+        return {"ok": True, "status": "up", "detail": None}
+
+    def delete_sessions(self, session_ids) -> None:
+        """Remove these sessions' stored messages from Langflow and CHECK they are gone. Every session is tried;
+        if any cannot be confirmed empty, one `chat_cleanup_failed` is raised at the end. Account deletion
+        waits for this, so a learner is never told their data is gone when it is not."""
+        failed = []
+        for session_id in session_ids:
+            quoted = urllib.parse.quote(session_id, safe="")
+            url = f"{self.base_url}/api/v1/monitor/messages/session/{quoted}"
+            try:
+                try:
+                    self._transport("DELETE", url, None, self._headers(), self.fallback_timeout)
+                except TransportError as e:
+                    # a 404 (nothing there) or a 200 with an odd body may already mean "gone": the check decides
+                    if not (e.kind == "badjson" or (e.kind == "http" and e.status == 404)):
+                        raise
+                remaining = self._transport("GET", f"{self.base_url}/api/v1/monitor/messages?session_id={quoted}",
+                                            None, self._headers(), self.fallback_timeout)
+                if not isinstance(remaining, list) or remaining:
+                    raise TransportError("badjson", None, "session not confirmed empty")
+            except TransportError as e:
+                log.error("could not delete langflow session %s: %s", session_id, e)
+                failed.append(session_id)
+        if failed:
+            raise cleanup_failed()

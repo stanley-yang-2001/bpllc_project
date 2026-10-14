@@ -13,8 +13,8 @@ from ..errors import AppError
 from ..policy import POLICY_VERSION
 from ..routes.auth import check_password_rules
 from ..schemas import LanguageOut, MetaOut, UserOut
-from ..security import hash_password, verify_password
-from ..services import export, sessions, users
+from ..security import hash_password, new_salt, verify_password
+from ..services import chat_sessions, export, sessions, users
 
 router = APIRouter(tags=["me"])
 
@@ -76,7 +76,7 @@ def _reauthenticate(request: Request, user: dict, password: str) -> None:
     state.login_guard.check(user["email"])
     with connection(state.pool) as conn:
         row = users.get_by_email(conn, user["email"])
-    if not row or not verify_password(password, row["password_hash"]):
+    if not row or not verify_password(password, row["password_hash"], row["password_salt"]):
         state.login_guard.failure(user["email"])
         raise AppError("wrong_password", "That password is not correct.", 403)
     state.login_guard.success(user["email"])
@@ -113,18 +113,27 @@ def change_email(body: EmailChange, request: Request, user: dict = Depends(curre
 def change_password(body: PasswordChange, request: Request, response: Response, user: dict = Depends(current_user)):
     """Changes the password and ends every OTHER session (a stolen login must not survive the change)."""
     _reauthenticate(request, user, body.current_password)
-    new_hash = hash_password(body.new_password, request.app.state.settings.bcrypt_rounds)
+    salt = new_salt()
+    new_hash = hash_password(body.new_password, salt, request.app.state.settings.bcrypt_rounds)
     with connection(request.app.state.pool) as conn:
-        users.set_password(conn, user["id"], new_hash)
+        users.set_password(conn, user["id"], new_hash, salt)
         sessions.revoke_others(conn, user["id"], request.state.session_id)
 
 
 @router.post("/me/delete", status_code=204)
 def delete_account(body: PasswordOnly, request: Request, response: Response, user: dict = Depends(current_user)):
-    """Permanently deletes the account and everything in it. Needs the password."""
+    """Permanently deletes the account and everything in it, including the chat history Langflow stores. Needs the
+    password. The Langflow side goes first and must be confirmed: if it can't be, nothing is deleted and the
+    learner is told to retry, because deleting the account row would leave their chat with no way to find it."""
     _reauthenticate(request, user, body.password)
-    with connection(request.app.state.pool) as conn:
-        users.delete_user(conn, user["id"])
+    state = request.app.state
+    with state.ai_gate.exclusive(user["id"]):          # no chat turn may add a session while we clean up
+        with connection(state.pool) as conn:
+            ids = chat_sessions.list_ids(conn, user["id"])
+        if ids:
+            state.chat.delete_sessions(ids)
+        with connection(state.pool) as conn:
+            users.delete_user(conn, user["id"])
     response.delete_cookie(COOKIE, path="/")
 
 

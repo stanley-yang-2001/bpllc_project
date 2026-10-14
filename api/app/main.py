@@ -11,7 +11,7 @@ from .db import make_pool
 from .errors import install_error_handlers
 from .migrate import run_migrations
 from .routes import auth, chat, health, me, words
-from .security import LoginGuard, make_dummy_hash
+from .security import LoginGuard, make_dummy_credentials
 from .services.ai_gate import AiGate
 from .services.chat import make_chat_client
 
@@ -42,8 +42,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="Language Tutor API", lifespan=lifespan, docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.settings = settings
     app.state.login_guard = LoginGuard()
-    app.state.dummy_hash = make_dummy_hash(settings.bcrypt_rounds)
-    app.state.ai_gate = AiGate(settings.ai_gate_slots, settings.ai_gate_wait)
+    app.state.dummy_credentials = make_dummy_credentials(settings.bcrypt_rounds)
+    app.state.ai_gate = AiGate(settings.ai_gate_slots, settings.ai_gate_wait, tokens_per_minute=settings.ai_tokens_per_minute)
     app.state.chat = make_chat_client(settings, lambda: app.state.pool)      # the pool exists once the app starts
     install_error_handlers(app)
 

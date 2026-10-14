@@ -2,6 +2,89 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — M5: the tokens-per-minute limiter (15 October 2026)
+
+**Written and tested here (API 490 passed); never run against Groq.** Decision 2 in the design's waiting list, now built.
+- **What it limits:** the tokens the whole app may use in any sliding 60 seconds (`AI_TOKENS_PER_MINUTE`, default **8000**, the free tier's figure in the design; `0` switches it off; negative stops startup). It sits in `AiGate`
+  next to the concurrency limit and the one-request-per-learner rule, and is checked first, so a refused turn waits for nothing and holds no slot, marker or reservation.
+- **How a turn is charged:** `slot(user, tokens=estimate)` reserves `1500 + ceil(chars / 3)` (the real captured turns were 618 and 1344 total tokens; the Agent may call the model twice, hence the margin), then
+  `ticket.settle(real)` replaces it with Langflow's `properties.usage` total (`find_tokens`: total, else input + output, found in the run response; tested on the real greeting and story fixtures). A failed turn, or one
+  that reports nothing, keeps its estimate. The stub and the "not switched on" tutors (`calls_ai = False`) are never charged.
+- **When full:** `tutor_busy` (429) with `Retry-After` = seconds until enough of the window has expired for this call to fit (not until it is empty). The page already handles `tutor_busy`: it keeps the message and pauses Send.
+  A single call larger than the whole budget is capped to it, so it can still run when nothing else has.
+- **Tests (`test_token_limit.py`, 32):** budget arithmetic with a fake clock, the exact wait, settle up and down, failure and silent calls keep their estimate, refusal holds nothing, off switch, 20 threads cannot overspend
+  (exactly 8 of 20 pass), real fixtures' counts, odd usage shapes, the route (shared across learners, refused turns never reach the tutor), settings. Mutations that made a test fail: no limit check, no pruning, no settle in
+  the gate or route, no cap, a flat wait, always charging, and not wiring the setting from the environment.
+- **Not known:** whether 8000 matches the key's real limit today (Groq changes it), and how far the estimate is off in practice. Watch one busy minute, then adjust `AI_TOKENS_PER_MINUTE`.
+- `docker-compose.yml` and `.env.example` carry the new variable.
+
+## Unreleased — M5: privacy wording, `/health` and the prompt-privacy test (15 October 2026)
+
+**Written and tested here (API 458 passed, web 77 passed, `tsc` clean).** From a pass over the design doc's M5 acceptance items:
+- **Prompt privacy:** `test_a_learners_name_email_and_password_never_reach_langflow` signs up "Zebulon Quux", chats through the real client and deletes the account, then fails if any request (body, URL, header) holds
+  the name, email or password. Chat's half of the design's requirement; Story Studio's half stays with M6.
+- **Policy:** version `2026-10-15`. The privacy page now says chat is stored, that deleting the account deletes it (or stops and asks to retry), that the export lists sessions but not messages, that passwords carry a per-account
+  salt, and that Chat is available when switched on (Story Studio still "not yet"). The delete dialog lists "your chat history with the tutor". Section 12B maps each new claim to its test.
+- **`/health`:** the Langflow line reports `stub`, `off` (tools not confirmed per-user), `up` or `down` (reason kind only, never the address or key); Settings shows it.
+- **Not done, on purpose:** save-to-library (it needs the `stories` table that the design puts in M6, so the owner of that table has to be decided), the routing re-run for the no-language story default (needs your machine), the token limiter (out of scope by your decision).
+
+## Unreleased — M5: a salt of our own for each password (15 October 2026)
+
+**Written and tested here (API 452 passed, 0 skipped).** Migration 0005 adds `tutor.users.password_salt` (nullable text). **How they are combined:** the salt (16 random bytes from
+`secrets`, stored as hex) is put **in front of** the password bytes, the result is hashed with SHA-256, the digest is base64-encoded (44 bytes), and **that** is what bcrypt hashes:
+`password_hash = bcrypt(base64(SHA-256(salt || password)))`. The salt and the hash are two columns of the same row. bcrypt still adds its own salt inside the hash string, so
+there are two salts; the separate one is as requested, and adds little on top of bcrypt's. Side effect: bcrypt's 72-byte cut-off no longer applies (the 72-byte input limit stays).
+- Registering, changing the password and the demo seed each make a new salt. Login and the re-check on account changes use the row's salt; an unknown email still spends one salted check
+  against a dummy `(salt, hash)` pair (`app.state.dummy_credentials`).
+- **Older accounts** (salt NULL) still log in with plain bcrypt and get a salt and a new hash on their next **successful** login (a wrong password upgrades nothing).
+- Salt and hash stay out of the profile and the export. `stories` is now migration 0006 in the design.
+- **Tests (`api/tests/test_password_salt.py`):** the exact combination, wrong password/salt, long passwords, two accounts get different salts, change-password, legacy upgrade, no leak. Removing the salt
+  from the digest, the legacy upgrade and the change-password salt each made a test fail.
+
+## Unreleased — M5: deleting an account deletes the learner's Langflow chat (15 October 2026)
+
+**Written and tested here (API 436 passed, 0 skipped); not yet run against the real Langflow.** Decision taken: record session ids in a table rather than list by prefix.
+- **`tutor.chat_sessions`** (migration 0004; `user_id` cascades, `session_id`, `created_at`): ids only, never message text. The chat route records the full server-built id
+  (`u<id>-<32 hex>`) before each run, so a turn that fails after Langflow stored the question can still be cleaned up. It is recorded only for tutors that store chat.
+- **`LangflowClient.delete_sessions(ids)`:** `DELETE /api/v1/monitor/messages/session/<id>` per session, then `GET /api/v1/monitor/messages?session_id=<id>` must return an **empty
+  list** (anything else, or no answer, counts as a failure). A 404 or a non-JSON 200 is settled by that check. Every session is attempted, then one `chat_cleanup_failed` (503,
+  retry-after 15) is raised; its text says the account has **not** been deleted and never names Langflow.
+- **`/me/delete`:** after the password check, inside a new `AiGate.exclusive(user)` (claims the learner's marker, uses no slot, `tutor_busy` if a chat turn is running), the learner's
+  sessions are deleted from Langflow **before** the user row. If that cannot be confirmed nothing is deleted and the login stays valid. A learner with no recorded sessions deletes
+  even if Langflow is down. The stub and the "not switched on" tutors hold no chat; if they are asked to delete sessions that exist, they fail closed.
+- **Export:** `chat_sessions` (session id and time) is in "Download my data"; the messages themselves are not, because they live in Langflow.
+- **Tests (`api/tests/test_chat_deletion.py`, gate tests):** client calls and failure modes, recording, account deletion order and failure, and an end-to-end test where the real client
+  runs against a fake Langflow that stores and forgets messages (only the deleted learner's sessions disappear). Breaking each of: the cleanup call, the empty check, the failure raise,
+  the exclusive claim, the recording condition and the learner filter made a test fail.
+- **Fixtures:** `greeting_run.json`, `story_run.json`, `story_messages.json` now live in `api/tests/fixtures/langflow/`, so the three `test_real_*` tests run instead of skipping.
+- **Still to do in M5:** try it against the real Langflow once (`LANGFLOW_API_KEY` set, one chat, then delete the account); privacy page text and policy version; Langflow's other run logs.
+
+## Unreleased — M0 chat-deletion probe: Langflow's stored chat can be deleted per session (14 October 2026)
+
+**Run on the author's machine** (`capture_fixtures.py --flow language-tutor --probe-delete`, Langflow 1.12.2). It sent a greeting and a Spanish story request in two fresh
+`capture-*` sessions, then listed, deleted and re-read only those two sessions.
+- **What Langflow keeps:** both sides of every turn, per session (2 stored messages for one question and one answer, senders `User` and `Machine`), and the tool call
+  inside the stored reply (the story session shows 1 tool call in its stored messages). So stored chat holds the learner's words and the tool's output (a story built from their
+  vocabulary), which is the privacy point the M5 acceptance item exists for.
+- **It can be listed:** `GET /api/v1/monitor/messages/sessions` returned 47 sessions (everything on this instance, earlier test runs included), both capture sessions among them,
+  and filtering that list by a session-id prefix worked. The API builds chat sessions as `u<user id>-<32 hex>`, so a learner's sessions can be found by prefix. The prefix must
+  include the dash (`u1-`, never `u1`), or learner 12's sessions would match learner 1.
+- **It can be deleted:** `DELETE /api/v1/monitor/messages/session/<session id>` returned ok for both, and re-reading with `GET /api/v1/monitor/messages?session_id=<id>` then showed
+  **0 messages** (2 before). The script's own conclusion: "per-session delete through the monitor API works".
+- **Not checked:** the probe re-reads only the stored messages. Langflow can also keep run logs of its own (its build and transaction records); whether any of them holds
+  learner text is unexamined, so "deleting the sessions removes everything Langflow holds" is **not** yet shown.
+- **Still to do (M5):** the account-deletion path must call that endpoint for the learner's sessions (the API will need `LANGFLOW_API_KEY`), with a test that fails if it is
+  forgotten; "Download my data" and the privacy policy must say what chat is kept; the policy version must change. Whether to list by prefix or record each session id in a
+  `chat_sessions` table is still the open decision in `docs/SITE-AND-AI-INTEGRATION.md` section 13.
+
+**Captured fixtures (on the author's machine; the three used by the tests are now in `api/tests/fixtures/langflow/`):** `greeting_run.json`, `greeting_messages.json`, `story_run.json`, `story_messages.json` in `scripts/captured/`.
+- The greeting reply was "I'm doing great, thank you! ...": no tool call; 2 stored messages. The reply sits at `outputs[0].outputs[0].results.message.text`; the top-level keys are `outputs` and `session_id`.
+- The story request carried no tweaks, so the Agent path **failed closed through the real HTTP run API**: the reply was "I can't write a story right now: I don't know whose vocabulary to use."
+  (This also shows `TUTOR_DEV_USER_ID` is empty in the running compose, since otherwise the tool would have acted as a developer account.) The same tool call appears at two paths in the
+  run response (`message.content_blocks` and `message.data.content_blocks`, both `story_generator_tool`) and once in the stored messages, as the client already expects.
+- Moving `greeting_run.json`, `story_run.json` and `story_messages.json` into `api/tests/fixtures/langflow/` would switch on the three skipped `test_real_*` tests
+  (a refusal still has a reply and one tool call whose output equals it). A fixture with a real story needs a tweaks file for a real learner.
+
 ## Unreleased — M3 verified live on the author's machine (14 October 2026)
 
 **Run:** image built from `langflow/Dockerfile` and running (Langflow 1.12.2, `tutor_core` importable inside it), then, in order:
@@ -27,7 +110,8 @@ Entries are newest first. Dates come from the git history; the project has no ve
   classes, so a `ContentBlock` imported from `langflow.schema` is refused by `Message` (confirmed with a one-line class-identity check in the container:
   `ContentBlock same: False`, `Message same: True`, `ToolContent same: False`). **Fixed** by importing the content classes from `lfx.schema` (falling back to
   `langflow.schema` where the two are the same), reproduced first in a harness with the same mismatch (same error, same test line), then 31 of 31 checks pass.
-  Re-run `make test-langflow` in the image to confirm all 16.
+  **Confirmed (14 Oct 2026):** `test_tool_result_relay.py` passes alone in the image (31 of 31), and the full `make test-langflow` re-run passes **all 16 test files**
+  (the `FAIL` lines printed by `test_run_story_batch.py` are that test's own simulated failures, each followed by `[PASS]`).
 
 **Still open for chat:** set `LANGFLOW_API_KEY` and
 `LANGFLOW_PER_USER_TOOLS=1`, run `capture_fixtures.py --probe-delete`, update the privacy page and policy version (design 19.3 step 6).

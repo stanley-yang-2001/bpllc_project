@@ -23,4 +23,7 @@ def build(conn, user_id: int) -> dict:
         # login records: when, not the secret ids
         cur.execute("SELECT created_at, expires_at FROM sessions WHERE user_id = %s ORDER BY created_at", (user_id,))
         out["sessions"] = cur.fetchall()
+        # which chat sessions we hold for you; the messages themselves live in the tutor service
+        cur.execute("SELECT session_id, created_at FROM chat_sessions WHERE user_id = %s ORDER BY created_at, session_id", (user_id,))
+        out["chat_sessions"] = cur.fetchall()
     return out

@@ -18,7 +18,7 @@ from tutor_core.languages import LANGUAGES, normalize_language, stories_enabled
 from ..db import connection
 from ..errors import AppError
 from . import vocab
-from .langflow_client import ChatResult, ToolCall
+from .langflow_client import ChatResult, NoStoredChat, ToolCall
 
 _ADD = re.compile(r"\badd\s+(?:the\s+)?word\s+[\"']?([^\s\"'.,!?;:]+)", re.IGNORECASE)
 _TOKEN = re.compile(r"\w+", re.UNICODE)
@@ -43,7 +43,7 @@ def _language_named_in(message: str) -> str | None:
     return None
 
 
-class StubChat:
+class StubChat(NoStoredChat):
     def __init__(self, get_pool):
         self._get_pool = get_pool
 

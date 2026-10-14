@@ -8,12 +8,12 @@ from ..errors import conflict, unauthorized
 USER_COLS = "id, email, display_name, native_language, created_at"
 
 
-def create_user(conn, email: str, password_hash: str, display_name: str, language: str, policy_version: str) -> dict:
+def create_user(conn, email: str, password_hash: str, password_salt: str, display_name: str, language: str, policy_version: str) -> dict:
     with cursor(conn) as cur:
         try:
             cur.execute(
-                "INSERT INTO users (email, password_hash, display_name, privacy_accepted_at, privacy_version) "
-                f"VALUES (%s, %s, %s, now(), %s) RETURNING {USER_COLS}", (email, password_hash, display_name, policy_version))
+                "INSERT INTO users (email, password_hash, password_salt, display_name, privacy_accepted_at, privacy_version) "
+                f"VALUES (%s, %s, %s, %s, now(), %s) RETURNING {USER_COLS}", (email, password_hash, password_salt, display_name, policy_version))
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             raise conflict("An account with that email already exists.")
@@ -24,7 +24,7 @@ def create_user(conn, email: str, password_hash: str, display_name: str, languag
 
 def get_by_email(conn, email: str):
     with cursor(conn) as cur:
-        cur.execute(f"SELECT {USER_COLS}, password_hash FROM users WHERE email = %s", (email,))
+        cur.execute(f"SELECT {USER_COLS}, password_hash, password_salt FROM users WHERE email = %s", (email,))
         return cur.fetchone()
 
 
@@ -66,9 +66,9 @@ def update_email(conn, user_id: int, email: str) -> dict:
         return cur.fetchone()
 
 
-def set_password(conn, user_id: int, password_hash: str) -> None:
+def set_password(conn, user_id: int, password_hash: str, password_salt: str) -> None:
     with cursor(conn) as cur:
-        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (password_hash, user_id))
+        cur.execute("UPDATE users SET password_hash = %s, password_salt = %s WHERE id = %s", (password_hash, password_salt, user_id))
 
 
 def delete_user(conn, user_id: int) -> None:

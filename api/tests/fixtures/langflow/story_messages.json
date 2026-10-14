@@ -1,0 +1,114 @@
+[
+  {
+    "id": "311148ce-84d2-4a8c-896e-af14911bd43f",
+    "flow_id": "564b5d01-2144-4b60-8f37-a693e2a1fe87",
+    "timestamp": "2026-10-14 19:46:10.711368 UTC",
+    "sender": "User",
+    "sender_name": "User",
+    "session_id": "capture-story-caa1d41b2ccf",
+    "context_id": "",
+    "text": "Tell me a story in Spanish.",
+    "files": "[]",
+    "edit": false,
+    "duration": null,
+    "properties": {
+      "text_color": null,
+      "background_color": null,
+      "edited": false,
+      "source": {
+        "id": null,
+        "display_name": null,
+        "source": null
+      },
+      "icon": null,
+      "allow_markdown": false,
+      "positive_feedback": null,
+      "state": "complete",
+      "targets": [],
+      "usage": null,
+      "build_duration": null
+    },
+    "category": "message",
+    "content_blocks": [],
+    "session_metadata": {
+      "graph_run_id": "e7785790-7e7f-4bbb-b0b7-a0955ce7166b"
+    }
+  },
+  {
+    "id": "06bad4b6-2a48-43b1-9577-6c8909cfd650",
+    "flow_id": "564b5d01-2144-4b60-8f37-a693e2a1fe87",
+    "timestamp": "2026-10-14 19:46:10.764805 UTC",
+    "sender": "Machine",
+    "sender_name": "AI",
+    "session_id": "capture-story-caa1d41b2ccf",
+    "context_id": "",
+    "text": "I can't write a story right now: I don't know whose vocabulary to use.",
+    "files": "[]",
+    "edit": false,
+    "duration": null,
+    "properties": {
+      "text_color": null,
+      "background_color": null,
+      "edited": false,
+      "source": {
+        "id": "ToolResultRelay-G5PjB",
+        "display_name": "Tool Result Relay",
+        "source": "Tool Result Relay"
+      },
+      "icon": "Bot",
+      "allow_markdown": false,
+      "positive_feedback": null,
+      "state": "complete",
+      "targets": [],
+      "usage": {
+        "input_tokens": 1200,
+        "output_tokens": 144,
+        "total_tokens": 1344
+      },
+      "build_duration": null
+    },
+    "category": "message",
+    "content_blocks": [
+      {
+        "title": "Agent Steps",
+        "contents": [
+          {
+            "type": "tool_use",
+            "duration": 10,
+            "header": {
+              "title": "Executed **story_generator_tool**",
+              "icon": "Hammer"
+            },
+            "name": "story_generator_tool",
+            "tool_input": {
+              "language": "Spanish"
+            },
+            "output": {
+              "content": "I can't write a story right now: I don't know whose vocabulary to use.",
+              "additional_kwargs": {},
+              "response_metadata": {},
+              "type": "tool",
+              "name": "story_generator_tool",
+              "id": "6d353fc0-c919-406a-82f4-3fc13e42e7f6",
+              "tool_call_id": "fc_96055b9f-5dbf-438c-88aa-15f5aa2d4042",
+              "artifact": null,
+              "status": "success"
+            },
+            "error": null
+          },
+          {
+            "type": "text",
+            "duration": null,
+            "header": {},
+            "text": "I can't write a story right now: I don't know whose vocabulary to use."
+          }
+        ],
+        "allow_markdown": true,
+        "media_url": null
+      }
+    ],
+    "session_metadata": {
+      "graph_run_id": "e7785790-7e7f-4bbb-b0b7-a0955ce7166b"
+    }
+  }
+]

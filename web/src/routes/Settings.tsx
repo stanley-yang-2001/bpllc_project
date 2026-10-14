@@ -194,6 +194,7 @@ function DeleteAccountModal({ open, onClose }: { open: boolean; onClose: () => v
         <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
           <li>your name and email address</li>
           <li>all your words, meanings and languages</li>
+          <li>your chat history with the tutor</li>
           <li>all your sign-ins, on every device</li>
         </ul>
         <p className="mt-3 text-sm text-slate-600">Consider downloading your data first.</p>
@@ -247,7 +248,8 @@ function DataSection() {
 }
 
 function Row({ label, check }: { label: string; check: Health["postgres"] }) {
-  const state = check.ok === true ? "OK" : check.ok === false ? `Problem${check.detail ? ` (${check.detail})` : ""}` : "Not checked yet";
+  const state = check.ok === true ? "OK" : check.ok === false ? `Problem${check.detail ? ` (${check.detail})` : ""}`
+    : check.status === "stub" ? "Using the built-in practice tutor" : "Not checked yet";
   const dot = check.ok === true ? "bg-emerald-500" : check.ok === false ? "bg-red-500" : "bg-slate-300";
   return (
     <li className="flex items-center justify-between border-b border-slate-100 py-3 last:border-0">
@@ -294,7 +296,7 @@ export default function Settings() {
           ) : (
             <ul>
               <Row label="Postgres" check={health.data.postgres} />
-              <Row label="Langflow (chat)" check={{ ok: null }} />
+              <Row label="Langflow (chat)" check={health.data.langflow} />
               <Row label="Groq (stories)" check={{ ok: null }} />
             </ul>
           )}

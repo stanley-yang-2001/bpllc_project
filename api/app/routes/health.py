@@ -22,6 +22,6 @@ def health(request: Request, _: dict = Depends(current_user)):
         postgres = {"ok": True}
     except Exception as exc:                                    # report, don't crash the page
         postgres = {"ok": False, "detail": type(exc).__name__}
-    # Langflow and Groq checks arrive with the chat (M5) and story (M6) milestones.
-    return {"postgres": postgres, "langflow": {"status": "unchecked"}, "groq": {"status": "unchecked"},
+    # Groq is checked with the story milestone (M6).
+    return {"postgres": postgres, "langflow": request.app.state.chat.health(), "groq": {"status": "unchecked"},
             "ai_mode": request.app.state.settings.ai_mode}

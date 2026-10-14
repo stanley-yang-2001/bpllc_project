@@ -1,0 +1,133 @@
+{
+  "session_id": "capture-greeting-fdf04c64f218",
+  "outputs": [
+    {
+      "inputs": {
+        "input_value": "Hi! How are you today?"
+      },
+      "outputs": [
+        {
+          "results": {
+            "message": {
+              "text_key": "text",
+              "data": {
+                "timestamp": "2026-10-14 19:46:09.117452 UTC",
+                "sender": "Machine",
+                "sender_name": "AI",
+                "session_id": "capture-greeting-fdf04c64f218",
+                "context_id": "",
+                "text": "I’m doing great, thank you! How can I help you with your language learning today?",
+                "files": [],
+                "error": false,
+                "edit": false,
+                "properties": {
+                  "text_color": null,
+                  "background_color": null,
+                  "edited": false,
+                  "source": {
+                    "id": "ToolResultRelay-G5PjB",
+                    "display_name": "Tool Result Relay",
+                    "source": "Tool Result Relay"
+                  },
+                  "icon": "Bot",
+                  "allow_markdown": false,
+                  "positive_feedback": null,
+                  "state": "complete",
+                  "targets": [],
+                  "usage": {
+                    "input_tokens": 578,
+                    "output_tokens": 40,
+                    "total_tokens": 618
+                  },
+                  "build_duration": null
+                },
+                "category": "message",
+                "content_blocks": [],
+                "session_metadata": {
+                  "graph_run_id": "ad735e48-e6d8-4aa3-aeb3-8b506f7a2605"
+                },
+                "id": "af35349f-9396-4c7d-a7f0-67b3846180e4",
+                "flow_id": "564b5d01-2144-4b60-8f37-a693e2a1fe87",
+                "run_id": "ad735e48-e6d8-4aa3-aeb3-8b506f7a2605",
+                "duration": null
+              },
+              "default_value": "",
+              "sender": "Machine",
+              "sender_name": "AI",
+              "files": [],
+              "session_id": "capture-greeting-fdf04c64f218",
+              "context_id": "",
+              "run_id": "ad735e48-e6d8-4aa3-aeb3-8b506f7a2605",
+              "timestamp": "2026-10-14 19:46:09.117452 UTC",
+              "flow_id": "564b5d01-2144-4b60-8f37-a693e2a1fe87",
+              "error": false,
+              "edit": false,
+              "properties": {
+                "text_color": null,
+                "background_color": null,
+                "edited": false,
+                "source": {
+                  "id": "ToolResultRelay-G5PjB",
+                  "display_name": "Tool Result Relay",
+                  "source": "Tool Result Relay"
+                },
+                "icon": "Bot",
+                "allow_markdown": false,
+                "positive_feedback": null,
+                "state": "complete",
+                "targets": [],
+                "usage": {
+                  "input_tokens": 578,
+                  "output_tokens": 40,
+                  "total_tokens": 618
+                },
+                "build_duration": null
+              },
+              "category": "message",
+              "content_blocks": [],
+              "duration": null,
+              "session_metadata": {
+                "graph_run_id": "ad735e48-e6d8-4aa3-aeb3-8b506f7a2605"
+              },
+              "text": "I’m doing great, thank you! How can I help you with your language learning today?"
+            }
+          },
+          "artifacts": {
+            "message": "I’m doing great, thank you! How can I help you with your language learning today?",
+            "sender": "Machine",
+            "sender_name": "AI",
+            "files": [],
+            "type": "object"
+          },
+          "outputs": {
+            "message": {
+              "message": "I’m doing great, thank you! How can I help you with your language learning today?",
+              "type": "text"
+            }
+          },
+          "logs": {
+            "message": []
+          },
+          "messages": [
+            {
+              "message": "I’m doing great, thank you! How can I help you with your language learning today?",
+              "sender": "Machine",
+              "sender_name": "AI",
+              "session_id": "capture-greeting-fdf04c64f218",
+              "stream_url": null,
+              "component_id": "ChatOutput-CqBla",
+              "files": [],
+              "type": "text"
+            }
+          ],
+          "timedelta": null,
+          "duration": null,
+          "component_display_name": "Chat Output",
+          "component_id": "ChatOutput-CqBla",
+          "used_frozen_result": false,
+          "token_usage": null
+        }
+      ]
+    }
+  ]
+}

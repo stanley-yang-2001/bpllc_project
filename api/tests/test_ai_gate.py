@@ -107,3 +107,34 @@ def test_the_limit_holds_under_real_concurrency():
     [t.join() for t in threads]
     assert peak[0] == 2 and finished[0] == 8
     assert gate.in_flight == 0
+
+
+# --- exclusive: account deletion claims the learner's marker without using an AI slot ------------------
+
+def test_exclusive_refuses_while_the_learner_has_a_request_in_flight():
+    gate = AiGate(slots=2, wait_seconds=0.1)
+    with gate.slot(1):
+        with pytest.raises(AppError) as err:
+            with gate.exclusive(1):
+                pass
+    assert err.value.code == "tutor_busy" and err.value.status == 429 and err.value.retry_after
+
+
+def test_a_chat_request_is_refused_while_the_learner_is_exclusive():
+    gate = AiGate(slots=2, wait_seconds=0.1)
+    with gate.exclusive(1):
+        with pytest.raises(AppError) as err:
+            with gate.slot(1):
+                pass
+    assert err.value.code == "tutor_busy"
+
+
+def test_exclusive_uses_no_slot_and_releases_the_marker():
+    gate = AiGate(slots=1, wait_seconds=0.05)
+    with gate.exclusive(1):
+        assert gate.in_flight == 0 and gate.active_users == {1}
+        with gate.slot(2):                      # the only slot is still free for someone else
+            pass
+    assert gate.active_users == set()
+    with gate.slot(1):
+        pass

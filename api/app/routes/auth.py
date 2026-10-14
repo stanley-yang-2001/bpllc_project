@@ -10,7 +10,7 @@ from ..emails import normalize_email, validate_email
 from ..errors import AppError
 from ..policy import POLICY_VERSION
 from ..schemas import UserOut
-from ..security import MAX_PASSWORD_BYTES, create_token, hash_password, verify_password
+from ..security import MAX_PASSWORD_BYTES, create_token, hash_password, new_salt, verify_password
 from ..services import sessions, users
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -83,9 +83,10 @@ def _start_session(request: Request, response: Response, conn, user_id: int) -> 
 @router.post("/register", status_code=201, response_model=UserOut)
 def register(body: RegisterBody, request: Request, response: Response):
     s = request.app.state.settings
-    pw_hash = hash_password(body.password, s.bcrypt_rounds)
+    salt = new_salt()
+    pw_hash = hash_password(body.password, salt, s.bcrypt_rounds)
     with connection(request.app.state.pool) as conn:
-        user = users.create_user(conn, body.email, pw_hash, body.display_name, body.language, POLICY_VERSION)
+        user = users.create_user(conn, body.email, pw_hash, salt, body.display_name, body.language, POLICY_VERSION)
         data = users.profile(conn, user)
         _start_session(request, response, conn, user["id"])
     return data
@@ -98,12 +99,15 @@ def login(body: LoginBody, request: Request, response: Response):
     state.login_guard.check(email)
     with connection(state.pool) as conn:
         user = users.get_by_email(conn, email)
-        stored = user["password_hash"] if user else state.dummy_hash      # always spend one bcrypt check
-        ok = verify_password(body.password, stored) and user is not None
+        salt, stored = (user["password_salt"], user["password_hash"]) if user else state.dummy_credentials  # always spend one bcrypt check
+        ok = verify_password(body.password, stored, salt) and user is not None
         if not ok:
             state.login_guard.failure(email)
             raise AppError("login_failed", "Wrong email or password.", 401)
         state.login_guard.success(email)
+        if user["password_salt"] is None:                # an account from before salts: give it one now
+            new = new_salt()
+            users.set_password(conn, user["id"], hash_password(body.password, new, state.settings.bcrypt_rounds), new)
         data = users.profile(conn, user)
         _start_session(request, response, conn, user["id"])
     return data

@@ -38,6 +38,7 @@ class Settings:
     langflow_per_user_tools: bool = False
     ai_gate_slots: int = 2
     ai_gate_wait: float = 5.0
+    ai_tokens_per_minute: int = 8000       # Groq's free tier, app-wide; 0 switches the limiter off
     max_chat_chars: int = 2000
 
     def validate(self) -> "Settings":
@@ -50,6 +51,8 @@ class Settings:
             raise ConfigError("AI_MODE must be 'live' or 'stub'")
         if self.ai_gate_slots < 1:
             raise ConfigError("AI_GATE_SLOTS must be at least 1")
+        if self.ai_tokens_per_minute < 0:
+            raise ConfigError("AI_TOKENS_PER_MINUTE must be 0 (off) or more")
         if self.ai_gate_wait < 0 or self.langflow_timeout <= 0:
             raise ConfigError("AI_GATE_WAIT must be 0 or more and LANGFLOW_TIMEOUT above 0")
         if self.ai_mode == "live" and self.langflow_per_user_tools and not self.langflow_api_key.strip():
@@ -76,6 +79,7 @@ def load_settings(env=None) -> Settings:
         langflow_per_user_tools=env.get("LANGFLOW_PER_USER_TOOLS", "0") == "1",
         ai_gate_slots=int(env.get("AI_GATE_SLOTS", "2")),
         ai_gate_wait=float(env.get("AI_GATE_WAIT", "5")),
+        ai_tokens_per_minute=int(env.get("AI_TOKENS_PER_MINUTE", "8000")),
     )
     if "LANGFLOW_TWEAK_KEYS" in env:
         s.langflow_tweak_keys = tuple(k.strip() for k in env["LANGFLOW_TWEAK_KEYS"].split(",") if k.strip())
