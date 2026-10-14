@@ -15,6 +15,7 @@ contains something that looks like an API key.
 import argparse
 import hashlib
 import json
+from importlib import metadata
 import os
 import re
 import sys
@@ -48,9 +49,19 @@ def hidden_field(name):
     }
 
 
-def tutor_core_version():
-    text = open(os.path.join(ROOT, "tutor_core", "pyproject.toml"), encoding="utf-8").read()
-    return re.search(r'^version\s*=\s*"([^"]+)"', text, flags=re.M).group(1)
+def tutor_core_version(root=ROOT):
+    """From the repo's pyproject.toml when it is there (a checkout). Inside the langflow container only scripts/, flows/,
+    custom_components/ and tests/ are mounted, so there is no tutor_core/ folder: fall back to the installed package, which
+    the image built from that same pyproject.toml."""
+    path = os.path.join(root, "tutor_core", "pyproject.toml")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return re.search(r'^version\s*=\s*"([^"]+)"', f.read(), flags=re.M).group(1)
+    try:
+        return metadata.version("tutor_core")
+    except metadata.PackageNotFoundError:
+        raise SystemExit("Cannot tell the tutor_core version: there is no tutor_core/pyproject.toml next to scripts/ "
+                         "and the package is not installed. Run this from a checkout, or inside the langflow container.")
 
 
 def code_of(filename):

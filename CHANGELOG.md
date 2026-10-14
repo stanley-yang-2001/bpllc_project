@@ -2,6 +2,16 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — fix: `sync_flow_nodes.py` failed inside the langflow container
+
+**Found on the author's machine (first container-side run):** `docker compose exec langflow python /app/scripts/sync_flow_nodes.py --check`
+died with `FileNotFoundError: /app/scripts/../tutor_core/pyproject.toml`. The container mounts `scripts/`, `flows/`, `custom_components/`
+and `tests/` but not `tutor_core/` (the package is installed into the interpreter instead), and the script read the version from the
+repo's pyproject. **Fix:** `tutor_core_version()` uses the repo's pyproject when it is there and the installed package's version
+otherwise, and says what is wrong instead of a traceback if neither exists. Three new tests in `api/tests/test_flow_file.py` (they failed
+first). The host test suite never saw this because it always runs from a checkout; the check was also run against a copy of
+`scripts/`, `flows/` and `custom_components/` with no `tutor_core/` folder, as in the container.
+
 ## Unreleased — M3: `tutor_core` extraction and per-learner, fail-closed tools
 
 Done as the design requires, in two commits so a regression can be blamed on the move or on the behaviour.

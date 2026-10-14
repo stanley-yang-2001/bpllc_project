@@ -154,3 +154,29 @@ def test_a_flow_with_a_key_in_it_is_refused(tmp_path, flow):
     r = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "sync_flow_nodes.py"), "--flow", str(p)], capture_output=True, text=True)
     assert r.returncode == 2 and "API key" in r.stdout
     assert "gsk_" + "a" * 40 in p.read_text()           # refused means unchanged, so the leak is the user's to see and fix
+
+
+# --- running the check inside the langflow container (found on the author's machine) -------------------------
+# The container mounts scripts/, flows/, custom_components/ and tests/ but NOT tutor_core/, so
+# /app/tutor_core/pyproject.toml does not exist there; the package is installed into the interpreter instead.
+
+def test_the_tutor_core_version_comes_from_the_repo_when_its_pyproject_is_there(tmp_path, monkeypatch):
+    (tmp_path / "tutor_core").mkdir()
+    (tmp_path / "tutor_core" / "pyproject.toml").write_text('[project]\nname = "tutor_core"\nversion = "1.2.3"\n')
+    monkeypatch.setattr(sync.metadata, "version", lambda name: "9.9.9")             # must not be consulted
+    assert sync.tutor_core_version(str(tmp_path)) == "1.2.3"
+
+
+def test_the_tutor_core_version_comes_from_the_installed_package_when_there_is_no_pyproject(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(sync.metadata, "version", lambda name: seen.append(name) or "4.5.6")
+    assert sync.tutor_core_version(str(tmp_path)) == "4.5.6" and seen == ["tutor_core"]
+
+
+def test_a_missing_tutor_core_is_explained_not_a_traceback(tmp_path, monkeypatch):
+    def not_installed(name):
+        raise sync.metadata.PackageNotFoundError(name)
+    monkeypatch.setattr(sync.metadata, "version", not_installed)
+    with pytest.raises(SystemExit) as e:
+        sync.tutor_core_version(str(tmp_path))
+    assert "tutor_core" in str(e.value) and "pyproject.toml" in str(e.value)
