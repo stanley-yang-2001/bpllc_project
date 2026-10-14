@@ -2,6 +2,27 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — M3 verified live on the author's machine (14 October 2026)
+
+**Run:** image built from `langflow/Dockerfile` and running (Langflow 1.12.2, `tutor_core` importable inside it), then, in order:
+- `sync_flow_nodes.py --check`: the flow is in step with `custom_components/` (after the fix in the entry below).
+- `m3_check.py --flow-id language-tutor --pause 30`: **M3 TOOLS VERIFIED.** All six checks passed: fail closed with no learner; two learners adding at
+  once, each word only in its own learner's list and language; an empty learner gets the empty-vocabulary message, not a story built from
+  others' words; a Spanish-only learner gets no French story; telling the Agent to write to another learner does not work; cleanup.
+  Raw replies: `scripts/m3_check_20261014_190133.json`.
+- `run_routing_tests.py --flow-id language-tutor --delay 20` (throwaway learners 31 with 12 English words and 32 with none): **13 of 15 turns passed**,
+  latency p50 2.8 s, p90 4.4 s. Add Word (A1-A3), Spanish and French stories (S2-S4, M1.2-M1.4), no-tool turns (N1, N2), the empty-vocabulary guard (E1)
+  and the no-language case (I1: tool called, reply identical to the tool output) all passed. Raw: `scripts/routing_results_20261014_190732.json`.
+- **The 2 failures (S1 and M1.1, both English stories) are story quality, not routing:** every tool, argument and relay check passed. They had 18 and 9 words
+  outside the 12-word list (the pass rule is at most 5). This is the tension already recorded after tuning change #2 (the looser word rule of the six
+  newer story types; English passed 2/20 at <= 5 strays in that measurement), not something M3 introduced: the Groq request in `tutor_core.groq` is the original
+  one (same model, `max_tokens`, reasoning effort and headers, checked against `story_tool.py` at 3c67c80), the prompt builder was proven identical to the original
+  under identical randomness (see the M3 entry), and the type labels of all eight story types were re-checked. Two English story turns cannot say how often it
+  happens: `run_story_batch.py --learner-id N --languages English --count 20` would.
+
+**Not reported yet:** `make test-langflow` (every container-side test under Python 3.14.7). **Still open for chat:** set `LANGFLOW_API_KEY` and
+`LANGFLOW_PER_USER_TOOLS=1`, run `capture_fixtures.py --probe-delete`, update the privacy page and policy version (design 19.3 step 6).
+
 ## Unreleased — fix: `sync_flow_nodes.py` failed inside the langflow container
 
 **Found on the author's machine (first container-side run):** `docker compose exec langflow python /app/scripts/sync_flow_nodes.py --check`
