@@ -2,6 +2,19 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — M6: Story Studio, the library and the quality report (16 October 2026)
+
+**Written and tested here (stub tutor, fake Groq); never run against real Groq.**
+- **Run on the author's machine (16 Oct 2026), after the quality move and the image rebuild:** `make test-langflow` passed (every file), `sync_flow_nodes.py --check` reported the flow in step with `custom_components/`, and `m3_check.py` passed all five checks (no learner: the tool refused and wrote nothing; two learners adding at once stayed separate; an empty learner got the empty-vocabulary message, not a story; a Spanish-only learner got no French story; telling the Agent to write to another learner did not work), and its throwaway learners were cleaned up. So the moved checker works inside the Langflow image. Still not run: a real Groq story, and the deletion check against the real Langflow.
+- **Quality checker moved into `tutor_core.quality`** (`scripts/vocab_adherence.py` is now a thin shim, output identical) with a new `report()`: `{rules_version, status, language, structure, vocabulary{mode}, read_seconds}`. English is scored (at most 5 strays), other space-delimited languages list strays for information only, Japanese is not word-checked. The language check runs without the learner's list, so a Spanish learner's Spanish words cannot count as English markers (17A item 6, reported only). **Rebuild the Langflow image** (`docker compose build`) because `tutor_core` is installed into it.
+- **`tutor.stories`** (migration 0006): id, user, language, story type (null for a chat story), topic, body (at most 20,000 characters), passed, report (JSON), created. Deleted with the account, included in the download (`stories`).
+- **`GET /api/stories/options`, `POST /api/stories/generate`:** one story from THIS learner's words, never from the cache. Order of refusals: language not enabled, fewer than 5 words (both cost nothing and never reach Groq), then the AI gate (one request per learner, concurrency, tokens per minute: `STORY_TOKENS` = 2000 reserved), then Groq. The report is made against the learner's whole list, not the prompt's sample. Groq failures are a plain 502 `ai_failed` that never names Groq. Nothing is saved.
+- **Library API:** `POST /api/stories` (the server makes the report; a pass or report sent by the page is ignored), `GET /api/stories` (newest first, language filter, paging, no reports), `GET/DELETE /api/stories/{id}` (another learner's story is "not found"). Limits: 8,000 characters, 500 stories each.
+- **Pages:** Story Studio (kind, topic, report in plain sentences, Save to library, Make another) and a Save story to library button under a chat story (saved with no type or topic).
+- **`/health`:** Groq is checked with one call to its models list, remembered for 60 seconds, never reporting the key; in stub mode it says so.
+- **Privacy:** policy `2026-10-16` (Story Studio sends words, kind and topic to Groq; a story you do not save is not kept; saved stories are deleted with the account). The delete dialog lists saved stories. Section 12B maps each claim to its test.
+- **Not done:** the Library page and Practice (M7), the non-English prompt decision, real-Groq runs, watching real token use.
+
 ## Unreleased — M5: the tokens-per-minute limiter (15 October 2026)
 
 **Written and tested here (API 490 passed); never run against Groq.** Decision 2 in the design's waiting list, now built.

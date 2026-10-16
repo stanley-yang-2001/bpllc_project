@@ -82,7 +82,7 @@ export default function Privacy() {
                 <tr><Td strong>Your name</Td><Td>The name you enter at sign-up. Shown in the app so it can greet you. You can change it.</Td></tr>
                 <tr><Td strong>Your email address</Td><Td>How you sign in, and the way the operator can contact you about your account. You can change it.</Td></tr>
                 <tr><Td strong>Your password</Td><Td>Stored only as a scrambled one-way hash, made with a random salt that belongs to your account alone. Nobody, including the operator, can read it.</Td></tr>
-                <tr><Td strong>Words, meanings and stories you add</Td><Td>To run the learning features. This is your own study material.</Td></tr>
+                <tr><Td strong>Words, meanings and stories you add</Td><Td>To run the learning features. This is your own study material. A story you make in Story Studio is kept only if you choose Save to library; then it is stored with its quality report (what the checker found), and nothing else about it.</Td></tr>
                 <tr><Td strong>Your chat with the tutor</Td><Td>What you type to the tutor, and its replies, are stored (in the operator’s tutor service) in chat sessions, so a conversation can continue. The app also keeps a list of your chat session codes, so that deleting your account can delete those chats. Chats are not shown to anyone else.</Td></tr>
                 <tr><Td strong>The languages you study</Td><Td>To show the right word list.</Td></tr>
                 <tr><Td strong>Sign-in records</Td><Td>When each sign-in started and when it ends, plus a random code. Used to keep you signed in and to let you sign out of every device. Removed when you sign out or they expire.</Td></tr>
@@ -121,9 +121,9 @@ export default function Privacy() {
           <p>We do not sell or give your information to anyone for their own purposes. Two things to know:</p>
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <strong>AI features.</strong> Chat is available when the operator has switched it on; Story Studio is not available
-              yet. The words and messages you type in Chat (and, later, in Story Studio) are sent to an AI service (Groq) so it can write
-              a reply or story. Your name and email address are <strong> not</strong> sent.
+              <strong>AI features.</strong> Chat is available when the operator has switched it on. The words and messages you type in Chat, and
+              the words from your list that Story Studio uses (a random selection if your list is long) together with the kind of story and topic you pick, are sent to an AI service (Groq) so it can write
+              a reply or story. Your name and email address are <strong> not</strong> sent. A story you do not save is not kept by the app.
             </li>
             <li>
               <strong>Where it is stored.</strong> Your information lives in a database run by the operator. If the law requires
@@ -135,7 +135,7 @@ export default function Privacy() {
         <Section id="keep" title="6. How long we keep it">
           <p>
             Until you delete your account. Deleting your account (Settings → Delete account) permanently removes your name, email,
-            password hash, words, languages, chat history and sign-in records straight away. If your chat history cannot be removed at that moment, nothing is deleted and you are asked to try again, so your account is never left half-deleted. The app itself keeps no backups. If the operator
+            password hash, words, languages, saved stories, chat history and sign-in records straight away. If your chat history cannot be removed at that moment, nothing is deleted and you are asked to try again, so your account is never left half-deleted. The app itself keeps no backups. If the operator
             makes database backups, deleted information can remain in them until they expire; ask the operator how long.
           </p>
         </Section>

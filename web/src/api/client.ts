@@ -10,6 +10,10 @@ export type Health = Schemas["HealthOut"];
 export type Meta = Schemas["MetaOut"];
 export type ChatReply = Schemas["ChatOut"];
 export type ToolCall = Schemas["ToolCallOut"];
+export type StoryOptions = Schemas["StoryOptionsOut"];
+export type GeneratedStory = Schemas["GeneratedStoryOut"];
+export type SavedStory = Schemas["StoryFull"];
+export type StoryPage = Schemas["StoryPage"];
 
 /** Every non-2xx response from the API has the same body: {error: {code, message, retry_after?}}. */
 export class ApiError extends Error {
@@ -85,5 +89,13 @@ export const api = {
     return request<UploadResult>("POST", "/words/upload", { form });
   },
   chat: (b: { message: string; language: string; session_id: string }) => request<ChatReply>("POST", "/chat", { json: b }),
+  storyOptions: () => request<StoryOptions>("GET", "/stories/options"),
+  generateStory: (b: { language: string; story_type?: string; topic?: string }) =>
+    request<GeneratedStory>("POST", "/stories/generate", { json: b }),
+  saveStory: (b: { language: string; body: string; story_type?: string | null; topic?: string | null }) =>
+    request<SavedStory>("POST", "/stories", { json: b }),
+  stories: (p: { language?: string; limit?: number; offset?: number }) => request<StoryPage>("GET", `/stories?${qs(p)}`),
+  story: (id: number) => request<SavedStory>("GET", `/stories/${id}`),
+  deleteStory: (id: number) => request<void>("DELETE", `/stories/${id}`),
   health: () => request<Health>("GET", "/health"),
 };

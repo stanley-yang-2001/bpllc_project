@@ -1,9 +1,36 @@
-import { LoaderCircle, MessageCircle, RotateCcw, SendHorizontal, SquarePen } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { BookmarkPlus, LoaderCircle, MessageCircle, RotateCcw, SendHorizontal, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { api, ApiError, type ToolCall } from "../api/client";
+import { storiesKey } from "../api/keys";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
+import { useAuth } from "../auth/AuthContext";
 import { MAX_CHARS, SLOW_AFTER_MS, useChat } from "../chat/ChatContext";
 import { ToolTrace } from "../chat/ToolTrace";
+import { useToast } from "../components/Toast";
 import { Badge, Button, Card, EmptyState, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
+
+const STORY_TOOL = "Story Generator Tool";
+const NOT_A_STORY = /not available yet|having trouble/i;          // the tool's own refusal messages
+
+/** Offers to keep a story the tutor wrote. The API makes the quality report when it saves; the chat itself is not stored. */
+function SaveStory({ call, language }: { call: ToolCall; language: string }) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: () => api.saveStory({ language, body: call.output, story_type: null, topic: null }),
+    onSuccess: () => { toast("Saved to your library"); if (user) void qc.invalidateQueries({ queryKey: storiesKey(user.id) }); },
+  });
+  return (
+    <div className="mt-2">
+      <Button variant="secondary" onClick={() => save.mutate()} disabled={save.isSuccess} loading={save.isPending} icon={<BookmarkPlus aria-hidden className="size-4" />}>
+        {save.isSuccess ? "Saved" : "Save story to library"}
+      </Button>
+      {save.error && <ErrorText>{save.error instanceof ApiError ? save.error.message : "Couldn't save. Please try again."}</ErrorText>}
+    </div>
+  );
+}
 
 function Waiting() {
   const [slow, setSlow] = useState(false);
@@ -72,7 +99,12 @@ export default function Chat() {
             ) : (
               <div key={m.id} className="flex flex-col items-start">
                 <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-md border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-900 dark:bg-slate-100/40">{m.text}</p>
-                <div className="max-w-[85%] self-stretch"><ToolTrace calls={m.toolCalls} /></div>
+                <div className="max-w-[85%] self-stretch">
+                  <ToolTrace calls={m.toolCalls} />
+                  {m.language && m.toolCalls.filter((c) => c.name === STORY_TOOL && !c.failed && c.output.trim() && !NOT_A_STORY.test(c.output)).map((c, i) => (
+                    <SaveStory key={i} call={c} language={m.language!} />
+                  ))}
+                </div>
               </div>
             ),
           )}

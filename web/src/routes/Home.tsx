@@ -10,7 +10,7 @@ import { Badge, Button, Card, PageHeader, Skeleton } from "../components/ui";
 const actions = [
   { to: "/vocabulary", title: "Vocabulary", text: "Add, edit and upload your words.", icon: BookOpen, ready: true },
   { to: "/chat", title: "Chat", text: "Talk to the tutor in plain language.", icon: MessageCircle, ready: true },
-  { to: "/studio", title: "Story Studio", text: "Generate a story from your words.", icon: Sparkles, ready: false },
+  { to: "/studio", title: "Story Studio", text: "Generate a story from your words.", icon: Sparkles, ready: true },
   { to: "/practice", title: "Practice", text: "Flashcards and fill-in-the-blank.", icon: Layers, ready: false },
   { to: "/library", title: "Library", text: "Reread the stories you saved.", icon: Library, ready: false },
 ] as const;

@@ -118,6 +118,99 @@
         "title": "EmailChange",
         "type": "object"
       },
+      "GenerateIn": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "story_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Type"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "GenerateIn",
+        "type": "object"
+      },
+      "GeneratedStoryOut": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "report": {
+            "additionalProperties": true,
+            "title": "Report",
+            "type": "object"
+          },
+          "story": {
+            "title": "Story",
+            "type": "string"
+          },
+          "story_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Type"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "words_total": {
+            "title": "Words Total",
+            "type": "integer"
+          },
+          "words_used": {
+            "title": "Words Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "story",
+          "language",
+          "story_type",
+          "topic",
+          "report",
+          "words_total",
+          "words_used"
+        ],
+        "title": "GeneratedStoryOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -355,6 +448,46 @@
         "title": "RegisterBody",
         "type": "object"
       },
+      "SaveIn": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "story_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Type"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          }
+        },
+        "required": [
+          "language",
+          "body"
+        ],
+        "title": "SaveIn",
+        "type": "object"
+      },
       "ServiceCheck": {
         "properties": {
           "detail": {
@@ -405,6 +538,183 @@
           "status"
         ],
         "title": "StatusOut",
+        "type": "object"
+      },
+      "StoryCard": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "story_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Type"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          }
+        },
+        "required": [
+          "id",
+          "language",
+          "story_type",
+          "topic",
+          "body",
+          "passed",
+          "created_at"
+        ],
+        "title": "StoryCard",
+        "type": "object"
+      },
+      "StoryFull": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "report": {
+            "additionalProperties": true,
+            "title": "Report",
+            "type": "object"
+          },
+          "story_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Story Type"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          }
+        },
+        "required": [
+          "id",
+          "language",
+          "story_type",
+          "topic",
+          "body",
+          "passed",
+          "created_at",
+          "report"
+        ],
+        "title": "StoryFull",
+        "type": "object"
+      },
+      "StoryOptionsOut": {
+        "properties": {
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topics",
+            "type": "array"
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "types",
+          "topics"
+        ],
+        "title": "StoryOptionsOut",
+        "type": "object"
+      },
+      "StoryPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StoryCard"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "StoryPage",
         "type": "object"
       },
       "ToolCallOut": {
@@ -964,7 +1274,7 @@
     },
     "/api/me/delete": {
       "post": {
-        "description": "Permanently deletes the account and everything in it. Needs the password.",
+        "description": "Permanently deletes the account and everything in it, including the chat history Langflow stores. Needs the\npassword. The Langflow side goes first and must be confirmed: if it can't be, nothing is deleted and the\nlearner is told to retry, because deleting the account row would leave their chat with no way to find it.",
         "operationId": "delete_account_api_me_delete_post",
         "requestBody": {
           "content": {
@@ -1152,6 +1462,256 @@
         "summary": "Meta",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/stories": {
+      "get": {
+        "operationId": "list_stories_api_stories_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Stories",
+        "tags": [
+          "stories"
+        ]
+      },
+      "post": {
+        "description": "Saves a story to the library. The report is made here, from the learner's own words; a report or a pass sent by the\npage is never read (it is not even a field).",
+        "operationId": "save_api_stories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryFull"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save",
+        "tags": [
+          "stories"
+        ]
+      }
+    },
+    "/api/stories/generate": {
+      "post": {
+        "description": "Makes one story from THIS learner's words and checks it. Nothing is saved; the learner saves it from the page.",
+        "operationId": "generate_api_stories_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedStoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate",
+        "tags": [
+          "stories"
+        ]
+      }
+    },
+    "/api/stories/options": {
+      "get": {
+        "operationId": "options_api_stories_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Options",
+        "tags": [
+          "stories"
+        ]
+      }
+    },
+    "/api/stories/{story_id}": {
+      "delete": {
+        "operationId": "delete_story_api_stories__story_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "story_id",
+            "required": true,
+            "schema": {
+              "title": "Story Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Story",
+        "tags": [
+          "stories"
+        ]
+      },
+      "get": {
+        "operationId": "open_story_api_stories__story_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "story_id",
+            "required": true,
+            "schema": {
+              "title": "Story Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoryFull"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Story",
+        "tags": [
+          "stories"
         ]
       }
     },

@@ -5,6 +5,7 @@ import Home from "./routes/Home";
 import Login from "./routes/Login";
 import Privacy from "./routes/Privacy";
 import { ComingSoon, NotFound } from "./routes/Placeholder";
+import Studio from "./routes/Studio";
 import Settings from "./routes/Settings";
 import Vocabulary from "./routes/Vocabulary";
 
@@ -18,7 +19,7 @@ export default function App() {
         <Route path="vocabulary" element={<Vocabulary />} />
         <Route path="settings" element={<Settings />} />
         <Route path="chat" element={<Chat />} />
-        <Route path="studio" element={<ComingSoon title="Story Studio" milestone="M6" note="Needs tutor_core extraction (M3)." />} />
+        <Route path="studio" element={<Studio />} />
         <Route path="library" element={<ComingSoon title="Library" milestone="M7" note="Saved stories arrive with Story Studio." />} />
         <Route path="practice" element={<ComingSoon title="Practice" milestone="M7" note="Flashcards and cloze exercises." />} />
         <Route path="home" element={<Navigate to="/" replace />} />

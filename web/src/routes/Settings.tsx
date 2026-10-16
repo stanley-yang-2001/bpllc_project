@@ -194,6 +194,7 @@ function DeleteAccountModal({ open, onClose }: { open: boolean; onClose: () => v
         <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-slate-600">
           <li>your name and email address</li>
           <li>all your words, meanings and languages</li>
+          <li>your saved stories</li>
           <li>your chat history with the tutor</li>
           <li>all your sign-ins, on every device</li>
         </ul>

@@ -282,4 +282,53 @@ describe("conversations", () => {
     await screen.findByLabelText("Message");
     expect(screen.queryByText(/alice's private/i)).not.toBeInTheDocument();
   });
+
+  describe("saving a story to the library", () => {
+    const STORY_TEXT = "Ana: Hola.\nLuis: Hola, amigo.";
+    const storyReply = reply("Here is a story.", [tool("Story Generator Tool", { language: "Spanish" }, STORY_TEXT)]);
+
+    it("offers a save button for a story and sends the story, language and no type or topic", async () => {
+      const { calls } = mockApi({ ...base, "POST /chat": storyReply, "POST /stories": () => ({ status: 201, json: { id: 1 } }) });
+      renderApp("/chat");
+      await say("tell me a story");
+      await userEvent.click(await screen.findByRole("button", { name: "Save story to library" }));
+      expect(await screen.findByRole("button", { name: "Saved" })).toBeDisabled();
+      const save = calls.find((c) => c.method === "POST" && c.path === "/stories")!;
+      expect(save.body).toEqual({ language: "en", body: STORY_TEXT, story_type: null, topic: null });
+    });
+
+    it("offers nothing for a reply without a story, a failed story or the tool's refusal message", async () => {
+      mockApi({ ...base, "POST /chat": reply("Added.", [tool("Add Word", { word: "bread" }, "ok")]) });
+      renderApp("/chat");
+      await say("add the word bread");
+      await screen.findByText("Added.");
+      expect(screen.queryByRole("button", { name: /Save story/ })).not.toBeInTheDocument();
+    });
+
+    it("hides the button when the story tool failed or only returned its refusal", async () => {
+      mockApi({ ...base, "POST /chat": reply("Sorry.", [tool("Story Generator Tool", {}, "Stories in German are not available yet.", true),
+                                                       tool("Story Generator Tool", {}, "Stories in German are not available yet.")]) });
+      renderApp("/chat");
+      await say("story");
+      await screen.findByText("Sorry.");
+      expect(screen.queryByRole("button", { name: /Save story/ })).not.toBeInTheDocument();
+    });
+
+    it("offers nothing for a story the tool reported as failed", async () => {
+      mockApi({ ...base, "POST /chat": reply("Hmm.", [tool("Story Generator Tool", {}, STORY_TEXT, true)]) });
+      renderApp("/chat");
+      await say("story");
+      await screen.findByText("Hmm.");
+      expect(screen.queryByRole("button", { name: /Save story/ })).not.toBeInTheDocument();
+    });
+
+    it("shows the API's error and keeps the button usable", async () => {
+      mockApi({ ...base, "POST /chat": storyReply, "POST /stories": err(422, "library_full", "Your library holds 500 stories. Delete some to save more.") });
+      renderApp("/chat");
+      await say("story");
+      await userEvent.click(await screen.findByRole("button", { name: "Save story to library" }));
+      expect(await screen.findByText(/Your library holds 500 stories/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save story to library" })).toBeEnabled();
+    });
+  });
 });

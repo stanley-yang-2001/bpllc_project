@@ -11,6 +11,7 @@ export interface ChatMessage {
   role: "user" | "tutor";
   text: string;
   toolCalls: ToolCall[];
+  language?: string;                  // on a tutor message: the language the learner was in when it was asked
   error?: string;                     // set on a learner message the tutor could not answer
 }
 
@@ -56,7 +57,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         const r = await chatRef.current({ message: text, language, session_id: session.current });
         setMessages((m) => [
           ...m.map((x) => (x.id === id ? { ...x, error: undefined } : x)),
-          { id: nextId.current++, role: "tutor", text: r.reply, toolCalls: r.tool_calls },
+          { id: nextId.current++, role: "tutor", text: r.reply, toolCalls: r.tool_calls, language },
         ]);
         if (r.tool_calls.some((c) => c.name === "Add Word" && !c.failed) && userId !== undefined) {
           void qc.invalidateQueries({ queryKey: ["words", userId] });       // the Vocabulary page and Home's word count

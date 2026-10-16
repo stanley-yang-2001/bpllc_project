@@ -86,3 +86,40 @@ class ChatOut(BaseModel):
     reply: str
     tool_calls: list[ToolCallOut]
     session_id: str
+
+
+class StoryOptionsOut(BaseModel):
+    types: list[str]
+    topics: list[str]
+
+
+class GeneratedStoryOut(BaseModel):
+    story: str
+    language: str
+    story_type: str | None
+    topic: str | None
+    report: dict
+    words_total: int
+    words_used: int
+
+
+class StoryCard(BaseModel):
+    id: int
+    language: str
+    story_type: str | None
+    topic: str | None
+    body: str
+    passed: bool
+    created_at: datetime
+
+
+class StoryFull(StoryCard):
+    report: dict
+
+
+class StoryPage(BaseModel):
+    items: list[StoryCard]
+    total: int
+    limit: int
+    offset: int
+

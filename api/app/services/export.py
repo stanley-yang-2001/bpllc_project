@@ -20,6 +20,9 @@ def build(conn, user_id: int) -> dict:
         out["user_languages"] = cur.fetchall()
         cur.execute("SELECT language, word, meaning, created_at FROM words WHERE user_id = %s ORDER BY language, word", (user_id,))
         out["words"] = cur.fetchall()
+        cur.execute("SELECT id, language, story_type, topic, body, passed, report, created_at FROM stories "
+                    "WHERE user_id = %s ORDER BY id", (user_id,))
+        out["stories"] = cur.fetchall()
         # login records: when, not the secret ids
         cur.execute("SELECT created_at, expires_at FROM sessions WHERE user_id = %s ORDER BY created_at", (user_id,))
         out["sessions"] = cur.fetchall()

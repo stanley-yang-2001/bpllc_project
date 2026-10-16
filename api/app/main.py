@@ -10,10 +10,11 @@ from .config import Settings, load_settings
 from .db import make_pool
 from .errors import install_error_handlers
 from .migrate import run_migrations
-from .routes import auth, chat, health, me, words
+from .routes import auth, chat, health, me, stories, words
 from .security import LoginGuard, make_dummy_credentials
 from .services.ai_gate import AiGate
 from .services.chat import make_chat_client
+from .services.story_llm import GroqHealth, make_story_llm
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 PRIVATE_HEADERS = {
@@ -45,6 +46,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.dummy_credentials = make_dummy_credentials(settings.bcrypt_rounds)
     app.state.ai_gate = AiGate(settings.ai_gate_slots, settings.ai_gate_wait, tokens_per_minute=settings.ai_tokens_per_minute)
     app.state.chat = make_chat_client(settings, lambda: app.state.pool)      # the pool exists once the app starts
+    app.state.story_llm = make_story_llm(settings)
+    app.state.groq_health = GroqHealth(stub=settings.ai_mode == "stub")
     install_error_handlers(app)
 
     @app.middleware("http")
@@ -64,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers[name] = value
         return response
 
-    for module in (auth, me, words, chat, health):
+    for module in (auth, me, words, chat, stories, health):
         app.include_router(module.router, prefix="/api")
     return app
 

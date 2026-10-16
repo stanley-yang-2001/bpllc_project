@@ -182,7 +182,9 @@ export interface paths {
         put?: never;
         /**
          * Delete Account
-         * @description Permanently deletes the account and everything in it. Needs the password.
+         * @description Permanently deletes the account and everything in it, including the chat history Langflow stores. Needs the
+         *     password. The Langflow side goes first and must be confirmed: if it can't be, nothing is deleted and the
+         *     learner is told to retry, because deleting the account row would leave their chat with no way to find it.
          */
         post: operations["delete_account_api_me_delete_post"];
         delete?: never;
@@ -277,6 +279,83 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Stories */
+        get: operations["list_stories_api_stories_get"];
+        put?: never;
+        /**
+         * Save
+         * @description Saves a story to the library. The report is made here, from the learner's own words; a report or a pass sent by the
+         *     page is never read (it is not even a field).
+         */
+        post: operations["save_api_stories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stories/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate
+         * @description Makes one story from THIS learner's words and checks it. Nothing is saved; the learner saves it from the page.
+         */
+        post: operations["generate_api_stories_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stories/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Options */
+        get: operations["options_api_stories_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stories/{story_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open Story */
+        get: operations["open_story_api_stories__story_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Story */
+        delete: operations["delete_story_api_stories__story_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -397,6 +476,34 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** GenerateIn */
+        GenerateIn: {
+            /** Language */
+            language: string;
+            /** Story Type */
+            story_type?: string | null;
+            /** Topic */
+            topic?: string | null;
+        };
+        /** GeneratedStoryOut */
+        GeneratedStoryOut: {
+            /** Language */
+            language: string;
+            /** Report */
+            report: {
+                [key: string]: unknown;
+            };
+            /** Story */
+            story: string;
+            /** Story Type */
+            story_type: string | null;
+            /** Topic */
+            topic: string | null;
+            /** Words Total */
+            words_total: number;
+            /** Words Used */
+            words_used: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -484,6 +591,17 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** SaveIn */
+        SaveIn: {
+            /** Body */
+            body: string;
+            /** Language */
+            language: string;
+            /** Story Type */
+            story_type?: string | null;
+            /** Topic */
+            topic?: string | null;
+        };
         /** ServiceCheck */
         ServiceCheck: {
             /** Detail */
@@ -497,6 +615,68 @@ export interface components {
         StatusOut: {
             /** Status */
             status: string;
+        };
+        /** StoryCard */
+        StoryCard: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Language */
+            language: string;
+            /** Passed */
+            passed: boolean;
+            /** Story Type */
+            story_type: string | null;
+            /** Topic */
+            topic: string | null;
+        };
+        /** StoryFull */
+        StoryFull: {
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Language */
+            language: string;
+            /** Passed */
+            passed: boolean;
+            /** Report */
+            report: {
+                [key: string]: unknown;
+            };
+            /** Story Type */
+            story_type: string | null;
+            /** Topic */
+            topic: string | null;
+        };
+        /** StoryOptionsOut */
+        StoryOptionsOut: {
+            /** Topics */
+            topics: string[];
+            /** Types */
+            types: string[];
+        };
+        /** StoryPage */
+        StoryPage: {
+            /** Items */
+            items: components["schemas"]["StoryCard"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
         };
         /** ToolCallOut */
         ToolCallOut: {
@@ -1015,6 +1195,185 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetaOut"];
+                };
+            };
+        };
+    };
+    list_stories_api_stories_get: {
+        parameters: {
+            query?: {
+                language?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_api_stories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_api_stories_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratedStoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    options_api_stories_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryOptionsOut"];
+                };
+            };
+        };
+    };
+    open_story_api_stories__story_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoryFull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_story_api_stories__story_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                story_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

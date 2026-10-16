@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
-const META = { policy_version: "2026-10-15", privacy_contact: null };
+const META = { policy_version: "2026-10-16", privacy_contact: null };
 
 describe("privacy policy page", () => {
   it("is readable without logging in", async () => {
@@ -31,7 +31,7 @@ describe("privacy policy page", () => {
     const text = document.body.textContent ?? "";
     for (const claim of [
       "one cookie", "Groq", "not sent", "Delete account", "Download my data", "do not sell", "does not send you any email",
-      "under 16", "data protection authority", "Your chat with the tutor", "chat history", "random salt", "not the messages",
+      "under 16", "data protection authority", "Your chat with the tutor", "chat history", "random salt", "not the messages", "Save to library", "saved stories", "A story you do not save is not kept",
     ]) expect(text, `policy should mention "${claim}"`).toContain(claim);
     for (const h of ["Who this applies to", "What we collect", "How we use it", "Cookies and browser storage", "Who we share it with",
       "How long we keep it", "Your choices and rights", "How we protect it", "Children", "Changes to this policy", "Contact"])
@@ -39,9 +39,9 @@ describe("privacy policy page", () => {
   });
 
   it("shows the policy version and the operator's contact address when configured", async () => {
-    mockApi({ "GET /me": err(401, "unauthorized", "x"), "GET /languages": LANGS, "GET /meta": { policy_version: "2026-10-15", privacy_contact: "privacy@school.example" } });
+    mockApi({ "GET /me": err(401, "unauthorized", "x"), "GET /languages": LANGS, "GET /meta": { policy_version: "2026-10-16", privacy_contact: "privacy@school.example" } });
     renderApp("/privacy");
-    expect(await screen.findByText(/Version 2026-10-15/)).toBeInTheDocument();
+    expect(await screen.findByText(/Version 2026-10-16/)).toBeInTheDocument();
     const links = await screen.findAllByRole("link", { name: "privacy@school.example" });
     expect(links[0]).toHaveAttribute("href", "mailto:privacy@school.example");
   });

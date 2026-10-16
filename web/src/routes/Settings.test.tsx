@@ -115,6 +115,7 @@ describe("settings: deleting the account", () => {
     const dialog = await open();
     expect(dialog.getByText(/your name and email address/)).toBeInTheDocument();
     expect(dialog.getByText(/all your words, meanings and languages/)).toBeInTheDocument();
+    expect(dialog.getByText(/your saved stories/)).toBeInTheDocument();
     expect(dialog.getByText(/your chat history with the tutor/)).toBeInTheDocument();
     expect(dialog.getByRole("button", { name: "Delete my account" })).toBeDisabled();       // no password yet
     await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
