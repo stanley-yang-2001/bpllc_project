@@ -123,3 +123,27 @@ class StoryPage(BaseModel):
     limit: int
     offset: int
 
+
+class FlashcardOut(BaseModel):
+    id: int
+    word: str
+    meaning: str
+
+
+class FlashcardSet(BaseModel):
+    items: list[FlashcardOut]
+    total: int
+
+
+class ClozeItem(BaseModel):
+    before: str
+    after: str
+    answer: str
+    hint: str
+    choices: list[str]
+
+
+class ClozeSet(BaseModel):
+    story_id: int
+    language: str
+    items: list[ClozeItem]

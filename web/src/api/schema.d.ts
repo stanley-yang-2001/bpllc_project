@@ -284,6 +284,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice/cloze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cloze
+         * @description Fill-in-the-blank items from one of THIS learner's saved stories, blanking only words from their own list.
+         */
+        get: operations["cloze_api_practice_cloze_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/practice/flashcards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Flashcards */
+        get: operations["flashcards_api_practice_flashcards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stories": {
         parameters: {
             query?: never;
@@ -459,6 +496,28 @@ export interface components {
             /** Tool Calls */
             tool_calls: components["schemas"]["ToolCallOut"][];
         };
+        /** ClozeItem */
+        ClozeItem: {
+            /** After */
+            after: string;
+            /** Answer */
+            answer: string;
+            /** Before */
+            before: string;
+            /** Choices */
+            choices: string[];
+            /** Hint */
+            hint: string;
+        };
+        /** ClozeSet */
+        ClozeSet: {
+            /** Items */
+            items: components["schemas"]["ClozeItem"][];
+            /** Language */
+            language: string;
+            /** Story Id */
+            story_id: number;
+        };
         /** DeleteBody */
         DeleteBody: {
             /** Ids */
@@ -475,6 +534,22 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** FlashcardOut */
+        FlashcardOut: {
+            /** Id */
+            id: number;
+            /** Meaning */
+            meaning: string;
+            /** Word */
+            word: string;
+        };
+        /** FlashcardSet */
+        FlashcardSet: {
+            /** Items */
+            items: components["schemas"]["FlashcardOut"][];
+            /** Total */
+            total: number;
         };
         /** GenerateIn */
         GenerateIn: {
@@ -1195,6 +1270,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetaOut"];
+                };
+            };
+        };
+    };
+    cloze_api_practice_cloze_get: {
+        parameters: {
+            query: {
+                story_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClozeSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flashcards_api_practice_flashcards_get: {
+        parameters: {
+            query: {
+                language: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashcardSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

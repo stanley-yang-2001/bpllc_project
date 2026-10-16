@@ -69,6 +69,68 @@
         "title": "ChatOut",
         "type": "object"
       },
+      "ClozeItem": {
+        "properties": {
+          "after": {
+            "title": "After",
+            "type": "string"
+          },
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "before": {
+            "title": "Before",
+            "type": "string"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "before",
+          "after",
+          "answer",
+          "hint",
+          "choices"
+        ],
+        "title": "ClozeItem",
+        "type": "object"
+      },
+      "ClozeSet": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClozeItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "story_id": {
+            "title": "Story Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "story_id",
+          "language",
+          "items"
+        ],
+        "title": "ClozeSet",
+        "type": "object"
+      },
       "DeleteBody": {
         "properties": {
           "ids": {
@@ -116,6 +178,50 @@
           "password"
         ],
         "title": "EmailChange",
+        "type": "object"
+      },
+      "FlashcardOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "meaning": {
+            "title": "Meaning",
+            "type": "string"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "word",
+          "meaning"
+        ],
+        "title": "FlashcardOut",
+        "type": "object"
+      },
+      "FlashcardSet": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FlashcardOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "FlashcardSet",
         "type": "object"
       },
       "GenerateIn": {
@@ -1462,6 +1568,103 @@
         "summary": "Meta",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/practice/cloze": {
+      "get": {
+        "description": "Fill-in-the-blank items from one of THIS learner's saved stories, blanking only words from their own list.",
+        "operationId": "cloze_api_practice_cloze_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "story_id",
+            "required": true,
+            "schema": {
+              "title": "Story Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClozeSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cloze",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/flashcards": {
+      "get": {
+        "operationId": "flashcards_api_practice_flashcards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlashcardSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Flashcards",
+        "tags": [
+          "practice"
         ]
       }
     },

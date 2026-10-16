@@ -2,6 +2,17 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — M7: Library, Practice, demo stories and the walkthrough (16 October 2026)
+
+**Written and tested here (stub tutor; browser tests run here against the stub stack); not run on your machine.**
+- **Practice API:** `GET /api/practice/flashcards?language=&limit=` (shuffled words that have a meaning, at most 50) and `GET /api/practice/cloze?story_id=` (fill-in-the-blank from one of the learner's saved stories). Nothing is stored and no AI is called, so no tokens are charged. A blank is always one of the learner's own single-word entries; each answer is asked once; a speaker label ("Ana:") and sentences under three words are never blanked; at most 8 items; each item offers the answer plus up to three other words from the learner's list. English inflections ("friends") match their base word. Another learner's story is "not found"; Tier 2 languages (Japanese and the rest) are refused; a story with no blankable word says so (`no_blanks`). 22 tests, 10 mutations (2 survivors found, tests added).
+- **Library page** (`/library`): this language's stories newest first, ten to a page, with kind, topic and a "Looks good" or "Needs a look" badge; Open shows the whole story and its report; Delete asks first; "Practice this story" links to `/practice?story=<id>`. The page position is kept per language, so switching language never asks for the old page.
+- **Practice page** (`/practice`): flashcards (ten cards, show the meaning, "I knew it" or "Not yet", a score, another round reshuffles) and fill-in-the-blank (pick a saved story, choose, see the answer, a score). The score is shown and forgotten. Studio shows "Practice this story" once a story is saved.
+- **Seed script:** the demo account also gets one short saved story in English and one in Spanish, reported by the real checker; running it again adds nothing.
+- **Browser tests:** `e2e/library-practice.spec.ts` (make, save, open, practise, delete; flashcards to a score; a story is invisible to another learner; the word minimum), plus axe scans of the story screens in light and dark. The scan found a dark-theme contrast failure on a link, fixed. Two older tests (CSP headers, "no white flash") fail against the Vite dev server by design and need the nginx build.
+- **Docs:** `docs/DEMO-WALKTHROUGH.md`.
+- **Not done:** running the walkthrough on your stack; the privacy policy is unchanged (practice collects and sends nothing new).
+
 ## Unreleased — M6: Story Studio, the library and the quality report (16 October 2026)
 
 **Written and tested here (stub tutor, fake Groq); never run against real Groq.**

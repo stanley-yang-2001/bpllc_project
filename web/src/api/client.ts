@@ -14,6 +14,10 @@ export type StoryOptions = Schemas["StoryOptionsOut"];
 export type GeneratedStory = Schemas["GeneratedStoryOut"];
 export type SavedStory = Schemas["StoryFull"];
 export type StoryPage = Schemas["StoryPage"];
+export type StoryCard = Schemas["StoryCard"];
+export type FlashcardSet = Schemas["FlashcardSet"];
+export type ClozeSet = Schemas["ClozeSet"];
+export type ClozeItem = Schemas["ClozeItem"];
 
 /** Every non-2xx response from the API has the same body: {error: {code, message, retry_after?}}. */
 export class ApiError extends Error {
@@ -97,5 +101,7 @@ export const api = {
   stories: (p: { language?: string; limit?: number; offset?: number }) => request<StoryPage>("GET", `/stories?${qs(p)}`),
   story: (id: number) => request<SavedStory>("GET", `/stories/${id}`),
   deleteStory: (id: number) => request<void>("DELETE", `/stories/${id}`),
+  flashcards: (p: { language: string; limit?: number }) => request<FlashcardSet>("GET", `/practice/flashcards?${qs(p)}`),
+  cloze: (storyId: number) => request<ClozeSet>("GET", `/practice/cloze?story_id=${storyId}`),
   health: () => request<Health>("GET", "/health"),
 };

@@ -16,7 +16,7 @@ def test_seed_creates_demo_user_who_can_log_in(app):
 def test_seed_is_idempotent(app):
     seed(DB_URL, "demo@example.com", "demo-password", rounds=4)
     again = seed(DB_URL, "demo@example.com", "demo-password", rounds=4)
-    assert again == {"user_created": False, "english": 0, "spanish": 0, "legacy": 0}
+    assert again == {"user_created": False, "english": 0, "spanish": 0, "legacy": 0, "stories": 0}
 
 
 def test_import_legacy_words_then_leaves_the_table(app):
@@ -37,3 +37,27 @@ def test_import_legacy_words_then_leaves_the_table(app):
     finally:
         with psycopg2.connect(DB_URL) as c3, c3.cursor() as cur:
             cur.execute("DROP TABLE IF EXISTS public.words")
+
+
+def test_the_demo_account_has_two_saved_stories_that_pass_their_own_checker_and_can_be_practised(app):
+    out = seed(DB_URL, "demo@example.com", "demo-password", rounds=4)
+    assert out["stories"] == 2
+    c = TestClient(app, headers=HEADERS)
+    c.post("/api/auth/login", json={"email": "demo@example.com", "password": "demo-password"})
+    for language in ("en", "es"):
+        page = c.get("/api/stories", params={"language": language}).json()
+        assert page["total"] == 1 and page["items"][0]["passed"] is True, language
+        r = c.get("/api/practice/cloze", params={"story_id": page["items"][0]["id"]})
+        assert r.status_code == 200 and r.json()["items"], language
+    assert c.get("/api/practice/flashcards", params={"language": "en"}).json()["items"]
+
+
+def test_the_demo_stories_use_the_reports_the_real_checker_makes(app):
+    seed(DB_URL, "demo@example.com", "demo-password", rounds=4)
+    c = TestClient(app, headers=HEADERS)
+    c.post("/api/auth/login", json={"email": "demo@example.com", "password": "demo-password"})
+    sid = c.get("/api/stories", params={"language": "en"}).json()["items"][0]["id"]
+    opened = c.get(f"/api/stories/{sid}").json()
+    report = opened["report"]
+    assert opened["passed"] == (report["status"] == "pass")
+    assert report["rules_version"] == 1 and report["vocabulary"]["mode"] == "strict" and report["vocabulary"]["outside_count"] <= 5

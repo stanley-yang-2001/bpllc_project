@@ -91,6 +91,15 @@ describe("Story Studio", () => {
     const save = calls.find((c) => c.method === "POST" && c.path === "/stories")!;
     expect(save.body).toEqual({ language: "en", body: STORY.story, story_type: "story", topic: "a market day" });
     expect(save.body).not.toHaveProperty("report");          // the server makes the report
+    expect(screen.getByRole("link", { name: "Practice this story" })).toHaveAttribute("href", "/practice?story=1");
+  });
+
+  it("offers practice only once the story is saved", async () => {
+    mockApi({ ...base, "POST /stories/generate": STORY });
+    renderApp("/studio");
+    await make();
+    await screen.findByText(/Hello, friend\./);
+    expect(screen.queryByRole("link", { name: "Practice this story" })).not.toBeInTheDocument();
   });
 
   it("make another asks again and clears the Saved state", async () => {

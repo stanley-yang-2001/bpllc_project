@@ -13,6 +13,8 @@ import os
 from pathlib import Path
 
 import psycopg2
+from psycopg2.extras import Json
+from tutor_core import quality
 from tutor_core.words import WordError, validate_meaning, validate_word
 
 from .db import SCHEMA
@@ -26,6 +28,28 @@ _SAMPLES = Path(os.environ.get("SAMPLE_DIR", Path(__file__).resolve().parents[2]
 SAMPLE_CSVS = [_SAMPLES / "starter_vocabulary.csv", _SAMPLES / "suggested_words.csv"]
 SPANISH = [("hola", "hello"), ("gracias", "thank you"), ("agua", "water"), ("pan", "bread"), ("casa", "house"),
            ("amigo", "friend"), ("comer", "to eat"), ("beber", "to drink"), ("grande", "big"), ("pequeño", "small")]
+
+
+# Two short saved stories, so Library and Practice have something to show on a clean checkout. They use only words from the
+# sample lists; the quality report is made by the real checker, exactly as it is when a learner saves a story.
+DEMO_STORIES = [
+    ("en", "dialogue", "Ana: Hello, my friend.\nBen: Hello, do you want some water?\nAna: Yes, please. I want some food too.\nBen: Here you are. Goodbye, friend."),
+    ("es", "dialogue", "Ana: Hola, amigo.\nLuis: Hola, ¿quieres agua?\nAna: Sí, gracias. Quiero pan en casa.\nLuis: Aquí tienes."),
+]
+
+
+def _stories(cur, user_id: int) -> int:
+    made = 0
+    for language, story_type, body in DEMO_STORIES:
+        cur.execute(f"SELECT 1 FROM {SCHEMA}.stories WHERE user_id = %s AND language = %s AND body = %s", (user_id, language, body))
+        if cur.fetchone():
+            continue
+        cur.execute(f"SELECT word FROM {SCHEMA}.words WHERE user_id = %s AND language = %s ORDER BY id", (user_id, language))
+        report = quality.report(body, language, [w for (w,) in cur.fetchall()])
+        cur.execute(f"INSERT INTO {SCHEMA}.stories (user_id, language, story_type, topic, body, passed, report) VALUES (%s, %s, %s, NULL, %s, %s, %s)",
+                    (user_id, language, story_type, body, report["status"] == "pass", Json(report)))
+        made += 1
+    return made
 
 
 def _insert(cur, user_id: int, language: str, pairs) -> int:
@@ -43,7 +67,7 @@ def _insert(cur, user_id: int, language: str, pairs) -> int:
 
 def seed(database_url: str, email: str, password: str, import_legacy: bool = False, rounds: int = 12) -> dict:
     run_migrations(database_url)
-    out = {"user_created": False, "english": 0, "spanish": 0, "legacy": 0}
+    out = {"user_created": False, "english": 0, "spanish": 0, "legacy": 0, "stories": 0}
     with psycopg2.connect(database_url) as conn, conn.cursor() as cur:
         cur.execute(f"SELECT id FROM {SCHEMA}.users WHERE email = %s", (email,))
         row = cur.fetchone()
@@ -63,6 +87,7 @@ def seed(database_url: str, email: str, password: str, import_legacy: bool = Fal
                 with sample.open(encoding="utf-8-sig", newline="") as f:
                     out["english"] += _insert(cur, user_id, "en", ((r["word"], r.get("definition", "")) for r in csv.DictReader(f)))
         out["spanish"] = _insert(cur, user_id, "es", SPANISH)
+        out["stories"] = _stories(cur, user_id)
         if import_legacy:
             cur.execute("SELECT to_regclass('public.words')")
             if cur.fetchone()[0]:

@@ -10,7 +10,7 @@ from .config import Settings, load_settings
 from .db import make_pool
 from .errors import install_error_handlers
 from .migrate import run_migrations
-from .routes import auth, chat, health, me, stories, words
+from .routes import auth, chat, health, me, practice, stories, words
 from .security import LoginGuard, make_dummy_credentials
 from .services.ai_gate import AiGate
 from .services.chat import make_chat_client
@@ -67,7 +67,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers[name] = value
         return response
 
-    for module in (auth, me, words, chat, stories, health):
+    for module in (auth, me, words, chat, stories, practice, health):
         app.include_router(module.router, prefix="/api")
     return app
 

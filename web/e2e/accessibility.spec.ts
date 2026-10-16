@@ -25,6 +25,31 @@ for (const scheme of ["light", "dark"] as const) {
       await scan(page, `privacy (${scheme})`);
     });
 
+    test("the story screens with real content: Studio, Library, flashcards and fill-in-the-blank", async ({ page }) => {
+      await register(page, `pat_${unique()}`, "Pat Doe");
+      for (const [word, meaning] of [["hello", "a greeting"], ["friend", "someone you like"], ["water", "a drink"], ["please", "polite"], ["goodbye", "parting"]]) await addWord(page, word, meaning);
+      await nav(page, "Studio").click();
+      await page.getByRole("button", { name: "Make a story" }).click();
+      await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
+      await scan(page, `studio with a story and report (${scheme})`);
+      await page.getByRole("button", { name: "Save to library" }).click();
+      await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
+      await nav(page, "Library").click();
+      await page.getByRole("button", { name: "Open" }).click();
+      await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
+      await scan(page, `library with an opened story (${scheme})`);
+      await page.getByRole("link", { name: "Practice this story" }).click();
+      await expect(page.getByText(/Sentence 1 of/)).toBeVisible();
+      await scan(page, `fill in the blank (${scheme})`);
+      await page.getByRole("group", { name: "Choices" }).getByRole("button").first().click();
+      await scan(page, `fill in the blank, answered (${scheme})`);
+      await nav(page, "Practice").click();
+      await scan(page, `practice menu (${scheme})`);
+      await page.getByRole("button", { name: "Start flashcards" }).click();
+      await page.getByRole("button", { name: "Show meaning" }).click();
+      await scan(page, `flashcard (${scheme})`);
+    });
+
     test("every signed-in screen, dialogs included", async ({ page }) => {
       await register(page, `pat_${unique()}`, "Pat Doe");
       await scan(page, `home, empty (${scheme})`);

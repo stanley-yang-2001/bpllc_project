@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookmarkPlus, RefreshCw, Sparkles } from "lucide-react";
+import { BookmarkPlus, GraduationCap, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, type GeneratedStory } from "../api/client";
@@ -24,18 +24,19 @@ export default function Studio() {
   const [type, setType] = useState("");
   const [topic, setTopic] = useState("");
   const [story, setStory] = useState<GeneratedStory | null>(null);
-  const [saved, setSaved] = useState(false);
-  const generate = useMutation({ mutationFn: api.generateStory, onSuccess: (s) => { setStory(s); setSaved(false); } });
+  const [savedId, setSavedId] = useState<number | null>(null);
+  const saved = savedId !== null;
+  const generate = useMutation({ mutationFn: api.generateStory, onSuccess: (s) => { setStory(s); setSavedId(null); } });
   const save = useMutation({
     mutationFn: api.saveStory,
-    onSuccess: () => {
-      setSaved(true);
+    onSuccess: (s) => {
+      setSavedId(s.id);
       toast("Saved to your library");
       if (user) void qc.invalidateQueries({ queryKey: storiesKey(user.id) });
     },
   });
 
-  useEffect(() => { setStory(null); setSaved(false); generate.reset(); save.reset(); }, [active]);   // a story belongs to one language
+  useEffect(() => { setStory(null); setSavedId(null); generate.reset(); save.reset(); }, [active]);   // a story belongs to one language
 
   const make = () => generate.mutate({ language: active, story_type: type || undefined, topic: !type || CLASSIC.includes(type) ? undefined : topic || undefined });
   const enabled = lang?.stories_enabled !== false;
@@ -106,6 +107,11 @@ export default function Studio() {
             >
               {saved ? "Saved" : "Save to library"}
             </Button>
+            {saved && (
+              <Link to={`/practice?story=${savedId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-surface px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-100/70">
+                <GraduationCap aria-hidden className="size-4" />Practice this story
+              </Link>
+            )}
             <Button variant="ghost" onClick={make} disabled={generate.isPending} icon={<RefreshCw aria-hidden className="size-4" />}>Make another</Button>
           </div>
           {save.error && <ErrorText>{save.error instanceof ApiError ? save.error.message : "Couldn't save. Please try again."}</ErrorText>}
