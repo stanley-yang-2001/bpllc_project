@@ -2,6 +2,11 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — run on the author's machine, 16 October 2026 (routing matrix) and a Makefile fix
+
+- **Routing matrix (`run_routing_tests.py`, 19.3 step 5): 14 of 15 turns passed**, p50 2.5 s, p90 4.8 s. S1 (English story) failed on 20 stray words, the known English story-quality weakness, not routing. I1 recorded one story-tool call with `language: English`.
+- **Makefile:** `PYTHON` is now a variable (`make check PYTHON=python` on Windows, where `python3` is not a command); `scripts/check_api_types.sh` honours it too. The default is unchanged.
+
 ## Unreleased — M7: Library, Practice, demo stories and the walkthrough (16 October 2026)
 
 **Written and tested here (stub tutor; browser tests run here against the stub stack); not run on your machine.**
