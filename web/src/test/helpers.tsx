@@ -5,6 +5,9 @@ import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import App from "../App";
 import { AuthProvider } from "../auth/AuthContext";
+import { PreferencesProvider } from "../prefs/PreferencesProvider";
+import { ActiveLanguageProvider } from "../auth/ActiveLanguage";
+import { I18nProvider } from "../i18n/I18nProvider";
 import { ThemeProvider } from "../theme/ThemeProvider";
 
 export type Handler = (req: { method: string; path: string; body: any; headers: Record<string, string> }) => { status?: number; json?: unknown; after?: Promise<unknown> };
@@ -42,15 +45,21 @@ export const err = (status: number, code: string, message: string) => () => ({ s
 
 export function renderApp(path = "/", client = new QueryClient({ defaultOptions: { queries: { retry: false } } })): { ui: ReturnType<typeof render>; client: QueryClient } {
   const ui: ReactElement = (
-    <ThemeProvider>
-      <QueryClientProvider client={client}>
-        <AuthProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <App />
-          </MemoryRouter>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={client}>
+      <AuthProvider>
+        <PreferencesProvider>
+          <ActiveLanguageProvider>
+            <I18nProvider>
+              <ThemeProvider>
+                <MemoryRouter initialEntries={[path]}>
+                  <App />
+                </MemoryRouter>
+              </ThemeProvider>
+            </I18nProvider>
+          </ActiveLanguageProvider>
+        </PreferencesProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
   return { ui: render(ui), client };
 }

@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n/I18nProvider";
 import { CircleAlert, CircleCheck, Info, LoaderCircle } from "lucide-react";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
@@ -61,12 +62,15 @@ export const ErrorText = ({ children }: { children?: ReactNode }) =>
     </p>
   ) : null;
 
-export const Spinner = ({ label = "Loading…" }: { label?: string }) => (
+export const Spinner = ({ label }: { label?: string }) => {
+  const { t } = useI18n();
+  return (
   <p role="status" className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
     <LoaderCircle aria-hidden className="size-4 animate-spin" />
-    {label}
+    {label ?? t("common.loading")}
   </p>
-);
+  );
+};
 
 export const Skeleton = ({ className = "" }: { className?: string }) => (
   <div aria-hidden className={`animate-pulse rounded-md bg-slate-200/70 ${className}`} />

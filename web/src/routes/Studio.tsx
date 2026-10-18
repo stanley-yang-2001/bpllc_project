@@ -8,18 +8,20 @@ import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { StoryReport } from "../components/StoryReport";
+import { topicLabel, typeLabel } from "../i18n/labels";
+import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, Card, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
 
 const CLASSIC = ["narration", "dialogue"];          // these two have no topic
-const label = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export default function Studio() {
   const { active, info } = useActiveLanguage();
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
+  const { t, err } = useI18n();
   const lang = info(active);
-  const name = lang?.name ?? active;
+  const name = lang?.native ?? active;
   const options = useQuery({ queryKey: ["story-options"], queryFn: api.storyOptions, staleTime: Infinity });
   const [type, setType] = useState("");
   const [topic, setTopic] = useState("");
@@ -31,7 +33,7 @@ export default function Studio() {
     mutationFn: api.saveStory,
     onSuccess: (s) => {
       setSavedId(s.id);
-      toast("Saved to your library");
+      toast(t("common.savedToLibrary"));
       if (user) void qc.invalidateQueries({ queryKey: storiesKey(user.id) });
     },
   });
@@ -45,44 +47,44 @@ export default function Studio() {
   return (
     <div>
       <PageHeader
-        title="Story Studio"
-        description="Make a short story from the words on your list, and see how well it fits them."
-        actions={<Badge tone="brand">{name}</Badge>}
+        title={t("studio.title")}
+        description={t("studio.description")}
+        actions={<Badge tone="brand"><span lang={active}>{name}</span></Badge>}
       />
       <Card className="space-y-4">
         {!enabled ? (
-          <Notice tone="warning">Stories in {name} are not available yet.</Notice>
+          <Notice tone="warning">{t("studio.unavailable", { language: name })}</Notice>
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="story-type" className="mb-1 block text-sm font-medium text-slate-700">Kind of story</label>
+                <label htmlFor="story-type" className="mb-1 block text-sm font-medium text-slate-700">{t("studio.kind")}</label>
                 <select id="story-type" className={inputCls} value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="">Surprise me</option>
-                  {options.data?.types.map((t) => <option key={t} value={t}>{label(t)}</option>)}
+                  <option value="">{t("studio.surprise")}</option>
+                  {options.data?.types.map((ty) => <option key={ty} value={ty}>{typeLabel(t, ty)}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="story-topic" className="mb-1 block text-sm font-medium text-slate-700">Topic</label>
+                <label htmlFor="story-topic" className="mb-1 block text-sm font-medium text-slate-700">{t("studio.topic")}</label>
                 <select id="story-topic" className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} disabled={!type || CLASSIC.includes(type)}>
-                  <option value="">Any topic</option>
-                  {options.data?.topics.map((t) => <option key={t} value={t}>{label(t)}</option>)}
+                  <option value="">{t("studio.anyTopic")}</option>
+                  {options.data?.topics.map((tp) => <option key={tp} value={tp}>{topicLabel(t, tp)}</option>)}
                 </select>
-                {(!type || CLASSIC.includes(type)) && <p className="mt-1 text-xs text-slate-600">Topics are for the newer kinds of story. Pick one of those to choose a topic.</p>}
+                {(!type || CLASSIC.includes(type)) && <p className="mt-1 text-xs text-slate-600">{t("studio.topicHint")}</p>}
               </div>
             </div>
             <div>
               <Button onClick={make} loading={generate.isPending} icon={<Sparkles aria-hidden className="size-4" />}>
-                {generate.isPending ? "Writing…" : "Make a story"}
+                {generate.isPending ? t("studio.writing") : t("studio.make")}
               </Button>
-              {generate.isPending && <p role="status" className="mt-2 text-sm text-slate-600">Stories can take up to a minute.</p>}
+              {generate.isPending && <p role="status" className="mt-2 text-sm text-slate-600">{t("studio.wait")}</p>}
               {failure && (
                 <ErrorText>
-                  {failure.message}
-                  {failure.code === "not_enough_words" && <> <Link to="/vocabulary" className="font-medium underline">Go to your vocabulary</Link>.</>}
+                  {err(failure)}
+                  {failure.code === "not_enough_words" && <> <Link to="/vocabulary" className="font-medium underline">{t("studio.goVocab")}</Link>.</>}
                 </ErrorText>
               )}
-              {generate.error && !failure && <ErrorText>Something went wrong. Please try again.</ErrorText>}
+              {generate.error && !failure && <ErrorText>{err(generate.error)}</ErrorText>}
             </div>
           </>
         )}
@@ -91,9 +93,9 @@ export default function Studio() {
       {story && (
         <Card className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>{label(story.story_type ?? "story")}</Badge>
-            {story.topic && <Badge>{label(story.topic)}</Badge>}
-            <span className="text-xs text-slate-600">Built from {story.words_used} of your {story.words_total} words</span>
+            <Badge>{typeLabel(t, story.story_type ?? "story")}</Badge>
+            {story.topic && <Badge>{topicLabel(t, story.topic)}</Badge>}
+            <span className="text-xs text-slate-600">{t("studio.builtFrom", { used: story.words_used, total: story.words_total })}</span>
           </div>
           <p lang={story.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.story}</p>
           <StoryReport report={story.report} languageName={name} />
@@ -105,16 +107,16 @@ export default function Studio() {
               loading={save.isPending}
               icon={<BookmarkPlus aria-hidden className="size-4" />}
             >
-              {saved ? "Saved" : "Save to library"}
+              {saved ? t("chat.saved") : t("studio.save")}
             </Button>
             {saved && (
               <Link to={`/practice?story=${savedId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-surface px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-100/70">
-                <GraduationCap aria-hidden className="size-4" />Practice this story
+                <GraduationCap aria-hidden className="size-4" />{t("studio.practice")}
               </Link>
             )}
-            <Button variant="ghost" onClick={make} disabled={generate.isPending} icon={<RefreshCw aria-hidden className="size-4" />}>Make another</Button>
+            <Button variant="ghost" onClick={make} disabled={generate.isPending} icon={<RefreshCw aria-hidden className="size-4" />}>{t("studio.another")}</Button>
           </div>
-          {save.error && <ErrorText>{save.error instanceof ApiError ? save.error.message : "Couldn't save. Please try again."}</ErrorText>}
+          {save.error && <ErrorText>{err(save.error, "common.saveFailed")}</ErrorText>}
         </Card>
       )}
     </div>

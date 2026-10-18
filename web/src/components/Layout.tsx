@@ -3,16 +3,18 @@ import { NavLink, Link, Outlet } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
+import { useI18n } from "../i18n/I18nProvider";
+import type { MessageKey } from "../i18n/messages";
 
 const links = [
-  ["/", "Home", House],
-  ["/chat", "Chat", MessageCircle],
-  ["/vocabulary", "Vocabulary", BookOpen],
-  ["/studio", "Studio", Sparkles],
-  ["/library", "Library", Library],
-  ["/practice", "Practice", Layers],
-  ["/settings", "Settings", Settings],
-] as const;
+  ["/", "nav.home", House],
+  ["/chat", "nav.chat", MessageCircle],
+  ["/vocabulary", "nav.vocabulary", BookOpen],
+  ["/studio", "nav.studio", Sparkles],
+  ["/library", "nav.library", Library],
+  ["/practice", "nav.practice", Layers],
+  ["/settings", "nav.settings", Settings],
+] as const satisfies readonly (readonly [string, MessageKey, unknown])[];
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("") || "?";
@@ -20,6 +22,7 @@ const initials = (name: string) =>
 export function Layout() {
   const { user, logout } = useAuth();
   const { active, setActive, studying } = useActiveLanguage();
+  const { t } = useI18n();
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-surface/85 backdrop-blur">
@@ -32,8 +35,8 @@ export function Layout() {
           </Link>
 
           {/* One nav, always its own row (scrolls sideways on phones). A single row for everything only fit by luck. */}
-          <nav aria-label="Main" className="order-last -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 pb-2">
-            {links.map(([to, label, Icon]) => (
+          <nav aria-label={t("nav.main")} className="order-last -mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 pb-2">
+            {links.map(([to, key, Icon]) => (
               <NavLink
                 key={to}
                 to={to}
@@ -45,22 +48,22 @@ export function Layout() {
                 }
               >
                 <Icon aria-hidden className="hidden size-4 sm:block" />
-                {label}
+                {t(key)}
               </NavLink>
             ))}
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
             <label className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-surface py-1 pl-2.5 pr-1 text-sm shadow-xs">
-              <span className="hidden text-slate-500 sm:inline">Studying</span>
+              <span className="hidden text-slate-500 sm:inline">{t("layout.studying")}</span>
               <select
-                aria-label="Active language"
+                aria-label={t("layout.activeLanguage")}
                 value={active}
                 onChange={(e) => setActive(e.target.value)}
                 className="rounded-md bg-transparent py-0.5 pr-1 font-medium text-slate-900 focus:outline-none"
               >
                 {studying.map((l) => (
-                  <option key={l.code} value={l.code}>{l.name}</option>
+                  <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>
                 ))}
               </select>
             </label>
@@ -72,8 +75,8 @@ export function Layout() {
             </div>
             <ThemeToggle />
             <button
-              aria-label="Log out"
-              title="Log out"
+              aria-label={t("layout.logout")}
+              title={t("layout.logout")}
               onClick={() => void logout()}
               className="flex size-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
             >
@@ -86,7 +89,7 @@ export function Layout() {
         <Outlet />
       </main>
       <footer className="mx-auto max-w-5xl px-4 pb-8 text-xs text-slate-500">
-        <Link to="/privacy" className="underline-offset-2 hover:text-slate-900 hover:underline">Privacy Policy</Link>
+        <Link to="/privacy" className="underline-offset-2 hover:text-slate-900 hover:underline">{t("layout.privacy")}</Link>
       </footer>
     </div>
   );

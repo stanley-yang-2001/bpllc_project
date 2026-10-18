@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { useI18n } from "../i18n/I18nProvider";
 import { Modal } from "./Modal";
 import { Button } from "./ui";
 
@@ -13,6 +14,7 @@ const Ctx = createContext<Confirm | null>(null);
 
 /** `if (await confirm({ title: "Delete 3 words?" })) ...`  Replaces the browser's plain confirm box. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [opts, setOpts] = useState<ConfirmOptions | null>(null);
   const resolver = useRef<((v: boolean) => void) | null>(null);
 
@@ -25,8 +27,8 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       <Modal open={opts !== null} onClose={() => finish(false)} title={opts?.title ?? ""}>
         {opts?.body && <div className="mb-5 text-sm text-slate-600">{opts.body}</div>}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" data-autofocus onClick={() => finish(false)}>Cancel</Button>
-          <Button variant={opts?.tone === "primary" ? "primary" : "danger"} onClick={() => finish(true)}>{opts?.confirmLabel ?? "Delete"}</Button>
+          <Button variant="secondary" data-autofocus onClick={() => finish(false)}>{t("common.cancel")}</Button>
+          <Button variant={opts?.tone === "primary" ? "primary" : "danger"} onClick={() => finish(true)}>{opts?.confirmLabel ?? t("common.delete")}</Button>
         </div>
       </Modal>
     </Ctx.Provider>

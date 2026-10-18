@@ -102,12 +102,13 @@ describe("vocabulary page", () => {
   });
 
   it("adds a new language and switches to it", async () => {
-    mockApi({ ...base, "GET /words": page([]), "POST /me/languages": { ...ALICE, languages: ["en", "es"] } });
+    const { calls } = mockApi({ ...base, "GET /words": page([]), "POST /me/languages": { ...ALICE, languages: ["en", "es"] },
+      "PATCH /me/preferences": ({ body }: any) => ({ json: { active_language: null, ui_follows_study_language: false, theme: "system", custom_colors: null, ...body } }) });
     renderApp("/vocabulary");
     await screen.findByText(/No words yet/);
     await userEvent.selectOptions(screen.getByLabelText("Language to start"), "es");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
     await waitFor(() => expect(screen.getByLabelText("Active language")).toHaveValue("es"));
-    expect(localStorage.getItem("tutor:lang:1")).toBe("es");
+    await waitFor(() => expect(calls.filter((c) => c.method === "PATCH").map((c) => c.body)).toEqual([{ active_language: "es" }]));
   });
 });

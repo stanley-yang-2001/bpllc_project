@@ -131,6 +131,74 @@
         "title": "ClozeSet",
         "type": "object"
       },
+      "ColorsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "accent": {
+            "title": "Accent",
+            "type": "string"
+          },
+          "borders": {
+            "title": "Borders",
+            "type": "string"
+          },
+          "cards": {
+            "title": "Cards",
+            "type": "string"
+          },
+          "page": {
+            "title": "Page",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "cards",
+          "text",
+          "borders",
+          "accent"
+        ],
+        "title": "ColorsIn",
+        "type": "object"
+      },
+      "CustomColors": {
+        "description": "The five parts of a custom theme (design 3G), each a #rrggbb colour.",
+        "properties": {
+          "accent": {
+            "title": "Accent",
+            "type": "string"
+          },
+          "borders": {
+            "title": "Borders",
+            "type": "string"
+          },
+          "cards": {
+            "title": "Cards",
+            "type": "string"
+          },
+          "page": {
+            "title": "Page",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page",
+          "cards",
+          "text",
+          "borders",
+          "accent"
+        ],
+        "title": "CustomColors",
+        "type": "object"
+      },
       "DeleteBody": {
         "properties": {
           "ids": {
@@ -439,6 +507,13 @@
       },
       "MetaOut": {
         "properties": {
+          "policy_languages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Policy Languages",
+            "type": "array"
+          },
           "policy_version": {
             "title": "Policy Version",
             "type": "string"
@@ -457,7 +532,8 @@
         },
         "required": [
           "policy_version",
-          "privacy_contact"
+          "privacy_contact",
+          "policy_languages"
         ],
         "title": "MetaOut",
         "type": "object"
@@ -491,6 +567,127 @@
           "password"
         ],
         "title": "PasswordOnly",
+        "type": "object"
+      },
+      "PolicyOut": {
+        "properties": {
+          "doc": {
+            "additionalProperties": true,
+            "title": "Doc",
+            "type": "object"
+          },
+          "fallback": {
+            "title": "Fallback",
+            "type": "boolean"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "version",
+          "fallback",
+          "doc"
+        ],
+        "title": "PolicyOut",
+        "type": "object"
+      },
+      "PreferencesOut": {
+        "properties": {
+          "active_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Language"
+          },
+          "custom_colors": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomColors"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "theme": {
+            "title": "Theme",
+            "type": "string"
+          },
+          "ui_follows_study_language": {
+            "title": "Ui Follows Study Language",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active_language",
+          "ui_follows_study_language",
+          "theme",
+          "custom_colors"
+        ],
+        "title": "PreferencesOut",
+        "type": "object"
+      },
+      "PreferencesPatch": {
+        "additionalProperties": false,
+        "description": "Any subset. Unknown keys are rejected so a typo never silently does nothing. The server checks the *shape* of\na theme id; what it means is up to the app, so an older app and a newer server never break each other.",
+        "properties": {
+          "active_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Language"
+          },
+          "custom_colors": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ColorsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "theme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theme"
+          },
+          "ui_follows_study_language": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ui Follows Study Language"
+          }
+        },
+        "title": "PreferencesPatch",
         "type": "object"
       },
       "ProfilePatch": {
@@ -907,6 +1104,16 @@
           "native_language": {
             "title": "Native Language",
             "type": "string"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreferencesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1549,6 +1756,48 @@
         ]
       }
     },
+    "/api/me/preferences": {
+      "patch": {
+        "description": "Saves display preferences on the account so they follow the learner to every browser.",
+        "operationId": "patch_preferences_api_me_preferences_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferencesPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Preferences",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/api/meta": {
       "get": {
         "description": "Public: what the privacy page and sign-up form need to show.",
@@ -1566,6 +1815,57 @@
           }
         },
         "summary": "Meta",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/policy": {
+      "get": {
+        "description": "Public: the privacy policy copy to show for `lang`. Only an approved, current copy is ever served; otherwise\nthe English copy, with fallback=true (design 3I).",
+        "operationId": "policy_copy_api_policy_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 8,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Policy Copy",
         "tags": [
           "me"
         ]

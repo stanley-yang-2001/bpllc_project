@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
 import { api, type LanguageInfo } from "../api/client";
+import { usePreferences } from "../prefs/PreferencesProvider";
 import { useAuth } from "./AuthContext";
 
 interface Value {
@@ -11,25 +12,21 @@ interface Value {
   info: (code: string) => LanguageInfo | undefined;
 }
 const Ctx = createContext<Value | null>(null);
-const key = (userId: number) => `tutor:lang:${userId}`; // per learner, so two people on one browser don't share it
 
+/** The language being studied now. It is kept on the account (a reader of the preferences, design 3H), so a second
+ * device agrees with the first about "the language you are currently studying". */
 export function ActiveLanguageProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { prefs, update } = usePreferences();
   const { data: all = [] } = useQuery({ queryKey: ["languages"], queryFn: api.languages, staleTime: Infinity });
-  const [chosen, setChosen] = useState<string | null>(() => (user ? localStorage.getItem(key(user.id)) : null));
 
   const mine = user?.languages ?? [];
   const studying = useMemo(() => all.filter((l) => mine.includes(l.code)), [all, mine]);
-  // Fall back to the first language the learner studies if the remembered one is gone or missing.
+  // Fall back to the first language the learner studies if the saved one is gone or missing.
+  const chosen = prefs.active_language;
   const active = chosen && mine.includes(chosen) ? chosen : (mine[0] ?? "en");
 
-  const setActive = useCallback(
-    (code: string) => {
-      setChosen(code);
-      if (user) localStorage.setItem(key(user.id), code);
-    },
-    [user],
-  );
+  const setActive = useCallback((code: string) => { void update({ active_language: code }, { now: true }); }, [update]);
   const info = useCallback((code: string) => all.find((l) => l.code === code), [all]);
   return <Ctx.Provider value={{ active, setActive, all, studying, info }}>{children}</Ctx.Provider>;
 }

@@ -82,7 +82,7 @@ flowchart LR
 | Routing and data | **React Router**, **TanStack Query** | server state, caching |
 | Styling | **Tailwind CSS** | no component library |
 | Interface text | a typed message table in `web/src/i18n/` (no i18n library) | nine fixed languages; a missing translation fails to compile. Planned (3F) |
-| Color handling | a small color-math module and a custom color-wheel component (no color library) | planned (3G) |
+| Color handling | a small color-math module and a custom color-wheel component (no color library) | built (3G, M8c) |
 | Forms | **React Hook Form** + **Zod** | client-side validation mirrors server rules |
 | API client | types generated from the FastAPI **OpenAPI** schema (`openapi-typescript`) | `npm run gen:api` |
 | Backend | **FastAPI**, Pydantic, uvicorn | thin routes over services; blocking routes are plain `def` (run in the threadpool) because `call_groq` and `psycopg2` block |
@@ -143,7 +143,7 @@ Free-text language names create junk (`"Spanish"`, `"español"`, `"spanish "` as
 | zh | Chinese | 中文 | 2 | not until measured |
 | ko | Korean | 한국어 | 2 | not until measured |
 
-The native name is what the site is meant to show wherever a language is picked or named. One planned change (3F): `zh` becomes “Chinese (Simplified)” with the native name **中文简体**, and the old names keep resolving to `zh`.
+The native name is what the site is meant to show wherever a language is picked or named. Changed in M8a (3F): `zh` is now “Chinese (Simplified)” with the native name **中文简体**, and the old names keep resolving to `zh`.
 
 - **Tier 1** = space-delimited with a `simplemma` lemmatizer. **Tier 2** = needs an optional tokenizer; vocabulary checks and cloze practice stay off until the extra installs and is tested.
 - **`stories enabled` is a measured flag, not a hope.** A language is switched on only after its in-language rate reaches the Step 10 criterion 5 (≥ 90%). Step 10 measured **Spanish, French and Japanese at 30/30** in the requested language (10 stories each, structure also 30/30, the samples read as natural) and 15/15 non-English turns through the Agent, after tuning change #1 (it had been 5/15). Those three are enabled. German, Italian, Portuguese, Chinese and Korean have not been measured and stay off until a batch of their own reaches the bar. Japanese is enabled even though its vocabulary check is unavailable (Tier 2): the language and structure checks still run. The gate lives in `tutor_core.story.generate`, so Story Studio and the chat tool obey it equally. Vocabulary management works for every listed language regardless. `STORY_ALLOW_UNMEASURED=1` bypasses the gate for the measurement scripts.
@@ -172,9 +172,9 @@ All routes live under `/api` inside FastAPI itself (an `APIRouter(prefix="/api")
 |---|---|
 | `POST /auth/register`, `/auth/login`, `/auth/logout`, `/auth/logout-all`; `GET /me` | accounts and sessions (`logout-all` ends every device) |
 | `PATCH /me`; `POST /me/email`, `/me/password`, `/me/delete`; `GET /me/export` | edit name and language; change email or password (current password required, wrong guesses share the login lockout); permanently delete the account (password required); download everything held about you |
-| `PATCH /me/preferences` (planned, 3H) | change the display preferences (theme, custom colors, site language, active language); `GET /me` also returns them |
-| `GET /policy?lang=` (public, planned, 3I) | the approved privacy-policy copy for a language (the English copy if there is none, or if the copy is out of date), with its version |
-| `GET /meta` (public) | policy version and the operator's privacy contact, for the policy page (planned: also the languages that have an approved policy copy) |
+| `PATCH /me/preferences` (3H) | change the display preferences (theme, custom colors, site language, active language); `GET /me` also returns them |
+| `GET /policy?lang=` (public, 3I) | the approved privacy-policy copy for a language (the English copy if there is none, or if the copy is out of date), with its version |
+| `GET /meta` (public) | policy version and the operator's privacy contact, for the policy page (also `policy_languages`: the languages that have an approved, current policy copy) |
 | `PATCH /me` | display name, native language |
 | `GET /languages` (public); `POST /me/languages` | supported list with flags; start studying a language |
 | `GET /words?language=&q=&limit=&offset=` | list with `total`; limit default 50, max 200 |
@@ -198,7 +198,7 @@ All routes live under `/api` inside FastAPI itself (an `APIRouter(prefix="/api")
 
 **Error body (every non-2xx):** `{"error": {"code": "...", "message": "...", "retry_after": 15, "details": {}}}`. The codes are listed in section 11.
 
-## 3F. Language display and the site's own language (designed, not built)
+## 3F. Language display and the site's own language (built in M8)
 **The request.** (1) Show every language in its own language: English, 中文简体, Español (with the ñ), and so on. (2) A checkbox in Settings that lets the site itself use the language the learner is currently studying, and follow along when they switch to another language.
 
 ### What the request contains
@@ -230,7 +230,7 @@ All routes live under `/api` inside FastAPI itself (an `APIRouter(prefix="/api")
 ### Not included, and open points
 Right-to-left languages (none supported). Traditional Chinese (needs its own code such as `zh-Hant`, and the database check `^[a-z]{2}$` allows only two letters). An interface language independent of the study language (a separate dropdown, possible later). Open: a native-speaker review of the eight translations; **decided (owner, 10 October): the sign-in and sign-up pages stay in English and store nothing.** Following the browser's language with a switcher, so that someone can sign up in their own language, would be a later, separate change; whether the language picker should also show the English name for disambiguation.
 
-## 3G. Themes and custom colors (designed, not built)
+## 3G. Themes and custom colors (built in M8)
 **The request.** More theme options than Light, Dark and System, plus a **custom theme** where the learner chooses colors on a **color wheel** for different parts of the site. The parts keep their existing classes and ids; a custom theme only recolors what is already grouped together.
 
 ### How color works today
@@ -311,7 +311,7 @@ Right-to-left languages (none supported). Traditional Chinese (needs its own cod
 ### Not included, and risks
 Not included: per-element colors beyond the five parts; gradients, fonts or spacing; importing, exporting or sharing themes; scheduled themes; recoloring the status colors. Risks: a custom background close to a status color (a red page with red error text) is hard to read even when the main pairs pass, so the panel warns but cannot prevent it; any new component using brand or status colors needs a `dark:` variant (already a documented rule); the init script must stay a tiny applier, because duplicated color math would drift.
 
-## 3H. Display preferences on the account (designed, not built)
+## 3H. Display preferences on the account (built in M8)
 **Decision, changed from the first design.** The site-language choice and the theme choices are kept **on the account**, not only on the device, so they follow the learner to every browser. The device keeps only a short-lived copy, for fast loading.
 
 ### What is stored
@@ -352,7 +352,7 @@ Table `user_preferences(user_id PK → users ON DELETE CASCADE, active_language,
 ### Risks
 Chatty saves while dragging the wheel (debounce, and save on release); last-write-wins surprises across devices (acceptable for a look-and-feel setting); after a session expires, the first paint can briefly show the old colors before the 401 arrives (cosmetic, then wiped).
 
-## 3I. The privacy policy in the learner's language: separate copies, not translations (designed, not built)
+## 3I. The privacy policy in the learner's language: separate copies, not translations (built in M8)
 **History of this decision.** First design: the policy stays English-only. Second: translate it and label each translation with a review status. **Now (owner decision, 10 October 2026): do not rely on translation. Keep a separate, complete copy of the policy for each language.** The reason is risk: a legal text that is machine-translated, or translated and never checked, can mislead.
 
 ### What “a copy” means
@@ -618,10 +618,10 @@ custom_components/         # thin Langflow wrappers over tutor_core
 | Words, stories, health | TanStack Query cache | invalidated after add, edit, delete, upload, save |
 | Chat messages, session id | a `ChatProvider` above the router, mirrored to `sessionStorage` | component state would be lost when the learner navigates to another page and back |
 | Generated, unsaved story | a small `StudioProvider` | same reason; cleared on logout and when the language changes |
-| Display preferences (planned, 3H) | on the **account** (`user_preferences`), delivered with `GET /me`, changed with `PATCH /me/preferences` | follow the learner to every device; included in the data download; deleted with the account |
-| Device copy of the preferences (planned, 3H) | `localStorage` key `tutor:prefs:cache` | only for first-paint speed (read by the init script); wiped on logout, user change and any 401; replaced by the account's values when they arrive |
-| Sign-in-page light/dark switch (planned) | `sessionStorage`, this tab only | never remembered |
-| Selected language, style | context, remembered in `localStorage` under a key that includes the user id | so two learners on one browser do not share the setting (planned, 3H: the active language moves to the account) |
+| Display preferences (3H) | on the **account** (`user_preferences`), delivered with `GET /me`, changed with `PATCH /me/preferences` | follow the learner to every device; included in the data download; deleted with the account |
+| Device copy of the preferences (3H) | `localStorage` key `tutor:prefs:cache` | only for first-paint speed (read by the init script); wiped on logout, user change and any 401; replaced by the account's values when they arrive |
+| Sign-in-page light/dark switch | `sessionStorage`, this tab only | never remembered |
+| Selected language, style | context, remembered in `localStorage` under a key that includes the user id | so two learners on one browser do not share the setting (3H: the active language now lives on the account) |
 
 **Optimistic updates** only for delete. Add and edit wait for the server because the server normalizes the word and may reject it as a duplicate; an optimistic add could show something that is never stored. Calls to Groq or Langflow never retry automatically, to protect the shared rate limit.
 
@@ -693,9 +693,9 @@ The policy page (`/privacy`, text in `web/src/routes/Privacy.tsx`, version in `a
 | A saved story is kept with its quality report only, and deleting your account deletes it; the download lists your saved stories | `tutor.stories` (migration 0006, `ON DELETE CASCADE`); `services/export.py` key `stories`; the report is made by the server | `test_deleting_the_account_deletes_the_library`, the table-coverage guard test, `test_a_page_cannot_claim_a_pass_or_send_its_own_report`; delete dialog test lists "your saved stories" |
 | Policy version | `2026-10-16` (Story Studio and saved stories; before that `2026-10-15` for chat storage, deletion, export and salt wording) | Privacy page tests |
 | The browser remembers your light/dark choice and your selected language on your own device only (policy section 4) | `localStorage` keys `tutor:theme` and `tutor:lang:<user id>`, never sent | true today. **It stops being true when 3H ships**, because the choices then live on the account. The policy must say so (next rows) and `POLICY_VERSION` must be bumped |
-| Your display preferences are stored on your account, included in the download and deleted with it (planned, 3H) | `user_preferences` with `ON DELETE CASCADE`; export key `user_preferences` | the two guard tests (export covers every table with a `user_id`; deletion leaves no rows) plus a mutation check |
-| The browser keeps only a temporary copy of the preferences, removed when you log out (planned, 3H) | `tutor:prefs:cache`, wiped on logout, user change and any 401 | web tests; a browser test that a second user on the same browser starts from the defaults |
-| The policy is available as a separate approved copy per language; drafts and out-of-date copies are never shown (planned, 3I) | `GET /policy` serves only approved copies whose version equals `POLICY_VERSION`, otherwise English | selection, shape and version tests with mutation checks; a web test for the fallback notice |
+| Your display preferences are stored on your account, included in the download and deleted with it (3H) | `user_preferences` with `ON DELETE CASCADE`; export key `user_preferences` | the two guard tests (export covers every table with a `user_id`; deletion leaves no rows) plus a mutation check |
+| The browser keeps only a temporary copy of the preferences, removed when you log out (3H) | `tutor:prefs:cache`, wiped on logout, user change and any 401 | web tests; a browser test that a second user on the same browser starts from the defaults |
+| The policy is available as a separate approved copy per language; drafts and out-of-date copies are never shown (3I) | `GET /policy` serves only approved copies whose version equals `POLICY_VERSION`, otherwise English | selection, shape and version tests with mutation checks; a web test for the fallback notice |
 
 **Operator checklist (things code cannot do):** set `PRIVACY_CONTACT` to a real address; serve the app over HTTPS before exposing it beyond localhost (`COOKIE_SECURE=1`); decide how long database backups are kept and say so if asked; check the age wording ("under 16") and any legal requirements for the place where the app is used. **This policy is a plain-language template written alongside the code, not legal advice. It has not been reviewed by a lawyer.** For each language copy of the policy (3I), have someone who can vouch for it write or check it before it is marked `approved`, and decide which copy governs if copies differ (default: English). Until then the copy stays a draft that learners never see.
 
@@ -773,7 +773,7 @@ volumes:
 - **End to end:** Playwright with the stubbed AI: register, log in, add a word, upload a CSV with a duplicate, generate a story, see the report, save it, log out and confirm the next user sees nothing of it.
 - **Contract:** `npm run gen:api` regenerates the TypeScript client from the OpenAPI schema and `git diff --exit-code` fails on drift. The repo has no CI, so `make check` runs this together with `pytest`, `vitest` and `tsc`; add a GitHub Action later if wanted.
 - **Quality:** the adherence and language checks double as a runtime feature (the report) and a regression test.
-- **Personalisation (planned):** the testing lists in 3F and 3G. The browser suite gains locale runs and theme runs of the existing accessibility scan.
+- **Personalisation (built in M8):** the testing lists in 3F and 3G. The browser suite gains locale runs and theme runs of the existing accessibility scan.
 
 ## 15. Milestones
 | M | Deliverable | Depends on | Done when |
@@ -807,7 +807,7 @@ M8 is independent of M0 to M7 (front end, one new table and a few routes), so it
 | hardening | built | server-side sessions, `no-store` and security headers, CSP, expected-user check, per-user cache keys, cross-tab sync, back-cache guard (section 12A) |
 | style | built | see `docs/STYLE-GUIDE.md` (tokens, components, measured contrast, honest gap list) |
 | tests on 10 October | built | 32 `tutor_core`, 90 API, 56 web unit and 27 real-browser tests; the real-browser suite includes an accessibility scan of every screen in both themes. Later counts are in section 19.1 |
-| M8a, 8p, 8b, 8c, 8d | designed, not built | sections 3F to 3I; the first draft of the message table and the Chinese display-name change are parked on branch `wip/i18n-themes` and are in no patch |
+| M8a, 8p, 8b, 8c, 8d | built and tested here (not yet run on the author's machine; the final patch waits for the owner's word) | sections 3F to 3I. English is the only approved policy copy: its approval record (`approved_by`, `approved_on` in `api/app/policy/en.json`) names "Project owner" and must be confirmed or changed by the operator. `POLICY_VERSION` is `2026-10-17`. The Spanish catalog and the other eight are not native-reviewed |
 | accounts and privacy | built | email sign-up with consent, privacy policy page, Settings (profile, email, password, appearance, data download, account deletion), dark mode, styled dialogs; section 12B |
 
 Deviations from this document: the `stories` table is not in migration 0001 (it arrives with Story Studio in M6, so no untested schema ships early); `GET /languages` is public because the registration form needs it; the upload response also carries `invalid_count`; TypeScript is pinned to 5.x because `openapi-typescript` does not run on TypeScript 7.

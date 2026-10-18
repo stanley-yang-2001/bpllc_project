@@ -264,6 +264,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Preferences
+         * @description Saves display preferences on the account so they follow the learner to every browser.
+         */
+        patch: operations["patch_preferences_api_me_preferences_patch"];
+        trace?: never;
+    };
     "/api/meta": {
         parameters: {
             query?: never;
@@ -276,6 +296,27 @@ export interface paths {
          * @description Public: what the privacy page and sign-up form need to show.
          */
         get: operations["meta_api_meta_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Policy Copy
+         * @description Public: the privacy policy copy to show for `lang`. Only an approved, current copy is ever served; otherwise
+         *     the English copy, with fallback=true (design 3I).
+         */
+        get: operations["policy_copy_api_policy_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -518,6 +559,35 @@ export interface components {
             /** Story Id */
             story_id: number;
         };
+        /** ColorsIn */
+        ColorsIn: {
+            /** Accent */
+            accent: string;
+            /** Borders */
+            borders: string;
+            /** Cards */
+            cards: string;
+            /** Page */
+            page: string;
+            /** Text */
+            text: string;
+        };
+        /**
+         * CustomColors
+         * @description The five parts of a custom theme (design 3G), each a #rrggbb colour.
+         */
+        CustomColors: {
+            /** Accent */
+            accent: string;
+            /** Borders */
+            borders: string;
+            /** Cards */
+            cards: string;
+            /** Page */
+            page: string;
+            /** Text */
+            text: string;
+        };
         /** DeleteBody */
         DeleteBody: {
             /** Ids */
@@ -626,6 +696,8 @@ export interface components {
         };
         /** MetaOut */
         MetaOut: {
+            /** Policy Languages */
+            policy_languages: string[];
             /** Policy Version */
             policy_version: string;
             /** Privacy Contact */
@@ -642,6 +714,43 @@ export interface components {
         PasswordOnly: {
             /** Password */
             password: string;
+        };
+        /** PolicyOut */
+        PolicyOut: {
+            /** Doc */
+            doc: {
+                [key: string]: unknown;
+            };
+            /** Fallback */
+            fallback: boolean;
+            /** Language */
+            language: string;
+            /** Version */
+            version: string;
+        };
+        /** PreferencesOut */
+        PreferencesOut: {
+            /** Active Language */
+            active_language: string | null;
+            custom_colors: components["schemas"]["CustomColors"] | null;
+            /** Theme */
+            theme: string;
+            /** Ui Follows Study Language */
+            ui_follows_study_language: boolean;
+        };
+        /**
+         * PreferencesPatch
+         * @description Any subset. Unknown keys are rejected so a typo never silently does nothing. The server checks the *shape* of
+         *     a theme id; what it means is up to the app, so an older app and a newer server never break each other.
+         */
+        PreferencesPatch: {
+            /** Active Language */
+            active_language?: string | null;
+            custom_colors?: components["schemas"]["ColorsIn"] | null;
+            /** Theme */
+            theme?: string | null;
+            /** Ui Follows Study Language */
+            ui_follows_study_language?: boolean | null;
         };
         /** ProfilePatch */
         ProfilePatch: {
@@ -792,6 +901,7 @@ export interface components {
             languages: string[];
             /** Native Language */
             native_language: string;
+            preferences?: components["schemas"]["PreferencesOut"] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1254,6 +1364,39 @@ export interface operations {
             };
         };
     };
+    patch_preferences_api_me_preferences_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreferencesPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     meta_api_meta_get: {
         parameters: {
             query?: never;
@@ -1270,6 +1413,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetaOut"];
+                };
+            };
+        };
+    };
+    policy_copy_api_policy_get: {
+        parameters: {
+            query?: {
+                lang?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

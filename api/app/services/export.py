@@ -20,6 +20,9 @@ def build(conn, user_id: int) -> dict:
         out["user_languages"] = cur.fetchall()
         cur.execute("SELECT language, word, meaning, created_at FROM words WHERE user_id = %s ORDER BY language, word", (user_id,))
         out["words"] = cur.fetchall()
+        cur.execute("SELECT active_language, ui_follows_study_language, theme, custom_colors, updated_at "
+                    "FROM user_preferences WHERE user_id = %s", (user_id,))
+        out["user_preferences"] = cur.fetchone()          # null when never saved
         cur.execute("SELECT id, language, story_type, topic, body, passed, report, created_at FROM stories "
                     "WHERE user_id = %s ORDER BY id", (user_id,))
         out["stories"] = cur.fetchall()

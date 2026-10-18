@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookmarkPlus, LoaderCircle, MessageCircle, RotateCcw, SendHorizontal, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, type ToolCall } from "../api/client";
+import { api, type ToolCall } from "../api/client";
 import { storiesKey } from "../api/keys";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { MAX_CHARS, SLOW_AFTER_MS, useChat } from "../chat/ChatContext";
 import { ToolTrace } from "../chat/ToolTrace";
 import { useToast } from "../components/Toast";
+import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, Card, EmptyState, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
 
 const STORY_TOOL = "Story Generator Tool";
@@ -18,21 +19,23 @@ function SaveStory({ call, language }: { call: ToolCall; language: string }) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
+  const { t, err } = useI18n();
   const save = useMutation({
     mutationFn: () => api.saveStory({ language, body: call.output, story_type: null, topic: null }),
-    onSuccess: () => { toast("Saved to your library"); if (user) void qc.invalidateQueries({ queryKey: storiesKey(user.id) }); },
+    onSuccess: () => { toast(t("common.savedToLibrary")); if (user) void qc.invalidateQueries({ queryKey: storiesKey(user.id) }); },
   });
   return (
     <div className="mt-2">
       <Button variant="secondary" onClick={() => save.mutate()} disabled={save.isSuccess} loading={save.isPending} icon={<BookmarkPlus aria-hidden className="size-4" />}>
-        {save.isSuccess ? "Saved" : "Save story to library"}
+        {save.isSuccess ? t("chat.saved") : t("chat.saveStory")}
       </Button>
-      {save.error && <ErrorText>{save.error instanceof ApiError ? save.error.message : "Couldn't save. Please try again."}</ErrorText>}
+      {save.error && <ErrorText>{err(save.error, "common.saveFailed")}</ErrorText>}
     </div>
   );
 }
 
 function Waiting() {
+  const { t } = useI18n();
   const [slow, setSlow] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setSlow(true), SLOW_AFTER_MS);
@@ -41,17 +44,18 @@ function Waiting() {
   return (
     <p role="status" className="flex items-center gap-2 text-sm text-slate-600">
       <LoaderCircle aria-hidden className="size-4 animate-spin" />
-      {slow ? "Still working. Stories can take up to a minute." : "The tutor is thinking…"}
+      {slow ? t("chat.slow") : t("chat.thinking")}
     </p>
   );
 }
 
 export default function Chat() {
   const { active, info } = useActiveLanguage();
+  const { t, code } = useI18n();
   const { messages, sending, send, retry, newChat } = useChat();
   const [text, setText] = useState("");
   const end = useRef<HTMLDivElement>(null);
-  const name = info(active)?.name ?? active;
+  const name = info(active)?.native ?? active;
 
   useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [messages, sending]);
 
@@ -64,23 +68,23 @@ export default function Chat() {
   return (
     <div>
       <PageHeader
-        title="Chat"
-        description="Ask the tutor to add words to your vocabulary or write you a short story."
+        title={t("nav.chat")}
+        description={t("chat.description")}
         actions={
           <div className="flex items-center gap-2">
-            <Badge tone="brand">{name}</Badge>
+            <Badge tone="brand"><span lang={active}>{name}</span></Badge>
             <Button variant="secondary" icon={<SquarePen aria-hidden className="size-4" />} onClick={newChat} disabled={sending || messages.length === 0}>
-              New chat
+              {t("chat.newChat")}
             </Button>
           </div>
         }
       />
 
       <Card className="flex flex-col gap-4">
-        <div role="log" aria-label="Conversation" aria-live="polite" className="min-h-64 space-y-4">
+        <div role="log" aria-label={t("chat.conversation")} aria-live="polite" className="min-h-64 space-y-4">
           {messages.length === 0 && !sending && (
-            <EmptyState icon={<MessageCircle aria-hidden className="size-5" />} title="Start a conversation">
-              Try “add the word bread” to add a word to your vocabulary, or “tell me a story” for a short dialogue. Words you add go to your {name} list.
+            <EmptyState icon={<MessageCircle aria-hidden className="size-5" />} title={t("chat.empty.title")}>
+              {t("chat.empty.body", { language: name })}
             </EmptyState>
           )}
           {messages.map((m) =>
@@ -89,9 +93,9 @@ export default function Chat() {
                 <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-600 px-3.5 py-2 text-sm text-white">{m.text}</p>
                 {m.error && (
                   <div className="flex flex-col items-end">
-                    <ErrorText>{m.error}</ErrorText>
+                    <ErrorText>{code(m.errorCode, m.error)}</ErrorText>
                     <Button variant="ghost" className="mt-1" icon={<RotateCcw aria-hidden className="size-4" />} onClick={() => retry(m.id, active)} disabled={sending}>
-                      Try again
+                      {t("common.tryAgain")}
                     </Button>
                   </div>
                 )}
@@ -113,15 +117,15 @@ export default function Chat() {
         </div>
 
         <div>
-          <label htmlFor="chat-message" className="sr-only">Message</label>
+          <label htmlFor="chat-message" className="sr-only">{t("chat.message")}</label>
           <div className="flex items-end gap-2">
             <textarea
               id="chat-message"
-              aria-label="Message"
+              aria-label={t("chat.message")}
               className={`${inputCls} resize-none`}
               rows={2}
               maxLength={MAX_CHARS}
-              placeholder={`Message the tutor (Enter to send, Shift+Enter for a new line)`}
+              placeholder={t("chat.placeholder")}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
@@ -132,13 +136,13 @@ export default function Chat() {
               }}
             />
             <Button onClick={submit} disabled={sending || !text.trim()} icon={<SendHorizontal aria-hidden className="size-4" />}>
-              Send
+              {t("common.send")}
             </Button>
           </div>
-          <p className="mt-2 text-xs text-slate-600">The tutor is an AI and can make mistakes. Don't share personal details in chat.</p>
+          <p className="mt-2 text-xs text-slate-600">{t("chat.disclaimer")}</p>
         </div>
       </Card>
-      <div className="mt-4"><Notice>This conversation is kept only on this page. It is gone when you log out or close the tab.</Notice></div>
+      <div className="mt-4"><Notice>{t("chat.notice")}</Notice></div>
     </div>
   );
 }

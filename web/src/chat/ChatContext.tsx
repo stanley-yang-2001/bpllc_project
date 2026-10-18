@@ -12,7 +12,8 @@ export interface ChatMessage {
   text: string;
   toolCalls: ToolCall[];
   language?: string;                  // on a tutor message: the language the learner was in when it was asked
-  error?: string;                     // set on a learner message the tutor could not answer
+  error?: string;                     // the server's message (English)
+  errorCode?: string;                 // its code: the screen translates by code when it can
 }
 
 interface Value {
@@ -56,7 +57,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       try {
         const r = await chatRef.current({ message: text, language, session_id: session.current });
         setMessages((m) => [
-          ...m.map((x) => (x.id === id ? { ...x, error: undefined } : x)),
+          ...m.map((x) => (x.id === id ? { ...x, error: undefined, errorCode: undefined } : x)),
           { id: nextId.current++, role: "tutor", text: r.reply, toolCalls: r.tool_calls, language },
         ]);
         if (r.tool_calls.some((c) => c.name === "Add Word" && !c.failed) && userId !== undefined) {
@@ -65,7 +66,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         const message = e instanceof ApiError ? e.message : "Something went wrong. Please try again.";
-        setMessages((m) => m.map((x) => (x.id === id ? { ...x, error: message } : x)));
+        const errorCode = e instanceof ApiError ? e.code : undefined;
+        setMessages((m) => m.map((x) => (x.id === id ? { ...x, error: message, errorCode } : x)));
       } finally {
         busy.current = false;
         setSending(false);

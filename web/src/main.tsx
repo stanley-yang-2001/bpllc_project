@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { AuthProvider } from "./auth/AuthContext";
+import { PreferencesProvider } from "./prefs/PreferencesProvider";
+import { ActiveLanguageProvider } from "./auth/ActiveLanguage";
+import { I18nProvider } from "./i18n/I18nProvider";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { installBfcacheGuard } from "./auth/bfcache";
 import "@fontsource-variable/inter";
@@ -15,14 +18,20 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWind
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <PreferencesProvider>
+          <ActiveLanguageProvider>
+            <I18nProvider>
+              <ThemeProvider>
+                <BrowserRouter>
+                  <App />
+                </BrowserRouter>
+              </ThemeProvider>
+            </I18nProvider>
+          </ActiveLanguageProvider>
+        </PreferencesProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   </StrictMode>,
 );

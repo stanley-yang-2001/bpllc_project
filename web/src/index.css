@@ -45,6 +45,13 @@
   --color-slate-900: #f8fafc;          /* headings and body */
 }
 
+/* Inter has no CJK glyphs. Each script gets a system font stack and, for Han characters, the right regional shapes
+   (the same character is drawn differently in Japanese, Simplified Chinese and Korean). Selected by :lang(), so a
+   <span lang="ja"> inside an English page also uses it. */
+:lang(ja) { font-family: "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", "Noto Sans JP", Meiryo, var(--font-sans); }
+:lang(zh), :lang(zh-Hans) { font-family: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", var(--font-sans); }
+:lang(ko) { font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", var(--font-sans); }
+
 @layer base {
   /* Tailwind v4 draws borders in currentColor (black) unless told otherwise. */
   *, ::before, ::after { border-color: var(--color-slate-200); }

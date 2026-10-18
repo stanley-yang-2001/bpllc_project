@@ -27,7 +27,7 @@ _LANGS = [
     Language("it", "Italian", "Italiano", 1, False),
     Language("pt", "Portuguese", "Português", 1, False),
     Language("ja", "Japanese", "日本語", 2, True),
-    Language("zh", "Chinese", "中文", 2, False),
+    Language("zh", "Chinese (Simplified)", "中文简体", 2, False),
     Language("ko", "Korean", "한국어", 2, False),
 ]
 LANGUAGES: dict[str, Language] = {lang.code: lang for lang in _LANGS}
@@ -35,6 +35,7 @@ LANGUAGES: dict[str, Language] = {lang.code: lang for lang in _LANGS}
 # Alternate spellings a learner or the Agent may use (casefolded). Mirrors story_tool._NATIVE_LANGUAGE_NAMES.
 _ALIASES = {
     "にほんご": "ja", "nihongo": "ja",
+    "chinese": "zh", "中文": "zh", "简体中文": "zh", "简体": "zh", "chinese simplified": "zh", "simplified chinese": "zh",
     "汉语": "zh", "漢語": "zh", "普通话": "zh", "国语": "zh", "國語": "zh", "mandarin": "zh",
     "espanol": "es", "castellano": "es",
     "francais": "fr", "portugues": "pt",

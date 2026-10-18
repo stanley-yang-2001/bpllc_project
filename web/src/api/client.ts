@@ -8,6 +8,8 @@ export type UploadResult = Schemas["UploadResult"];
 export type LanguageInfo = Schemas["LanguageOut"];
 export type Health = Schemas["HealthOut"];
 export type Meta = Schemas["MetaOut"];
+export type Policy = Schemas["PolicyOut"];
+export type Preferences = Schemas["PreferencesOut"];
 export type ChatReply = Schemas["ChatOut"];
 export type ToolCall = Schemas["ToolCallOut"];
 export type StoryOptions = Schemas["StoryOptionsOut"];
@@ -71,7 +73,9 @@ export const api = {
     request<User>("POST", "/auth/register", { json: b, skipExpected: true }),
   login: (b: { email: string; password: string }) => request<User>("POST", "/auth/login", { json: b, skipExpected: true }),
   meta: () => request<Meta>("GET", "/meta", { skipExpected: true }),
+  policy: (lang?: string) => request<Policy>("GET", `/policy${lang ? `?lang=${encodeURIComponent(lang)}` : ""}`, { skipExpected: true }),
   updateProfile: (b: { display_name?: string; native_language?: string }) => request<User>("PATCH", "/me", { json: b }),
+  savePreferences: (b: Partial<Preferences>) => request<Preferences>("PATCH", "/me/preferences", { json: b }),
   changeEmail: (b: { email: string; password: string }) => request<User>("POST", "/me/email", { json: b }),
   changePassword: (b: { current_password: string; new_password: string }) => request<void>("POST", "/me/password", { json: b }),
   deleteAccount: (password: string) => request<void>("POST", "/me/delete", { json: { password } }),

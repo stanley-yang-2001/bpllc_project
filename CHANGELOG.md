@@ -2,6 +2,16 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — M8: display names, preferences on the account, site language, themes, policy copies (17 October 2026)
+
+**Written and tested here (stub stack, real Chromium); not run on your machine. Apply migration 0007.**
+- **8a:** `zh` is "Chinese (Simplified)" / 中文简体 (old names still resolve); every picker shows the native name with a `lang` attribute; CJK font stacks.
+- **8p:** `tutor.user_preferences` (migration 0007), `GET /me` carries `preferences`, `PATCH /me/preferences`; included in the download and deleted with the account. The web `PreferencesProvider` saves with a short pause, retries after a failure, and keeps a device copy (`tutor:prefs:cache`) only for first paint, wiped on logout and user change. Old device settings are adopted once.
+- **8b:** nine-language message catalog (`web/src/i18n/messages.ts`, not native-reviewed), `I18nProvider`, plural keys, error-code mapping, `<html lang>`, a "Use my study language for the site" checkbox in Settings. Sign-in pages stay English. **Fixed:** the Settings Groq row always said "Not checked yet"; it now shows the real check.
+- **8c:** colour maths, `derivePalette`, seven presets, `ThemeProvider` for presets and custom colours, a colour wheel (pointer, touch, keyboard, hex box), the Settings editor with a readability panel. Browser scans found two real bugs, fixed: the accent could fail as link text on a light page, and the sign-in page's light/dark switch flashed on reload.
+- **8d:** the privacy policy is data (`api/app/policy/en.json`) served by the public `GET /policy?lang=`; only approved, current copies are shown, anything else falls back to English with a notice; `/meta` lists `policy_languages`; the page has a picker. The English text now covers display preferences. `POLICY_VERSION` bumped once to 2026-10-17.
+- **Tests:** API 625, core 86, web 203, Playwright 49 (incl. scans of every preset, three extreme custom palettes, and all nine site languages). Mutation checks killed all deliberate breakages except two equivalent ones.
+
 ## Unreleased — run on the author's machine, 16 October 2026 (routing matrix) and a Makefile fix
 
 - **Routing matrix (`run_routing_tests.py`, 19.3 step 5): 14 of 15 turns passed**, p50 2.5 s, p90 4.8 s. S1 (English story) failed on 20 stray words, the known English story-quality weakness, not routing. I1 recorded one story-tool call with `language: English`.

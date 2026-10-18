@@ -4,6 +4,7 @@ import psycopg2.errors
 
 from ..db import cursor
 from ..errors import conflict, unauthorized
+from . import preferences
 
 USER_COLS = "id, email, display_name, native_language, created_at"
 
@@ -80,4 +81,5 @@ def delete_user(conn, user_id: int) -> None:
 
 def profile(conn, user: dict) -> dict:
     return {**{k: user[k] for k in ("id", "email", "display_name", "native_language")},
-            "languages": languages_of(conn, user["id"])}
+            "languages": languages_of(conn, user["id"]),
+            "preferences": preferences.get(conn, user["id"])}

@@ -69,14 +69,15 @@ describe("settings: password", () => {
 });
 
 describe("settings: appearance", () => {
-  it("choosing Dark turns dark mode on and remembers it", async () => {
-    mockApi(base);
+  it("choosing Dark turns dark mode on at once and saves it to the account", async () => {
+    const { calls } = mockApi({ ...base, "PATCH /me/preferences": ({ body }: any) => ({ json: { active_language: null, ui_follows_study_language: false, theme: "system", custom_colors: null, ...body } }) });
     renderApp("/settings");
     await userEvent.click(await screen.findByRole("radio", { name: "Dark" }));
     expect(document.documentElement).toHaveClass("dark");
-    expect(localStorage.getItem("tutor:theme")).toBe("dark");
     await userEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(document.documentElement).not.toHaveClass("dark");
+    await waitFor(() => expect(calls.filter((c) => c.method === "PATCH" && c.path === "/me/preferences").map((c) => c.body)).toEqual([{ theme: "light" }]), { timeout: 3000 });
+    expect(localStorage.getItem("tutor:theme")).toBeNull();
   });
 });
 
@@ -98,7 +99,7 @@ describe("settings: your data", () => {
   it("links to the privacy policy and says what is kept", async () => {
     mockApi(base);
     renderApp("/settings");
-    expect(await screen.findByText(/We keep your name, your email and the words you add/)).toBeInTheDocument();
+    expect(await screen.findByText(/We keep your name, your email, the words and stories you add, and your display preferences/)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Privacy Policy" })[0]).toHaveAttribute("href", "/privacy");
   });
 });
@@ -150,5 +151,39 @@ describe("settings: deleting the account", () => {
     expect(sessionStorage.getItem("chat")).toBeNull();
     expect(client.getQueryCache().findAll({ predicate: (q) => q.queryKey[0] !== "me" && q.queryKey[0] !== "languages" })).toHaveLength(0);
     void fn;
+  });
+});
+
+describe("settings: appearance, when the save fails", () => {
+  it("keeps the choice on screen and says it was not saved", async () => {
+    mockApi({ ...base, "PATCH /me/preferences": () => ({ status: 500, json: { error: { code: "internal_error", message: "x" } } }) });
+    renderApp("/settings");
+    await userEvent.click(await screen.findByRole("radio", { name: "Dark" }));
+    expect((await screen.findAllByText(/could not be saved to your account/, {}, { timeout: 3000 })).length).toBeGreaterThan(0);
+    expect(document.documentElement).toHaveClass("dark");
+    expect(screen.getByRole("radio", { name: "Dark" })).toBeChecked();
+  });
+});
+
+
+describe("settings: site language and services", () => {
+  it("the checkbox switches the site to the study language and is saved to the account", async () => {
+    const { calls } = mockApi({
+      ...base,
+      "GET /me": { ...ALICE, languages: ["en", "es"], preferences: { active_language: "es", ui_follows_study_language: false, theme: "system", custom_colors: null } },
+      "PATCH /me/preferences": ({ body }: any) => ({ json: { active_language: "es", ui_follows_study_language: false, theme: "system", custom_colors: null, ...body } }),
+    });
+    renderApp("/settings");
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Use my study language for the site" }));
+    expect(await screen.findByRole("heading", { name: "Idioma del sitio" })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("es");
+    await waitFor(() => expect(calls.some((c: any) => c.path === "/me/preferences" && c.body?.ui_follows_study_language === true)).toBe(true));
+  });
+
+  it("shows the Groq check from the server, not a fixed placeholder", async () => {
+    mockApi({ ...base, "GET /health": { postgres: { ok: true }, langflow: { ok: true }, groq: { ok: false, detail: "no key" } } });
+    renderApp("/settings");
+    const row = (await screen.findByText("Groq (stories)")).closest("li")!;
+    expect(row).toHaveTextContent("Problem (no key)");
   });
 });

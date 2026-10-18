@@ -1,20 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+import re
+
+from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from tutor_core.languages import LANGUAGES, stories_enabled
 
 from ..db import connection
 from ..deps import COOKIE, current_user, require_language
 from ..emails import validate_email
-from ..errors import AppError
+from ..errors import AppError, validation_error
+from .. import policy
 from ..policy import POLICY_VERSION
 from ..routes.auth import check_password_rules
-from ..schemas import LanguageOut, MetaOut, UserOut
+from ..schemas import LanguageOut, MetaOut, PolicyOut, PreferencesOut, UserOut
 from ..security import hash_password, new_salt, verify_password
-from ..services import chat_sessions, export, sessions, users
+from ..services import chat_sessions, export, preferences, sessions, users
 
 router = APIRouter(tags=["me"])
 
@@ -38,6 +41,44 @@ class ProfilePatch(BaseModel):
     def _nl(cls, v):
         if v is not None and v not in LANGUAGES:
             raise ValueError("unsupported language")
+        return v
+
+
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+_THEME = re.compile(r"^[a-z][a-z0-9-]{0,23}$")
+_COLOR_PARTS = ("page", "cards", "text", "borders", "accent")
+
+
+class ColorsIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    page: str
+    cards: str
+    text: str
+    borders: str
+    accent: str
+
+    @field_validator(*_COLOR_PARTS)
+    @classmethod
+    def _hex(cls, v: str) -> str:
+        if not _HEX.match(v):
+            raise ValueError("must be a colour like #1a2b3c")
+        return v.lower()
+
+
+class PreferencesPatch(BaseModel):
+    """Any subset. Unknown keys are rejected so a typo never silently does nothing. The server checks the *shape* of
+    a theme id; what it means is up to the app, so an older app and a newer server never break each other."""
+    model_config = ConfigDict(extra="forbid")
+    active_language: str | None = None
+    ui_follows_study_language: bool | None = None
+    theme: str | None = None
+    custom_colors: ColorsIn | None = None
+
+    @field_validator("theme")
+    @classmethod
+    def _theme(cls, v):
+        if v is not None and not _THEME.match(v):
+            raise ValueError("must be a short lowercase id such as dark or ocean")
         return v
 
 
@@ -85,7 +126,16 @@ def _reauthenticate(request: Request, user: dict, password: str) -> None:
 @router.get("/meta", response_model=MetaOut)
 def meta(request: Request):
     """Public: what the privacy page and sign-up form need to show."""
-    return {"policy_version": POLICY_VERSION, "privacy_contact": request.app.state.settings.privacy_contact}
+    return {"policy_version": POLICY_VERSION, "privacy_contact": request.app.state.settings.privacy_contact,
+            "policy_languages": policy.languages()}
+
+
+@router.get("/policy", response_model=PolicyOut)
+def policy_copy(lang: str | None = Query(default=None, max_length=8)):
+    """Public: the privacy policy copy to show for `lang`. Only an approved, current copy is ever served; otherwise
+    the English copy, with fallback=true (design 3I)."""
+    doc, fallback = policy.select(lang)
+    return {"language": doc["language"], "version": doc["version"], "fallback": fallback, "doc": doc}
 
 
 @router.get("/me", response_model=UserOut)
@@ -99,6 +149,29 @@ def patch_me(body: ProfilePatch, request: Request, user: dict = Depends(current_
     with connection(request.app.state.pool) as conn:
         updated = users.update_profile(conn, user["id"], body.display_name, body.native_language)
         return users.profile(conn, updated)
+
+
+@router.patch("/me/preferences", response_model=PreferencesOut)
+def patch_preferences(body: PreferencesPatch, request: Request, user: dict = Depends(current_user)):
+    """Saves display preferences on the account so they follow the learner to every browser."""
+    sent = body.model_fields_set
+    changes: dict = {}
+    if "active_language" in sent:
+        changes["active_language"] = body.active_language
+    if "theme" in sent:
+        if body.theme is None:
+            raise validation_error("theme: cannot be empty")
+        changes["theme"] = body.theme
+    if "ui_follows_study_language" in sent:
+        if body.ui_follows_study_language is None:
+            raise validation_error("ui_follows_study_language: must be true or false")
+        changes["ui_follows_study_language"] = body.ui_follows_study_language
+    if "custom_colors" in sent:
+        changes["custom_colors"] = body.custom_colors.model_dump() if body.custom_colors else None
+    with connection(request.app.state.pool) as conn:
+        if changes.get("active_language") is not None and changes["active_language"] not in users.languages_of(conn, user["id"]):
+            raise validation_error("active_language: not one of your languages")
+        return preferences.save(conn, user["id"], changes)
 
 
 @router.post("/me/email", response_model=UserOut)

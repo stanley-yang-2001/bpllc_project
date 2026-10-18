@@ -125,10 +125,17 @@ def test_languages_list_is_public(client):
     assert r.status_code == 200 and {l["code"] for l in r.json()} >= {"en", "es", "ja"}
 
 
+def test_languages_carry_their_own_names(client):
+    by_code = {l["code"]: l for l in client.get("/api/languages").json()}
+    assert by_code["zh"]["native"] == "中文简体" and by_code["zh"]["name"] == "Chinese (Simplified)"
+    assert by_code["es"]["native"] == "Español" and by_code["fr"]["native"] == "Français"
+    assert by_code["ja"]["native"] == "日本語" and by_code["ko"]["native"] == "한국어"
+
+
 def test_meta_is_public_and_carries_the_policy_version(app, client):
     from app.policy import POLICY_VERSION
     r = client.get("/api/meta")
-    assert r.status_code == 200 and r.json() == {"policy_version": POLICY_VERSION, "privacy_contact": None}
+    assert r.status_code == 200 and r.json() == {"policy_version": POLICY_VERSION, "privacy_contact": None, "policy_languages": ["en"]}
     app.state.settings.privacy_contact = "privacy@school.example"
     try:
         assert client.get("/api/meta").json()["privacy_contact"] == "privacy@school.example"

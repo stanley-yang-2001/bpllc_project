@@ -126,7 +126,7 @@ def test_responses_are_never_cacheable(client):
         assert resp.headers["x-frame-options"] == "DENY"
 
 
-PUBLIC = {("GET", "/api/meta"), ("POST", "/api/auth/register"), ("POST", "/api/auth/login"), ("POST", "/api/auth/logout"),
+PUBLIC = {("GET", "/api/meta"), ("GET", "/api/policy"), ("POST", "/api/auth/register"), ("POST", "/api/auth/login"), ("POST", "/api/auth/logout"),
           ("GET", "/api/health/live"), ("GET", "/api/languages")}
 
 

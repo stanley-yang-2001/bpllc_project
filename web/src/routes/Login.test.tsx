@@ -100,11 +100,22 @@ describe("login page", () => {
     expect(client.getQueryCache().findAll({ queryKey: ["words"] })).toHaveLength(0);
   });
 
-  it("remembers the active language per user", async () => {
-    mockApi({ "GET /me": { ...ALICE, languages: ["en", "es"] }, "GET /languages": LANGS, "GET /words": { items: [], total: 0, limit: 1, offset: 0 } });
+  it("saves the active language on the account, not on the device", async () => {
+    const { calls } = mockApi({
+      "GET /me": { ...ALICE, languages: ["en", "es"], preferences: null }, "GET /languages": LANGS, "GET /words": { items: [], total: 0, limit: 1, offset: 0 },
+      "PATCH /me/preferences": ({ body }: any) => ({ json: { active_language: null, ui_follows_study_language: false, theme: "system", custom_colors: null, ...body } }),
+    });
     renderApp("/");
-    await screen.findByRole("option", { name: "Spanish" });          // options arrive with /languages
+    await screen.findByRole("option", { name: "Español" });          // options arrive with /languages
     await userEvent.selectOptions(screen.getByLabelText("Active language"), "es");
-    expect(localStorage.getItem("tutor:lang:1")).toBe("es");
+    await waitFor(() => expect(calls.filter((c) => c.method === "PATCH").map((c) => c.body)).toEqual([{ active_language: "es" }]));
+    expect(screen.getByLabelText("Active language")).toHaveValue("es");
+    expect(localStorage.getItem("tutor:lang:1")).toBeNull();
+  });
+
+  it("a second device shows the language chosen on the first", async () => {
+    mockApi({ "GET /me": { ...ALICE, languages: ["en", "es"], preferences: { active_language: "es", ui_follows_study_language: false, theme: "system", custom_colors: null } }, "GET /languages": LANGS, "GET /words": { items: [], total: 0, limit: 1, offset: 0 } });
+    renderApp("/");
+    await waitFor(() => expect(screen.getByLabelText("Active language")).toHaveValue("es"));
   });
 });

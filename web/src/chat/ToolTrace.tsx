@@ -1,9 +1,11 @@
 import { CircleAlert, Wrench } from "lucide-react";
 import type { ToolCall } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 
 /** What the tutor did behind the scenes for one reply: which tool, with what, and what came back. Collapsed by
  * default, because most learners only want the answer; a learner (or a developer) can open it to check. */
 export function ToolTrace({ calls }: { calls: ToolCall[] }) {
+  const { t } = useI18n();
   if (calls.length === 0) return null;
   return (
     <div className="mt-2 space-y-1.5">
@@ -11,16 +13,16 @@ export function ToolTrace({ calls }: { calls: ToolCall[] }) {
         <details key={i} className="group rounded-lg border border-slate-200 bg-slate-50/60 text-xs text-slate-700 dark:bg-slate-100/40">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium hover:bg-slate-100/70 focus-visible:outline-2 focus-visible:outline-brand-500">
             {call.failed ? <CircleAlert aria-hidden className="size-3.5 text-red-600 dark:text-red-400" /> : <Wrench aria-hidden className="size-3.5 text-slate-500" />}
-            <span>{call.failed ? `${call.name} didn't work` : `Used ${call.name}`}</span>
+            <span>{call.failed ? t("tool.failed", { name: call.name }) : t("tool.used", { name: call.name })}</span>
           </summary>
           <dl className="space-y-1.5 border-t border-slate-200 px-2.5 py-2">
             <div>
-              <dt className="font-medium text-slate-600">Sent</dt>
+              <dt className="font-medium text-slate-600">{t("tool.sent")}</dt>
               <dd><code className="break-words">{JSON.stringify(call.args)}</code></dd>
             </div>
             <div>
-              <dt className="font-medium text-slate-600">Returned</dt>
-              <dd className="whitespace-pre-wrap break-words">{call.output || "(nothing)"}</dd>
+              <dt className="font-medium text-slate-600">{t("tool.returned")}</dt>
+              <dd className="whitespace-pre-wrap break-words">{call.output || t("tool.nothing")}</dd>
             </div>
           </dl>
         </details>

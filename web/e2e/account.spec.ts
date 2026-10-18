@@ -227,7 +227,7 @@ test.describe("dark mode", () => {
 
   test("a saved light choice also applies before the app starts, even if the OS is dark", async ({ browser }) => {
     const context = await browser.newContext({ colorScheme: "dark" });
-    await context.addInitScript(() => localStorage.setItem("tutor:theme", "light"));
+    await context.addInitScript(() => localStorage.setItem("tutor:prefs:cache", JSON.stringify({ userId: 1, theme: "light" })));
     const page = await context.newPage();
     await page.route("**/assets/*.js", (route) => route.abort());
     await page.goto("/login");
@@ -235,14 +235,25 @@ test.describe("dark mode", () => {
     await context.close();
   });
 
-  test("dark mode survives logout (it is a device setting, not account data)", async ({ browser }) => {
-    const context = await browser.newContext({ colorScheme: "light" });
-    const page = await context.newPage();
-    await register(page, `pat_${unique()}`);
+  test("the theme is on the account: it follows the learner to a second browser, and logout wipes the device copy", async ({ browser }) => {
+    const first = await browser.newContext({ colorScheme: "light" });
+    const page = await first.newPage();
+    const local = `pat_${unique()}`;
+    await register(page, local);
     await page.getByRole("button", { name: "Switch to dark mode" }).click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("tutor:prefs:cache"))).toContain('"theme":"dark"');
+    await page.waitForTimeout(1500);                                               // the save is sent after a short pause
+
+    const second = await browser.newContext({ colorScheme: "light" });             // another device
+    const other = await second.newPage();
+    await login(other, local);
+    await expect.poll(() => other.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(true);
+
     await page.getByRole("button", { name: "Log out", exact: true }).click();
     await expect(loginButton(page)).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(true);
-    await context.close();
+    expect(await page.evaluate(() => localStorage.getItem("tutor:prefs:cache"))).toBeNull();      // nothing left for the next person
+    expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(false);   // the OS is light
+    await first.close();
+    await second.close();
   });
 });

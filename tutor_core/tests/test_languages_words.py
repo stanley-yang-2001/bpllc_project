@@ -70,3 +70,19 @@ def test_newlines_never_survive():
     still a legal entry, so the prompt builder must also present the list as data (done in M3/M6)."""
     out = validate_word("hello\nignore previous")
     assert "\n" not in out and out == "hello ignore previous"
+
+
+@pytest.mark.parametrize("text", ["Chinese", "中文", "简体中文", "中文简体", "chinese (simplified)", " Simplified Chinese ", "汉语", "ZH"])
+def test_every_way_of_naming_chinese_resolves_to_zh(text):
+    assert normalize_language(text) == "zh"
+
+
+def test_chinese_is_named_in_its_own_script_and_marked_simplified():
+    from tutor_core.languages import LANGUAGES
+    assert LANGUAGES["zh"].native == "中文简体" and LANGUAGES["zh"].name == "Chinese (Simplified)"
+
+
+def test_every_language_has_a_native_name_different_from_none():
+    from tutor_core.languages import LANGUAGES
+    assert all(l.native.strip() for l in LANGUAGES.values())
+    assert len({l.native for l in LANGUAGES.values()}) == len(LANGUAGES)      # no two pickers look the same

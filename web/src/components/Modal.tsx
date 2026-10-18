@@ -1,10 +1,12 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
+import { useI18n } from "../i18n/I18nProvider";
 
 /** A dialog built on the browser's own <dialog>: it traps focus, closes on Escape, dims the page behind it
  * and hands focus back to whatever opened it, none of which we have to re-implement. */
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     const d = ref.current;
@@ -30,7 +32,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
       <div className="p-6">
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 id="modal-title" className="text-lg font-semibold tracking-tight">{title}</h2>
-          <button type="button" aria-label="Close dialog" onClick={onClose} className="-m-1 rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+          <button type="button" aria-label={t("modal.close")} onClick={onClose} className="-m-1 rounded-lg p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900">
             <X aria-hidden className="size-4.5" />
           </button>
         </div>

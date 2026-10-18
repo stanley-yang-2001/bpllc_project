@@ -153,8 +153,8 @@ export default function Login() {
               <PasswordField id="r-pass" autoComplete="new-password" error={registerForm.formState.errors.password?.message} reg={registerForm.register("password")} />
               <Field id="r-lang" label="Language I'm learning">
                 <select id="r-lang" className={inputCls} {...registerForm.register("language")}>
-                  {(languages.length ? languages : [{ code: "en", name: "English" }]).map((l) => (
-                    <option key={l.code} value={l.code}>{l.name}</option>
+                  {(languages.length ? languages : [{ code: "en", native: "English" }]).map((l) => (
+                    <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>
                   ))}
                 </select>
               </Field>

@@ -2,8 +2,25 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel
+
+
+class CustomColors(BaseModel):
+    """The five parts of a custom theme (design 3G), each a #rrggbb colour."""
+    page: str
+    cards: str
+    text: str
+    borders: str
+    accent: str
+
+
+class PreferencesOut(BaseModel):
+    active_language: str | None
+    ui_follows_study_language: bool
+    theme: str
+    custom_colors: CustomColors | None
 
 
 class UserOut(BaseModel):
@@ -12,6 +29,7 @@ class UserOut(BaseModel):
     display_name: str
     native_language: str
     languages: list[str]
+    preferences: PreferencesOut | None = None      # null until the learner saves one (then the app uses defaults)
 
 
 class WordOut(BaseModel):
@@ -56,6 +74,14 @@ class LanguageOut(BaseModel):
 class MetaOut(BaseModel):
     policy_version: str
     privacy_contact: str | None
+    policy_languages: list[str]          # languages with an approved, current policy copy; English first
+
+
+class PolicyOut(BaseModel):
+    language: str                        # the copy that is being served
+    version: str
+    fallback: bool                       # true when English stands in for the language asked for
+    doc: dict[str, Any]                  # the copy itself: data, never HTML (design 3I)
 
 
 class StatusOut(BaseModel):
