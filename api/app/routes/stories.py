@@ -32,9 +32,15 @@ class GenerateIn(BaseModel):
     @field_validator("story_type")
     @classmethod
     def _type(cls, value):
-        if value is not None and value not in prompts.ALL_STORY_TYPES:
-            raise ValueError("Unknown story type.")
-        return value
+        """A built-in type, an alias ("conversation"), or the learner's own short label ("a poem"). The result is the
+        canonical built-in name or the cleaned label; text that cannot be used never gets as far as the prompt."""
+        if value is None:
+            return None
+        resolved = prompts.resolve_story_type(value)
+        if resolved is None:
+            raise ValueError("Pick one of the listed kinds, or write a short one of your own: up to 40 characters and 6 words, "
+                             "with letters, numbers, spaces, apostrophes and hyphens only.")
+        return resolved
 
     @field_validator("topic")
     @classmethod

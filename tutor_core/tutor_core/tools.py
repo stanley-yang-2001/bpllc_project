@@ -98,9 +98,11 @@ def add_word_for_agent(word, learner_id, active_language, *, connect=None, env=N
     return f"'{result.word}' is already in your {name} vocabulary."
 
 
-def story_for_agent(language, learner_id, active_language, *, connect=None, env=None, call_groq_fn=None) -> str:
+def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, *, connect=None, env=None,
+                    call_groq_fn=None) -> str:
     """`language` is what the Agent passed (the learner may say "a story in French" while Spanish is active); blank means the
-    hidden active language."""
+    hidden active language. `story_type` and `topic` are what the learner asked for in chat ("a dialogue", "a letter about my
+    trip"); both are optional, and blank means "choose for me". generate_story cleans them and refuses a type it cannot use."""
     learner = resolve_learner(learner_id, env)
     if learner is None:
         return NO_LEARNER_STORY
@@ -116,7 +118,7 @@ def story_for_agent(language, learner_id, active_language, *, connect=None, env=
     try:                                    # generate_story itself declines a language whose story quality is not measured
         conn = _open(connect, env)
         try:
-            return generate_story(conn, learner, code, call_groq_fn=call_groq_fn).text
+            return generate_story(conn, learner, code, call_groq_fn=call_groq_fn, story_type=story_type, topic=topic).text
         finally:
             conn.close()
     except Exception:  # noqa: BLE001

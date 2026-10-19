@@ -18,7 +18,8 @@ from typing import Optional
 
 from . import groq as groq_module
 from .languages import LANGUAGES, stories_enabled
-from .prompts import EMPTY_VOCABULARY_MESSAGE, build_story_prompt, describe_prompt, extract_final_passage
+from .prompts import (EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage,
+                      resolve_story_type)
 from .vocab import _check, load_words, max_prompt_words, sample_words
 
 _STORY_CACHE: dict = {}
@@ -28,13 +29,17 @@ _FAILURE_CACHE_TTL_SECONDS = 15
 FAILURE_FALLBACK_MESSAGE = (
     "I'm having trouble generating a story right now — please try again in a moment."
 )
+BAD_TYPE_MESSAGE = (
+    "I can't write that kind of text. Try a story, a dialogue, a diary entry, a letter, a place, a daily routine or a "
+    "funny anecdote, or name a short kind of text in plain words."
+)
 
 
 @dataclass(frozen=True)
 class StoryResult:
     text: str                       # the passage, or the fixed message for the two non-success cases
     ok: bool
-    reason: Optional[str]           # None | "empty_vocabulary" | "failed" | "language_not_enabled"
+    reason: Optional[str]           # None | "empty_vocabulary" | "failed" | "language_not_enabled" | "bad_type"
     language: str                   # ISO 639-1 code
     story_type: Optional[str] = None
     topic: Optional[str] = None     # only the newer story types have one
@@ -57,10 +62,22 @@ def generate_story(
     clock=time.time,
 ) -> StoryResult:
     """`language` is an ISO code. Raises VocabError for a malformed learner or language (a caller bug, not a story
-    failure); every story failure comes back as a StoryResult with ok=False."""
+    failure); every story failure comes back as a StoryResult with ok=False.
+
+    `story_type` may be a built-in type, an alias ("conversation"), a short custom label of the learner's own, or
+    blank / "random" for the weighted random choice; one that cannot be used comes back as reason "bad_type" and never
+    reaches the prompt. `topic` may be one from the built-in list or a short free-text subject; a topic that cannot be
+    used is dropped (a random one is chosen) rather than failing the story."""
     _check(learner_id, language)
     if not stories_enabled(language):       # a measured flag (design 3C), checked before anything else is touched
         return StoryResult(f"Stories in {LANGUAGES[language].name} are not available yet.", False, "language_not_enabled", language)
+    if story_type is not None and str(story_type).strip().casefold() not in ("", "random"):
+        story_type = resolve_story_type(story_type)
+        if story_type is None:
+            return StoryResult(BAD_TYPE_MESSAGE, False, "bad_type", language)
+    else:
+        story_type = None
+    topic = clean_topic(topic) if topic else None
     key = (learner_id, language, story_type or "", topic or "")
     now = clock()
 

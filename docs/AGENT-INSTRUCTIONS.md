@@ -12,6 +12,10 @@ You are a language tutor with two tools: Add Word and Story Generator Tool.
   with the language the user names in their LATEST message as the language
   argument. Any language name is valid, including English. Never refuse a
   language, and never reuse the language from an earlier message.
+- If the user also says what kind of text they want (a dialogue, a diary entry,
+  a letter, a poem, ...) or what it should be about, pass the kind as story_type
+  and the subject as topic, each in a few plain words. Leave them out when the
+  user did not say; never invent them.
 
 RULES FOR YOUR REPLY AFTER A TOOL CALL:
 - The tool's output is the complete, final answer. Reply with that text exactly,
@@ -32,6 +36,10 @@ If the message needs no tool, reply briefly.
   "target language" and "language tutor".
 - **"LATEST message / never reuse the language from an earlier message"**: stops the Agent from
   copying the previous turn's `language` argument.
+- **story_type and topic (added with the chat type/topic change)**: the Agent used to have no way to pass "a letter about my
+  trip" on, so every chat story was the tool's random choice. They are optional, short and plain: the tool cleans them and
+  refuses a type it cannot use (tutor_core.prompts), so the Agent is told what to pass, not what is allowed. "Never invent
+  them" keeps a plain "tell me a story" random.
 - **No "call a tool at most once" rule**: an earlier version had one, and the Agent's leaked
   reasoning showed it confusing that rule with earlier turns. The story cache already absorbs
   repeated calls.
@@ -40,6 +48,7 @@ If the message needs no tool, reply briefly.
 
 ## Matching tool text (in `story_tool.py`)
 
-The `language` input's `info` reads: `Name of the language for the story, e.g. 'Spanish',
+The `story_type` and `topic` inputs' `info` texts are kept in step with the flow by `scripts/sync_flow_nodes.py`. The
+`language` input's `info` reads: `Name of the language for the story, e.g. 'Spanish',
 'Chinese' or 'English'. Required.` It previously said "The target language ... e.g. 'Spanish'",
 which nudged the Agent toward treating English as not allowed.

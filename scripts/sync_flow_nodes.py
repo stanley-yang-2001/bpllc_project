@@ -9,6 +9,9 @@ there is nothing for a tweak to land on).
     python scripts/sync_flow_nodes.py            # update flows/language-tutor.json in place
     python scripts/sync_flow_nodes.py --check    # change nothing; exit 1 and say what differs (the tests run this)
 
+It also keeps the Story Generator Tool's optional visible inputs (`story_type`, `topic`) in step: their fields, their place in
+field_order, and their entries in the tool's argument list (the Agent only sees what is listed there).
+
 It never touches any other node, the edges, or the Agent's instructions, and it refuses to write a file that still
 contains something that looks like an API key.
 """
@@ -36,6 +39,36 @@ HIDDEN = {
     "active_language": ("Active language (hidden)",
                         "Set per request by the API through tweaks: the learner's selected language, as an ISO code."),
 }
+
+
+# (display name, info) of the extra VISIBLE inputs of a node, in the order they follow `language`; they must match the
+# MessageTextInput definitions in the component (api/tests/test_flow_file.py compares them with the component's source).
+VISIBLE = {
+    "StoryGeneratorTool-RQpvc": {
+        "story_type": ("Story type",
+                       "Optional. The kind of text the learner asked for: story, dialogue, diary, letter, place, routine, anecdote, "
+                       "or a short kind of text in plain words (for example 'poem'). Leave blank to let the tutor choose."),
+        "topic": ("Topic",
+                  "Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). "
+                  "Leave blank to let the tutor choose."),
+    },
+}
+
+
+def visible_field(name, display, info):
+    """A visible, tool-mode text field in the format Langflow 1.12.2 generates for `MessageTextInput(tool_mode=True)`."""
+    return {
+        "_input_type": "MessageTextInput", "advanced": False, "api_editable": False, "display_name": display, "dynamic": False,
+        "info": info, "input_types": ["Message"], "list": False, "list_add_label": "Add More", "load_from_db": False,
+        "name": name, "override_skip": False, "placeholder": "", "required": False, "show": True, "title_case": False,
+        "tool_mode": True, "trace_as_input": True, "trace_as_metadata": True, "track_in_telemetry": False, "type": "str",
+        "value": "",
+    }
+
+
+def tool_arg(display, info):
+    """One entry of a tool's `args` in the node's tools_metadata."""
+    return {"default": "", "description": info, "title": display, "type": "string"}
 
 
 def hidden_field(name):
@@ -97,6 +130,25 @@ def sync(flow, write=True):
             problems.append(f"{node_id}: dependency metadata is out of date")
             if write:
                 node["metadata"]["dependencies"] = deps
+        previous = "language"
+        for name, (display, info) in VISIBLE.get(node_id, {}).items():
+            if node["template"].get(name) != visible_field(name, display, info):
+                problems.append(f"{node_id}: visible field {name} is missing or differs")
+                if write:
+                    node["template"][name] = visible_field(name, display, info)
+            order = node.setdefault("field_order", [])
+            if name not in order or order.index(name) != order.index(previous) + 1:
+                problems.append(f"{node_id}: {name} is not right after {previous} in field_order")
+                if write:
+                    if name in order:
+                        order.remove(name)
+                    order.insert(order.index(previous) + 1, name)
+            previous = name
+            for tool in node["template"].get("tools_metadata", {}).get("value", []):
+                if tool.get("args", {}).get(name) != tool_arg(display, info):
+                    problems.append(f"{node_id}: the tool's argument list is missing or differs for {name}")
+                    if write:
+                        tool.setdefault("args", {})[name] = tool_arg(display, info)
         for name in HIDDEN:
             if node["template"].get(name) != hidden_field(name):
                 problems.append(f"{node_id}: hidden field {name} is missing or differs")

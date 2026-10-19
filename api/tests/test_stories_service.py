@@ -68,7 +68,7 @@ def test_delete_removes_only_that_story(conn, make_learner):
     assert [s["id"] for s in stories.list_for_user(conn, uid, None, 10, 0)["items"]] == [keep["id"]]
 
 
-@pytest.mark.parametrize("kwargs", [{"story_type": "poem"}, {"language": "spanish"}, {"language": "E"}, {"body": "   "},
+@pytest.mark.parametrize("kwargs", [{"story_type": "x" * 41}, {"story_type": ""}, {"language": "spanish"}, {"language": "E"}, {"body": "   "},
                                     {"body": "x" * 20001}, {"topic": "t" * 121}])
 def test_the_database_refuses_junk_even_if_the_service_were_bypassed(conn, make_learner, kwargs):
     uid = make_learner("a")

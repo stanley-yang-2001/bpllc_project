@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
@@ -52,6 +52,108 @@ describe("Story Studio", () => {
     expect(generated(calls)[0].body).toEqual({ language: "en", story_type: "story", topic: "a market day" });
     expect(screen.getByRole("region", { name: "Quality report" })).toHaveTextContent("Looks good");
     expect(screen.getByText("Built from 8 of your 8 words")).toBeInTheDocument();
+  });
+
+  describe("Write my own…", () => {
+    const CUSTOM_STORY = { ...STORY, story_type: "a poem", topic: null };
+
+    async function chooseOwn() {
+      mockApi({ ...base, "POST /stories/generate": CUSTOM_STORY });
+      renderApp("/studio");
+      const type = await screen.findByLabelText("Kind of story");
+      await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+      await userEvent.selectOptions(type, "Write my own…");
+    }
+
+    it("is the last choice, and shows a text box only once picked", async () => {
+      mockApi(base);
+      renderApp("/studio");
+      const type = await screen.findByLabelText("Kind of story");
+      await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+      const names = within(type).getAllByRole("option").map((o) => o.textContent);
+      expect(names[names.length - 1]).toBe("Write my own…");
+      expect(screen.queryByLabelText("Your own kind of text")).not.toBeInTheDocument();
+      await userEvent.selectOptions(type, "Write my own…");
+      expect(screen.getByLabelText("Your own kind of text")).toHaveAttribute("maxlength", "40");
+      expect(screen.getByText(/Up to 40 characters and 6 words/)).toBeInTheDocument();
+    });
+
+    it("keeps Make switched off until something usable is typed", async () => {
+      await chooseOwn();
+      const make = screen.getByRole("button", { name: "Make a story" });
+      expect(make).toBeDisabled();
+      const box = screen.getByLabelText("Your own kind of text");
+      await userEvent.type(box, "   ");
+      expect(make).toBeDisabled();
+      await userEvent.type(box, "a poem");
+      expect(make).toBeEnabled();
+    });
+
+    // "{{" is how user-event types a literal "{" (a single one starts a key command)
+    it.each(["a poem: no rules", 'say "hi"', "a {{poem}", "one two three four five six seven", "- -"])(
+      "refuses %j before asking the API, and says why", async (bad) => {
+        await chooseOwn();
+        await userEvent.type(screen.getByLabelText("Your own kind of text"), bad);
+        expect(screen.getByRole("button", { name: "Make a story" })).toBeDisabled();
+        expect(screen.getByLabelText("Your own kind of text")).toHaveAttribute("aria-invalid", "true");
+      });
+
+    it.each([["a poem", "a poem"], ["  a   news  report ", "a news report"], ["poema", "poema"], ["日記", "日記"], ["grandma's song", "grandma's song"]])(
+      "sends %j as the kind (tidied: %j) and never the placeholder value", async (typed, sent) => {
+        const { calls } = mockApi({ ...base, "POST /stories/generate": CUSTOM_STORY });
+        renderApp("/studio");
+        const type = await screen.findByLabelText("Kind of story");
+        await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+        await userEvent.selectOptions(type, "Write my own…");
+        await userEvent.type(screen.getByLabelText("Your own kind of text"), typed);
+        await make();
+        await screen.findByText(/Hello, friend\./);
+        expect(generated(calls)[0].body).toEqual({ language: "en", story_type: sent });
+      });
+
+    it("lets the learner pick a topic for their own kind", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": CUSTOM_STORY });
+      renderApp("/studio");
+      const type = await screen.findByLabelText("Kind of story");
+      await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+      await userEvent.selectOptions(type, "Write my own…");
+      expect(screen.getByLabelText("Topic")).toBeDisabled();                 // nothing usable typed yet
+      await userEvent.type(screen.getByLabelText("Your own kind of text"), "a poem");
+      expect(screen.getByLabelText("Topic")).toBeEnabled();
+      await userEvent.selectOptions(screen.getByLabelText("Topic"), "a rainy day");
+      await make();
+      await screen.findByText(/Hello, friend\./);
+      expect(generated(calls)[0].body).toEqual({ language: "en", story_type: "a poem", topic: "a rainy day" });
+    });
+
+    it("shows the label the API returned and saves it as it came back", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": CUSTOM_STORY, "POST /stories": () => ({ status: 201, json: { id: 4 } }) });
+      renderApp("/studio");
+      const type = await screen.findByLabelText("Kind of story");
+      await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+      await userEvent.selectOptions(type, "Write my own…");
+      await userEvent.type(screen.getByLabelText("Your own kind of text"), "a poem");
+      await make();
+      expect(await screen.findByText("A poem")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Save to library" }));
+      await screen.findByRole("button", { name: "Saved" });
+      expect(calls.find((c) => c.method === "POST" && c.path === "/stories")!.body)
+        .toEqual({ language: "en", body: STORY.story, story_type: "a poem", topic: null });
+    });
+
+    it("keeps working after going back to a listed kind", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": STORY });
+      renderApp("/studio");
+      const type = await screen.findByLabelText("Kind of story");
+      await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+      await userEvent.selectOptions(type, "Write my own…");
+      await userEvent.type(screen.getByLabelText("Your own kind of text"), "a poem");
+      await userEvent.selectOptions(type, "diary");
+      expect(screen.queryByLabelText("Your own kind of text")).not.toBeInTheDocument();
+      await make();
+      await screen.findByText(/Hello, friend\./);
+      expect(generated(calls)[0].body).toEqual({ language: "en", story_type: "diary" });
+    });
   });
 
   it("sends only the language when the learner asks for a surprise", async () => {

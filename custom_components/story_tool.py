@@ -22,7 +22,9 @@ request with an HTTP 1010).
 M3: the pipeline is tutor_core.story and the tool logic is tutor_core.tools.story_for_agent (tested in
 api/tests/test_tutor_core_story.py and test_tutor_tools.py). The story is built from the CALLING LEARNER's words in the
 chosen language only; `learner_id` and `active_language` are hidden inputs set by the API, and without a usable
-learner the tool refuses (fail closed). The visible `language` argument is what the Agent fills in.
+learner the tool refuses (fail closed). The visible `language`, `story_type` and `topic` arguments are what the Agent
+fills in; the last two are optional and carry what the learner asked for in chat ("a dialogue", "a letter about my trip").
+A type or topic the tool cannot use is cleaned or refused inside tutor_core.prompts, never passed into the prompt as it came.
 """
 
 from tutor_core.tools import story_for_agent
@@ -49,6 +51,22 @@ class StoryGeneratorTool(Component):
             info="Name of the language for the story, e.g. 'Spanish', 'Chinese' ,'English' etc. Required.",
             tool_mode=True,
         ),
+        MessageTextInput(
+            name="story_type",
+            display_name="Story type",
+            info="Optional. The kind of text the learner asked for: story, dialogue, diary, letter, place, routine, anecdote, "
+                 "or a short kind of text in plain words (for example 'poem'). Leave blank to let the tutor choose.",
+            value="",
+            tool_mode=True,
+        ),
+        MessageTextInput(
+            name="topic",
+            display_name="Topic",
+            info="Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). "
+                 "Leave blank to let the tutor choose.",
+            value="",
+            tool_mode=True,
+        ),
         StrInput(
             name="learner_id",
             display_name="Learner ID (hidden)",
@@ -73,6 +91,7 @@ class StoryGeneratorTool(Component):
     ]
 
     def run(self) -> Message:
-        message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language))
+        message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,
+                                               self.story_type, self.topic))
         self.status = message
         return message

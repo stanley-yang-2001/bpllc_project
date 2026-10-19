@@ -13,6 +13,17 @@ import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, Card, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
 
 const CLASSIC = ["narration", "dialogue"];          // these two have no topic
+const CUSTOM = "__custom__";                        // the "Write my own…" choice; never sent to the API
+const CUSTOM_MAX = 40;
+
+/** The same rule the API applies (tutor_core.prompts.clean_free_text), so a bad label is explained here and Make stays off.
+ * The API is the authority and checks again. */
+export function customLabel(text: string): string | null {
+  const clean = text.trim().replace(/\s+/g, " ");
+  const ok = clean.length > 0 && clean.length <= CUSTOM_MAX && clean.split(" ").length <= 6
+    && /^[\p{L}\p{M}\p{N}'\u2019 -]+$/u.test(clean) && /[\p{L}\p{N}]/u.test(clean);
+  return ok ? clean : null;
+}
 
 export default function Studio() {
   const { active, info } = useActiveLanguage();
@@ -25,6 +36,7 @@ export default function Studio() {
   const options = useQuery({ queryKey: ["story-options"], queryFn: api.storyOptions, staleTime: Infinity });
   const [type, setType] = useState("");
   const [topic, setTopic] = useState("");
+  const [custom, setCustom] = useState("");
   const [story, setStory] = useState<GeneratedStory | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
   const saved = savedId !== null;
@@ -40,7 +52,9 @@ export default function Studio() {
 
   useEffect(() => { setStory(null); setSavedId(null); generate.reset(); save.reset(); }, [active]);   // a story belongs to one language
 
-  const make = () => generate.mutate({ language: active, story_type: type || undefined, topic: !type || CLASSIC.includes(type) ? undefined : topic || undefined });
+  const kind = type === CUSTOM ? customLabel(custom) ?? "" : type;       // "" = surprise me (or an unusable label, which blocks Make)
+  const customBad = type === CUSTOM && !kind;
+  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !kind || CLASSIC.includes(kind) ? undefined : topic || undefined });
   const enabled = lang?.stories_enabled !== false;
   const failure = generate.error instanceof ApiError ? generate.error : null;
 
@@ -62,19 +76,31 @@ export default function Studio() {
                 <select id="story-type" className={inputCls} value={type} onChange={(e) => setType(e.target.value)}>
                   <option value="">{t("studio.surprise")}</option>
                   {options.data?.types.map((ty) => <option key={ty} value={ty}>{typeLabel(t, ty)}</option>)}
+                  <option value={CUSTOM}>{t("studio.kindCustom")}</option>
                 </select>
+                {type === CUSTOM && (
+                  <div className="mt-2">
+                    <label htmlFor="story-custom" className="mb-1 block text-sm font-medium text-slate-700">{t("studio.customLabel")}</label>
+                    <input
+                      id="story-custom" className={inputCls} value={custom} maxLength={CUSTOM_MAX} lang={active}
+                      onChange={(e) => setCustom(e.target.value)} aria-describedby="story-custom-hint"
+                      aria-invalid={custom.trim() !== "" && customBad}
+                    />
+                    <p id="story-custom-hint" className={`mt-1 text-xs ${custom.trim() !== "" && customBad ? "text-red-700" : "text-slate-600"}`}>{t("studio.customHint")}</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label htmlFor="story-topic" className="mb-1 block text-sm font-medium text-slate-700">{t("studio.topic")}</label>
-                <select id="story-topic" className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} disabled={!type || CLASSIC.includes(type)}>
+                <select id="story-topic" className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} disabled={!kind || CLASSIC.includes(kind)}>
                   <option value="">{t("studio.anyTopic")}</option>
                   {options.data?.topics.map((tp) => <option key={tp} value={tp}>{topicLabel(t, tp)}</option>)}
                 </select>
-                {(!type || CLASSIC.includes(type)) && <p className="mt-1 text-xs text-slate-600">{t("studio.topicHint")}</p>}
+                {(!kind || CLASSIC.includes(kind)) && <p className="mt-1 text-xs text-slate-600">{t("studio.topicHint")}</p>}
               </div>
             </div>
             <div>
-              <Button onClick={make} loading={generate.isPending} icon={<Sparkles aria-hidden className="size-4" />}>
+              <Button onClick={make} loading={generate.isPending} disabled={customBad} icon={<Sparkles aria-hidden className="size-4" />}>
                 {generate.isPending ? t("studio.writing") : t("studio.make")}
               </Button>
               {generate.isPending && <p role="status" className="mt-2 text-sm text-slate-600">{t("studio.wait")}</p>}

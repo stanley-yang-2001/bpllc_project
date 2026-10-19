@@ -3,6 +3,7 @@
 A node holds its OWN copy of its component's code and field templates, so the repo's components and the flow can drift
 apart without anything failing until a learner hits it. These tests make the drift fail here instead. They also tie the
 API's default tweak keys to real nodes in the flow."""
+import ast
 import copy
 import json
 import os
@@ -59,11 +60,48 @@ def test_the_hidden_inputs_exist_on_every_tool_node_and_the_agent_cannot_see_the
     assert "user_id" not in template                                     # Langflow reserves it
 
 
-def test_the_agent_still_sees_exactly_one_argument_per_tool(flow):
+def test_the_agent_sees_only_the_documented_arguments(flow):
+    """Add Word takes just the word; the story tool takes the language and, optionally, a type and a topic. The learner id and
+    the active language stay hidden."""
     visible = {nid: sorted(k for k, v in node(flow, nid)["template"].items()
                            if isinstance(v, dict) and v.get("tool_mode") is True and k != "tools_metadata")
                for nid in ("AddWord-WhP5g", "StoryGeneratorTool-RQpvc")}
-    assert visible == {"AddWord-WhP5g": ["word"], "StoryGeneratorTool-RQpvc": ["language"]}
+    assert visible == {"AddWord-WhP5g": ["word"], "StoryGeneratorTool-RQpvc": ["language", "story_type", "topic"]}
+
+
+def test_the_story_tools_argument_list_names_the_same_three_arguments(flow):
+    """The tool's `args` in tools_metadata is what the Agent is actually shown; it must list the type and the topic too."""
+    tool = node(flow, "StoryGeneratorTool-RQpvc")["template"]["tools_metadata"]["value"][0]
+    assert sorted(tool["args"]) == ["language", "story_type", "topic"]
+    for name, (display, info) in sync.VISIBLE["StoryGeneratorTool-RQpvc"].items():
+        assert tool["args"][name] == {"default": "", "description": info, "title": display, "type": "string"}
+
+
+def test_the_visible_fields_follow_language_in_field_order(flow):
+    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "learner_id", "active_language"]
+
+
+def _component_inputs(filename):
+    """{input name: (class name, display_name, info, tool_mode, value)} read from the component's source without importing Langflow."""
+    tree = ast.parse(open(os.path.join(ROOT, "custom_components", filename), encoding="utf-8").read())
+    found = {}
+    for call in (n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "id", "") in ("MessageTextInput", "StrInput")):
+        kw = {k.arg: ast.literal_eval(k.value) for k in call.keywords if k.arg in ("name", "display_name", "info", "tool_mode", "value")}
+        found[kw["name"]] = (call.func.id, kw.get("display_name"), kw.get("info"), kw.get("tool_mode"), kw.get("value"))
+    return found
+
+
+def test_the_sync_script_and_the_component_describe_the_visible_inputs_in_the_same_words():
+    inputs = _component_inputs("story_tool.py")
+    for name, (display, info) in sync.VISIBLE["StoryGeneratorTool-RQpvc"].items():
+        assert inputs[name] == ("MessageTextInput", display, info, True, ""), name
+
+
+def test_the_sync_script_and_the_component_describe_the_hidden_inputs_in_the_same_words():
+    for filename in ("add_word.py", "story_tool.py", "word_loader.py"):
+        inputs = _component_inputs(filename)
+        for name, (display, info) in sync.HIDDEN.items():
+            assert inputs[name][:3] == ("StrInput", display, info), (filename, name)
 
 
 def test_the_word_loader_stays_unwired(flow):
@@ -113,6 +151,48 @@ def test_a_missing_hidden_field_is_reported_and_restored(flow):
     assert any("learner_id" in p and "missing" in p for p in sync.sync(broken, write=False))
     sync.sync(broken, write=True)
     assert "learner_id" in node(broken, "StoryGeneratorTool-RQpvc")["template"]
+
+
+def test_a_missing_visible_field_is_reported_and_restored(flow):
+    broken = copy.deepcopy(flow)
+    del node(broken, "StoryGeneratorTool-RQpvc")["template"]["topic"]
+    assert any("visible field topic is missing" in p for p in sync.sync(broken, write=False))
+    sync.sync(broken, write=True)
+    assert sync.sync(broken, write=False) == [] and "topic" in node(broken, "StoryGeneratorTool-RQpvc")["template"]
+
+
+def test_a_visible_field_the_agent_could_not_see_is_reported_and_restored(flow):
+    broken = copy.deepcopy(flow)
+    node(broken, "StoryGeneratorTool-RQpvc")["template"]["story_type"]["tool_mode"] = False
+    assert any("story_type" in p for p in sync.sync(broken, write=False))
+    sync.sync(broken, write=True)
+    assert node(broken, "StoryGeneratorTool-RQpvc")["template"]["story_type"]["tool_mode"] is True
+
+
+def test_an_argument_list_without_the_type_and_topic_is_reported_and_restored(flow):
+    stale = copy.deepcopy(flow)
+    args = node(stale, "StoryGeneratorTool-RQpvc")["template"]["tools_metadata"]["value"][0]["args"]
+    del args["story_type"], args["topic"]
+    problems = sync.sync(stale, write=False)
+    assert sorted(problems) == ["StoryGeneratorTool-RQpvc: the tool's argument list is missing or differs for story_type",
+                                "StoryGeneratorTool-RQpvc: the tool's argument list is missing or differs for topic"]
+    sync.sync(stale, write=True)
+    assert sync.sync(stale, write=False) == []
+
+
+def test_a_visible_field_out_of_place_in_field_order_is_reported_and_moved(flow):
+    stale = copy.deepcopy(flow)
+    order = node(stale, "StoryGeneratorTool-RQpvc")["field_order"]
+    order.remove("story_type")
+    order.append("story_type")
+    assert any("story_type is not right after language" in p for p in sync.sync(stale, write=False))
+    sync.sync(stale, write=True)
+    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "learner_id", "active_language"]
+
+
+def test_the_other_tool_nodes_get_no_visible_extras(flow):
+    for nid in ("AddWord-WhP5g", "WordLoader-2zTeQ"):
+        assert "story_type" not in node(flow, nid)["template"] and "topic" not in node(flow, nid)["template"]
 
 
 def test_a_tampered_hidden_field_is_reported(flow):
