@@ -59,7 +59,7 @@ def test_the_prompt_is_the_one_the_agent_path_always_built_for_that_language(con
     l = learner_with(conn, make_learner, "es", ["pan", "queso"])
     g = Groq()
     generate_story(conn, l, "es", call_groq_fn=g, story_type="dialogue", topic="a market")
-    assert g.prompts[0] == prompts.build_story_prompt("Spanish", "pan, queso", "dialogue", "a market")
+    assert g.prompts[0] == prompts.build_story_prompt("Spanish", "pan, queso", "dialogue", "a market", vocab_in_target=True)
 
 
 @pytest.mark.parametrize("code", sorted(LANGUAGES))
@@ -68,7 +68,7 @@ def test_every_supported_language_builds_a_prompt_with_its_english_name(conn, ma
     l = learner_with(conn, make_learner, code, ["pan"])
     g = Groq()
     generate_story(conn, l, code, call_groq_fn=g, story_type="narration", topic="a market")
-    assert g.prompts[0] == prompts.build_story_prompt(LANGUAGES[code].name, "pan", "narration", "a market")
+    assert g.prompts[0] == prompts.build_story_prompt(LANGUAGES[code].name, "pan", "narration", "a market", vocab_in_target=True)
 
 
 @pytest.mark.parametrize("learner, language", [(None, "es"), (0, "es"), ("1", "es"), (1, "xx"), (1, None)])
@@ -263,7 +263,7 @@ def test_a_long_list_is_capped_in_the_prompt_but_reported_in_full(conn, make_lea
     l = learner_with(conn, make_learner, "es", [f"palabra{chr(97 + i // 26)}{chr(97 + i % 26)}" for i in range(300)])
     seen = []
     real = prompts.build_story_prompt
-    monkeypatch.setattr(story, "build_story_prompt", lambda lang, words, *a: (seen.append(words), real(lang, words, *a))[1])
+    monkeypatch.setattr(story, "build_story_prompt", lambda lang, words, *a, **kw: (seen.append(words), real(lang, words, *a, **kw))[1])
     r = generate_story(conn, l, "es", call_groq_fn=Groq(), max_words=150, rng=random.Random(5), story_type="narration", topic="a market")
     assert len(seen[0].split(", ")) == 150
     assert (r.words_total, r.words_used) == (300, 150)

@@ -151,19 +151,39 @@ _LANGUAGE_REMINDER = (
     "No English.\n\n"
 )
 
+# The vocabulary variant: a learner's word list is stored PER LANGUAGE, so a Spanish learner's list is already
+# Spanish. Telling the model those entries are English "meanings" to be translated is wrong for them and makes it hunt
+# for translations of words that are already in the target language. This variant says the list is already in the
+# target language and must be used as written (inflected for grammar), never translated.
+_LANGUAGE_BLOCK_IN_TARGET = (
+    "LANGUAGE RULE (most important): write the ENTIRE passage or dialogue (everything after "
+    "the ===STORY=== line) in {language}, and nothing in English. The vocabulary list below is "
+    "already written in {language}: use those words as they are (you may inflect them for "
+    "grammar) and do not translate, replace or explain them. Do not leave any English word in "
+    "the story; only character names may stay as they are.\n\n"
+)
+_LANGUAGE_REMINDER_IN_TARGET = (
+    "Final check before you write: every word of the story is in {language} \u2014 each one a "
+    "word from the list (as written or inflected), or a basic {language} grammar word or simple "
+    "verb. No English.\n\n"
+)
 
-def _template_for_other_languages(template: str) -> str:
+
+def _template_for_other_languages(template: str, vocab_in_target: bool = False) -> str:
     """The same template with the language rule added after the intro, the English tone example
-    removed (if it has one), and a final reminder before 'Begin:'."""
+    removed (if it has one), and a final reminder before 'Begin:'. `vocab_in_target` swaps in the
+    wording for a word list that is already written in the target language."""
+    block = _LANGUAGE_BLOCK_IN_TARGET if vocab_in_target else _LANGUAGE_BLOCK
+    reminder = _LANGUAGE_REMINDER_IN_TARGET if vocab_in_target else _LANGUAGE_REMINDER
     intro_end = template.index("\n\n") + 2
     begin = template.index("Begin:")
     example_start = template.find("Tone example only")
     middle_end = example_start if example_start != -1 else begin
-    return (template[:intro_end] + _LANGUAGE_BLOCK + template[intro_end:middle_end]
-            + _LANGUAGE_REMINDER + template[begin:])
+    return template[:intro_end] + block + template[intro_end:middle_end] + reminder + template[begin:]
 
 
 _OTHER_LANGUAGE_STYLES = {style: _template_for_other_languages(t) for style, t in VALID_STYLES.items()}
+_IN_TARGET_STYLES = {style: _template_for_other_languages(t, True) for style, t in VALID_STYLES.items()}
 
 
 # --- story variety (Step 10, tuning change #2) ---------------------------------------------------
@@ -246,6 +266,7 @@ _VARIETY_TEMPLATE = (
     "Begin: planning, then delimiter, then the text."
 )
 _OTHER_LANGUAGE_VARIETY = _template_for_other_languages(_VARIETY_TEMPLATE)
+_IN_TARGET_VARIETY = _template_for_other_languages(_VARIETY_TEMPLATE, True)
 
 
 def choose_story_type(rng=None) -> str:
@@ -262,9 +283,12 @@ def choose_topic(rng=None, recent=None) -> str:
 
 
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
-                       topic: Optional[str] = None, rng=None) -> str:
+                       topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False) -> str:
     """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
-    applies to the new story types; when omitted it is chosen at random, avoiding recent topics."""
+    applies to the new story types; when omitted it is chosen at random, avoiding recent topics.
+    vocab_in_target: the word list is already written in `language` (a learner's per-language list),
+    so the prompt says to use the words as written instead of translating English meanings. It has
+    no effect for English, whose prompts are unchanged."""
     language = normalize_language(language)
     words = (words or "").strip()
     if not language:
@@ -276,13 +300,13 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     english = is_english(language)
 
     if style in VALID_STYLES:  # the two classic prompts, unchanged
-        templates = VALID_STYLES if english else _OTHER_LANGUAGE_STYLES
+        templates = VALID_STYLES if english else (_IN_TARGET_STYLES if vocab_in_target else _OTHER_LANGUAGE_STYLES)
         return templates[style].format(language=language, words=words)
     if style in STORY_TYPES:
         if not topic:
             topic = choose_topic(rng, recent=_RECENT_TOPICS)
             _RECENT_TOPICS.append(topic)
-        template = _VARIETY_TEMPLATE if english else _OTHER_LANGUAGE_VARIETY
+        template = _VARIETY_TEMPLATE if english else (_IN_TARGET_VARIETY if vocab_in_target else _OTHER_LANGUAGE_VARIETY)
         return template.format(language=language, words=words, topic=topic, **STORY_TYPES[style])
     raise ValueError(f"style must be one of {list(ALL_STORY_TYPES)}, got {style!r}")
 
