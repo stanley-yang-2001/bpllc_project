@@ -77,12 +77,12 @@ unchanged. This is the project's central documented finding (see `CHANGELOG.md` 
 | 1 | Docker environment | Infra | Runs Langflow + Postgres locally as linked containers (`docker-compose.yml`) |
 | 2 | Postgres `words` table | Data store | Persists the learner's known vocabulary |
 | 3 | Groq API (`gpt-oss-20b`, `gpt-oss-120b`) | Hosted model serving | Serves the free open-weight LLMs used by the orchestrating agent and the story-generation call |
-| 4 | Upload Word File (`upload_word_file.py`) | Langflow custom component (standalone) | One-off CSV import to seed the vocabulary table |
+| 4 | ~~Upload Word File (`upload_word_file.py`)~~ | Deleted 18 October 2026 | Was a one-off CSV import into the old shared table; words now come in through the site (Vocabulary page, CSV upload) |
 | 5 | Add Word (`add_word.py`) | Langflow custom component (tool mode) | Inserts a single new word, callable by the agent |
 | 6 | Word Loader (`word_loader.py`) | Langflow custom component | Reads all known words, outputs them as one string (Step 8 canvas pipeline) |
-| 7 | Story Prompt Builder (`story_prompt_builder.py`) | Langflow custom component | Builds the story prompt from `{language}` + `{words}`; picks narration or dialogue at random (Step 8 canvas pipeline) |
-| 8 | Story Guard (`story_guard.py`) | Plain function | Empty-vocabulary check (mirrors the If-Else node on the Step 8 canvas) |
-| 9 | Final Passage Extractor (`final_passage_extractor.py`) | Langflow custom component | Strips the hidden planning summary using the `===STORY===` delimiter (Step 8 canvas pipeline) |
+| 7 | ~~Story Prompt Builder (`story_prompt_builder.py`)~~ | Deleted 18 October 2026 | Was the Step 8 canvas prompt builder; prompts are now built by `tutor_core.prompts` |
+| 8 | ~~Story Guard (`story_guard.py`)~~ | Deleted 18 October 2026 | Was the empty-vocabulary check; now in `tutor_core.story` |
+| 9 | ~~Final Passage Extractor (`final_passage_extractor.py`)~~ | Deleted 18 October 2026 | Was the Step 8 plan stripper; now `tutor_core.prompts.extract_final_passage` |
 | 10 | **Story Generator Tool** (`story_tool.py`) | Langflow custom component (tool mode) | **Production story path.** Consolidates 6–9 into one atomic call: load words, empty-vocabulary guard, build prompt, call Groq (retry on 429), strip planning, cache |
 | 11 | Language Agent | Langflow Agent node (top-level), backed by Groq `gpt-oss-120b` | Orchestrator: routes each chat message to Add Word or Story Generator Tool |
 | 11b | Tool Result Relay (`tool_result_relay.py`) | Langflow custom component | After the Agent: replaces its reply with the called tool's exact output (passes the Agent's text through when no tool was called) |

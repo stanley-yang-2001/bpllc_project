@@ -213,9 +213,8 @@ The summary reports "Written in the requested language" for each language. The c
 3. A language given by its own name is normalized ("日本語" → Japanese, "español" → Spanish) before
    it goes into the prompt and the cache key.
 
-Not changed: `story_prompt_builder.py` (the Step 8 canvas pipeline, kept for debugging) still has
-the old templates, so it will differ from the production path until the duplicated logic is cleaned
-up (deferred list).
+Not changed at the time: `story_prompt_builder.py` (the Step 8 canvas pipeline, kept for debugging) still had
+the old templates. It was deleted on 18 October 2026 along with the rest of that pipeline.
 
 ## Criteria status (final)
 

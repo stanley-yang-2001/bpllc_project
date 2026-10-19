@@ -89,24 +89,16 @@ CHANGELOG.md
 DEVELOPER-DIARY.md
 
 custom_components/
-├── upload_word_file.py          # Standalone admin tool — seeds vocabulary from a CSV
 ├── add_word.py                  # Tool: adds one word to the learner's vocabulary
 ├── story_tool.py                # Tool: generates a vocabulary-constrained story/dialogue
 │                                #   (single atomic call; the production path for the Agent)
-├── word_loader.py               # Step 8 canvas pipeline: loads all known words
-├── story_prompt_builder.py      # Step 8 canvas pipeline: builds the story prompt
-├── story_guard.py               # Step 8 canvas pipeline: empty-vocabulary check
-├── final_passage_extractor.py   # Step 8 canvas pipeline: strips the hidden plan
+├── word_loader.py               # Debugging only, not wired to the Agent: one learner's words, comma-separated
 ├── groq_language_model.py       # Langflow Language Model component for Groq
 └── tool_result_relay.py         # After the Agent: shows the tool's output exactly
 
 tests/
-├── test_upload_word_file.py
 ├── test_tool_wrappers.py        # M3: what the Agent can see of each tool, and the hidden inputs
 ├── test_call_groq_retry.py
-├── test_story_prompt_builder.py
-├── test_story_guard.py
-├── test_final_passage_extractor.py
 ├── test_tool_result_relay.py
 ├── test_vocab_adherence.py
 ├── test_routing_checks.py
@@ -145,9 +137,11 @@ docs/
 └── workflow-diagram.md          # One chat message, end to end
 ```
 
-`story_tool.py` duplicates the logic of the four Step 8 components on purpose: Langflow's Tool
-Mode returns only a component's own output, so a multi-step pipeline can't be called as one tool
-unless it lives in one component. The Step 8 components stay on the canvas for visual debugging.
+`story_tool.py` is one component on purpose: Langflow's Tool Mode returns only a component's own
+output, so a multi-step pipeline can't be called as one tool unless it lives in one component. The
+old Step 8 canvas pipeline (upload word file, story prompt builder, story guard, final passage
+extractor) was deleted on 18 October 2026; the logic lives in `tutor_core` and is tested there.
+Only `word_loader.py` stays on the canvas, unwired, for debugging.
 
 For more information about this project, see the markdown files in the `docs` folder.
 

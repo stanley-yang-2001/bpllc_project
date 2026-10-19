@@ -2,16 +2,13 @@
 Story Generator Tool — consolidated, single-call version of the Step 8 pipeline, built to
 be used as ONE tool by the top-level Language Agent (Step 9).
 
-Why this duplicates logic already in word_loader.py, story_guard.py, story_prompt_builder.py,
-and final_passage_extractor.py: when a component is used as a Tool by another Agent,
-Langflow only returns that component's own output — it does not execute anything wired
-downstream of it on the canvas. The Step 8 pipeline is four separate components chained
-together, so exposing the Agent alone as a tool would leak the hidden planning summary
-straight to the learner, since the Final Passage Extractor (downstream) would never run as
-part of the tool call. This module inlines everything into one atomic operation instead.
-
-The standalone Step 8 components remain on the canvas for manual, visual debugging in the
-Playground — this file is the production path the top-level Agent actually calls.
+Why this is ONE component: when a component is used as a Tool by another Agent, Langflow only
+returns that component's own output; it does not execute anything wired downstream of it on the
+canvas. The old Step 8 pipeline was four separate components chained together (word loader, guard,
+prompt builder, passage extractor), so exposing it as a tool would have leaked the hidden planning
+summary straight to the learner. This module therefore does everything in one atomic operation. The
+four Step 8 components were deleted on 18 October 2026; only the Word Loader stays, kept unwired on
+the canvas for debugging (see tutor_core.tools.vocabulary_for_agent).
 
 generate_story_for_learner() takes an injectable call_groq_fn so it's testable without a
 real network call (see tests/test_story_tool.py); call_groq() itself is the real

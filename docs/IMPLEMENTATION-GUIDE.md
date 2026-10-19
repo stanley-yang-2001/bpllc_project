@@ -115,7 +115,8 @@ Write the custom Python component: typed inputs for a CSV file and a column name
 words (skipping duplicates). Run it once against a starter vocabulary list to seed the
 database — this is a standalone component, run by you as admin, not wired to any agent.
 - **Implemented as:** `custom_components/upload_word_file.py`, tested by
-  `tests/test_upload_word_file.py`; seed data in `sample_data/starter_vocabulary.csv`.
+  `tests/test_upload_word_file.py`; seed data in `sample_data/starter_vocabulary.csv`. **Both files were
+  deleted on 18 October 2026**; words now come in through the site.
 - **Satisfies:** Story 2.
 - **Covers:** **LO 3** (build a custom Python component with typed inputs/outputs), **LO 4**
   (read/write Postgres via `psycopg2` from a component).
@@ -146,7 +147,8 @@ model to write a short story in the target language using only the supplied voca
 it by manually filling in sample values and checking the rendered prompt text looks right
 before any LLM is involved.
 - **Implemented as:** `custom_components/story_prompt_builder.py` (a Python component rather than
-  Langflow's Prompt node), tested by `tests/test_story_prompt_builder.py`. It holds two
+  Langflow's Prompt node), tested by `tests/test_story_prompt_builder.py` (**both deleted on 18 October
+  2026**; the prompts live in `tutor_core.prompts`). It holds two
   interchangeable templates (first-person narration and two-person dialogue), picked at random in
   code. Each asks the model for a hidden Character/Want/Event/Resolution plan, a `===STORY===`
   delimiter, then the passage. The prompt went through five documented iterations (see
@@ -168,7 +170,7 @@ agent in Step 9.
   to the learner. `story_tool.py` also adds Groq 429 retry/backoff and a short-lived cache for
   successes and failures. Tested by `tests/test_story_tool.py`, `tests/test_call_groq_retry.py`,
   `tests/test_story_guard.py`, and `tests/test_final_passage_extractor.py`. The Step 8 canvas
-  components remain for manual debugging.
+  components were kept for manual debugging until 18 October 2026, when they and these two tests were deleted.
 - **Satisfies:** Story 5 (agent half).
 - **Covers:** **LO 6** (design a sub-agent used as a tool by another agent), **LO 7**
   (iterating the prompt against real output), **LO 8** (using the open-source model for
