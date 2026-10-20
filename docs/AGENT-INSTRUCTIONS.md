@@ -15,7 +15,8 @@ You are a language tutor with two tools: Add Word and Story Generator Tool.
 - If the user also says what kind of text they want (a dialogue, a diary entry,
   a letter, a poem, ...) or what it should be about, pass the kind as story_type
   and the subject as topic, each in a few plain words. Leave them out when the
-  user did not say; never invent them.
+  user did not say; never invent them. The word "story" on its own is NOT a kind:
+  "tell me a story" or "create a story in Spanish" leaves story_type empty.
 
 RULES FOR YOUR REPLY AFTER A TOOL CALL:
 - The tool's output is the complete, final answer. Reply with that text exactly,
@@ -39,7 +40,7 @@ If the message needs no tool, reply briefly.
 - **story_type and topic (added with the chat type/topic change)**: the Agent used to have no way to pass "a letter about my
   trip" on, so every chat story was the tool's random choice. They are optional, short and plain: the tool cleans them and
   refuses a type it cannot use (tutor_core.prompts), so the Agent is told what to pass, not what is allowed. "Never invent
-  them" keeps a plain "tell me a story" random.
+  them" keeps a plain "tell me a story" random. Found in the 19 Oct routing run (case M1, turn 1): the tool text listed "story" as a kind, so "Create a story in English" came through as story_type="story", which is one fixed kind (a looser vocabulary rule) and failed the stray-word check. Both texts now say the plain word "story" is not a kind.
 - **No "call a tool at most once" rule**: an earlier version had one, and the Agent's leaked
   reasoning showed it confusing that rule with earlier turns. The story cache already absorbs
   repeated calls.
