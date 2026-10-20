@@ -18,7 +18,7 @@ without a password it stays off. Grants are explicit, so a table added by a late
 until a migration grants it.
 
 Needs a database user that may create roles (the compose file's `langflow` user is a superuser). The role is created only
-if it does not exist, so running this again, or after DROP SCHEMA in the tests, is safe.
+if it does not exist and its attributes are reset either way, so running this again, or after DROP SCHEMA in the tests, is safe.
 """
 from alembic import op
 
@@ -35,6 +35,8 @@ def upgrade() -> None:
         END IF;
     END
     $$""")
+    # also for a role that was there already (made by hand, or left over): it must not keep a login or any extra power
+    op.execute("ALTER ROLE tutor_tools NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS")
     op.execute("GRANT USAGE ON SCHEMA tutor TO tutor_tools")
     op.execute("GRANT SELECT, INSERT ON tutor.words TO tutor_tools")
     op.execute("GRANT INSERT ON tutor.user_languages TO tutor_tools")
