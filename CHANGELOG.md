@@ -2,6 +2,15 @@
 
 Entries are newest first. Dates come from the git history; the project has no versioned releases.
 
+## Unreleased — tools role, non-English prompt, chat type and topic, Step 8 removed (19 October 2026)
+
+**Written and tested here (stub stack); not run on your machine. Apply migrations 0008 and 0009 (they run at API startup) and add `TOOLS_DB_PASSWORD` to `.env`.**
+- **Least-privilege role for the Langflow tools (migration 0008):** `tutor_tools` can SELECT and INSERT on `tutor.words`, INSERT on `tutor.user_languages`, and use the word id sequence; nothing else, and no tables added later until a migration grants them. The API sets its password at startup from `TOOLS_DB_PASSWORD` (empty = cannot log in; characters that break a URL are refused). Langflow's `DATABASE_URL` in `docker-compose.yml` uses it; `ADMIN_DATABASE_URL` keeps the checking scripts working. **Honest limit:** it limits the tools' database connection, not code inside the container, because Langflow still has its own `LANGFLOW_DATABASE_URL`.
+- **Non-English story prompt:** a variant that says the vocabulary list is already in the target language (`vocab_in_target=True`), used by `generate_story`. English prompt unchanged. Not yet re-measured on Groq.
+- **Chat story tool takes a type and topic:** the Story Generator Tool has `story_type` and `topic` inputs (the Agent passes them only when the learner says them); a learner may write a kind of their own (up to 40 characters, 6 words, letters, numbers, spaces, apostrophes, hyphens), quoted in the prompt as a label so it cannot carry instructions. Migration 0009 relaxes the stories type check; Story Studio has a "Write my own…" option in nine languages.
+- **Removed:** the old Step 8 canvas components (`upload_word_file`, `story_prompt_builder`, `story_guard`, `final_passage_extractor`) and their tests; docs updated.
+- **Tests:** core 273, API 711, web 220. `tests/test_tool_wrappers.py` and the routing tests need the Langflow container and were not run here.
+
 ## Unreleased — M8: display names, preferences on the account, site language, themes, policy copies (17 October 2026)
 
 **Written and tested here (stub stack, real Chromium); not run on your machine. Apply migration 0007.**
