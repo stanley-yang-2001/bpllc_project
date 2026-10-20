@@ -40,6 +40,9 @@ class Settings:
     ai_gate_wait: float = 5.0
     ai_tokens_per_minute: int = 8000       # Groq's free tier, app-wide; 0 switches the limiter off
     max_chat_chars: int = 2000
+    # Password of the database role the Langflow tools connect with (migration 0008). Empty = that role cannot log in.
+    # It goes into a URL in docker-compose.yml, so characters that would break a URL are refused.
+    tools_db_password: str = ""
 
     def validate(self) -> "Settings":
         if not self.database_url:
@@ -55,6 +58,9 @@ class Settings:
             raise ConfigError("AI_TOKENS_PER_MINUTE must be 0 (off) or more")
         if self.ai_gate_wait < 0 or self.langflow_timeout <= 0:
             raise ConfigError("AI_GATE_WAIT must be 0 or more and LANGFLOW_TIMEOUT above 0")
+        bad = sorted({c for c in self.tools_db_password if c in ":@/%?#" or c.isspace() or not c.isprintable()})
+        if bad:
+            raise ConfigError("TOOLS_DB_PASSWORD must not contain whitespace or any of : @ / % ? # (it is part of a database URL)")
         if self.ai_mode == "live" and self.langflow_per_user_tools and not self.langflow_api_key.strip():
             raise ConfigError("LANGFLOW_API_KEY must be set when LANGFLOW_PER_USER_TOOLS=1")
         return self
@@ -80,6 +86,7 @@ def load_settings(env=None) -> Settings:
         ai_gate_slots=int(env.get("AI_GATE_SLOTS", "2")),
         ai_gate_wait=float(env.get("AI_GATE_WAIT", "5")),
         ai_tokens_per_minute=int(env.get("AI_TOKENS_PER_MINUTE", "8000")),
+        tools_db_password=env.get("TOOLS_DB_PASSWORD", ""),
     )
     if "LANGFLOW_TWEAK_KEYS" in env:
         s.langflow_tweak_keys = tuple(k.strip() for k in env["LANGFLOW_TWEAK_KEYS"].split(",") if k.strip())

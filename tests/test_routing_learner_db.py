@@ -19,7 +19,7 @@ import run_routing_tests as rr  # noqa: E402
 from tutor_core import vocab  # noqa: E402
 from tutor_core.words import validate_word  # noqa: E402
 
-DSN = os.environ.get("DATABASE_URL") or "postgresql://langflow:langflow@postgres:5432/langflow"
+DSN = os.environ.get("ADMIN_DATABASE_URL") or os.environ.get("DATABASE_URL") or "postgresql://langflow:langflow@postgres:5432/langflow"   # these create and delete learners
 os.environ["DATABASE_URL"] = DSN
 failures = []
 

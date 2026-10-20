@@ -19,7 +19,7 @@ import psycopg2
 sys.path.insert(0, "/app/custom_components")
 from tutor_core import vocab  # noqa: E402
 
-DSN = os.environ.get("DATABASE_URL") or "postgresql://langflow:langflow@postgres:5432/langflow"
+DSN = os.environ.get("ADMIN_DATABASE_URL") or os.environ.get("DATABASE_URL") or "postgresql://langflow:langflow@postgres:5432/langflow"   # these create and delete learners
 SCRIPT = "/app/scripts/run_story_batch.py"
 failures = []
 

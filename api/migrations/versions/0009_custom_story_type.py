@@ -9,7 +9,7 @@ database only keeps it short. The downgrade turns the learners' own labels into 
 from alembic import op
 
 revision = "0009"
-down_revision = "0007"
+down_revision = "0008"
 
 _BUILT_IN = "'narration','dialogue','story','diary','letter','place','routine','anecdote'"
 

@@ -155,7 +155,7 @@ class LearnerDb:
     def __init__(self):
         from tutor_core import db, vocab
 
-        self._connect, self._vocab, self._created = db.connect, vocab, []
+        self._connect, self._vocab, self._created = db.connect_admin, vocab, []     # creates and deletes learners: not the tools' role
 
     def _run(self, sql, params=None, fetch=False):
         conn = self._connect()

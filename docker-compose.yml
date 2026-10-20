@@ -16,7 +16,12 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY}
       - LANGFLOW_LOAD_FLOWS_PATH=/app/flows   # M0: flows in ./flows load at startup (verify in M0)
       # M3: what the tools (tutor_core) read. No credentials, hosts or model names are written in the code.
-      - DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
+      # The tools connect as the least-privilege role tutor_tools (migration 0008): read and add a learner's words, nothing
+      # else. The api sets its password from the same TOOLS_DB_PASSWORD when it starts, before this service starts.
+      - DATABASE_URL=postgresql://tutor_tools:${TOOLS_DB_PASSWORD:?set TOOLS_DB_PASSWORD in .env - letters and digits only is safest}@postgres:5432/langflow
+      # For the checking scripts that run in this container (run_routing_tests.py, m3_check.py and their tests): they create
+      # and delete throwaway learners, which the tools' role may not. The tools never use it (tutor_core.db.connect_admin).
+      - ADMIN_DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - MAX_PROMPT_WORDS=${MAX_PROMPT_WORDS:-150}
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
@@ -58,6 +63,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
       - JWT_SECRET=${JWT_SECRET:?set JWT_SECRET in .env (at least 32 characters)}
+      - TOOLS_DB_PASSWORD=${TOOLS_DB_PASSWORD:?set TOOLS_DB_PASSWORD in .env - letters and digits only is safest}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - AI_MODE=${AI_MODE:-live}
       - MAX_PROMPT_WORDS=${MAX_PROMPT_WORDS:-150}

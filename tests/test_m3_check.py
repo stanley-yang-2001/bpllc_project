@@ -29,7 +29,7 @@ sys.path.insert(0, "/app/scripts")
 import m3_check as m3  # noqa: E402
 from tutor_core import prompts, tools, vocab  # noqa: E402
 
-DSN = os.environ.get("DATABASE_URL") or "postgresql://langflow:langflow@postgres:5432/langflow"
+DSN = os.environ.get("ADMIN_DATABASE_URL") or os.environ.get("DATABASE_URL") or "postgresql://langflow:langflow@postgres:5432/langflow"   # these create and delete learners
 SCRIPT = "/app/scripts/m3_check.py"
 failures = []
 MODE = {"name": "healthy"}

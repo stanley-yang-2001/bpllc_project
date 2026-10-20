@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from .config import Settings, load_settings
 from .db import make_pool
 from .errors import install_error_handlers
-from .migrate import run_migrations
+from .migrate import run_migrations, set_tools_password
 from .routes import auth, chat, health, me, practice, stories, words
 from .security import LoginGuard, make_dummy_credentials
 from .services.ai_gate import AiGate
@@ -36,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         if settings.run_migrations:
             run_migrations(settings.database_url)
+            set_tools_password(settings.database_url, settings.tools_db_password)
         app.state.pool = make_pool(settings.database_url)
         yield
         app.state.pool.closeall()
