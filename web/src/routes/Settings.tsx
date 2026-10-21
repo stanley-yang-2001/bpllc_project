@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Download, LogOut, Monitor, Moon, Palette, RefreshCw, Sun, Trash2 } from "lucide-react";
+import { Download, LogOut, Monitor, Moon, Palette, RefreshCw, Sun, Trash2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { api, type Health } from "../api/client";
@@ -71,29 +71,6 @@ function ProfileSection() {
   );
 }
 
-/** The learner's own id, selectable and with a Copy button. Support and the checking scripts (`--learner-id`) ask for it. The
- *  copy is best effort: a browser without the clipboard (or a page without a secure origin) just leaves the number to select. */
-function UserId({ id }: { id: number }) {
-  const { t } = useI18n();
-  const toast = useToast();
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(String(id));
-      toast(t("settings.userId.copied"));
-    } catch { /* nothing to report: the number is on screen to select */ }
-  };
-  return (
-    <div className="mb-4">
-      <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-        <span>{t("settings.userId")}</span>
-        <strong className="select-all text-slate-900" data-testid="user-id">{id}</strong>
-        <Button type="button" variant="secondary" onClick={copy} aria-label={t("settings.userId.copy")}><Copy size={14} aria-hidden="true" /> {t("settings.userId.copy")}</Button>
-      </p>
-      <p className="mt-1 text-xs text-slate-500">{t("settings.userId.hint")}</p>
-    </div>
-  );
-}
-
 function EmailSection() {
   const { user, setUser } = useAuth();
   const toast = useToast();
@@ -113,8 +90,7 @@ function EmailSection() {
   };
   return (
     <Section title={t("settings.email.title")} description={t("settings.email.description")}>
-      <p className="mb-2 text-sm text-slate-600">{t("settings.email.current")} <strong className="text-slate-900">{user?.email}</strong></p>
-      {user ? <UserId id={user.id} /> : null}
+      <p className="mb-4 text-sm text-slate-600">{t("settings.email.current")} <strong className="text-slate-900">{user?.email}</strong></p>
       <form onSubmit={save} className="grid gap-4 sm:grid-cols-2" aria-label={t("settings.form.email")}>
         <div>
           <Label htmlFor="e-new">{t("settings.email.new")}</Label>
@@ -430,6 +406,8 @@ export default function Settings() {
           <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[8rem_1fr]">
             <dt className="text-slate-500">{t("settings.email")}</dt>
             <dd className="font-medium text-slate-900">{user?.email}</dd>
+            <dt className="text-slate-500">{t("settings.userId")}</dt>
+            <dd className="select-all font-medium text-slate-900" data-testid="user-id">{user?.id}</dd>
             <dt className="text-slate-500">{t("settings.languages")}</dt>
             <dd className="flex flex-wrap gap-1.5">{user?.languages.map((l) => <Badge key={l} tone="brand">{l.toUpperCase()}</Badge>)}</dd>
           </dl>

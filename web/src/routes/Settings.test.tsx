@@ -189,30 +189,24 @@ describe("settings: site language and services", () => {
 });
 
 describe("settings: user id", () => {
-  it("shows the learner's own id", async () => {
+  it("shows the learner's own id in the Account card, next to the email", async () => {
     mockApi({ ...base });
     renderApp("/settings");
-    expect(await screen.findByText("Your user ID:")).toBeInTheDocument();
-    expect(screen.getByTestId("user-id")).toHaveTextContent(String(ALICE.id));
+    const card = (await screen.findByRole("heading", { name: "Account" })).closest("div")!;
+    expect(within(card).getByText("User ID")).toBeInTheDocument();
+    expect(within(card).getByTestId("user-id")).toHaveTextContent(String(ALICE.id));
   });
 
-  it("copies the id with the button and says so", async () => {
-    const user = userEvent.setup();
-    mockApi({ ...base });
+  it("shows whichever id the signed-in account has", async () => {
+    mockApi({ ...base, "GET /me": { ...ALICE, id: 197 } });
     renderApp("/settings");
-    await user.click(await screen.findByRole("button", { name: "Copy ID" }));
-    expect(await screen.findByText("ID copied")).toBeInTheDocument();
-    expect(await navigator.clipboard.readText()).toBe(String(ALICE.id));
+    expect(await screen.findByTestId("user-id")).toHaveTextContent("197");
   });
 
-  it("does not claim success, or break, when the browser refuses the copy", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+  it("has no copy button", async () => {
     mockApi({ ...base });
     renderApp("/settings");
-    await user.click(await screen.findByRole("button", { name: "Copy ID" }));
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
-    expect(screen.queryByText("ID copied")).not.toBeInTheDocument();
-    expect(screen.getByTestId("user-id")).toBeInTheDocument();       // the number is still there to select
+    await screen.findByTestId("user-id");
+    expect(screen.queryByRole("button", { name: /copy/i })).not.toBeInTheDocument();
   });
 });
