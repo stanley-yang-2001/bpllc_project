@@ -923,8 +923,8 @@ The remote repository moved while this design was being built (`eace656`, `3c67c
 5. `docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id language-tutor --delay 20`: the routing matrix as throwaway learners; compare with Step 10 (43 of 45 routing, 30 of 30 non-English). The Agent-facing tool text is unchanged, so routing should not move; if it does, that is a finding.
 6. If 4 and 5 pass: set `LANGFLOW_API_KEY` and `LANGFLOW_PER_USER_TOOLS=1` in `.env` (live chat then turns on), The privacy page and policy version are already updated. The deletion code is written (19.4 item 5): after setting the key, send one chat as a test learner, delete that account, and check in Langflow that the session's messages are gone.
 
-### 19.3a English story kinds and list size (21 October 2026)
-A Step 10 English batch on a one-word list passed 1 of 15 and then 0 of 15: the richer kinds need far more words than the learner has. Decided: with no kind named, English lists under 20 words get only narration or dialogue (`tutor_core.prompts.choose_story_type`, `MIN_WORDS_FOR_VARIED_TYPES = 20`). Built and tested here; the Step 10 criterion should be re-measured on a list of realistic size (20 or more words), since a one-word list cannot pass the stray-word check by design.
+### 19.3a English story kinds (21 October 2026)
+English batches on Groq: the richer kinds failed the stray-word check on a one-word list (13 of 13) and on a 31-word list (14 of 14), while narration and dialogue passed or came close. Decided: with no kind named, an English story is narration or dialogue only (`tutor_core.prompts.choose_story_type(classic_only=True)`); the richer kinds appear only when the learner names one, and a named kind is never refused. Other languages are unchanged. Re-measure with a 30+ word list; the one-word list is not a fair test.
 
 ### 19.4 Decisions waiting for the author
 1. **Non-English story prompt** (17A item 6): **decided and built (18-19 October 2026):** a target-language variant; the re-measurement on Groq is still to do.

@@ -351,28 +351,25 @@ def test_different_custom_types_are_cached_separately(conn, make_learner):
     assert len(g.prompts) == 2 and {k[2] for k in story._STORY_CACHE} == {"a poem", "a song"}
 
 
-# --- a short English list gets only the classic styles (unless a kind is named) -------------------------------------------
+# --- English with no kind named: classic styles only -----------------------------------------------------------------
 
 def _kinds_for(conn, learner, language, n=40, **kw):
     g = Groq()
     return {generate_story(conn, learner, language, call_groq_fn=g, use_cache=False, **kw).story_type for _ in range(n)}
 
 
-def test_a_short_english_list_gets_only_classic_styles(conn, make_learner):
-    learner = learner_with(conn, make_learner, "en", ["computer", "water", "bread"])
-    assert _kinds_for(conn, learner, "en") <= {"narration", "dialogue"}
+def test_english_with_no_kind_gets_only_classic_styles_whatever_the_list_size(conn, make_learner):
+    small = learner_with(conn, make_learner, "en", ["computer", "water", "bread"])
+    big = learner_with(conn, make_learner, "en", [chr(97 + i) * 3 for i in range(26)] + [chr(97 + i) * 4 for i in range(14)])
+    assert _kinds_for(conn, small, "en") <= {"narration", "dialogue"}
+    assert _kinds_for(conn, big, "en") <= {"narration", "dialogue"}
 
 
-def test_a_long_english_list_gets_the_full_mix(conn, make_learner):
-    learner = learner_with(conn, make_learner, "en", [f"word{chr(97 + i)}" for i in range(24)])
-    assert len(_kinds_for(conn, learner, "en", n=60) - {"narration", "dialogue"}) >= 2
-
-
-def test_a_named_kind_works_for_a_short_english_list(conn, make_learner):
+def test_a_named_kind_works_for_english(conn, make_learner):
     learner = learner_with(conn, make_learner, "en", ["computer"])
     assert _kinds_for(conn, learner, "en", n=3, story_type="letter") == {"letter"}
 
 
-def test_a_short_spanish_list_still_gets_the_full_mix(conn, make_learner):
+def test_spanish_still_gets_the_full_mix(conn, make_learner):
     learner = learner_with(conn, make_learner, "es", ["pan", "agua", "casa"])
     assert len(_kinds_for(conn, learner, "es", n=60) - {"narration", "dialogue"}) >= 2
