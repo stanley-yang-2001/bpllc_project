@@ -121,6 +121,14 @@ def reply_for(message, session, learner, language):
             out = f"'{word}' is already in your {name} vocabulary." if word in have else f"Added '{word}' to your {name} vocabulary."
             have.add(word)
         return build_response(out, [tool("add_word", {"word": m.group(1)}, out)])
+    typed = re.match(r"(?:tell me|write) (?:a|an) (dialogue|letter|poem) in (\w+)(?: about (.*))?$", low)
+    if typed:                                          # a request that names a kind of text (and maybe a subject)
+        kind, lang, about = typed.group(1), typed.group(2).capitalize(), typed.group(3)
+        words = STATE["words"].get(learner, {}).get(CODES.get(lang.lower(), "en"), set()) if learner is not None else None
+        out = ("I can't write a story right now: I don't know whose vocabulary to use." if learner is None
+               else GUARD if not words else STORIES.get(lang.lower(), STORIES["english"]))
+        args = {"language": lang, "story_type": kind, "topic": about or ""}
+        return build_response(out, [tool("story_generator_tool", args, out)])
     if "story" in low and ("in " in low):
         lang = "japanese" if "\u65e5\u672c\u8a9e" in message else re.search(r"in (\w+)", low).group(1)
         arg = lang.capitalize() if lang != "japanese" else "Japanese"

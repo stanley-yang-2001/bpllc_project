@@ -227,6 +227,31 @@ def test_duplicate_tool_calls_are_collapsed():
 # --- the case catalogue ----------------------------------------------------------------------
 
 
+def test_requested_kind_and_topic_are_checked():
+    by_id = {c["id"]: c["turns"][0] for c in CASES}
+    t1, t2, t3 = by_id["T1"], by_id["T2"], by_id["T3"]
+    es = "Ana: Hola.\nLuis: Hola, amigo.\nAna: Gracias.\nLuis: Adiós.\nAna: Vamos.\nLuis: Sí."
+    good = response(es, tool_block("story_generator_tool", {"language": "Spanish", "story_type": "dialogue", "topic": ""}, es))
+    check("a dialogue request that reaches the tool as a dialogue passes the argument checks",
+          all(c["ok"] for c in evaluate_turn(t1, good, VOCAB) if c["check"] == "tool argument"))
+    dropped = response(es, tool_block("story_generator_tool", {"language": "Spanish", "story_type": "", "topic": ""}, es))
+    check("a dialogue request whose kind was dropped fails",
+          not all(c["ok"] for c in evaluate_turn(t1, dropped, VOCAB) if c["check"] == "tool argument"))
+    wrong = response(es, tool_block("story_generator_tool", {"language": "Spanish", "story_type": "diary", "topic": ""}, es))
+    check("a dialogue request that became a diary fails",
+          not all(c["ok"] for c in evaluate_turn(t1, wrong, VOCAB) if c["check"] == "tool argument"))
+    fr = "Cher ami,\nJe vais au marché.\nJ'achète du pain.\nMerci.\nÀ bientôt,\nLéa"
+    letter = response(fr, tool_block("story_generator_tool", {"language": "French", "story_type": "letter", "topic": "a trip to the market"}, fr))
+    check("a letter about a market passes both extra argument checks",
+          [c["ok"] for c in evaluate_turn(t2, letter, VOCAB) if c["check"] == "tool argument"] == [True, True, True])
+    no_topic = response(fr, tool_block("story_generator_tool", {"language": "French", "story_type": "letter", "topic": ""}, fr))
+    check("the same letter with the subject dropped fails on the topic",
+          [c["ok"] for c in evaluate_turn(t2, no_topic, VOCAB) if c["check"] == "tool argument"] == [True, True, False])
+    poem = response(es, tool_block("story_generator_tool", {"language": "Spanish", "story_type": "poem", "topic": ""}, es))
+    check("a kind of the learner's own (a poem) passes through", all(c["ok"] for c in evaluate_turn(t3, poem, VOCAB) if c["check"] == "tool argument"))
+    check("the poem case does not apply the story-shape check", "story quality" not in results_by_name(evaluate_turn(t3, poem, VOCAB)))
+
+
 def test_case_catalogue():
     ids = [c["id"] for c in CASES]
     check("case ids are unique", len(ids) == len(set(ids)))
@@ -259,6 +284,7 @@ def main():
     test_story_must_be_in_the_requested_language()
     test_duplicate_tool_calls_are_collapsed()
     test_request_error()
+    test_requested_kind_and_topic_are_checked()
     test_case_catalogue()
     print()
     if failures:

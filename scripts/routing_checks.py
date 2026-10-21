@@ -35,6 +35,16 @@ GUARD_MARKER = "don't have any vocabulary yet"
 TEST_WORD = "autotestapple"  # removed from the vocabulary again after the run
 
 
+def _typed(say, languages, extra, quality=True):
+    """A story request that also names a kind of text and/or a subject. `extra` is a list of argument checks on the story
+    tool's other arguments: {"key", "any_of"} (exact, case-insensitive) or {"key", "contains"} (any listed word inside)."""
+    turn = {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "args": extra}
+    if quality:
+        turn["story"] = "other"
+        turn["language"] = languages[0].capitalize()
+    return turn
+
+
 def _story(say, languages, kind):
     turn = {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "story": kind}
     if kind == "other":
@@ -65,6 +75,15 @@ CASES = [
         _story("Create a story in Spanish", ["spanish", "español", "espanol"], "other"),
         _story("Create a story in English", ["english"], "english"),
         _story("Create a story in French", ["french", "français", "francais"], "other")]},
+    {"id": "T1", "name": "A requested kind of text reaches the tool (a dialogue)", "turns": [
+        _typed("Tell me a dialogue in Spanish", ["spanish", "español", "espanol"],
+               [{"key": "story_type", "any_of": ["dialogue", "dialogo", "diálogo", "conversation", "conversación", "conversacion"]}])]},
+    {"id": "T2", "name": "A requested kind and subject reach the tool (a letter about a market)", "turns": [
+        _typed("Write a letter in French about a trip to the market", ["french", "français", "francais"],
+               [{"key": "story_type", "any_of": ["letter", "lettre"]}, {"key": "topic", "contains": ["market", "marché", "marche"]}])]},
+    {"id": "T3", "name": "A kind of the learner's own reaches the tool (a poem)", "turns": [
+        _typed("Write a poem in Spanish", ["spanish", "español", "espanol"],
+               [{"key": "story_type", "any_of": ["poem", "poema", "a poem"]}], quality=False)]},
     {"id": "N1", "name": "A greeting needs no tool", "turns": [{"say": "hi", "tool": None}]},
     {"id": "N2", "name": "An unrelated question needs no tool", "turns": [
         {"say": "What's the weather like today?", "tool": None}]},
@@ -222,12 +241,16 @@ def evaluate_turn(spec, resp, vocab, error=None, max_oov=5):
         checks.append(_c("tool called", called, f"expected {expected}; called: {', '.join(names) or 'none'}{extra}", info))
 
     # argument
-    arg = spec.get("arg")
-    if arg and expected not in (None, "either"):
+    if expected not in (None, "either"):
         match = [c for c in calls if _tool_matches(c["name"], expected)]
-        actual = _norm(match[-1]["args"].get(arg["key"])) if match else ""
-        accepted = [_norm(a) for a in arg["any_of"]]
-        checks.append(_c("tool argument", actual in accepted, f"{arg['key']}={actual!r}; accepted {accepted}", info))
+        for arg in [a for a in [spec.get("arg")] if a] + list(spec.get("args") or []):
+            actual = _norm(match[-1]["args"].get(arg["key"])) if match else ""
+            if "contains" in arg:
+                words = [_norm(w) for w in arg["contains"]]
+                checks.append(_c("tool argument", any(w in actual for w in words), f"{arg['key']}={actual!r}; should mention one of {words}", info))
+            else:
+                accepted = [_norm(a) for a in arg["any_of"]]
+                checks.append(_c("tool argument", actual in accepted, f"{arg['key']}={actual!r}; accepted {accepted}", info))
 
     # relay: the learner must see exactly what the tool returned
     if good_calls:
