@@ -187,3 +187,32 @@ describe("settings: site language and services", () => {
     expect(row).toHaveTextContent("Problem (no key)");
   });
 });
+
+describe("settings: user id", () => {
+  it("shows the learner's own id", async () => {
+    mockApi({ ...base });
+    renderApp("/settings");
+    expect(await screen.findByText("Your user ID:")).toBeInTheDocument();
+    expect(screen.getByTestId("user-id")).toHaveTextContent(String(ALICE.id));
+  });
+
+  it("copies the id with the button and says so", async () => {
+    const user = userEvent.setup();
+    mockApi({ ...base });
+    renderApp("/settings");
+    await user.click(await screen.findByRole("button", { name: "Copy ID" }));
+    expect(await screen.findByText("ID copied")).toBeInTheDocument();
+    expect(await navigator.clipboard.readText()).toBe(String(ALICE.id));
+  });
+
+  it("does not claim success, or break, when the browser refuses the copy", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+    mockApi({ ...base });
+    renderApp("/settings");
+    await user.click(await screen.findByRole("button", { name: "Copy ID" }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
+    expect(screen.queryByText("ID copied")).not.toBeInTheDocument();
+    expect(screen.getByTestId("user-id")).toBeInTheDocument();       // the number is still there to select
+  });
+});
