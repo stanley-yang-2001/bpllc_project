@@ -349,3 +349,30 @@ def test_different_custom_types_are_cached_separately(conn, make_learner):
     generate_story(conn, l, "es", call_groq_fn=g, story_type="a poem", topic="the sea")
     generate_story(conn, l, "es", call_groq_fn=g, story_type="a song", topic="the sea")
     assert len(g.prompts) == 2 and {k[2] for k in story._STORY_CACHE} == {"a poem", "a song"}
+
+
+# --- a short English list gets only the classic styles (unless a kind is named) -------------------------------------------
+
+def _kinds_for(conn, learner, language, n=40, **kw):
+    g = Groq()
+    return {generate_story(conn, learner, language, call_groq_fn=g, use_cache=False, **kw).story_type for _ in range(n)}
+
+
+def test_a_short_english_list_gets_only_classic_styles(conn, make_learner):
+    learner = learner_with(conn, make_learner, "en", ["computer", "water", "bread"])
+    assert _kinds_for(conn, learner, "en") <= {"narration", "dialogue"}
+
+
+def test_a_long_english_list_gets_the_full_mix(conn, make_learner):
+    learner = learner_with(conn, make_learner, "en", [f"word{chr(97 + i)}" for i in range(24)])
+    assert len(_kinds_for(conn, learner, "en", n=60) - {"narration", "dialogue"}) >= 2
+
+
+def test_a_named_kind_works_for_a_short_english_list(conn, make_learner):
+    learner = learner_with(conn, make_learner, "en", ["computer"])
+    assert _kinds_for(conn, learner, "en", n=3, story_type="letter") == {"letter"}
+
+
+def test_a_short_spanish_list_still_gets_the_full_mix(conn, make_learner):
+    learner = learner_with(conn, make_learner, "es", ["pan", "agua", "casa"])
+    assert len(_kinds_for(conn, learner, "es", n=60) - {"narration", "dialogue"}) >= 2

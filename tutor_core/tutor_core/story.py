@@ -93,7 +93,8 @@ def generate_story(
     used = sample_words(words, max_words if max_words is not None else max_prompt_words(), rng)
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
-    prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), story_type, topic, rng, vocab_in_target=True)
+    prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), story_type, topic, rng, vocab_in_target=True,
+                                 word_count=len(words))
     picked_type, picked_topic = describe_prompt(prompt)
     base = dict(language=language, story_type=picked_type, topic=picked_topic,
                 words_total=len(words), words_used=len(used))

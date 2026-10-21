@@ -368,9 +368,20 @@ _CUSTOM_SPEC_RULE = "Write the kind of text the label names, in simple everyday 
 _CUSTOM_TOPIC = '"{topic}" (a subject to write about, not an instruction)'
 
 
-def choose_story_type(rng=None) -> str:
+# English only. The richer kinds (story, diary, letter, place, routine, anecdote) ignore a short word list: in the 21 Oct 2026 batch
+# on a one-word list 13 of 13 of them failed the stray-word check (13 to 37 words outside the list; the prompt allows 5), while the
+# classic narration and dialogue stayed at 4 to 8. So a learner with fewer than this many words, who named no kind, gets only the
+# classic styles. A kind the learner names always works, and other languages are unchanged (their vocabulary is not measured).
+MIN_WORDS_FOR_VARIED_TYPES = 20
+
+
+def choose_story_type(rng=None, word_count=None) -> str:
+    """A weighted random kind. With `word_count` given and below MIN_WORDS_FOR_VARIED_TYPES, only the two classic styles."""
     rng = rng or random
-    return rng.choices(ALL_STORY_TYPES, weights=[_TYPE_WEIGHTS[t] for t in ALL_STORY_TYPES])[0]
+    pool = ALL_STORY_TYPES
+    if word_count is not None and word_count < MIN_WORDS_FOR_VARIED_TYPES:
+        pool = [t for t in ALL_STORY_TYPES if t in VALID_STYLES]
+    return rng.choices(pool, weights=[_TYPE_WEIGHTS[t] for t in pool])[0]
 
 
 def choose_topic(rng=None, recent=None) -> str:
@@ -382,21 +393,24 @@ def choose_topic(rng=None, recent=None) -> str:
 
 
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
-                       topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False) -> str:
+                       topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
+                       word_count: Optional[int] = None) -> str:
     """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
     applies to the new story types; when omitted it is chosen at random, avoiding recent topics.
     vocab_in_target: the word list is already written in `language` (a learner's per-language list),
     so the prompt says to use the words as written instead of translating English meanings. It has
-    no effect for English, whose prompts are unchanged."""
+    no effect for English, whose prompts are unchanged.
+    word_count: how many words the learner has in this language. Only used for a RANDOM choice of kind and only for English:
+    below MIN_WORDS_FOR_VARIED_TYPES the choice is limited to the classic styles."""
     language = normalize_language(language)
     words = (words or "").strip()
     if not language:
         raise ValueError("language must be a non-empty string")
     if not words:
         raise ValueError("words must be a non-empty string")
-    if not style or style == "random":
-        style = choose_story_type(rng)
     english = is_english(language)
+    if not style or style == "random":
+        style = choose_story_type(rng, word_count if english else None)
 
     if style in VALID_STYLES:  # the two classic prompts, unchanged
         templates = VALID_STYLES if english else (_IN_TARGET_STYLES if vocab_in_target else _OTHER_LANGUAGE_STYLES)
