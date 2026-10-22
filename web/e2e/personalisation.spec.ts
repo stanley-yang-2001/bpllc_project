@@ -4,6 +4,9 @@ import { addWord, nav, register, unique } from "./helpers";
 
 /** Themes, the colour wheel and the site language, in a real browser with the production Content-Security-Policy. */
 async function scan(page: Page, label: string) {
+  // A button that is still loading (spinner) is mid-transition and is disabled for a moment; wait for it, or the scan is flaky.
+  await expect(page.locator(".animate-spin")).toHaveCount(0);
+  await page.waitForTimeout(300);
   const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const summary = violations.map((v) => `${v.id}: ${v.help}\n   ${v.nodes.slice(0, 3).map((n) => n.target.join(" ") + " :: " + (n.any[0]?.message ?? n.failureSummary?.split("\n")[1] ?? "")).join("\n   ")}`);
   expect(summary, `${label}\n${summary.join("\n")}`).toEqual([]);

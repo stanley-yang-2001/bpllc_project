@@ -5,6 +5,9 @@ import { addWord, nav, register, unique } from "./helpers";
 /** Automated checks (axe-core, WCAG 2 A/AA rules including colour contrast) on every screen, in both themes.
  * Automated tools find about a third of accessibility problems; this is a floor, not a certificate. */
 async function scan(page: Page, label: string) {
+  // A button that is still loading (spinner) is mid-transition and is disabled for a moment; wait for it, or the scan is flaky.
+  await expect(page.locator(".animate-spin")).toHaveCount(0);
+  await page.waitForTimeout(300);
   const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const summary = violations.map((v) => `${v.id}: ${v.help}\n   ${v.nodes.slice(0, 3).map((n) => n.target.join(" ") + " :: " + (n.any[0]?.message ?? n.failureSummary?.split("\n")[1] ?? "")).join("\n   ")}`);
   expect(summary, `${label}\n${summary.join("\n")}`).toEqual([]);
