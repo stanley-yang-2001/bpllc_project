@@ -240,13 +240,17 @@ def _failure_result(reason):
 
 
 def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10),
-                  strict_verbs=False, extra_allowed=(), names=(), max_unit_words=None, language=None):
+                  strict_verbs=False, extra_allowed=(), names=(), max_unit_words=None, language=None,
+                  vocab_in_target=False):
     """Score one passage. Returns a dict; `passed` is the overall verdict.
 
     max_oov: words outside the vocabulary tolerated (0 = strict; the batch runner defaults to 2
     so ordinary everyday words such as "eat" or "drink" don't fail a story).
     max_unit_words: optional cap on the words in any one sentence/line (beginner readability);
     the longest and mean lengths are always reported either way.
+    vocab_in_target: `vocab` is written in `language` (a learner's own per-language list). Its words must then NOT count as
+    English markers in the language check: German "Haus, Brot, Freund" are not English. Without this, a correct German
+    story was called "mixed" (22 Oct 2026 batch: 14 of 15).
     language: the language the story was requested in. For anything other than English the
     passage must actually be written in it (see language_check); None skips that check."""
     text = _norm(text).strip()
@@ -343,7 +347,7 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
     unit_ok = max_unit_words is None or result["longest_unit_words"] <= max_unit_words
     language_ok = True
     if language:
-        result["language_check"] = language_check(text, language, vocab)
+        result["language_check"] = language_check(text, language, "" if vocab_in_target else vocab)
         language_ok = result["language_check"]["ok"]
     else:
         result["language_check"] = None
@@ -425,15 +429,18 @@ def report(text, language, vocab_words):
 def rescore_results(data, max_oov=0, strict_verbs=False, max_unit_words=None):
     """Re-score a saved batch (the JSON written by run_story_batch.py) under different rules,
     without generating anything new. Returns {language: [result, ...]}."""
-    vocab = data.get("vocabulary", "")
     rescored = {}
     for language, items in data["results"].items():
+        # Newer files keep one list per language, written in that language; older files had one English list for all.
+        per_language = (data.get("vocabularies") or {}).get(language)
+        vocab = per_language if per_language is not None else data.get("vocabulary", "")
+        in_target = per_language is not None and language.strip().lower() != "english"
         rescored[language] = []
         for item in items:
             r = check_passage(
                 item.get("text", ""), vocab, check_vocab=(language.strip().lower() == "english"),
                 max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
-                language=language,
+                language=language, vocab_in_target=in_target,
             )
             r.update(language=language, latency=item.get("latency"),
                      style_requested=item.get("style_requested"), text=item.get("text"),

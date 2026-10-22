@@ -75,7 +75,7 @@ def run_language(language, count, delay, conn, learner_id, words, max_oov, stric
         result = check_passage(
             text, words, check_vocab=(language.strip().lower() == "english"),
             max_oov=max_oov, strict_verbs=strict_verbs, max_unit_words=max_unit_words,
-            language=language,
+            language=language, vocab_in_target=(language.strip().lower() != "english"),
         )
         result.update(language=language, latency=seen.get("latency"), style_requested=seen.get("story_type"),
                       story_type=seen.get("story_type"), topic=seen.get("topic"), text=text,
