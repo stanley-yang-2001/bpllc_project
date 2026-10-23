@@ -17,18 +17,20 @@ class Language:
 
 # Measured in Step 10 (docs/STEP-10-TEST-PLAN.md, tuning change #1): Spanish, French and Japanese were each
 # 10/10 in the requested language (30/30 in all, structure 30/30), and 15/15 non-English turns through the Agent.
-# German, Italian, Portuguese, Chinese and Korean have not been measured, so they stay off until a batch of their
-# own reaches the bar. Change a flag only together with the measurement that justifies it.
+# Measured 23 Oct 2026 on the author's machine with a 25-word list each, 15 stories per language, scripts/run_story_batch.py:
+# German, Italian, Portuguese, Chinese and Korean were each 15/15 in the requested language (75/75 in all; German after the
+# language-check fix, see CHANGELOG). Stories are checked for language and structure only: the word-list check is English only.
+# Change a flag only together with the measurement that justifies it.
 _LANGS = [
     Language("en", "English", "English", 1, True),
     Language("es", "Spanish", "Español", 1, True),
     Language("fr", "French", "Français", 1, True),
-    Language("de", "German", "Deutsch", 1, False),
-    Language("it", "Italian", "Italiano", 1, False),
-    Language("pt", "Portuguese", "Português", 1, False),
+    Language("de", "German", "Deutsch", 1, True),
+    Language("it", "Italian", "Italiano", 1, True),
+    Language("pt", "Portuguese", "Português", 1, True),
     Language("ja", "Japanese", "日本語", 2, True),
-    Language("zh", "Chinese (Simplified)", "中文简体", 2, False),
-    Language("ko", "Korean", "한국어", 2, False),
+    Language("zh", "Chinese (Simplified)", "中文简体", 2, True),
+    Language("ko", "Korean", "한국어", 2, True),
 ]
 LANGUAGES: dict[str, Language] = {lang.code: lang for lang in _LANGS}
 

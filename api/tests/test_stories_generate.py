@@ -156,7 +156,7 @@ def test_exactly_five_words_is_enough(make_user, llm):
 
 # --- the language gate and validation ---------------------------------------------------------------------------
 
-def test_a_language_that_is_not_enabled_is_refused_before_anything_else(make_user, llm, app):
+def test_a_language_that_is_not_enabled_is_refused_before_anything_else(make_user, llm, app, de_off):
     r = gen(learner(make_user, words=WORDS, language="de"), "de")
     assert r.status_code == 422 and r.json()["error"]["code"] == "language_unavailable"
     assert r.json()["error"]["message"] == "Stories in German are not available yet."

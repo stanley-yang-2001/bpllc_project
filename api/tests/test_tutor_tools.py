@@ -213,8 +213,8 @@ def test_the_story_of_an_empty_learner_is_the_empty_message_even_if_others_have_
     assert story_for(learner="2", groq=g) == prompts.EMPTY_VOCABULARY_MESSAGE and g.prompts == []
 
 
-@pytest.mark.parametrize("language", ["German", "de", "Chinese", "Klingon", "xx"])
-def test_a_language_without_measured_story_quality_is_declined(conn, make_learner, language):
+@pytest.mark.parametrize("language", ["German", "de", "Klingon", "xx"])
+def test_a_language_without_measured_story_quality_is_declined(conn, make_learner, language, de_off):
     make_learner()
     g = Groq()
     out = story_for(language=language, groq=g)

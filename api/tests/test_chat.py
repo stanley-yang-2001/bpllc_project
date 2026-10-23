@@ -111,7 +111,7 @@ def test_stub_story_uses_the_active_language_when_none_is_named(make_user, stub)
     assert r.json()["tool_calls"][0]["args"] == {"language": "ja"}
 
 
-def test_stub_story_in_a_language_that_is_not_enabled_is_declined_not_faked(make_user, stub):
+def test_stub_story_in_a_language_that_is_not_enabled_is_declined_not_faked(make_user, stub, de_off):
     body = say(make_user("alice"), "tell me a story in German").json()
     assert "not available yet" in body["reply"] and body["tool_calls"][0]["failed"] is True
 

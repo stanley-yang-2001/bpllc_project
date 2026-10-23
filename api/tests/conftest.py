@@ -96,3 +96,11 @@ def words_of(conn, learner_id, language=None):
         else:
             cur.execute("SELECT word FROM tutor.words WHERE user_id = %s ORDER BY id", (learner_id,))
         return [r[0] for r in cur.fetchall()]
+
+
+@pytest.fixture
+def de_off(monkeypatch):
+    """German with stories switched off, to test the language gate whatever the real flags are."""
+    import dataclasses
+    from tutor_core.languages import LANGUAGES
+    monkeypatch.setitem(LANGUAGES, "de", dataclasses.replace(LANGUAGES["de"], stories_enabled=False))

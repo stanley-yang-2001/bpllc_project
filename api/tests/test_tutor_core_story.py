@@ -82,15 +82,15 @@ def test_malformed_arguments_are_refused_before_any_work(conn, make_learner, lea
 
 # --- the language gate (design 3C: it lives in the story function so Studio and chat obey it equally) ----------
 
-@pytest.mark.parametrize("code", ["de", "it", "pt", "zh", "ko"])
-def test_a_language_without_measured_story_quality_is_declined_before_any_work(code):
+@pytest.mark.parametrize("code", ["de"])
+def test_a_language_without_measured_story_quality_is_declined_before_any_work(code, de_off):
     g = Groq()
     r = generate_story(None, 1, code, call_groq_fn=g)               # no connection at all: nothing may be touched
     assert (r.ok, r.reason) == (False, "language_not_enabled") and g.prompts == []
     assert r.text == f"Stories in {LANGUAGES[code].name} are not available yet."
 
 
-@pytest.mark.parametrize("code", ["en", "es", "fr", "ja"])
+@pytest.mark.parametrize("code", ["en", "es", "fr", "ja", "de", "it", "pt", "zh", "ko"])
 def test_the_measured_languages_are_not_declined(conn, make_learner, code):
     l = learner_with(conn, make_learner, code, ["pan"])
     assert generate_story(conn, l, code, call_groq_fn=Groq()).ok is True

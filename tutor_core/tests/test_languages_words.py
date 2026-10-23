@@ -1,6 +1,8 @@
+import dataclasses
+
 import pytest
 
-from tutor_core.languages import normalize_language, stories_enabled, supported_names
+from tutor_core.languages import LANGUAGES, normalize_language, stories_enabled, supported_names
 from tutor_core.words import WordError, normalize_word, validate_meaning, validate_word
 
 
@@ -19,10 +21,11 @@ def test_normalize_language_unknown_is_none(text):
 
 def test_story_gate(monkeypatch):
     monkeypatch.delenv("STORY_ALLOW_UNMEASURED", raising=False)
-    for code in ("en", "es", "fr", "ja"):                      # measured in Step 10
+    for code in ("en", "es", "fr", "ja", "de", "it", "pt", "zh", "ko"):    # all measured (Step 10 / Step G)
         assert stories_enabled(code), code
-    for code in ("de", "it", "pt", "zh", "ko", "xx"):          # not measured yet (or not a language at all)
-        assert not stories_enabled(code), code
+    assert not stories_enabled("xx")                                      # not a language at all
+    monkeypatch.setitem(LANGUAGES, "de", dataclasses.replace(LANGUAGES["de"], stories_enabled=False))
+    assert not stories_enabled("de")                                      # a language switched off stays off
     monkeypatch.setenv("STORY_ALLOW_UNMEASURED", "1")
     assert stories_enabled("de") and not stories_enabled("xx")
 

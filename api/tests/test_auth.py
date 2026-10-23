@@ -152,7 +152,7 @@ def test_profile_and_languages(client):
     assert client.post("/api/me/languages", json={"language": "de"}).json()["languages"] == ["en", "de"]   # idempotent
     langs = {l["code"]: l for l in client.get("/api/languages").json()}
     assert langs["en"]["stories_enabled"] and langs["es"]["stories_enabled"] and langs["ja"]["stories_enabled"]
-    assert not langs["de"]["stories_enabled"] and not langs["ko"]["stories_enabled"]
+    assert all(langs[c]["stories_enabled"] for c in ("de", "it", "pt", "zh", "ko"))
 
 
 def test_health(client):
