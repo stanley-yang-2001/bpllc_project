@@ -115,11 +115,18 @@ def test_classic_styles_are_unchanged_when_requested():
 
 
 def test_default_style_is_a_mix():
-    types = Counter()
+    # English with no kind named: narration and dialogue only (the richer kinds drifted outside the word list).
+    en = Counter()
     rng = random.Random(11)
     for _ in range(200):
-        types[describe_prompt(build_story_prompt("English", WORDS, rng=rng))[0]] += 1
-    check("the default (no style) now produces all 8 types", set(types) == set(ALL_STORY_TYPES))
+        en[describe_prompt(build_story_prompt("English", WORDS, rng=rng))[0]] += 1
+    check("English with no style gives only narration and dialogue", set(en) == {"narration", "dialogue"})
+    # Other languages keep the full mix of 8 kinds.
+    es = Counter()
+    rng = random.Random(11)
+    for _ in range(200):
+        es[describe_prompt(build_story_prompt("Spanish", WORDS, rng=rng))[0]] += 1
+    check("the default (no style) in another language produces all 8 types", set(es) == set(ALL_STORY_TYPES))
 
 
 def test_invalid_style():
