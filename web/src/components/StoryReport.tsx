@@ -10,6 +10,7 @@ export interface Report {
   structure?: { ok?: boolean; leaked_plan?: boolean; units?: number };
   vocabulary?: { mode?: string; ok?: boolean | null; outside?: string[] | null; outside_count?: number; limit?: number | null };
   read_seconds?: number;
+  model?: { custom?: boolean; name?: string };
   difficulty?: {
     requested?: { length?: number; own_words?: number; uncommon_pct?: number };
     measured?: { length?: number; length_unit?: string; own_words?: number; uncommon_pct?: number | null };
@@ -44,6 +45,7 @@ export function StoryReport({ report, languageName }: { report: Report; language
         <Row ok={report.structure?.ok}>
           {report.structure?.ok ? t("report.shapeOk") : report.structure?.leaked_plan ? t("report.leaked") : t("report.shapeBad")}
         </Row>
+        {report.model?.custom && <Row ok={null}>{t("report.ownModel", { model: report.model.name ?? "" })}</Row>}
         {v.mode === "unavailable" ? (
           <Row ok={null}>{t("report.vocabUnavailable")}</Row>
         ) : v.mode === "informational" ? (

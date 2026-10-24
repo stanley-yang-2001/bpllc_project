@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { MyModel } from "../api/client";
 import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); localStorage.clear(); document.documentElement.classList.remove("dark"); });
@@ -223,5 +224,54 @@ describe("settings: user id", () => {
     renderApp("/settings");
     await screen.findByTestId("user-id");
     expect(screen.queryByRole("button", { name: /copy/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("settings: my own model", () => {
+  const OFF: MyModel = { enabled: false, configured: false, model: null, base_url: null, key_last4: null, has_key: false };
+  const ON: MyModel = { ...OFF, enabled: true };
+
+  it("is not shown on an account that is not switched on", async () => {
+    mockApi({ ...base, "GET /me/model": OFF });
+    renderApp("/settings");
+    await screen.findByRole("button", { name: "Save profile" });
+    expect(screen.queryByText("My model")).not.toBeInTheDocument();
+  });
+
+  it("tests, saves and removes, and never shows the saved key", async () => {
+    let state = ON;
+    const { calls } = mockApi({
+      ...base,
+      "GET /me/model": () => ({ json: state }),
+      "POST /me/model/test": { ok: true },
+      "PUT /me/model": ({ body }: { body: { model: string; base_url: string } }) => { state = { ...ON, configured: true, model: body.model, base_url: body.base_url, key_last4: "1234", has_key: true }; return { json: state }; },
+      "DELETE /me/model": () => { state = ON; return { status: 204 }; },
+    });
+    renderApp("/settings");
+    const name = await screen.findByLabelText("Model name");
+    expect(screen.getByRole("button", { name: "Save model" })).toBeDisabled();
+    await userEvent.type(name, "gpt-4o-mini");
+    await userEvent.type(screen.getByLabelText("Model address (base URL)"), "https://api.openai.com/v1");
+    await userEvent.type(screen.getByLabelText("API key"), "sk-secret-1234");
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(await screen.findByText("The model answered.")).toBeInTheDocument();
+    expect(calls.find((c) => c.path === "/me/model/test")!.body).toEqual({ model: "gpt-4o-mini", base_url: "https://api.openai.com/v1", api_key: "sk-secret-1234" });
+    await userEvent.click(screen.getByRole("button", { name: "Save model" }));
+    expect(await screen.findByText(/Model saved/)).toBeInTheDocument();
+    expect(await screen.findByText(/A key ending 1234 is saved/)).toBeInTheDocument();
+    expect((screen.getByLabelText("API key") as HTMLInputElement).value).toBe("");          // the key box is cleared, and nothing returns it
+    expect(document.body.textContent).not.toContain("sk-secret");
+    await userEvent.click(screen.getByRole("button", { name: "Remove my model" }));
+    expect(await screen.findByText(/Model removed/)).toBeInTheDocument();
+    await waitFor(() => expect((screen.getByLabelText("Model name") as HTMLInputElement).value).toBe(""));
+  });
+
+  it("shows the server's reason when the test fails", async () => {
+    mockApi({ ...base, "GET /me/model": ON, "POST /me/model/test": err(422, "model_test_failed", "The model server answered 401. Check the key.") });
+    renderApp("/settings");
+    await userEvent.type(await screen.findByLabelText("Model name"), "x");
+    await userEvent.type(screen.getByLabelText("Model address (base URL)"), "https://a.example.com/v1");
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(await screen.findByText(/Check the key/)).toBeInTheDocument();
   });
 });

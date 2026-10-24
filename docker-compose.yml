@@ -80,6 +80,9 @@ services:
       - LANGFLOW_PER_USER_TOOLS=${LANGFLOW_PER_USER_TOOLS:-0}
       - AI_GATE_SLOTS=${AI_GATE_SLOTS:-2}
       - AI_TOKENS_PER_MINUTE=${AI_TOKENS_PER_MINUTE:-8000}
+      # A learner's own model (docs/CUSTOM-MODEL-DESIGN.md). Empty secret = the feature is off for everyone.
+      - MODEL_KEY_SECRET=${MODEL_KEY_SECRET:-}
+      - ALLOW_PRIVATE_MODEL_URLS=${ALLOW_PRIVATE_MODEL_URLS:-0}
     depends_on:
       postgres:
         condition: service_healthy

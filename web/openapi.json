@@ -582,6 +582,40 @@
         "title": "MetaOut",
         "type": "object"
       },
+      "ModelIn": {
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "remove_key": {
+            "default": false,
+            "title": "Remove Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "model",
+          "base_url"
+        ],
+        "title": "ModelIn",
+        "type": "object"
+      },
       "PasswordChange": {
         "properties": {
           "current_password": {
@@ -1844,6 +1878,113 @@
         "summary": "Add Language",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/me/model": {
+      "delete": {
+        "operationId": "remove_api_me_model_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Remove",
+        "tags": [
+          "model"
+        ]
+      },
+      "get": {
+        "operationId": "show_api_me_model_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Show",
+        "tags": [
+          "model"
+        ]
+      },
+      "put": {
+        "operationId": "save_api_me_model_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save",
+        "tags": [
+          "model"
+        ]
+      }
+    },
+    "/api/me/model/test": {
+      "post": {
+        "operationId": "test_api_me_model_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test",
+        "tags": [
+          "model"
         ]
       }
     },

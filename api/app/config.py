@@ -43,6 +43,10 @@ class Settings:
     # Password of the database role the Langflow tools connect with (migration 0008). Empty = that role cannot log in.
     # It goes into a URL in docker-compose.yml, so characters that would break a URL are refused.
     tools_db_password: str = ""
+    # Protects learners' own model keys at rest (Fernet). Empty = the custom model feature cannot store a key, so it is off.
+    model_key_secret: str = ""
+    # Single-user setups only: let a learner's model address be on the host's own network (a local Ollama, say). Off by default.
+    allow_private_model_urls: bool = False
 
     def validate(self) -> "Settings":
         if not self.database_url:
@@ -87,6 +91,8 @@ def load_settings(env=None) -> Settings:
         ai_gate_wait=float(env.get("AI_GATE_WAIT", "5")),
         ai_tokens_per_minute=int(env.get("AI_TOKENS_PER_MINUTE", "8000")),
         tools_db_password=env.get("TOOLS_DB_PASSWORD", ""),
+        model_key_secret=env.get("MODEL_KEY_SECRET", "").strip(),
+        allow_private_model_urls=env.get("ALLOW_PRIVATE_MODEL_URLS", "0") == "1",
     )
     if "LANGFLOW_TWEAK_KEYS" in env:
         s.langflow_tweak_keys = tuple(k.strip() for k in env["LANGFLOW_TWEAK_KEYS"].split(",") if k.strip())

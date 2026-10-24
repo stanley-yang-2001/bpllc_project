@@ -1,6 +1,6 @@
 # Use the model the learner chooses (design, 22 October 2026)
 
-**Status: design only. Nothing is built. Section 6 lists the decisions I need from you before I start.**
+**Status (24 October 2026): phase 1 (stories) is built and tested here, not yet run on your machine; decisions are in section 6. Phase 2 (chat) is not built and waits for the spike. Not done: the privacy-policy sentence (it needs your wording and a version bump, which makes every learner accept the policy again).**
 
 ## 1. The request
 A learner can enter **a model name, an API key and the model's address** (base URL), and the site then uses that model instead of the shared Groq one.
@@ -61,3 +61,12 @@ A provider that is not OpenAI-compatible (Anthropic's own API, Gemini's own API)
 5. Story Studio uses it; the quality report names the model.
 6. The privacy policy sentence and version bump.
 7. The phase 2 spike on your machine.
+
+
+## 8. What was built in phase 1 (24 October 2026)
+- Migration 0011: `tutor.users.custom_model_enabled` (off for everyone) and `tutor.user_models` (model, base URL, encrypted key, last four characters). The row goes with the account and is in "Download my data" without the key.
+- Switch an account on: `docker compose exec api python -m app.custom_model_admin on you@example.com` (also `off`, `list`). Needs `MODEL_KEY_SECRET` in `.env`; empty means the feature is off for everyone. `ALLOW_PRIVATE_MODEL_URLS=1` allows a local address (your own machine only).
+- Address guard: https only, no credentials or query in the address, every address the name resolves to must be public, the call goes to the address that was checked, no redirects, 30 second timeout, 1 MB answer cap, errors shown with the key removed.
+- Routes: `GET/PUT/DELETE /api/me/model` and `POST /api/me/model/test` (5 tests a minute). Story Studio uses the model when it is saved: no shared token budget, 10 stories a minute, a failure shows the provider's reason and says to remove the model to go back to the shared one; no silent fallback. The report names the model.
+- Settings has a My model card (only on switched-on accounts), in nine languages.
+- Not built: chat on your own model (phase 2), a saved story remembering which model wrote it, other providers than OpenAI-compatible.

@@ -7,3 +7,4 @@ bcrypt>=4.1
 pyjwt>=2.7
 python-multipart>=0.0.9
 pydantic>=2.6
+cryptography>=42

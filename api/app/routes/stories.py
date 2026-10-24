@@ -11,7 +11,8 @@ from ..db import connection
 from ..deps import current_user, require_language
 from ..errors import AppError, not_found
 from ..schemas import GeneratedStoryOut, StoryFull, StoryOptionsOut, StoryPage
-from ..services import stories
+from ..services import model_secrets, stories, user_models
+from ..services.user_model import make_call_fn
 
 router = APIRouter(prefix="/stories", tags=["stories"])
 MIN_WORDS = 5
@@ -22,6 +23,21 @@ STORY_TOKENS = 2000
 MAX_BODY = 8000          # characters; a generated story is a few hundred
 MAX_STORIES = 500        # per learner
 CLASSIC_TYPES = tuple(prompts.VALID_STYLES)      # narration and dialogue have no topic
+
+
+def _own_model(state, conn, user_id: int):
+    """The learner's saved model with its key decrypted, or None when it is not switched on or not set up."""
+    s = state.settings
+    if not s.model_key_secret or not user_models.enabled(conn, user_id):
+        return None
+    row = user_models.get(conn, user_id)
+    if not row:
+        return None
+    return {"model": row["model"], "base_url": row["base_url"], "key": model_secrets.decrypt(s.model_key_secret, row["api_key_encrypted"])}
+
+
+def _last_model_error(call) -> str:
+    return getattr(call, "last_error", "") or "no answer."
 
 
 class DifficultyIn(BaseModel):
@@ -90,16 +106,29 @@ def generate(body: GenerateIn, request: Request, user: dict = Depends(current_us
         words = load_words(conn, user["id"], body.language)
     if len(words) < MIN_WORDS:
         raise AppError("not_enough_words", f"Add at least {MIN_WORDS} {lang.name} words to your list before making a story.", 422)
-    llm = state.story_llm
+    llm, own = state.story_llm, None
+    with connection(state.pool) as conn:
+        own = _own_model(state, conn, user["id"])
+    if own:
+        # The learner's own model (decision 1 to 6 of docs/CUSTOM-MODEL-DESIGN.md): no shared token budget, a request limit instead,
+        # and a failure is shown as it is with a way back to the shared model; never a silent fallback.
+        if not state.model_limiter.allow(user["id"]):
+            raise AppError("rate_limited", "You are making stories with your own model too quickly. Wait a minute.", 429, retry_after=60)
+        llm = make_call_fn(own["model"], own["base_url"], own["key"], state.settings.allow_private_model_urls)
     with state.ai_gate.slot(user["id"], tokens=STORY_TOKENS if getattr(llm, "calls_ai", True) else 0):
         with connection(state.pool) as conn:
             result = generate_story(conn, user["id"], body.language, use_cache=False, story_type=body.story_type,
                                     topic=body.topic, difficulty=body.targets, call_groq_fn=llm)
     if not result.ok:
+        if own:
+            raise AppError("custom_model_failed", f"Your model ({own['model']}) didn't answer: {_last_model_error(llm)} "
+                           "You can switch back to the shared model in Settings, under My model, by removing your model.", 502)
         raise AppError("ai_failed", "The story writer didn't answer. Please try again in a moment.", 502)
+    report = quality.report(result.text, body.language, words, body.targets)      # the learner's WHOLE list, not the prompt's sample
+    if own:
+        report["model"] = {"custom": True, "name": own["model"]}
     return {"story": result.text, "language": body.language, "story_type": result.story_type, "topic": result.topic,
-            "report": quality.report(result.text, body.language, words, body.targets),      # the learner's WHOLE list, not the prompt's sample
-            "words_total": result.words_total, "words_used": result.words_used}
+            "report": report, "words_total": result.words_total, "words_used": result.words_used}
 
 
 class SaveIn(DifficultyIn):

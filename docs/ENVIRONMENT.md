@@ -37,6 +37,12 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # AI_GATE_SLOTS=2                  # AI calls at once across all learners (Groq free tier)
 # AI_TOKENS_PER_MINUTE=8000        # tokens the whole app may use in any 60 seconds (Groq free tier); 0 = no limit
 
+# --- a learner's own model (docs/CUSTOM-MODEL-DESIGN.md) ---------------------------------------------
+# MODEL_KEY_SECRET=                # a long random value (16+ characters) that encrypts learners' own API keys in the database. EMPTY = the feature is off for everyone. Changing it makes saved keys unreadable (learners enter them again).
+# ALLOW_PRIVATE_MODEL_URLS=0       # 1 = a model address may be on your own network or http:// (a local Ollama). Single-user setups only: it lets the server call any address a learner types.
+# Switch an account on (off by default), from the project folder:
+#   docker compose exec api python -m app.custom_model_admin on you@example.com      (also: off, list)
+
 # --- the Langflow tools (milestone M3) --------------------------------------------------------------
 # GROQ_MODEL=openai/gpt-oss-120b   # the model Step 10 measured; change only with a new measurement
 # MAX_PROMPT_WORDS=150             # at most this many of a learner's words go into one story prompt

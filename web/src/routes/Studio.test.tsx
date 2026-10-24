@@ -225,6 +225,13 @@ describe("Story Studio", () => {
       expect(calls.find((c) => c.method === "POST" && c.path === "/stories")!.body).toMatchObject({ difficulty: "easy" });
     });
 
+    it("says which model wrote the story when it was the learner's own", async () => {
+      mockApi({ ...base, "POST /stories/generate": { ...STORY, report: { ...REPORT, model: { custom: true, name: "gpt-4o-mini" } } } });
+      renderApp("/studio");
+      await make();
+      expect(await screen.findByText("Written by your own model: gpt-4o-mini.")).toBeInTheDocument();
+    });
+
     it("says the share of unusual words is not measured when the API has none", async () => {
       const none = { ...DIFF_REPORT, difficulty: { ...DIFF_REPORT.difficulty, measured: { length: 90, length_unit: "characters", own_words: 3, uncommon_pct: null } } };
       mockApi({ ...base, "POST /stories/generate": { ...STORY, report: none } });

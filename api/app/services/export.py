@@ -26,6 +26,9 @@ def build(conn, user_id: int) -> dict:
         cur.execute("SELECT id, language, story_type, topic, body, passed, report, created_at FROM stories "
                     "WHERE user_id = %s ORDER BY id", (user_id,))
         out["stories"] = cur.fetchall()
+        # your own model: the settings you entered, never the key (only its last four characters)
+        cur.execute("SELECT model, base_url, key_last4, updated_at FROM user_models WHERE user_id = %s", (user_id,))
+        out["user_models"] = cur.fetchone()               # null when you have none
         # login records: when, not the secret ids
         cur.execute("SELECT created_at, expires_at FROM sessions WHERE user_id = %s ORDER BY created_at", (user_id,))
         out["sessions"] = cur.fetchall()
