@@ -66,6 +66,17 @@ def build_tweaks(keys, user_id: int, language: str) -> dict | None:
     return {key: {"learner_id": str(int(user_id)), "active_language": language} for key in keys}
 
 
+def with_reply_language(message: str, reply_language: str | None) -> str:
+    """The Agent is asked to write ITS OWN sentences in the learner's study language when the learner chose that
+    (Settings, "Chat replies in my study language"). The note names only the language, goes in front of the learner's message, and
+    says tool names and arguments stay as they are. Fixed tool messages are relayed as the tool wrote them, so they are not affected.
+    English needs no note: it is what the Agent writes anyway."""
+    if not reply_language or reply_language.strip().lower() == "english":
+        return message
+    return (f"[Note for the tutor: write your own sentences to the learner in {reply_language}. "
+            f"Tool names and tool arguments stay exactly as they are.]\n\n{message}")
+
+
 def build_run_payload(message: str, session_id: str, tweaks: dict | None) -> dict:
     payload = {"input_value": message, "input_type": "chat", "output_type": "chat", "session_id": session_id}
     if tweaks:
@@ -330,8 +341,8 @@ class LangflowClient:
         except TransportError:
             return None                                 # best effort: the run response is the main source
 
-    def run(self, *, user_id: int, language: str, message: str, session_id: str) -> ChatResult:
-        payload = build_run_payload(message, session_id, build_tweaks(self.tweak_keys, user_id, language))
+    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None) -> ChatResult:
+        payload = build_run_payload(with_reply_language(message, reply_language), session_id, build_tweaks(self.tweak_keys, user_id, language))
         url = f"{self.base_url}/api/v1/run/{urllib.parse.quote(self.flow, safe='')}?stream=false"
         try:
             response = self._transport("POST", url, payload, self._headers(), self.timeout)

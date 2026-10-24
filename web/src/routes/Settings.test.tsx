@@ -180,6 +180,21 @@ describe("settings: site language and services", () => {
     await waitFor(() => expect(calls.some((c: any) => c.path === "/me/preferences" && c.body?.ui_follows_study_language === true)).toBe(true));
   });
 
+  it("a second checkbox asks the chat tutor to reply in the study language, and it only changes that setting", async () => {
+    const { calls } = mockApi({
+      ...base,
+      "GET /me": { ...ALICE, languages: ["en", "es"], preferences: { active_language: "es", ui_follows_study_language: false, chat_in_study_language: false, theme: "system", custom_colors: null } },
+      "PATCH /me/preferences": ({ body }: any) => ({ json: { active_language: "es", ui_follows_study_language: false, chat_in_study_language: false, theme: "system", custom_colors: null, ...body } }),
+    });
+    renderApp("/settings");
+    const box = await screen.findByRole("checkbox", { name: /Chat replies in my study language/ });
+    expect(box).not.toBeChecked();
+    await userEvent.click(box);
+    expect(box).toBeChecked();
+    expect(document.documentElement.lang).toBe("en");                       // the site itself did not change language
+    await waitFor(() => expect(calls.some((c: any) => c.path === "/me/preferences" && c.body?.chat_in_study_language === true && c.body?.ui_follows_study_language === undefined)).toBe(true));
+  });
+
   it("shows the Groq check from the server, not a fixed placeholder", async () => {
     mockApi({ ...base, "GET /health": { postgres: { ok: true }, langflow: { ok: true }, groq: { ok: false, detail: "no key" } } });
     renderApp("/settings");

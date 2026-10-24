@@ -29,8 +29,14 @@ def flashcards(conn, user_id: int, language: str, limit: int) -> dict:
 
 
 def can_cloze(language: str) -> bool:
+    """Every listed language. Languages that put spaces between words (tier 1) blank a whole word. Chinese, Japanese and
+    Korean (tier 2) have no word splitter here, so they blank the learner's OWN list words wherever they appear in the text."""
+    return LANGUAGES.get(language) is not None
+
+
+def _unspaced(language: str) -> bool:
     lang = LANGUAGES.get(language)
-    return bool(lang and lang.tier == 1)          # Tier 2 languages have no word splitter here yet (design 3B)
+    return bool(lang and lang.tier == 2)
 
 
 def _vocabulary(conn, user_id: int, language: str) -> dict[str, str]:
@@ -47,8 +53,50 @@ def _units(body: str):
                 yield part
 
 
+_UNSPACED_SENTENCE = re.compile(r"(?<=[。！？!?….])\s*")
+_UNSPACED_LABEL = re.compile(r"^\s*[^\W\d_][^\W\d_'\-]*(?:\s[^\W\d_][^\W\d_'\-]*)?\s*[:：]\s*")     # "Ana:" or "アナ：" at the start of a line
+MIN_CHARS_IN_UNSPACED_SENTENCE = 4
+
+
+def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Random) -> list[dict]:
+    """Chinese, Japanese and Korean: no splitter, so look for the learner's own words inside each sentence. The longest word
+    wins where two overlap (学校 before 学), the earliest not-yet-used word in a sentence is blanked, and whatever is stuck to
+    it (a Korean ending, a Japanese particle) stays in the text around the blank."""
+    words = sorted((w for w in vocabulary if w), key=len, reverse=True)
+    items, used = [], set()
+    for line in body.split("\n"):
+        for unit in _UNSPACED_SENTENCE.split(line):
+            unit = unit.strip()
+            label = _UNSPACED_LABEL.match(unit)
+            start = label.end() if label else 0
+            if len(unit) - start < MIN_CHARS_IN_UNSPACED_SENTENCE:
+                continue
+            covered, found = [False] * len(unit), []
+            for w in words:
+                pos = start
+                while (i := unit.find(w, pos)) >= 0:
+                    pos = i + len(w)
+                    if not any(covered[i:i + len(w)]):
+                        covered[i:i + len(w)] = [True] * len(w)
+                        found.append((i, w))
+            choice = min(((i, w) for i, w in found if w not in used), default=None)
+            if choice is None:
+                continue
+            i, w = choice
+            used.add(w)
+            picks = rng.sample([x for x in vocabulary if x != w], min(CHOICES - 1, len(vocabulary) - 1))
+            choices = [w] + picks
+            rng.shuffle(choices)
+            items.append({"before": unit[:i], "after": unit[i + len(w):], "answer": w, "hint": vocabulary[w], "choices": choices})
+            if len(items) == MAX_ITEMS:
+                return items
+    return items
+
+
 def make_cloze(body: str, language: str, vocabulary: dict[str, str], rng: random.Random | None = None) -> list[dict]:
     rng = rng or random.Random()
+    if _unspaced(language):
+        return _make_cloze_by_word(body, vocabulary, rng)
     english = language == "en"
     base_of = {w: w for w in vocabulary}
     if english:

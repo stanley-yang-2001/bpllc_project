@@ -21,7 +21,7 @@ Almost every provider (OpenAI, Groq, Together, OpenRouter, Ollama, LM Studio, vL
 A provider that is not OpenAI-compatible (Anthropic's own API, Gemini's own API) would need its own adapter; I would add those later only if you want them.
 
 ## 4. How it works
-**Storage (migration 0010, table `tutor.user_models`, one row per learner):** `model`, `base_url`, `api_key_encrypted`, `key_last4`, `updated_at`. The key is encrypted with a server secret (`MODEL_KEY_SECRET` in `.env`, Fernet). It is **never returned by any API**: the Settings page shows only "key ending 1a2b" and a Replace button. Deleting the account deletes the row (cascade), and a Remove button deletes it at any time.
+**Storage (migration 0011, table `tutor.user_models` (0010 is the chat-language preference), one row per learner):** `model`, `base_url`, `api_key_encrypted`, `key_last4`, `updated_at`. The key is encrypted with a server secret (`MODEL_KEY_SECRET` in `.env`, Fernet). It is **never returned by any API**: the Settings page shows only "key ending 1a2b" and a Replace button. Deleting the account deletes the row (cascade), and a Remove button deletes it at any time.
 
 **Settings page:** a "My model" card with the three fields, a **Test** button (sends one tiny request, shows success or the provider's error), Save, Remove. Nine languages in the message table, as for every other string.
 
@@ -46,7 +46,7 @@ A provider that is not OpenAI-compatible (Anthropic's own API, Gemini's own API)
 6. **Fallback:** if their model fails, show the error, or quietly use the shared Groq model? *(recommendation: show the error; a silent fallback would send their words somewhere they did not choose)*
 
 ## 7. Build order once decided
-1. Migration 0010 and the encryption helper, with tests (round trip, key never in any response, cascade delete).
+1. Migration 0011 and the encryption helper, with tests (round trip, key never in any response, cascade delete).
 2. The address guard (SSRF rules) with tests for each refused class.
 3. The `call_fn` for an OpenAI-compatible endpoint, tested against a fake server, and Test / Save / Remove routes.
 4. The Settings card, nine languages.

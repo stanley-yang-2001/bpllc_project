@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.routes import practice as routes
+from app.services import practice as routes_service
 from conftest import HEADERS
 
 WORDS = {"hello": "greeting", "water": "a drink", "friend": "someone you like", "bread": "baked food", "house": "a home",
@@ -129,14 +130,50 @@ def test_another_learners_story_is_not_found(make_user):
     assert cloze(bob, saved(alice)).status_code == 404 and cloze(alice, 9999).status_code == 404
 
 
-def test_a_language_without_a_word_tokeniser_says_so(make_user):
+def test_unspaced_languages_blank_the_learners_own_words(make_user):
+    cases = {
+        "ja": ({"こんにちは": "hello", "ありがとう": "thanks", "水": "water", "パン": "bread", "家": "house"},
+               "アナ：こんにちは。水をください。\nベン：はい、どうぞ。パンもありますよ。"),
+        "zh": ({"你好": "hello", "谢谢": "thanks", "水": "water", "面包": "bread", "学校": "school", "学": "study"},
+               "安娜：你好，我想要水。\n本：这里有面包。\n安娜：我们去学校吧。"),
+        "ko": ({"집": "house", "물": "water", "빵": "bread", "친구": "friend", "학교": "school"},
+               "안나: 친구는 집에 있어요.\n벤: 저는 물을 마셔요.\n안나: 학교에서 빵을 먹어요."),
+    }
     c = make_user("alice")
-    for w in ("こんにちは", "ありがとう", "水", "パン", "家"):
-        c.post("/api/words", json={"language": "ja", "word": w, "meaning": "x"})
-    sid = c.post("/api/stories", json={"language": "ja", "body": "アナ：こんにちは。水をください。\nベン：はい、どうぞ。", "story_type": "dialogue"}).json()["id"]
+    for lang, (words, story) in cases.items():
+        for w, m in words.items():
+            assert c.post("/api/words", json={"language": lang, "word": w, "meaning": m}).status_code == 201
+        sid = c.post("/api/stories", json={"language": lang, "body": story, "story_type": "dialogue"}).json()["id"]
+        r = cloze(c, sid)
+        assert r.status_code == 200, (lang, r.text)
+        items = r.json()["items"]
+        assert items and len(items) >= 2, lang
+        for item in items:
+            assert item["answer"] in words and item["answer"] in item["choices"] and len(set(item["choices"])) == len(item["choices"])
+            assert item["hint"] == words[item["answer"]]
+            rebuilt = item["before"] + item["answer"] + item["after"]
+            assert rebuilt in story, (lang, item)
+        assert len({i["answer"] for i in items}) == len(items), "one blank per word"
+
+
+def test_the_longest_list_word_wins_where_two_overlap():
+    items = routes_service.make_cloze("安娜：我们去学校吧。", "zh", {"学": "study", "学校": "school", "我们": "we"})
+    assert items and items[0]["answer"] == "我们"      # earliest
+    items = routes_service.make_cloze("安娜：去学校吧，好吗。", "zh", {"学": "study", "学校": "school"})
+    assert items[0]["answer"] == "学校" and items[0]["before"] == "安娜：去"
+
+
+def test_a_korean_ending_stays_outside_the_blank():
+    items = routes_service.make_cloze("나는 학교에서 공부해요.", "ko", {"학교": "school"})
+    assert items[0]["before"] == "나는 " and items[0]["after"] == "에서 공부해요."
+
+
+def test_a_story_in_an_unspaced_language_with_none_of_your_words_has_no_blanks(make_user):
+    c = make_user("alice")
+    c.post("/api/words", json={"language": "zh", "word": "苹果", "meaning": "apple"})
+    sid = c.post("/api/stories", json={"language": "zh", "body": "安娜：你好，今天天气很好。", "story_type": "dialogue"}).json()["id"]
     r = cloze(c, sid)
-    assert r.status_code == 422 and r.json()["error"]["code"] == "language_unavailable"
-    assert "Japanese" in r.json()["error"]["message"]
+    assert r.status_code == 422 and r.json()["error"]["code"] == "no_blanks"
 
 
 def test_cloze_for_spanish_uses_exact_words_and_the_learners_spanish_list(make_user):

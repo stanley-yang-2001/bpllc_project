@@ -279,8 +279,8 @@ _IN_TARGET_VARIETY = _template_for_other_languages(_VARIETY_TEMPLATE, True)
 
 CUSTOM_TYPE_MAX_CHARS = 40
 CUSTOM_TYPE_MAX_WORDS = 6
-CUSTOM_TOPIC_MAX_CHARS = 60
-CUSTOM_TOPIC_MAX_WORDS = 8
+CUSTOM_TOPIC_MAX_CHARS = 40          # the same limits as a custom kind (23 Oct 2026)
+CUSTOM_TOPIC_MAX_WORDS = 6
 
 # Ways a learner or the Agent may name a built-in type. Keys are lower case.
 TYPE_ALIASES = {

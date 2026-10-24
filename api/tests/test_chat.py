@@ -275,3 +275,20 @@ def test_nothing_personal_leaves_the_api_when_chatting_through_the_real_client(a
     blob = " ".join(sent).lower()
     assert "zebulon" not in blob and "quux" not in blob and "@example.com" not in blob and "password" not in blob
     assert f'"learner_id": "{uid}"' in blob and f"u{uid}-{PART}" in blob
+
+
+# --- chat replies in the study language (Settings checkbox) ------------------------------------------------
+
+def test_the_chat_asks_for_the_study_language_only_when_the_learner_chose_it(make_user, recorder):
+    c = make_user("alice")
+    c.post("/api/me/languages", json={"language": "es"})
+    say(c, "hola", language="es")
+    assert recorder.calls[-1]["reply_language"] is None
+    assert c.patch("/api/me/preferences", json={"chat_in_study_language": True}).status_code == 200
+    say(c, "hola", language="es")
+    assert recorder.calls[-1]["reply_language"] == "Spanish"
+    say(c, "hello", language="en")
+    assert recorder.calls[-1]["reply_language"] == "English"
+    c.patch("/api/me/preferences", json={"chat_in_study_language": False})
+    say(c, "hola", language="es")
+    assert recorder.calls[-1]["reply_language"] is None

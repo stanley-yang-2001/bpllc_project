@@ -313,3 +313,11 @@ def test_real_story_run_parses_to_the_story_and_one_tool_call():
 def test_real_stored_messages_contain_the_tool_call_too():
     r = lc.parse_run_response({}, stored_messages=_fixture("story_messages.json"))
     assert [c.name for c in r.tool_calls] == ["Story Generator Tool"]
+
+
+def test_the_reply_language_note_names_only_the_language_and_goes_in_front_of_the_message():
+    assert lc.with_reply_language("tell me a story", None) == "tell me a story"
+    assert lc.with_reply_language("tell me a story", "English") == "tell me a story"
+    out = lc.with_reply_language("hola", "Korean")
+    assert out.endswith("\n\nhola") and "Korean" in out and out.startswith("[Note for the tutor:")
+    assert "Tool names and tool arguments stay exactly as they are" in out

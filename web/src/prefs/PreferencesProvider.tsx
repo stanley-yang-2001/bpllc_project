@@ -4,7 +4,7 @@ import { api, type User } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { COPY_KEY, LEGACY_THEME_KEY, legacyLanguageKey, readCopy, wipeCopy, writeCopy, type Prefs } from "./deviceCopy";
 
-export const DEFAULT_PREFS: Prefs = { active_language: null, ui_follows_study_language: false, theme: "system", custom_colors: null };
+export const DEFAULT_PREFS: Prefs = { active_language: null, ui_follows_study_language: false, chat_in_study_language: false, theme: "system", custom_colors: null };
 const SAVE_DELAY_MS = 600;
 const LEGACY_THEMES = ["light", "dark", "system"];
 
@@ -116,6 +116,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       qc.setQueryData<User | null>(["me"], (me) => me && me.id === userId ? {
         ...me,
         preferences: {
+          chat_in_study_language: me.preferences?.chat_in_study_language ?? false,
           theme: copy.theme, custom_colors: copy.custom_colors,
           active_language: copy.active_language, ui_follows_study_language: copy.ui_follows_study_language,
         },

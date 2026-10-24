@@ -52,7 +52,7 @@ def test_the_downgrade_turns_custom_labels_into_story_and_restores_the_old_rule(
     conn.commit()
     conn.close()                                   # the migration needs the table free of this session's locks
     try:
-        command.downgrade(cfg(), "-1")
+        command.downgrade(cfg(), "0008")
         with psycopg2.connect(DB_URL) as c:
             assert story_types(c) == ["story", "diary", None, "story"]
             with pytest.raises(errors.CheckViolation):

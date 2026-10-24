@@ -14,6 +14,7 @@ import { Badge, Button, Card, ErrorText, inputCls, Notice, PageHeader } from "..
 
 const CLASSIC = ["narration", "dialogue"];          // these two have no topic
 const CUSTOM = "__custom__";                        // the "Write my own…" choice; never sent to the API
+const CUSTOM_TOPIC = "__custom_topic__";            // the same for the topic
 const CUSTOM_MAX = 40;
 
 /** The same rule the API applies (tutor_core.prompts.clean_free_text), so a bad label is explained here and Make stays off.
@@ -37,6 +38,7 @@ export default function Studio() {
   const [type, setType] = useState("");
   const [topic, setTopic] = useState("");
   const [custom, setCustom] = useState("");
+  const [customTopic, setCustomTopic] = useState("");
   const [story, setStory] = useState<GeneratedStory | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
   const saved = savedId !== null;
@@ -54,7 +56,10 @@ export default function Studio() {
 
   const kind = type === CUSTOM ? customLabel(custom) ?? "" : type;       // "" = surprise me (or an unusable label, which blocks Make)
   const customBad = type === CUSTOM && !kind;
-  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !kind || CLASSIC.includes(kind) ? undefined : topic || undefined });
+  const topicValue = topic === CUSTOM_TOPIC ? customLabel(customTopic) ?? "" : topic;    // same rule and limits as a custom kind
+  const topicOn = !!kind && !CLASSIC.includes(kind);
+  const topicBad = topicOn && topic === CUSTOM_TOPIC && !topicValue;
+  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !topicOn ? undefined : topicValue || undefined });
   const enabled = lang?.stories_enabled !== false;
   const failure = generate.error instanceof ApiError ? generate.error : null;
 
@@ -95,12 +100,24 @@ export default function Studio() {
                 <select id="story-topic" className={inputCls} value={topic} onChange={(e) => setTopic(e.target.value)} disabled={!kind || CLASSIC.includes(kind)}>
                   <option value="">{t("studio.anyTopic")}</option>
                   {options.data?.topics.map((tp) => <option key={tp} value={tp}>{topicLabel(t, tp)}</option>)}
+                  <option value={CUSTOM_TOPIC}>{t("studio.kindCustom")}</option>
                 </select>
+                {topicOn && topic === CUSTOM_TOPIC && (
+                  <div className="mt-2">
+                    <label htmlFor="story-topic-custom" className="mb-1 block text-sm font-medium text-slate-700">{t("studio.topicCustomLabel")}</label>
+                    <input
+                      id="story-topic-custom" className={inputCls} value={customTopic} maxLength={CUSTOM_MAX} lang={active}
+                      onChange={(e) => setCustomTopic(e.target.value)} aria-describedby="story-topic-custom-hint"
+                      aria-invalid={customTopic.trim() !== "" && topicBad}
+                    />
+                    <p id="story-topic-custom-hint" className={`mt-1 text-xs ${customTopic.trim() !== "" && topicBad ? "text-red-700" : "text-slate-600"}`}>{t("studio.topicCustomHint")}</p>
+                  </div>
+                )}
                 {(!kind || CLASSIC.includes(kind)) && <p className="mt-1 text-xs text-slate-600">{t("studio.topicHint")}</p>}
               </div>
             </div>
             <div>
-              <Button onClick={make} loading={generate.isPending} disabled={customBad} icon={<Sparkles aria-hidden className="size-4" />}>
+              <Button onClick={make} loading={generate.isPending} disabled={customBad || topicBad} icon={<Sparkles aria-hidden className="size-4" />}>
                 {generate.isPending ? t("studio.writing") : t("studio.make")}
               </Button>
               {generate.isPending && <p role="status" className="mt-2 text-sm text-slate-600">{t("studio.wait")}</p>}

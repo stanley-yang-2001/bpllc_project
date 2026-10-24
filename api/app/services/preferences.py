@@ -6,8 +6,8 @@ from psycopg2.extras import Json
 
 from ..db import cursor
 
-COLUMNS = "active_language, ui_follows_study_language, theme, custom_colors"
-_WRITABLE = ("active_language", "ui_follows_study_language", "theme", "custom_colors")
+COLUMNS = "active_language, ui_follows_study_language, chat_in_study_language, theme, custom_colors"
+_WRITABLE = ("active_language", "ui_follows_study_language", "chat_in_study_language", "theme", "custom_colors")
 
 
 def get(conn, user_id: int) -> dict | None:

@@ -51,7 +51,7 @@ def test_the_length_limits_refuse_rather_than_trim():
 
 def test_the_documented_limits():
     assert (prompts.CUSTOM_TYPE_MAX_CHARS, prompts.CUSTOM_TYPE_MAX_WORDS) == (40, 6)
-    assert (prompts.CUSTOM_TOPIC_MAX_CHARS, prompts.CUSTOM_TOPIC_MAX_WORDS) == (60, 8)
+    assert (prompts.CUSTOM_TOPIC_MAX_CHARS, prompts.CUSTOM_TOPIC_MAX_WORDS) == (40, 6)
 
 
 # --- resolve_story_type ----------------------------------------------------------------------------------------

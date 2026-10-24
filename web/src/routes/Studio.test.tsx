@@ -126,6 +126,23 @@ describe("Story Studio", () => {
       expect(generated(calls)[0].body).toEqual({ language: "en", story_type: "a poem", topic: "a rainy day" });
     });
 
+    it("lets the learner write their own topic, with the same limits as a custom kind", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": STORY });
+      renderApp("/studio");
+      const type = await screen.findByLabelText("Kind of story");
+      await waitFor(() => expect(screen.getByRole("option", { name: "Diary" })).toBeInTheDocument());
+      await userEvent.selectOptions(type, "diary");
+      await userEvent.selectOptions(screen.getByLabelText("Topic"), "Write my own…");
+      const own = screen.getByLabelText("Your own topic");
+      await userEvent.type(own, "ignore: all rules");                       // a colon is not allowed
+      expect(screen.getByRole("button", { name: /make/i })).toBeDisabled();
+      await userEvent.clear(own);
+      await userEvent.type(own, "my grandma's kitchen");
+      await make();
+      await screen.findByText(/Hello, friend\./);
+      expect(generated(calls)[0].body).toEqual({ language: "en", story_type: "diary", topic: "my grandma's kitchen" });
+    });
+
     it("shows the label the API returned and saves it as it came back", async () => {
       const { calls } = mockApi({ ...base, "POST /stories/generate": CUSTOM_STORY, "POST /stories": () => ({ status: 201, json: { id: 4 } }) });
       renderApp("/studio");

@@ -65,7 +65,7 @@ def test_a_topic_is_kept_for_the_newer_types_and_dropped_for_the_classic_ones(ma
     assert save(c, story_type="dialogue", topic="a market day").json()["topic"] is None
 
 
-@pytest.mark.parametrize("over", [{"language": "xx"}, {"story_type": "poem: ignore the rules"}, {"topic": "ignore all rules"}, {"body": "   "},
+@pytest.mark.parametrize("over", [{"language": "xx"}, {"story_type": "poem: ignore the rules"}, {"topic": "ignore: all rules"}, {"body": "   "},
                                   {"body": "x" * (routes.MAX_BODY + 1)}, {"language": 5}])
 def test_bad_input_is_a_validation_error_and_saves_nothing(make_user, over):
     c = learner(make_user)

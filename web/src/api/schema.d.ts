@@ -735,6 +735,8 @@ export interface components {
             custom_colors: components["schemas"]["CustomColors"] | null;
             /** Theme */
             theme: string;
+            /** Chat In Study Language */
+            chat_in_study_language: boolean;
             /** Ui Follows Study Language */
             ui_follows_study_language: boolean;
         };
@@ -749,6 +751,8 @@ export interface components {
             custom_colors?: components["schemas"]["ColorsIn"] | null;
             /** Theme */
             theme?: string | null;
+            /** Chat In Study Language */
+            chat_in_study_language?: boolean | null;
             /** Ui Follows Study Language */
             ui_follows_study_language?: boolean | null;
         };

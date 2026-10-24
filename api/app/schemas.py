@@ -19,6 +19,7 @@ class CustomColors(BaseModel):
 class PreferencesOut(BaseModel):
     active_language: str | None
     ui_follows_study_language: bool
+    chat_in_study_language: bool
     theme: str
     custom_colors: CustomColors | None
 

@@ -6,7 +6,9 @@ from pydantic import BaseModel, field_validator
 from ..db import connection
 from ..deps import current_user, require_language
 from ..schemas import ChatOut
-from ..services import chat_sessions
+from tutor_core.languages import LANGUAGES
+
+from ..services import chat_sessions, preferences
 from ..services.langflow_client import build_session_id
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -49,7 +51,13 @@ def chat(body: ChatIn, request: Request, user: dict = Depends(current_user)):
             # noted BEFORE the run, so even a failed turn (Langflow may already hold the question) can be deleted later
             with connection(state.pool) as conn:
                 chat_sessions.record(conn, user["id"], session_id)
-        result = state.chat.run(user_id=user["id"], language=body.language, message=body.message, session_id=session_id)
+        reply_language = None
+        with connection(state.pool) as conn:
+            prefs = preferences.get(conn, user["id"])
+        if prefs and prefs["chat_in_study_language"]:
+            reply_language = LANGUAGES[body.language].name           # the model's own sentences only; tool messages stay as the tool wrote them
+        result = state.chat.run(user_id=user["id"], language=body.language, message=body.message, session_id=session_id,
+                                reply_language=reply_language)
         ticket.settle(result.tokens)
     return {"reply": result.reply,
             "tool_calls": [{"name": c.name, "args": c.args, "output": c.output, "failed": c.failed} for c in result.tool_calls],

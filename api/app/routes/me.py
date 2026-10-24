@@ -71,6 +71,7 @@ class PreferencesPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
     active_language: str | None = None
     ui_follows_study_language: bool | None = None
+    chat_in_study_language: bool | None = None
     theme: str | None = None
     custom_colors: ColorsIn | None = None
 
@@ -166,6 +167,10 @@ def patch_preferences(body: PreferencesPatch, request: Request, user: dict = Dep
         if body.ui_follows_study_language is None:
             raise validation_error("ui_follows_study_language: must be true or false")
         changes["ui_follows_study_language"] = body.ui_follows_study_language
+    if "chat_in_study_language" in sent:
+        if body.chat_in_study_language is None:
+            raise validation_error("chat_in_study_language: must be true or false")
+        changes["chat_in_study_language"] = body.chat_in_study_language
     if "custom_colors" in sent:
         changes["custom_colors"] = body.custom_colors.model_dump() if body.custom_colors else None
     with connection(request.app.state.pool) as conn:

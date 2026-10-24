@@ -45,9 +45,15 @@ class GenerateIn(BaseModel):
     @field_validator("topic")
     @classmethod
     def _topic(cls, value):
-        if value is not None and value not in prompts.TOPICS:
-            raise ValueError("Pick a topic from the list.")      # free text would go straight into the prompt
-        return value
+        """A topic from the list, or the learner's own short one ("my grandma's kitchen"): the same rule and limits as a
+        custom kind. Text that cannot be used never gets as far as the prompt, where it is quoted as a subject."""
+        if value is None:
+            return None
+        resolved = prompts.clean_topic(value)
+        if resolved is None:
+            raise ValueError("Pick a topic from the list, or write a short one of your own: up to 40 characters and 6 words, "
+                             "with letters, numbers, spaces, apostrophes and hyphens only.")
+        return resolved
 
 
 @router.get("/options", response_model=StoryOptionsOut)
