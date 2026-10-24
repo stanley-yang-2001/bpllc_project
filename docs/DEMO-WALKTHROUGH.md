@@ -6,7 +6,7 @@ the library and practice are the real code.
 
 ## Set up
 
-1. Copy `.env.example` to `.env` and set:
+1. Create `.env` (see `docs/ENVIRONMENT.md`) and set:
    ```
    JWT_SECRET=<at least 32 random characters>
    AI_MODE=stub

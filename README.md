@@ -55,7 +55,7 @@ seen yet.
 ## Quick start
 
 ```bash
-cp .env.example .env     # then fill in GROQ_API_KEY, JWT_SECRET (>= 32 chars), LANGFLOW_SECRET_KEY, TOOLS_DB_PASSWORD (letters and digits; the Langflow tools' database login), ...
+# create .env (see docs/ENVIRONMENT.md) with GROQ_API_KEY, JWT_SECRET (>= 32 chars), LANGFLOW_SECRET_KEY, TOOLS_DB_PASSWORD (letters and digits; the Langflow tools' database login), ...
 docker compose up -d
 docker compose exec langflow python /app/scripts/smoke_test.py   # confirm Postgres + Groq are reachable
 ```

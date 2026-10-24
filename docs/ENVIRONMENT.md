@@ -1,10 +1,21 @@
-# Copy to .env (git-ignored) and fill in. Never commit real values.
+# Environment settings (`.env`)
 
-# --- required -----------------------------------------------------------------------------------
-GROQ_API_KEY=                      # from the Groq console; Langflow's Groq node falls back to this
-JWT_SECRET=                        # at least 32 random characters, e.g.  python3 -c "import secrets; print(secrets.token_urlsafe(48))"
-TOOLS_DB_PASSWORD=                 # password of the narrow database role the Langflow tools use (migration 0008). Pick a long random one with NO : @ / % ? # or spaces (it goes into a URL), e.g.  python3 -c "import secrets; print(secrets.token_hex(24))". The api sets it on the role at startup; change it by editing here and restarting the api and langflow. Compose refuses to start without it.
+Docker Compose and the API read their settings from a file called `.env` in the project folder. It is git-ignored: never
+commit real values. There is no template file; create `.env` and add the lines below. Only the three required ones must be
+set; everything else has a default.
 
+```
+# --- required ---
+GROQ_API_KEY=            # from the Groq console; Langflow's Groq node falls back to this
+JWT_SECRET=              # at least 32 random characters, e.g.  python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow tools use (migration 0008). A long random one
+                         # with NO : @ / % ? # or spaces (it goes into a URL), e.g.  python3 -c "import secrets; print(secrets.token_hex(24))"
+                         # The API sets it on the role at startup. Compose refuses to start without it.
+```
+
+## Everything else (optional; the value shown is the default)
+
+```
 # --- database and Langflow admin (defaults are fine for local development) ------------------------
 # POSTGRES_PASSWORD=langflow
 # LANGFLOW_SUPERUSER_PASSWORD=admin123
@@ -32,3 +43,4 @@ TOOLS_DB_PASSWORD=                 # password of the narrow database role the La
 # LANGFLOW_RUN_AS_USER=user        # the user the langflow base image runs as (see the comment in langflow/Dockerfile)
 # TUTOR_DEV_USER_ID=               # DEVELOPMENT ONLY: acts as this learner when a request sends none. Keep EMPTY otherwise.
 # TUTOR_DEV_LANGUAGE=en            # ... and this language
+```

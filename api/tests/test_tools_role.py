@@ -259,6 +259,6 @@ def test_langflow_keeps_an_admin_connection_for_the_checking_scripts_and_not_as_
     assert TOOLS_ROLE not in e.get("LANGFLOW_DATABASE_URL", "")
 
 
-def test_the_example_env_file_documents_the_password():
-    text = (REPO / ".env.example").read_text(encoding="utf-8")
+def test_the_environment_doc_documents_the_password():
+    text = (REPO / "docs" / "ENVIRONMENT.md").read_text(encoding="utf-8")
     assert re.search(r"^TOOLS_DB_PASSWORD=", text, re.M)

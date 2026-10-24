@@ -317,7 +317,8 @@ def test_real_stored_messages_contain_the_tool_call_too():
 
 def test_the_reply_language_note_names_only_the_language_and_goes_in_front_of_the_message():
     assert lc.with_reply_language("tell me a story", None) == "tell me a story"
-    assert lc.with_reply_language("tell me a story", "English") == "tell me a story"
+    assert lc.with_reply_language("tell me a story", "") == "tell me a story"
+    assert "English" in lc.with_reply_language("你好", "English")          # a learner studying English writing in Chinese
     out = lc.with_reply_language("hola", "Korean")
     assert out.endswith("\n\nhola") and "Korean" in out and out.startswith("[Note for the tutor:")
     assert "Tool names and tool arguments stay exactly as they are" in out

@@ -37,10 +37,15 @@ A learner with a short list cannot reach Medium or Hard on measure 2: the tier i
 - **Per-language word matching** for measure 2 (inflections and particles), which the vocabulary check does not do for non-English today.
 - **A measurement round** on your machine, as for languages: generate stories per tier and look at where the real numbers fall before fixing the table above.
 
-## Decisions for the owner
+## Decisions (owner, 23 October 2026)
 
-1. Is the tier **chosen by the learner** (my suggestion), **set automatically** from the learner's list size, or both?
-2. Frequency data: add `wordfreq` (accurate, bigger images) or start with a small everyday-word list for English, Spanish and French only and add languages later?
-3. Chinese, Japanese and Korean: measure only length and own-words used at first, and skip "uncommon words" until a splitter exists?
-4. If a story misses its tier, regenerate once, or show it with the measured tier?
-5. Are the three starting tier tables above the right size, or do you want different lengths?
+1. **Chosen by the learner** in Story Studio (Any, Easy, Medium, Hard, or Custom).
+2. **Frequency data:** a small everyday-word list, for **English, Spanish and French first**. German, Italian and Portuguese get one later.
+3. **Chinese, Japanese and Korean:** measure length and own words used; **skip uncommon words** until a splitter exists. The splitter is built **after all the other tasks**.
+4. **A story that misses its tier is shown as it is,** with the tier that was asked for next to what it measured. No regenerating for tier.
+5. **The three tier sizes above are right.**
+6. **The learner can customise the three elements** (length, own words used, uncommon share) instead of picking a preset. The page notes the limit: the model follows these targets loosely, especially own-word counts and the uncommon share, which is why the report shows what was measured.
+
+## What is built (24 October 2026)
+
+See the changelog entry of that date. Not built: German, Italian and Portuguese uncommon-word lists, the splitter, and a `difficulty` argument for the chat story tool.

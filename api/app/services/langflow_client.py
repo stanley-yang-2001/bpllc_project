@@ -70,8 +70,8 @@ def with_reply_language(message: str, reply_language: str | None) -> str:
     """The Agent is asked to write ITS OWN sentences in the learner's study language when the learner chose that
     (Settings, "Chat replies in my study language"). The note names only the language, goes in front of the learner's message, and
     says tool names and arguments stay as they are. Fixed tool messages are relayed as the tool wrote them, so they are not affected.
-    English needs no note: it is what the Agent writes anyway."""
-    if not reply_language or reply_language.strip().lower() == "english":
+    English gets the note too: a learner studying English who writes in another language still gets English back."""
+    if not reply_language or not reply_language.strip():
         return message
     return (f"[Note for the tutor: write your own sentences to the learner in {reply_language}. "
             f"Tool names and tool arguments stay exactly as they are.]\n\n{message}")

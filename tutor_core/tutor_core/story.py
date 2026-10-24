@@ -18,6 +18,7 @@ from typing import Optional
 
 from . import groq as groq_module
 from .languages import LANGUAGES, stories_enabled
+from .quality import language_check
 from .prompts import (EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage,
                       resolve_story_type)
 from .vocab import _check, load_words, max_prompt_words, sample_words
@@ -113,4 +114,13 @@ def generate_story(
     # as an empty string: the Agent fills the gap by inventing its own story. It is a failure, cached briefly.
     if not passage.strip():
         return remember(StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base))
+    # The model sometimes answers in English (or mixes English in) when asked for another language (seen 23 Oct, Chinese).
+    # Ask once more before the learner ever sees it; whatever the second try gives is returned and reported honestly.
+    if language != "en" and language_check(passage, LANGUAGES[language].name, "")["verdict"] not in ("ok", "not_checked"):
+        try:
+            second = extract_final_passage((call_groq_fn or groq_module.call_groq)(prompt))
+        except Exception:
+            second = ""
+        if second.strip():
+            passage = second
     return remember(StoryResult(passage, True, None, **base))

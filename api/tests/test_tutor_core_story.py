@@ -232,10 +232,10 @@ def test_the_direct_path_can_switch_the_cache_off(conn, make_learner):
 def test_one_learners_story_is_never_served_to_another(conn, make_learner):
     a = learner_with(conn, make_learner, "es", ["manzana"])
     b = learner_with(conn, make_learner, "es", ["pan"])
-    ga, gb = Groq(text="story for a"), Groq(text="story for b")
+    ga, gb = Groq(text="historia de Ana"), Groq(text="historia de Beto")
     ra = generate_story(conn, a, "es", call_groq_fn=ga)
     rb = generate_story(conn, b, "es", call_groq_fn=gb)
-    assert (ra.text, rb.text) == ("story for a", "story for b")
+    assert (ra.text, rb.text) == ("historia de Ana", "historia de Beto")
     assert len(ga.prompts) == 1 and len(gb.prompts) == 1                     # b got a real call, not a's cached story
     assert "manzana" in ga.prompts[0] and "pan" in gb.prompts[0] and "manzana" not in gb.prompts[0]
     assert rb.cached is False
@@ -373,3 +373,61 @@ def test_a_named_kind_works_for_english(conn, make_learner):
 def test_spanish_still_gets_the_full_mix(conn, make_learner):
     learner = learner_with(conn, make_learner, "es", ["pan", "agua", "casa"])
     assert len(_kinds_for(conn, learner, "es", n=60) - {"narration", "dialogue"}) >= 2
+
+
+# --- a story in the wrong language is asked for once more -------------------------------------------------------
+
+class Sequence:
+    """Answers with each text in turn, in the delimiter format, and records the prompts."""
+
+    def __init__(self, *texts):
+        self.prompts, self.texts = [], list(texts)
+
+    def __call__(self, prompt):
+        self.prompts.append(prompt)
+        text = self.texts[min(len(self.prompts), len(self.texts)) - 1]
+        return f"plan\n{prompts.DELIMITER}\n{text}"
+
+
+ENGLISH = "Ana: Hi! Do you have any bread?\nBen: Yes, here you are.\nAna: Thank you!"
+CHINESE = "安娜：你好！你有面包吗？\n本：有，给你。\n安娜：谢谢你！"
+
+
+def test_an_english_answer_to_a_chinese_request_is_asked_for_again(conn, make_learner):
+    l = learner_with(conn, make_learner, "zh", ["面包"])
+    g = Sequence(ENGLISH, CHINESE)
+    r = generate_story(conn, l, "zh", call_groq_fn=g, use_cache=False)
+    assert r.ok and r.text == CHINESE and len(g.prompts) == 2
+
+
+def test_a_story_in_the_right_language_is_not_asked_for_twice(conn, make_learner):
+    l = learner_with(conn, make_learner, "zh", ["面包"])
+    g = Sequence(CHINESE)
+    assert generate_story(conn, l, "zh", call_groq_fn=g, use_cache=False).text == CHINESE and len(g.prompts) == 1
+
+
+def test_if_the_second_answer_is_still_wrong_it_is_returned_for_the_report_to_flag(conn, make_learner):
+    l = learner_with(conn, make_learner, "zh", ["面包"])
+    g = Sequence(ENGLISH, ENGLISH)
+    r = generate_story(conn, l, "zh", call_groq_fn=g, use_cache=False)
+    assert r.ok and r.text == ENGLISH and len(g.prompts) == 2           # never a third call
+
+
+def test_a_failing_second_call_keeps_the_first_story(conn, make_learner):
+    l = learner_with(conn, make_learner, "zh", ["面包"])
+    calls = []
+
+    def groq(prompt):
+        calls.append(prompt)
+        if len(calls) == 2:
+            raise RuntimeError("429")
+        return f"plan\n{prompts.DELIMITER}\n{ENGLISH}"
+
+    assert generate_story(conn, l, "zh", call_groq_fn=groq, use_cache=False).text == ENGLISH
+
+
+def test_english_stories_are_never_asked_for_again(conn, make_learner):
+    l = learner_with(conn, make_learner, "en", ["bread"])
+    g = Sequence(ENGLISH)
+    generate_story(conn, l, "en", call_groq_fn=g, use_cache=False)
+    assert len(g.prompts) == 1
