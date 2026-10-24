@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkPlus, GraduationCap, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, ApiError, type GeneratedStory } from "../api/client";
+import { api, ApiError, type DifficultyChoice, type GeneratedStory } from "../api/client";
 import { storiesKey } from "../api/keys";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { StoryReport } from "../components/StoryReport";
-import { topicLabel, typeLabel } from "../i18n/labels";
+import { diffLabel, topicLabel, typeLabel } from "../i18n/labels";
 import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, Card, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
 
@@ -16,6 +16,13 @@ const CLASSIC = ["narration", "dialogue"];          // these two have no topic
 const CUSTOM = "__custom__";                        // the "Write my own…" choice; never sent to the API
 const CUSTOM_TOPIC = "__custom_topic__";            // the same for the topic
 const CUSTOM_MAX = 40;
+const PRESETS = { easy: { length: 60, own_words: 3, uncommon_pct: 5 }, medium: { length: 110, own_words: 5, uncommon_pct: 10 }, hard: { length: 200, own_words: 8, uncommon_pct: 20 } } as const;
+const LIMITS = { length: [20, 400], own_words: [1, 30], uncommon_pct: [0, 50] } as const;       // the API checks the same limits
+type Tier = "" | "easy" | "medium" | "hard" | "custom";
+const whole = (text: string, [lo, hi]: readonly [number, number]): number | null => {
+  const n = Number(text);
+  return text.trim() !== "" && Number.isInteger(n) && n >= lo && n <= hi ? n : null;
+};
 
 /** The same rule the API applies (tutor_core.prompts.clean_free_text), so a bad label is explained here and Make stays off.
  * The API is the authority and checks again. */
@@ -24,6 +31,13 @@ export function customLabel(text: string): string | null {
   const ok = clean.length > 0 && clean.length <= CUSTOM_MAX && clean.split(" ").length <= 6
     && /^[\p{L}\p{M}\p{N}'\u2019 -]+$/u.test(clean) && /[\p{L}\p{N}]/u.test(clean);
   return ok ? clean : null;
+}
+
+/** The tier a generated story was made with, read back from its report so Save records the same one. */
+function requestedOf(report: GeneratedStory["report"]): DifficultyChoice {
+  const r = (report as { difficulty?: { requested?: { tier?: string; length?: number; own_words?: number; uncommon_pct?: number } } }).difficulty?.requested;
+  if (!r?.tier) return {};
+  return r.tier === "custom" ? { difficulty: "custom", length: r.length, own_words: r.own_words, uncommon_pct: r.uncommon_pct } : { difficulty: r.tier };
 }
 
 export default function Studio() {
@@ -39,6 +53,8 @@ export default function Studio() {
   const [topic, setTopic] = useState("");
   const [custom, setCustom] = useState("");
   const [customTopic, setCustomTopic] = useState("");
+  const [tier, setTier] = useState<Tier>("");
+  const [nums, setNums] = useState({ length: "110", own_words: "5", uncommon_pct: "10" });
   const [story, setStory] = useState<GeneratedStory | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
   const saved = savedId !== null;
@@ -59,7 +75,12 @@ export default function Studio() {
   const topicValue = topic === CUSTOM_TOPIC ? customLabel(customTopic) ?? "" : topic;    // same rule and limits as a custom kind
   const topicOn = !!kind && !CLASSIC.includes(kind);
   const topicBad = topicOn && topic === CUSTOM_TOPIC && !topicValue;
-  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !topicOn ? undefined : topicValue || undefined });
+  const picked = { length: whole(nums.length, LIMITS.length), own_words: whole(nums.own_words, LIMITS.own_words), uncommon_pct: whole(nums.uncommon_pct, LIMITS.uncommon_pct) };
+  const diffBad = tier === "custom" && (picked.length === null || picked.own_words === null || picked.uncommon_pct === null);
+  const choice: DifficultyChoice = tier === "" ? {} : tier === "custom"
+    ? { difficulty: "custom", length: picked.length ?? undefined, own_words: picked.own_words ?? undefined, uncommon_pct: picked.uncommon_pct ?? undefined }
+    : { difficulty: tier };
+  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !topicOn ? undefined : topicValue || undefined, ...choice });
   const enabled = lang?.stories_enabled !== false;
   const failure = generate.error instanceof ApiError ? generate.error : null;
 
@@ -117,7 +138,40 @@ export default function Studio() {
               </div>
             </div>
             <div>
-              <Button onClick={make} loading={generate.isPending} disabled={customBad || topicBad} icon={<Sparkles aria-hidden className="size-4" />}>
+              <label htmlFor="story-difficulty" className="mb-1 block text-sm font-medium text-slate-700">{t("studio.difficulty")}</label>
+              <select id="story-difficulty" className={`${inputCls} sm:max-w-xs`} value={tier} onChange={(e) => setTier(e.target.value as Tier)}>
+                <option value="">{t("studio.diffAny")}</option>
+                <option value="easy">{t("studio.diffEasy")}</option>
+                <option value="medium">{t("studio.diffMedium")}</option>
+                <option value="hard">{t("studio.diffHard")}</option>
+                <option value="custom">{t("studio.diffCustom")}</option>
+              </select>
+              {tier !== "" && tier !== "custom" && (
+                <p className="mt-1 text-xs text-slate-600">{t("studio.diffPreset", { length: PRESETS[tier].length, own: PRESETS[tier].own_words, pct: PRESETS[tier].uncommon_pct })}</p>
+              )}
+              {tier === "custom" && (
+                <div className="mt-2 grid gap-3 sm:grid-cols-3">
+                  {([["length", "studio.diffLength"], ["own_words", "studio.diffOwn"], ["uncommon_pct", "studio.diffUncommon"]] as const).map(([key, label]) => (
+                    <div key={key}>
+                      <label htmlFor={`diff-${key}`} className="mb-1 block text-sm font-medium text-slate-700">{t(label)}</label>
+                      <input
+                        id={`diff-${key}`} type="number" inputMode="numeric" className={inputCls} value={nums[key]}
+                        min={LIMITS[key][0]} max={LIMITS[key][1]} step={1}
+                        onChange={(e) => setNums({ ...nums, [key]: e.target.value })}
+                        aria-invalid={picked[key] === null}
+                      />
+                    </div>
+                  ))}
+                  <p className={`text-xs sm:col-span-3 ${diffBad ? "text-red-700" : "text-slate-600"}`}>
+                    {diffBad && <>{t("studio.diffBad")} </>}
+                    {t("studio.diffLimits", { lmin: LIMITS.length[0], lmax: LIMITS.length[1], omin: LIMITS.own_words[0], omax: LIMITS.own_words[1], umin: LIMITS.uncommon_pct[0], umax: LIMITS.uncommon_pct[1] })}
+                  </p>
+                </div>
+              )}
+              {tier !== "" && <p className="mt-1 text-xs text-slate-600">{t("studio.diffNote")}</p>}
+            </div>
+            <div>
+              <Button onClick={make} loading={generate.isPending} disabled={customBad || topicBad || diffBad} icon={<Sparkles aria-hidden className="size-4" />}>
                 {generate.isPending ? t("studio.writing") : t("studio.make")}
               </Button>
               {generate.isPending && <p role="status" className="mt-2 text-sm text-slate-600">{t("studio.wait")}</p>}
@@ -138,6 +192,7 @@ export default function Studio() {
           <div className="flex flex-wrap items-center gap-2">
             <Badge>{typeLabel(t, story.story_type ?? "story")}</Badge>
             {story.topic && <Badge>{topicLabel(t, story.topic)}</Badge>}
+            {requestedOf(story.report).difficulty && <Badge>{diffLabel(t, requestedOf(story.report).difficulty!)}</Badge>}
             <span className="text-xs text-slate-600">{t("studio.builtFrom", { used: story.words_used, total: story.words_total })}</span>
           </div>
           <p lang={story.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.story}</p>
@@ -145,7 +200,7 @@ export default function Studio() {
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              onClick={() => save.mutate({ language: story.language, body: story.story, story_type: story.story_type, topic: story.topic })}
+              onClick={() => save.mutate({ language: story.language, body: story.story, story_type: story.story_type, topic: story.topic, ...requestedOf(story.report) })}
               disabled={saved}
               loading={save.isPending}
               icon={<BookmarkPlus aria-hidden className="size-4" />}

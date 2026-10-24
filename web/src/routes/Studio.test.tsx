@@ -181,6 +181,61 @@ describe("Story Studio", () => {
     expect(generated(calls)[0].body).toEqual({ language: "en" });
   });
 
+  describe("difficulty", () => {
+    const DIFF_REPORT = { ...REPORT, difficulty: { requested: { tier: "easy", length: 60, own_words: 3, uncommon_pct: 5 },
+      measured: { length: 24, length_unit: "words", own_words: 2, uncommon_pct: 12.5 }, met: { length: false, own_words: false, uncommon_pct: false }, list_size: 8 } };
+
+    it("sends nothing about difficulty by default, and the preset name when one is picked", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": STORY });
+      renderApp("/studio");
+      await userEvent.selectOptions(await screen.findByLabelText("Difficulty"), "Hard");
+      expect(screen.getByText(/About 200 words, at least 8 of your words/)).toBeInTheDocument();
+      expect(screen.getByText(/follows these numbers loosely/)).toBeInTheDocument();
+      await make();
+      await screen.findByText(/Hello, friend\./);
+      expect(generated(calls)[0].body).toEqual({ language: "en", difficulty: "hard" });
+    });
+
+    it("takes the learner's own numbers, inside the limits, and keeps Make off until they are valid", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": STORY });
+      renderApp("/studio");
+      await userEvent.selectOptions(await screen.findByLabelText("Difficulty"), "Custom");
+      const length = screen.getByLabelText("Length (words)");
+      await userEvent.clear(length);
+      await userEvent.type(length, "5");
+      expect(screen.getByRole("button", { name: /make/i })).toBeDisabled();
+      expect(screen.getByText(/Use whole numbers inside the limits/)).toBeInTheDocument();
+      await userEvent.clear(length);
+      await userEvent.type(length, "90");
+      await make();
+      await screen.findByText(/Hello, friend\./);
+      expect(generated(calls)[0].body).toEqual({ language: "en", difficulty: "custom", length: 90, own_words: 5, uncommon_pct: 10 });
+    });
+
+    it("shows asked-for against measured in the report and saves with the same tier", async () => {
+      const { calls } = mockApi({ ...base, "POST /stories/generate": { ...STORY, report: DIFF_REPORT }, "POST /stories": { id: 9 } });
+      renderApp("/studio");
+      await userEvent.selectOptions(await screen.findByLabelText("Difficulty"), "Easy");
+      await make();
+      expect(await screen.findByText(/Length: 24 words \(asked for about 60\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Your words used: 2 \(asked for at least 3\)/)).toBeInTheDocument();
+      expect(screen.getByText(/Unusual words: 12.5% \(asked for at most about 5%\)/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /save/i }));
+      await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.path === "/stories")).toBe(true));
+      expect(calls.find((c) => c.method === "POST" && c.path === "/stories")!.body).toMatchObject({ difficulty: "easy" });
+    });
+
+    it("says the share of unusual words is not measured when the API has none", async () => {
+      const none = { ...DIFF_REPORT, difficulty: { ...DIFF_REPORT.difficulty, measured: { length: 90, length_unit: "characters", own_words: 3, uncommon_pct: null } } };
+      mockApi({ ...base, "POST /stories/generate": { ...STORY, report: none } });
+      renderApp("/studio");
+      await userEvent.selectOptions(await screen.findByLabelText("Difficulty"), "Easy");
+      await make();
+      expect(await screen.findByText(/not measured for this language yet/)).toBeInTheDocument();
+      expect(screen.getByText(/Length: 90 characters/)).toBeInTheDocument();
+    });
+  });
+
   it("says plainly what is outside the list and when the language is wrong", async () => {
     const bad = { ...STORY, report: { ...REPORT, status: "fail", language: { requested: "en", ok: false, verdict: "other" },
       vocabulary: { mode: "strict", ok: false, outside: ["zebra", "quantum"], outside_count: 7, limit: 5 } } };

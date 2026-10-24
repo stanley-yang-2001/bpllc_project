@@ -10,7 +10,7 @@ import { useConfirm } from "../components/Confirm";
 import { StoryReport } from "../components/StoryReport";
 import { useToast } from "../components/Toast";
 import { useI18n } from "../i18n/I18nProvider";
-import { topicLabel, typeLabel } from "../i18n/labels";
+import { diffLabel, topicLabel, typeLabel } from "../i18n/labels";
 import { Badge, Button, Card, EmptyState, ErrorText, PageHeader, Skeleton } from "../components/ui";
 
 const LIMIT = 10;
@@ -39,6 +39,7 @@ function Row({ story, languageName, open, onToggle, onDelete, deleting }: {
       <div className="flex flex-wrap items-center gap-2">
         <Badge>{story.story_type ? typeLabel(t, story.story_type) : t("library.fromChat")}</Badge>
         {story.topic && <Badge>{topicLabel(t, story.topic)}</Badge>}
+        {story.difficulty && <Badge>{diffLabel(t, story.difficulty)}</Badge>}
         <Badge tone={story.passed ? "good" : "accent"}>{story.passed ? t("common.looksGood") : t("common.needsLook")}</Badge>
         <span className="text-xs text-slate-600">{when(story.created_at, locale)}</span>
       </div>

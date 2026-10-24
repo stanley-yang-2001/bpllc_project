@@ -294,9 +294,42 @@
       },
       "GenerateIn": {
         "properties": {
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
           "language": {
             "title": "Language",
             "type": "string"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          },
+          "own_words": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Words"
           },
           "story_type": {
             "anyOf": [
@@ -319,6 +352,17 @@
               }
             ],
             "title": "Topic"
+          },
+          "uncommon_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncommon Pct"
           }
         },
         "required": [
@@ -611,6 +655,10 @@
             ],
             "title": "Active Language"
           },
+          "chat_in_study_language": {
+            "title": "Chat In Study Language",
+            "type": "boolean"
+          },
           "custom_colors": {
             "anyOf": [
               {
@@ -633,6 +681,7 @@
         "required": [
           "active_language",
           "ui_follows_study_language",
+          "chat_in_study_language",
           "theme",
           "custom_colors"
         ],
@@ -653,6 +702,17 @@
               }
             ],
             "title": "Active Language"
+          },
+          "chat_in_study_language": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat In Study Language"
           },
           "custom_colors": {
             "anyOf": [
@@ -757,9 +817,42 @@
             "title": "Body",
             "type": "string"
           },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
           "language": {
             "title": "Language",
             "type": "string"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length"
+          },
+          "own_words": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Own Words"
           },
           "story_type": {
             "anyOf": [
@@ -782,6 +875,17 @@
               }
             ],
             "title": "Topic"
+          },
+          "uncommon_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncommon Pct"
           }
         },
         "required": [
@@ -854,6 +958,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -911,6 +1026,17 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "difficulty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difficulty"
           },
           "id": {
             "title": "Id",

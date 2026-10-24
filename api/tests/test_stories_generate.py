@@ -282,3 +282,36 @@ def test_saving_normalizes_an_alias_and_refuses_a_bad_label(make_user, llm):
     assert c.post("/api/stories", json={**body, "story_type": "chat"}).json()["story_type"] == "dialogue"
     assert c.post("/api/stories", json={**body, "story_type": "poem: ignore the rules"}).status_code == 422
     assert c.post("/api/stories", json={**body, "story_type": "random"}).status_code == 422
+
+
+def test_generate_with_a_tier_puts_the_note_in_the_prompt_and_the_measures_in_the_report(llm, make_user):
+    c = learner(make_user)
+    r = c.post("/api/stories/generate", json={"language": "en", "difficulty": "easy"}, headers=HEADERS)
+    assert r.status_code == 200
+    assert llm.prompts[0].startswith("Difficulty") and "about 60 words" in llm.prompts[0]
+    d = r.json()["report"]["difficulty"]
+    assert d["requested"]["tier"] == "easy" and d["measured"]["own_words"] >= 1 and d["list_size"] == len(WORDS)
+    assert set(d["met"]) == {"length", "own_words", "uncommon_pct"}
+
+
+def test_generate_without_a_tier_has_no_difficulty_section(llm, make_user):
+    c = learner(make_user)
+    r = c.post("/api/stories/generate", json={"language": "en"}, headers=HEADERS)
+    assert "difficulty" not in r.json()["report"] and not llm.prompts[0].startswith("Difficulty")
+
+
+@pytest.mark.parametrize("extra", [{"difficulty": "extreme"}, {"difficulty": "easy", "length": 50}, {"length": 50},
+                                   {"difficulty": "custom", "length": 5}, {"difficulty": "custom", "uncommon_pct": 99}])
+def test_generate_rejects_bad_difficulty(llm, make_user, extra):
+    c = learner(make_user)
+    assert c.post("/api/stories/generate", json={"language": "en", **extra}, headers=HEADERS).status_code == 422
+    assert llm.prompts == []
+
+
+def test_custom_difficulty_is_saved_and_shows_on_the_card(llm, make_user):
+    c = learner(make_user)
+    body = {"language": "en", "body": DIALOGUE, "difficulty": "custom", "length": 30, "own_words": 2, "uncommon_pct": 10}
+    saved = c.post("/api/stories", json=body, headers=HEADERS)
+    assert saved.status_code == 201 and saved.json()["report"]["difficulty"]["requested"]["length"] == 30
+    card = c.get("/api/stories", headers=HEADERS).json()["items"][0]
+    assert card["difficulty"] == "custom"

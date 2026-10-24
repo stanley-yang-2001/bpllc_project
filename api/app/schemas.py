@@ -138,6 +138,7 @@ class StoryCard(BaseModel):
     body: str
     passed: bool
     created_at: datetime
+    difficulty: str | None = None      # easy / medium / hard / custom, or None when no tier was asked for
 
 
 class StoryFull(StoryCard):

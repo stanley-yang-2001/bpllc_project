@@ -49,7 +49,7 @@ def test_the_list_leaves_out_the_report_but_keeps_what_the_cards_need(conn, make
     uid = make_learner("a")
     make(conn, uid)
     item = stories.list_for_user(conn, uid, None, 10, 0)["items"][0]
-    assert set(item) == {"id", "language", "story_type", "topic", "body", "passed", "created_at"}
+    assert set(item) == {"id", "language", "story_type", "topic", "body", "passed", "created_at", "difficulty"}
 
 
 def test_one_learner_cannot_read_list_or_delete_anothers_story(conn, make_learner):

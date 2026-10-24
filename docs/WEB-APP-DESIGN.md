@@ -504,6 +504,7 @@ sequenceDiagram
 4. Build the prompt (the code picks the story type and a topic when none is given, never repeating the last 8 topics; `describe_prompt` recovers which were used), call Groq, strip the planning text.
 5. `quality.check(...)` scores it and the response returns story, `story_type`, `topic` and report.
 The direct path **never reads or writes the story cache**: "Regenerate" must produce a new story.
+**Difficulty (24 October 2026):** generate and save also take `difficulty` (easy, medium, hard or custom) and, for custom, `length`, `own_words`, `uncommon_pct`; `tutor_core.difficulty` turns them into targets, a note at the top of the prompt, and a `difficulty` section in the report (requested, measured, met). With a tier the 4-to-10-sentence length rule is not applied. See `docs/DIFFICULTY-TIERS-DESIGN.md`.
 
 ## 7. Data model
 Everything lives in a dedicated Postgres **schema `tutor`** inside the existing `langflow` database. A separate schema keeps Alembic away from Langflow's own tables and lets the migration read the legacy `public.words` table, which a separate database could not.

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import BaseModel, field_validator
-from tutor_core import prompts, quality
+from pydantic import BaseModel, field_validator, model_validator
+from tutor_core import difficulty, prompts, quality
 from tutor_core.languages import LANGUAGES, stories_enabled
 from tutor_core.story import generate_story
 from tutor_core.vocab import load_words
@@ -24,7 +24,24 @@ MAX_STORIES = 500        # per learner
 CLASSIC_TYPES = tuple(prompts.VALID_STYLES)      # narration and dialogue have no topic
 
 
-class GenerateIn(BaseModel):
+class DifficultyIn(BaseModel):
+    """The learner's difficulty choice: nothing (any), a preset, or custom with their own numbers (tutor_core.difficulty)."""
+    difficulty: str | None = None
+    length: int | None = None
+    own_words: int | None = None
+    uncommon_pct: int | None = None
+
+    @model_validator(mode="after")
+    def _difficulty(self):
+        self.targets           # raises ValueError (shown to the learner as a 422) for anything not allowed
+        return self
+
+    @property
+    def targets(self):
+        return difficulty.resolve(self.difficulty, self.length, self.own_words, self.uncommon_pct)
+
+
+class GenerateIn(DifficultyIn):
     language: str
     story_type: str | None = None
     topic: str | None = None
@@ -77,15 +94,15 @@ def generate(body: GenerateIn, request: Request, user: dict = Depends(current_us
     with state.ai_gate.slot(user["id"], tokens=STORY_TOKENS if getattr(llm, "calls_ai", True) else 0):
         with connection(state.pool) as conn:
             result = generate_story(conn, user["id"], body.language, use_cache=False, story_type=body.story_type,
-                                    topic=body.topic, call_groq_fn=llm)
+                                    topic=body.topic, difficulty=body.targets, call_groq_fn=llm)
     if not result.ok:
         raise AppError("ai_failed", "The story writer didn't answer. Please try again in a moment.", 502)
     return {"story": result.text, "language": body.language, "story_type": result.story_type, "topic": result.topic,
-            "report": quality.report(result.text, body.language, words),      # the learner's WHOLE list, not the prompt's sample
+            "report": quality.report(result.text, body.language, words, body.targets),      # the learner's WHOLE list, not the prompt's sample
             "words_total": result.words_total, "words_used": result.words_used}
 
 
-class SaveIn(BaseModel):
+class SaveIn(DifficultyIn):
     language: str
     body: str
     story_type: str | None = None
@@ -115,7 +132,7 @@ def save(body: SaveIn, request: Request, user: dict = Depends(current_user)):
         if stories.list_for_user(conn, user["id"], None, 1, 0)["total"] >= MAX_STORIES:
             raise AppError("library_full", f"Your library holds {MAX_STORIES} stories. Delete some to save more.", 422)
         words = load_words(conn, user["id"], body.language)
-        report = quality.report(body.body, body.language, words)
+        report = quality.report(body.body, body.language, words, body.targets)
         return stories.create(conn, user["id"], body.language, body.story_type, topic, body.body, report)
 
 

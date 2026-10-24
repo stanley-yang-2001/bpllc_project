@@ -372,7 +372,7 @@ def _read_seconds(text, unspaced):
     return max(1, math.ceil(words / READ_WORDS_PER_SECOND))
 
 
-def report(text, language, vocab_words):
+def report(text, language, vocab_words, difficulty=None):
     """The quality report for one passage: a plain, JSON-ready dict (design section 8).
 
     `language` is an ISO code from tutor_core.languages; `vocab_words` is the learner's FULL list in that language (the
@@ -393,7 +393,9 @@ def report(text, language, vocab_words):
     vocab = ", ".join(vocab_words or [])
 
     # check_passage's own `passed` is not used: the pass rule is applied below, per mode.
-    scored = check_passage(text, vocab, check_vocab=(mode != "unavailable"), max_oov=10 ** 9)
+    # With a difficulty tier the length is the tier's business (reported below), so the sentence-count rule is not applied.
+    scored = check_passage(text, vocab, check_vocab=(mode != "unavailable"), max_oov=10 ** 9,
+                           **({"length_range": (1, 10 ** 6)} if difficulty else {}))
     failure = scored["failure"]
     structure_ok = (not failure) and (not scored["leaked_plan"]) and scored["length_ok"] and scored["format_ok"]
 
@@ -413,7 +415,7 @@ def report(text, language, vocab_words):
         vocab_ok = (not failure) and count <= MAX_STRAYS_ENGLISH
 
     passed = (structure_ok and lang_part["ok"] is not False and (mode != "strict" or vocab_ok is True))
-    return {
+    out = {
         "rules_version": RULES_VERSION,
         "status": "pass" if passed else "fail",
         "language": lang_part,
@@ -424,6 +426,10 @@ def report(text, language, vocab_words):
                        "limit": MAX_STRAYS_ENGLISH if mode == "strict" else None},
         "read_seconds": _read_seconds(text, unspaced=(lang.tier == 2)) if text else 1,
     }
+    if difficulty and not failure:
+        from . import difficulty as _difficulty
+        out["difficulty"] = _difficulty.section(difficulty, text, language, vocab_words)
+    return out
 
 
 def rescore_results(data, max_oov=0, strict_verbs=False, max_unit_words=None):

@@ -10,6 +10,11 @@ export interface Report {
   structure?: { ok?: boolean; leaked_plan?: boolean; units?: number };
   vocabulary?: { mode?: string; ok?: boolean | null; outside?: string[] | null; outside_count?: number; limit?: number | null };
   read_seconds?: number;
+  difficulty?: {
+    requested?: { length?: number; own_words?: number; uncommon_pct?: number };
+    measured?: { length?: number; length_unit?: string; own_words?: number; uncommon_pct?: number | null };
+    met?: { length?: boolean | null; own_words?: boolean | null; uncommon_pct?: boolean | null };
+  };
 }
 
 function Row({ ok, children }: { ok: boolean | null | undefined; children: ReactNode }) {
@@ -27,6 +32,7 @@ export function StoryReport({ report, languageName }: { report: Report; language
   const { t, tc } = useI18n();
   const v = report.vocabulary ?? {};
   const outside = v.outside ?? [];
+  const d = report.difficulty;
   return (
     <section aria-label={t("report.aria")} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-sm dark:bg-slate-100/40">
       <h3 className="font-medium text-slate-900">{report.status === "pass" ? t("common.looksGood") : t("common.needsLook")}</h3>
@@ -47,6 +53,17 @@ export function StoryReport({ report, languageName }: { report: Report; language
           <Row ok={v.ok}>
             {outside.length === 0 ? t("report.allFromList") : tc("report.outside", v.outside_count ?? outside.length, { words: outside.join(", ") })}
           </Row>
+        )}
+        {d?.requested && d.measured && (
+          <>
+            <Row ok={d.met?.length}>
+              {t("report.diffLength", { measured: d.measured.length ?? 0, unit: t(d.measured.length_unit === "characters" ? "report.unitChars" : "report.unitWords"), target: d.requested.length ?? 0 })}
+            </Row>
+            <Row ok={d.met?.own_words}>{t("report.diffOwn", { measured: d.measured.own_words ?? 0, target: d.requested.own_words ?? 0 })}</Row>
+            <Row ok={d.measured.uncommon_pct == null ? null : d.met?.uncommon_pct}>
+              {d.measured.uncommon_pct == null ? t("report.diffNoUncommon") : t("report.diffUncommon", { measured: d.measured.uncommon_pct, target: d.requested.uncommon_pct ?? 0 })}
+            </Row>
+          </>
         )}
       </ul>
       {report.read_seconds ? <p className="mt-2 text-xs text-slate-600">{t("report.readSeconds", { seconds: report.read_seconds })}</p> : null}

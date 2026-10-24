@@ -388,13 +388,26 @@ def choose_topic(rng=None, recent=None) -> str:
 
 
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
-                       topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False) -> str:
+                       topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
+                       difficulty: Optional[dict] = None) -> str:
     """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
     applies to the new story types; when omitted it is chosen at random, avoiding recent topics.
     vocab_in_target: the word list is already written in `language` (a learner's per-language list),
     so the prompt says to use the words as written instead of translating English meanings. It has
     no effect for English, whose prompts are unchanged.
-    A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured."""
+    A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured.
+    difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt."""
+    prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
+    if difficulty:
+        from .difficulty import prompt_note
+        from .languages import LANGUAGES
+        name = (normalize_language(language) or "").casefold()
+        code = next((c for c, lang in LANGUAGES.items() if lang.name.casefold() == name or c == name), "en")
+        prompt = prompt_note(code, difficulty) + "\n\n" + prompt
+    return prompt
+
+
+def _build_story_prompt(language, words, style, topic, rng, vocab_in_target):
     language = normalize_language(language)
     words = (words or "").strip()
     if not language:

@@ -48,4 +48,4 @@ A learner with a short list cannot reach Medium or Hard on measure 2: the tier i
 
 ## What is built (24 October 2026)
 
-See the changelog entry of that date. Not built: German, Italian and Portuguese uncommon-word lists, the splitter, and a `difficulty` argument for the chat story tool.
+Built: `tutor_core/difficulty.py` (targets, prompt note, measuring, report section), the wordfreq-derived everyday lists for English, Spanish and French, the `difficulty` fields on generate and save, the report section, the Studio controls (Any, Easy, Medium, Hard, Custom with the model-limit note), the Library badge and nine-language text. Tests in core, API and web. See the changelog entry of that date. Not built: German, Italian and Portuguese uncommon-word lists, the splitter, and a `difficulty` argument for the chat story tool.

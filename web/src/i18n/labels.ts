@@ -22,3 +22,6 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export const topicLabel = (t: T, topic: string): string => (TOPIC_KEYS[topic] ? t(TOPIC_KEYS[topic]) : cap(topic));
 export const typeLabel = (t: T, type: string): string => (TYPE_KEYS[type] ? t(TYPE_KEYS[type]) : cap(type));
 export const TOPIC_NAMES = Object.keys(TOPIC_KEYS);
+
+const DIFF_KEYS: Record<string, MessageKey> = { easy: "studio.diffEasy", medium: "studio.diffMedium", hard: "studio.diffHard", custom: "studio.diffCustom" };
+export const diffLabel = (t: T, tier: string): string => (DIFF_KEYS[tier] ? t(DIFF_KEYS[tier]) : cap(tier));

@@ -47,6 +47,7 @@ class StoryResult:
     cached: bool = False
     words_total: int = 0            # the learner's full list (the quality check uses this one)
     words_used: int = 0             # what went into the prompt after the cap
+    difficulty: Optional[dict] = None   # the targets asked for (tutor_core.difficulty.resolve), or None
 
 
 def generate_story(
@@ -59,6 +60,7 @@ def generate_story(
     story_type: Optional[str] = None,
     topic: Optional[str] = None,
     max_words: Optional[int] = None,
+    difficulty: Optional[dict] = None,
     rng=None,
     clock=time.time,
 ) -> StoryResult:
@@ -79,7 +81,7 @@ def generate_story(
     else:
         story_type = None
     topic = clean_topic(topic) if topic else None
-    key = (learner_id, language, story_type or "", topic or "")
+    key = (learner_id, language, story_type or "", topic or "") + ((tuple(sorted(difficulty.items())),) if difficulty else ())
     now = clock()
 
     if use_cache and key in _STORY_CACHE:
@@ -94,10 +96,10 @@ def generate_story(
     used = sample_words(words, max_words if max_words is not None else max_prompt_words(), rng)
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
-    prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), story_type, topic, rng, vocab_in_target=True)
+    prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), story_type, topic, rng, vocab_in_target=True, difficulty=difficulty)
     picked_type, picked_topic = describe_prompt(prompt)
     base = dict(language=language, story_type=picked_type, topic=picked_topic,
-                words_total=len(words), words_used=len(used))
+                words_total=len(words), words_used=len(used), difficulty=difficulty)
 
     def remember(result: StoryResult) -> StoryResult:
         if use_cache:

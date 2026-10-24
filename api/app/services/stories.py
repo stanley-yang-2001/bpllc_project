@@ -5,7 +5,7 @@ from psycopg2.extras import Json
 
 from ..db import cursor
 
-CARD_COLS = "id, language, story_type, topic, body, passed, created_at"
+CARD_COLS = "id, language, story_type, topic, body, passed, created_at, report #>> '{difficulty,requested,tier}' AS difficulty"
 FULL_COLS = CARD_COLS + ", report"
 
 

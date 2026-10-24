@@ -623,12 +623,20 @@ export interface components {
         };
         /** GenerateIn */
         GenerateIn: {
+            /** Difficulty */
+            difficulty?: string | null;
             /** Language */
             language: string;
+            /** Length */
+            length?: number | null;
+            /** Own Words */
+            own_words?: number | null;
             /** Story Type */
             story_type?: string | null;
             /** Topic */
             topic?: string | null;
+            /** Uncommon Pct */
+            uncommon_pct?: number | null;
         };
         /** GeneratedStoryOut */
         GeneratedStoryOut: {
@@ -732,11 +740,11 @@ export interface components {
         PreferencesOut: {
             /** Active Language */
             active_language: string | null;
+            /** Chat In Study Language */
+            chat_in_study_language: boolean;
             custom_colors: components["schemas"]["CustomColors"] | null;
             /** Theme */
             theme: string;
-            /** Chat In Study Language */
-            chat_in_study_language: boolean;
             /** Ui Follows Study Language */
             ui_follows_study_language: boolean;
         };
@@ -748,11 +756,11 @@ export interface components {
         PreferencesPatch: {
             /** Active Language */
             active_language?: string | null;
+            /** Chat In Study Language */
+            chat_in_study_language?: boolean | null;
             custom_colors?: components["schemas"]["ColorsIn"] | null;
             /** Theme */
             theme?: string | null;
-            /** Chat In Study Language */
-            chat_in_study_language?: boolean | null;
             /** Ui Follows Study Language */
             ui_follows_study_language?: boolean | null;
         };
@@ -783,12 +791,20 @@ export interface components {
         SaveIn: {
             /** Body */
             body: string;
+            /** Difficulty */
+            difficulty?: string | null;
             /** Language */
             language: string;
+            /** Length */
+            length?: number | null;
+            /** Own Words */
+            own_words?: number | null;
             /** Story Type */
             story_type?: string | null;
             /** Topic */
             topic?: string | null;
+            /** Uncommon Pct */
+            uncommon_pct?: number | null;
         };
         /** ServiceCheck */
         ServiceCheck: {
@@ -813,6 +829,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Difficulty */
+            difficulty?: string | null;
             /** Id */
             id: number;
             /** Language */
@@ -833,6 +851,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Difficulty */
+            difficulty?: string | null;
             /** Id */
             id: number;
             /** Language */
