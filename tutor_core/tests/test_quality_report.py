@@ -45,7 +45,7 @@ def test_a_clean_english_dialogue_passes_in_strict_mode():
 
 
 def stray_dialogue(n):
-    words = ["umbrella", "bicycle", "elephant", "mountain", "guitar", "window", "pencil"][:n]
+    words = ["zeppelin", "quokka", "gazebo", "ocarina", "pangolin", "trebuchet", "marmoset"][:n]     # rare on purpose: everyday words are not strays
     lines = ["Ana: Hello, friend.", "Ben: Please, water.", "Ana: Thank you.", "Ben: Goodbye."]
     for i, w in enumerate(words):
         lines[i % 4] += f" {w}"
@@ -56,7 +56,7 @@ def test_five_strays_pass_and_six_fail():
     five, six = rep(stray_dialogue(5)), rep(stray_dialogue(6))
     assert five["status"] == "pass" and five["vocabulary"]["outside_count"] == 5 and five["vocabulary"]["ok"] is True
     assert six["status"] == "fail" and six["vocabulary"]["outside_count"] == 6 and six["vocabulary"]["ok"] is False
-    assert "pencil" in six["vocabulary"]["outside"] or "guitar" in six["vocabulary"]["outside"]
+    assert "trebuchet" in six["vocabulary"]["outside"] or "ocarina" in six["vocabulary"]["outside"]
 
 
 def test_too_short_a_passage_fails_on_structure_not_vocabulary():
@@ -79,14 +79,14 @@ def test_an_empty_passage_fails_cleanly():
 # --- other space-delimited languages: informational ------------------------------------------------------
 
 ES_VOCAB = ["hola", "agua", "amigo", "casa", "gracias", "adiós", "hoy"]
-ES = "Ana: Hola, amigo.\nLuis: Hola, agua, por favor.\nAna: Gracias, amigo.\nLuis: Adiós, Ana."
+ES = "Ana: Hola, amigo.\nLuis: Hola, agua, zepelín.\nAna: Gracias, amigo.\nLuis: Adiós, Ana."
 
 
 def test_a_spanish_story_in_spanish_passes_and_lists_words_without_scoring_them():
     r = rep(ES, "es", ES_VOCAB)
     v = r["vocabulary"]
     assert r["status"] == "pass" and v["mode"] == "informational" and v["limit"] is None and v["ok"] is None
-    assert v["outside"] and v["outside_count"] == len(v["outside"])            # listed (por, favor ...), not a failure
+    assert v["outside"] and v["outside_count"] == len(v["outside"])            # listed (zepelín), not a failure
     assert r["language"]["ok"] is True and r["language"]["verdict"] == "ok"
 
 
@@ -131,3 +131,11 @@ def test_japanese_read_time_comes_from_the_letters_because_there_are_no_spaces()
     letters = sum(1 for ch in "".join(ln.partition(":")[2] for ln in JA.splitlines()) if ch.isalpha())
     expected = -(-letters // 4)                      # letters / 2 per word, / 2 words per second, rounded up
     assert rep(JA, "ja", ["みず"])["read_seconds"] == expected and expected > 3
+
+
+def test_everyday_words_outside_the_list_are_not_strays():
+    text = "Ana: Hello, I want water.\nBen: My friend works at the bakery and finished early.\nAna: Thank you.\nBen: Goodbye."
+    r = rep(text, "en", ["water", "bread"])
+    assert r["vocabulary"]["outside_count"] <= 2 and r["status"] == "pass"            # friend, works, finished: everyday
+    rare = rep("Ana: Hello, I want water.\nBen: A quokka rides a zeppelin to the gazebo with an ocarina and pangolin and marmoset.\nAna: Thank you.\nBen: Goodbye.", "en", ["water"])
+    assert rare["vocabulary"]["outside_count"] >= 6 and rare["status"] == "fail"

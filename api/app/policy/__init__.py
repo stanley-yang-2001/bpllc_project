@@ -12,7 +12,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-POLICY_VERSION = "2026-10-17"
+POLICY_VERSION = "2026-10-24"
 FALLBACK = "en"
 _DIR = Path(__file__).parent
 

@@ -214,3 +214,10 @@ def test_a_phrase_in_the_list_is_never_a_blank_or_a_wrong_choice(make_user):
     c = learner(make_user, words={**WORDS, "thank you": "gratitude"})
     for item in cloze(c, saved(c, "Ana: Thank you for the bread.\nBen: Here is some water.\nAna: I like my house.")).json()["items"]:
         assert " " not in item["answer"] and all(" " not in x for x in item["choices"])
+
+
+def test_a_one_character_word_is_not_blanked_inside_a_longer_chinese_word():
+    pytest.importorskip("rjieba")
+    import random
+    assert routes_service.make_cloze("我喜欢吃面包和水果。", "zh", {"面": "noodle"}, random.Random(1)) == []
+    assert routes_service.make_cloze("我喜欢吃面包和水果。", "zh", {"面包": "bread"}, random.Random(1))[0]["answer"] == "面包"

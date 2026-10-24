@@ -241,7 +241,7 @@ def _failure_result(reason):
 
 def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10),
                   strict_verbs=False, extra_allowed=(), names=(), max_unit_words=None, language=None,
-                  vocab_in_target=False):
+                  vocab_in_target=False, everyday=None):
     """Score one passage. Returns a dict; `passed` is the overall verdict.
 
     max_oov: words outside the vocabulary tolerated (0 = strict; the batch runner defaults to 2
@@ -251,6 +251,8 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
     vocab_in_target: `vocab` is written in `language` (a learner's own per-language list). Its words must then NOT count as
     English markers in the language check: German "Haus, Brot, Freund" are not English. Without this, a correct German
     story was called "mixed" (22 Oct 2026 batch: 14 of 15).
+    everyday: optional function word -> bool; an everyday word of the language outside the learner's list is not a stray
+    (24 Oct 2026: the learner should not have to add "friend" or "work" to their vocabulary to keep a story from failing).
     language: the language the story was requested in. For anything other than English the
     passage must actually be written in it (see language_check); None skips that check."""
     text = _norm(text).strip()
@@ -334,7 +336,7 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
                 if low in known_names:
                     continue
                 word_count += 1
-                if not _is_known(low, vocab_forms, allowed):
+                if not _is_known(low, vocab_forms, allowed) and not (everyday and everyday(low)):
                     oov_occurrences.append(low)
 
         result["oov_words"] = list(dict.fromkeys(oov_occurrences))
@@ -357,7 +359,7 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
 
 # --- the report Story Studio shows (M6, commit 2 of 2) -----------------------------------------------------
 
-RULES_VERSION = 1            # bump when the pass rule changes, so a saved report stays interpretable
+RULES_VERSION = 2            # bump when the pass rule changes, so a saved report stays interpretable
 MAX_STRAYS_ENGLISH = 5       # tuning change #2: raised from 2
 READ_WORDS_PER_SECOND = 2    # a slow beginner pace
 _OUTSIDE_LIST_CAP = 30       # informational mode lists at most this many words
@@ -398,7 +400,9 @@ def report(text, language, vocab_words, difficulty=None):
 
     # check_passage's own `passed` is not used: the pass rule is applied below, per mode.
     # With a difficulty tier the length is the tier's business (reported below), so the sentence-count rule is not applied.
-    scored = check_passage(text, vocab, check_vocab=(mode != "unavailable"), max_oov=10 ** 9,
+    from . import difficulty as _d
+    everyday = (lambda w: _d.is_everyday(w, language)) if _d.has_everyday_list(language) and lang.tier == 1 else None
+    scored = check_passage(text, vocab, check_vocab=(mode != "unavailable"), max_oov=10 ** 9, everyday=everyday,
                            **({"length_range": (1, 10 ** 6)} if difficulty else {}))
     failure = scored["failure"]
     structure_ok = (not failure) and (not scored["leaked_plan"]) and scored["length_ok"] and scored["format_ok"]

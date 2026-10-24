@@ -3,7 +3,7 @@
   1. LENGTH         the story's length in words (characters for Chinese and Japanese, which have no spaces)
   2. OWN WORDS      how many DIFFERENT words from the learner's list the story uses
   3. UNCOMMON SHARE the share of words that are neither in the language's everyday list nor the learner's own words
-                    (English, Spanish and French only; other languages report None until they have a list or a splitter)
+                    (all nine languages; Chinese, Japanese and Korean need the splitter, see splitter.py, else None)
 
 A tier is a set of targets for the three. They go into the story prompt as a note at the top, and the finished story is measured
 against them. The model follows them loosely (own-word counts and the uncommon share especially), so the report shows what was
@@ -15,6 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
+from . import splitter
 from .languages import LANGUAGES
 
 TIERS = {
@@ -27,7 +28,6 @@ LIMITS = {"length": (20, 400), "own_words": (1, 30), "uncommon_pct": (0, 50)}   
 LENGTH_TOLERANCE = 0.35        # a story within 35% of the target length counts as meeting it
 UNCOMMON_SLACK = 5             # and one with at most this many points more uncommon words than asked
 CHARS_PER_WORD = 1.6           # Chinese and Japanese: a target of N words is about N * 1.6 characters
-EVERYDAY_LANGUAGES = ("en", "es", "fr")
 _UNSPACED = ("zh", "ja")
 _DATA = Path(__file__).parent / "data"
 _TOKEN = re.compile(r"[^\W\d_]+(?:['’\-][^\W\d_]+)*")
@@ -74,7 +74,7 @@ def prompt_note(language_code: str, targets: dict) -> str:
     lines = [f"Difficulty (this overrides any length given below): write {size} in total, and do not stop early. A story that is much shorter than this is wrong.",
              f"Use at least {targets['own_words']} different words from the list (as many as the list allows).",
              "Every other word must be an everyday word that a beginner already knows."]
-    if language_code in EVERYDAY_LANGUAGES:
+    if can_measure_uncommon(language_code):
         lines[-1] = (f"Every other word must be an everyday word that a beginner already knows; no more than about "
                      f"{targets['uncommon_pct']}% of all the words may be unusual ones.")
     return " ".join(lines)
@@ -90,26 +90,18 @@ def has_everyday_list(code: str) -> bool:
     return bool(_everyday(code))
 
 
-def _tokens(text: str):
-    return [m for m in _TOKEN.finditer(_LABEL.sub("", text))]
-
-
-def _own_found(text: str, code: str, vocab_words) -> int:
-    folded = text.casefold()
-    words = {w.casefold() for w in vocab_words if w and w.strip()}
-    if LANGUAGES[code].tier == 2:                      # no splitter: look for the word anywhere in the text
-        return sum(1 for w in words if w in folded)
-    if code == "en":
-        from .quality import word_forms
-        tokens = {m.group(0).casefold() for m in _TOKEN.finditer(folded)}
-        return sum(1 for w in words if tokens & set(word_forms(w)))
-    tokens = {m.group(0).casefold() for m in _TOKEN.finditer(folded)}
-    return sum(1 for w in words if w in tokens)
+def can_measure_uncommon(code: str) -> bool:
+    """The share of uncommon words needs the everyday list and, for Chinese, Japanese and Korean, a splitter."""
+    if not has_everyday_list(code):
+        return False
+    return splitter.available(code) if code in splitter.SPLIT_LANGUAGES else True
 
 
 def _lemma(word: str, code: str) -> str:
     """The dictionary form, when the optional simplemma package is installed (the API image has it): "llegué" is "llegar", so a
-    verb form the 3000-word list does not spell out still counts as the everyday word it is. Without it, the word is unchanged."""
+    verb form the list does not spell out still counts as the everyday word it is. Without it, the word is unchanged."""
+    if code in splitter.SPLIT_LANGUAGES:
+        return word
     try:
         import simplemma
         return simplemma.lemmatize(word, lang=code).casefold()
@@ -117,21 +109,79 @@ def _lemma(word: str, code: str) -> str:
         return word
 
 
-def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:
+def is_everyday(word: str, code: str) -> bool:
+    """Is this word (or its dictionary form) among the language's everyday words? Used for the share of uncommon words and so
+    that an everyday word outside the learner's list is not counted as a stray."""
     everyday = _everyday(code)
-    if not everyday:
-        return None
-    own = {w.casefold() for w in vocab_words if w}
+    low = word.casefold()
+    if low in everyday or _lemma(low, code) in everyday:
+        return True
+    pieces = [p for p in re.split(r"['\u2019]", low) if len(p) > 1]
+    return bool((pieces and all(p in everyday for p in pieces)) or low.replace("-", "") in everyday or all(p in everyday for p in low.split("-")))
+
+
+def _tokens(text: str):
+    return [m for m in _TOKEN.finditer(_LABEL.sub("", text))]
+
+
+def _own_set(vocab_words, code: str) -> set:
+    own = {w.casefold() for w in vocab_words if w and w.strip()}
     if code == "en":
         from .quality import word_forms
-        own = {f for w in list(own) for f in word_forms(w)} | own
+        own = own | {f for w in list(own) for f in word_forms(w)}
+    return own
+
+
+def _own_found(text: str, code: str, vocab_words) -> int:
+    folded = text.casefold()
+    words = {w.casefold() for w in vocab_words if w and w.strip()}
+    if code in splitter.SPLIT_LANGUAGES:
+        tokens = splitter.split(_LABEL.sub("", folded), code)
+        if tokens is not None:
+            forms = {t.surface for t in tokens} | {t.base for t in tokens}
+            joined = [t.surface for t in tokens]
+            found = 0
+            for w in words:
+                # a token (or its dictionary form) is the word; a word the splitter cut in pieces is found by joining neighbours
+                if w in forms or any("".join(joined[i:i + n]) == w for n in (2, 3, 4) for i in range(len(joined) - n + 1)):
+                    found += 1
+            return found
+        return sum(1 for w in words if w in folded)          # no splitter installed: look for the word anywhere in the text
+    tokens = {m.group(0).casefold() for m in _TOKEN.finditer(folded)}
+    if code == "en":
+        from .quality import word_forms
+        return sum(1 for w in words if tokens & set(word_forms(w)))
+    return sum(1 for w in words if w in tokens)
+
+
+def _uncommon_split(text: str, code: str, own: set) -> Optional[float]:
+    tokens = splitter.split(_LABEL.sub("", text), code)
+    if tokens is None:
+        return None
+    everyday = _everyday(code)
+    checked = uncommon = 0
+    for t in tokens:
+        if not t.content or t.surface.casefold() in own or t.base.casefold() in own:
+            continue
+        checked += 1
+        if t.surface not in everyday and t.base not in everyday:
+            uncommon += 1
+    return round(100.0 * uncommon / checked, 1) if checked else 0.0
+
+
+def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:
+    if not has_everyday_list(code):
+        return None
+    own = _own_set(vocab_words, code)
+    if code in splitter.SPLIT_LANGUAGES:
+        return _uncommon_split(text, code, own)
     checked = uncommon = 0
     sentence_start = True
     stripped = _LABEL.sub("", text)
     pos = 0
     for m in _TOKEN.finditer(stripped):
         between = stripped[pos:m.start()]
-        if re.search(r"[.!?…]\s*$|\n", between) or pos == 0:
+        if re.search(r"[.!?\u2026]\s*$|\n", between) or pos == 0:
             sentence_start = True
         pos = m.end()
         word = m.group(0)
@@ -139,20 +189,16 @@ def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:
             sentence_start = False
             continue
         sentence_start = False
-        low = word.casefold()
-        if low in own:
+        if word.casefold() in own:
             continue
         checked += 1
-        pieces = [p for p in re.split(r"['’]", low) if len(p) > 1]
-        if low in everyday or _lemma(low, code) in everyday or (pieces and all(p in everyday for p in pieces)) or low.replace("-", "") in everyday \
-                or all(p in everyday for p in low.split("-")):
-            continue
-        uncommon += 1
+        if not is_everyday(word, code):
+            uncommon += 1
     return round(100.0 * uncommon / checked, 1) if checked else 0.0
 
 
 def measure(text: str, language_code: str, vocab_words) -> dict:
-    """What the finished story measures: {"length", "length_unit", "own_words", "uncommon_pct" (None when there is no list)}."""
+    """What the finished story measures: {"length", "length_unit", "own_words", "uncommon_pct" (None when it cannot be measured)}."""
     text = (text or "").strip()
     if language_code in _UNSPACED:
         length = sum(1 for ch in _LABEL.sub("", text) if ch.isalpha())

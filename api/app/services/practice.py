@@ -58,7 +58,27 @@ _UNSPACED_LABEL = re.compile(r"^\s*[^\W\d_][^\W\d_'\-]*(?:\s[^\W\d_][^\W\d_'\-]*
 MIN_CHARS_IN_UNSPACED_SENTENCE = 4
 
 
-def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Random) -> list[dict]:
+def _boundaries(unit: str, language: str):
+    """The character offsets where a word starts or ends according to the splitter (tutor_core.splitter), or None when there is
+    no splitter or its pieces do not add up to the text. A word the learner listed only counts where it starts and ends on one."""
+    from tutor_core import splitter
+    tokens = splitter.split(unit, language)
+    if not tokens:
+        return None
+    if "".join(t.surface for t in tokens) != unit.replace(" ", "").replace("\u3000", "") and "".join(t.surface for t in tokens) != unit:
+        return None
+    marks, pos = {0}, 0
+    for t in tokens:
+        pos = unit.find(t.surface, pos) if t.surface.strip() else pos
+        if pos < 0:
+            return None
+        marks.add(pos)
+        pos += len(t.surface)
+        marks.add(pos)
+    return marks
+
+
+def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Random, language: str = "") -> list[dict]:
     """Chinese, Japanese and Korean: no splitter, so look for the learner's own words inside each sentence. The longest word
     wins where two overlap (学校 before 学), the earliest not-yet-used word in a sentence is blanked, and whatever is stuck to
     it (a Korean ending, a Japanese particle) stays in the text around the blank."""
@@ -72,10 +92,13 @@ def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Rando
             if len(unit) - start < MIN_CHARS_IN_UNSPACED_SENTENCE:
                 continue
             covered, found = [False] * len(unit), []
+            marks = _boundaries(unit[start:], language) if language else None
             for w in words:
                 pos = start
                 while (i := unit.find(w, pos)) >= 0:
                     pos = i + len(w)
+                    if marks is not None and (i - start not in marks or i - start + len(w) not in marks):
+                        continue              # inside a longer word the splitter found, such as 面 in 面包
                     if not any(covered[i:i + len(w)]):
                         covered[i:i + len(w)] = [True] * len(w)
                         found.append((i, w))
@@ -96,7 +119,7 @@ def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Rando
 def make_cloze(body: str, language: str, vocabulary: dict[str, str], rng: random.Random | None = None) -> list[dict]:
     rng = rng or random.Random()
     if _unspaced(language):
-        return _make_cloze_by_word(body, vocabulary, rng)
+        return _make_cloze_by_word(body, vocabulary, rng, language)
     english = language == "en"
     base_of = {w: w for w in vocabulary}
     if english:

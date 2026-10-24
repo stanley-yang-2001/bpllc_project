@@ -60,4 +60,4 @@ def test_the_demo_stories_use_the_reports_the_real_checker_makes(app):
     opened = c.get(f"/api/stories/{sid}").json()
     report = opened["report"]
     assert opened["passed"] == (report["status"] == "pass")
-    assert report["rules_version"] == 1 and report["vocabulary"]["mode"] == "strict" and report["vocabulary"]["outside_count"] <= 5
+    assert report["rules_version"] == 2 and report["vocabulary"]["mode"] == "strict" and report["vocabulary"]["outside_count"] <= 5
