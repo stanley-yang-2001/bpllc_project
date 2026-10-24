@@ -70,10 +70,13 @@ def with_reply_language(message: str, reply_language: str | None) -> str:
     """The Agent is asked to write ITS OWN sentences in the learner's study language when the learner chose that
     (Settings, "Chat replies in my study language"). The note names only the language, goes in front of the learner's message, and
     says tool names and arguments stay as they are. Fixed tool messages are relayed as the tool wrote them, so they are not affected.
-    English gets the note too: a learner studying English who writes in another language still gets English back."""
+    English gets the note too: a learner studying English who writes in another language still gets English back.
+    It also says which language a story is in when the learner names none (24 Oct: with English active, "生成一个故事" came back as a
+    Chinese story, because the Agent took the language from the message); a language the learner does name still wins."""
     if not reply_language or not reply_language.strip():
         return message
     return (f"[Note for the tutor: write your own sentences to the learner in {reply_language}. "
+            f"If the learner asks for a story without naming a language, the story is in {reply_language}. "
             f"Tool names and tool arguments stay exactly as they are.]\n\n{message}")
 
 
