@@ -235,6 +235,18 @@ def find_tokens(obj, _depth: int = 0) -> int | None:
     return None
 
 
+def _one_story_call(calls: list, reply: str) -> list:
+    """A reply holds ONE story, so it gets one story call (24 Oct: a chat showed three "Used Story Generator Tool" and three
+    "Save story" buttons for one reply, so the learner could save a story they were never shown). Keep the story call whose output is
+    the reply (else the last one); other tools' calls are untouched and keep their order."""
+    stories = [c for c in calls if c.name == "Story Generator Tool"]
+    if len(stories) < 2:
+        return calls
+    norm = lambda t: re.sub(r"\s+", " ", t or "").strip()
+    keep = next((c for c in reversed(stories) if norm(c.output) == norm(reply)), stories[-1])
+    return [c for c in calls if c.name != "Story Generator Tool" or c is keep]
+
+
 def parse_run_response(resp, stored_messages=None) -> ChatResult:
     calls = find_tool_calls(resp)
     if not calls and stored_messages:
@@ -242,6 +254,7 @@ def parse_run_response(resp, stored_messages=None) -> ChatResult:
     reply = reply_text(resp)
     if not reply.strip() and calls:
         reply = calls[-1].output
+    calls = _one_story_call(calls, reply)
     return ChatResult(reply=reply, tool_calls=calls, tokens=find_tokens(resp))
 
 

@@ -322,3 +322,15 @@ def test_the_reply_language_note_names_only_the_language_and_goes_in_front_of_th
     out = lc.with_reply_language("hola", "Korean")
     assert out.endswith("\n\nhola") and "Korean" in out and out.startswith("[Note for the tutor:") and "call the story tool with language \"Korean\"" in out
     assert "Tool names and every other tool argument stay exactly as they are" in out
+
+
+def _story_block(text, **args):
+    return {"type": "tool_use", "name": "story_generator_tool", "tool_input": {"language": "English", **args}, "output": text}
+
+
+def test_a_reply_with_several_story_calls_keeps_only_the_one_it_shows():
+    resp = {"outputs": [{"outputs": [{"results": {"message": {"text": "Anna: Hi.\nBen: Hello."},
+            "blocks": [_story_block("Old story one."), _story_block("Another old one.", topic="x"), _story_block("Anna: Hi.\nBen: Hello.", topic="y")]}}]}]}
+    out = lc.parse_run_response(resp)
+    stories = [c for c in out.tool_calls if c.name == "Story Generator Tool"]
+    assert len(stories) == 1 and stories[0].output == "Anna: Hi.\nBen: Hello."
