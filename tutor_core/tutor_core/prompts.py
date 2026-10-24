@@ -387,6 +387,9 @@ def choose_topic(rng=None, recent=None) -> str:
     return rng.choice(candidates)
 
 
+_LENGTH_PHRASE = re.compile(r"([Aa])im for \d+ to \d+ (?:short )?(sentences|lines)(?: of back-and-forth conversation)?(?: \((?:up to )?[\d-]+ words each\))?")
+
+
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
                        topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
                        difficulty: Optional[dict] = None) -> str:
@@ -399,6 +402,9 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt."""
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
     if difficulty:
+        # The built-in templates ask for 5 to 9 sentences; with a tier that sentence count is replaced by the tier's own.
+        count = max(2, round(difficulty["length"] / 10))
+        prompt = _LENGTH_PHRASE.sub(lambda m: f"{m.group(1)}im for about {count} {m.group(2)} (about 10 words each)", prompt)
         from .difficulty import prompt_note
         from .languages import LANGUAGES
         name = (normalize_language(language) or "").casefold()

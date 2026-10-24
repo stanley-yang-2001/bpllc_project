@@ -389,6 +389,10 @@ def report(text, language, vocab_words, difficulty=None):
     if lang is None:
         raise ValueError(f"unknown language code: {language!r}")
     mode = "strict" if language == "en" else ("informational" if lang.tier == 1 else "unavailable")
+    if difficulty and mode == "strict":
+        # A tier asks for everyday words beyond the learner's list, so the strict stray-word count would fail every such story
+        # (24 Oct: "friend", "work", "thanks" counted). The tier's own unusual-word share replaces it; strays are listed only.
+        mode = "informational"
     text = _norm(text).strip()
     vocab = ", ".join(vocab_words or [])
 

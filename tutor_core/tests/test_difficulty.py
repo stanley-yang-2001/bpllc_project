@@ -61,3 +61,15 @@ def test_report_section_only_when_asked():
     assert "difficulty" not in report(text, "en", ["water", "bread"])
     r = report(text, "en", ["water", "bread"], d.TIERS["easy"])
     assert r["difficulty"]["measured"]["own_words"] == 2 and r["structure"]["length_ok"] is True
+
+
+def test_a_tier_replaces_the_template_sentence_count_and_the_strict_stray_rule():
+    p = build_story_prompt("English", "water, bread", "narration", difficulty=d.TIERS["hard"])
+    assert "aim for about 20 sentences" in p and "5 to 6" not in p
+    d_ = build_story_prompt("English", "water, bread", "dialogue", difficulty=d.TIERS["easy"])
+    assert "Aim for about 6 lines" in d_
+    text = "Ana: Hello, I want water.\nBen: My friend works at the bakery and finished early."
+    plain = report(text, "en", ["water", "bread"])
+    tier = report(text, "en", ["water", "bread"], d.TIERS["medium"])
+    assert plain["vocabulary"]["mode"] == "strict" and tier["vocabulary"]["mode"] == "informational"
+    assert tier["vocabulary"]["ok"] is None and tier["status"] == "pass"

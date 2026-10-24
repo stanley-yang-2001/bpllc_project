@@ -45,6 +45,14 @@ A provider that is not OpenAI-compatible (Anthropic's own API, Gemini's own API)
 5. **Providers:** OpenAI-compatible only for now? *(recommendation: yes)*
 6. **Fallback:** if their model fails, show the error, or quietly use the shared Groq model? *(recommendation: show the error; a silent fallback would send their words somewhere they did not choose)*
 
+### Decisions (24 October 2026, from the owner)
+1. Yes: stories first (phase 1), chat after the spike (phase 2).
+2. Only accounts that have the custom model switched on (a per-account flag, off by default), not one global setting for everyone.
+3. Yes: private addresses stay refused by default, with the single-user override.
+4. Yes: a learner on their own key skips the shared token budget, with a per-learner request limit.
+5. Yes: OpenAI-compatible providers only for now.
+6. If their model fails, show the error and recommend switching back to the shared Groq model; never fall back silently.
+
 ## 7. Build order once decided
 1. Migration 0011 and the encryption helper, with tests (round trip, key never in any response, cascade delete).
 2. The address guard (SSRF rules) with tests for each refused class.

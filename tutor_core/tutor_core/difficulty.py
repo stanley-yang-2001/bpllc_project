@@ -71,7 +71,7 @@ def prompt_note(language_code: str, targets: dict) -> str:
         size = f"about {round(targets['length'] * CHARS_PER_WORD)} characters"
     else:
         size = f"about {targets['length']} words"
-    lines = [f"Difficulty (this overrides any length given below): write {size} in total.",
+    lines = [f"Difficulty (this overrides any length given below): write {size} in total, and do not stop early. A story that is much shorter than this is wrong.",
              f"Use at least {targets['own_words']} different words from the list (as many as the list allows).",
              "Every other word must be an everyday word that a beginner already knows."]
     if language_code in EVERYDAY_LANGUAGES:
