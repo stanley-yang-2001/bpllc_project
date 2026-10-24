@@ -8,7 +8,7 @@ COPY api/requirements.txt api/requirements.txt
 RUN pip install --no-cache-dir -r api/requirements.txt
 
 COPY tutor_core /app/tutor_core
-RUN pip install --no-cache-dir /app/tutor_core
+RUN pip install --no-cache-dir "/app/tutor_core[lemmas]"
 
 COPY api /app/api
 COPY sample_data /app/sample_data

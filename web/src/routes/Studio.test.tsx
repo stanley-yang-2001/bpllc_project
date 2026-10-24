@@ -232,7 +232,7 @@ describe("Story Studio", () => {
       await userEvent.selectOptions(await screen.findByLabelText("Difficulty"), "Easy");
       await make();
       expect(await screen.findByText(/not measured for this language yet/)).toBeInTheDocument();
-      expect(screen.getByText(/Length: 90 characters/)).toBeInTheDocument();
+      expect(screen.getByText(/Length: 90 characters \(asked for about 96\)/)).toBeInTheDocument();     // 60 words is about 96 characters
     });
   });
 

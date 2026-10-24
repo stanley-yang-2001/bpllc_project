@@ -107,6 +107,16 @@ def _own_found(text: str, code: str, vocab_words) -> int:
     return sum(1 for w in words if w in tokens)
 
 
+def _lemma(word: str, code: str) -> str:
+    """The dictionary form, when the optional simplemma package is installed (the API image has it): "llegué" is "llegar", so a
+    verb form the 3000-word list does not spell out still counts as the everyday word it is. Without it, the word is unchanged."""
+    try:
+        import simplemma
+        return simplemma.lemmatize(word, lang=code).casefold()
+    except Exception:
+        return word
+
+
 def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:
     everyday = _everyday(code)
     if not everyday:
@@ -134,7 +144,7 @@ def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:
             continue
         checked += 1
         pieces = [p for p in re.split(r"['’]", low) if len(p) > 1]
-        if low in everyday or (pieces and all(p in everyday for p in pieces)) or low.replace("-", "") in everyday \
+        if low in everyday or _lemma(low, code) in everyday or (pieces and all(p in everyday for p in pieces)) or low.replace("-", "") in everyday \
                 or all(p in everyday for p in low.split("-")):
             continue
         uncommon += 1

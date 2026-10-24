@@ -13,6 +13,7 @@ export interface Report {
   difficulty?: {
     requested?: { length?: number; own_words?: number; uncommon_pct?: number };
     measured?: { length?: number; length_unit?: string; own_words?: number; uncommon_pct?: number | null };
+    list_size?: number;
     met?: { length?: boolean | null; own_words?: boolean | null; uncommon_pct?: boolean | null };
   };
 }
@@ -57,9 +58,9 @@ export function StoryReport({ report, languageName }: { report: Report; language
         {d?.requested && d.measured && (
           <>
             <Row ok={d.met?.length}>
-              {t("report.diffLength", { measured: d.measured.length ?? 0, unit: t(d.measured.length_unit === "characters" ? "report.unitChars" : "report.unitWords"), target: d.requested.length ?? 0 })}
+              {t("report.diffLength", { measured: d.measured.length ?? 0, unit: t(d.measured.length_unit === "characters" ? "report.unitChars" : "report.unitWords"), target: Math.round((d.requested.length ?? 0) * (d.measured.length_unit === "characters" ? 1.6 : 1)) })}
             </Row>
-            <Row ok={d.met?.own_words}>{t("report.diffOwn", { measured: d.measured.own_words ?? 0, target: d.requested.own_words ?? 0 })}</Row>
+            <Row ok={d.met?.own_words}>{t("report.diffOwn", { measured: d.measured.own_words ?? 0, target: Math.min(d.requested.own_words ?? 0, d.list_size ?? 1e9) })}</Row>
             <Row ok={d.measured.uncommon_pct == null ? null : d.met?.uncommon_pct}>
               {d.measured.uncommon_pct == null ? t("report.diffNoUncommon") : t("report.diffUncommon", { measured: d.measured.uncommon_pct, target: d.requested.uncommon_pct ?? 0 })}
             </Row>

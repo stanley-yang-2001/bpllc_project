@@ -76,8 +76,9 @@ def with_reply_language(message: str, reply_language: str | None) -> str:
     if not reply_language or not reply_language.strip():
         return message
     return (f"[Note for the tutor: write your own sentences to the learner in {reply_language}. "
-            f"If the learner asks for a story without naming a language, the story is in {reply_language}. "
-            f"Tool names and tool arguments stay exactly as they are.]\n\n{message}")
+            f"If the learner asks for a story without naming a language in words, call the story tool with language \"{reply_language}\", "
+            f"whatever language the message is written in. A language the learner does name wins. "
+            f"Tool names and every other tool argument stay exactly as they are.]\n\n{message}")
 
 
 def build_run_payload(message: str, session_id: str, tweaks: dict | None) -> dict:

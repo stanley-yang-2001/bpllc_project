@@ -73,3 +73,11 @@ def test_a_tier_replaces_the_template_sentence_count_and_the_strict_stray_rule()
     tier = report(text, "en", ["water", "bread"], d.TIERS["medium"])
     assert plain["vocabulary"]["mode"] == "strict" and tier["vocabulary"]["mode"] == "informational"
     assert tier["vocabulary"]["ok"] is None and tier["status"] == "pass"
+
+
+def test_verb_forms_count_as_everyday_when_a_lemmatizer_is_installed(monkeypatch):
+    pytest.importorskip("simplemma")
+    text = "Ayer llegué a casa. Decidí venir con el amigo."
+    with_lemmas = d.measure(text, "es", [])["uncommon_pct"]
+    monkeypatch.setattr(d, "_lemma", lambda word, code: word)
+    assert with_lemmas < d.measure(text, "es", [])["uncommon_pct"]
