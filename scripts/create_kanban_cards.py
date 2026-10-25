@@ -9,7 +9,7 @@ Project also needs the project scope once: `gh auth refresh -s project`.
 What it does for each card: makes the issue (title, body with a checklist, labels), closes it when the card is Done (a Project's
 built-in workflow moves closed issues to its Done column; open ones land in Todo), and adds it to the Project. Statuses
 "In review" and "Backlog" are added as labels so you can drag the cards into those columns if your board has them.
-Cards already created are remembered in docs/kanban/created.json, so running it twice does not duplicate anything.
+Cards that already exist (found by title in the repository, and remembered in docs/kanban/created.json) are skipped, so running it again never duplicates anything.
 Nothing is created without you running this; no push is involved.
 """
 import argparse
@@ -44,6 +44,26 @@ def body(c):
     return "\n".join(lines)
 
 
+def add_to_project(project, owner, url):
+    """Adds the issue to the board. A failure is reported but never stops the run: a Project with an auto-add workflow has
+    often added the issue already ("Content already exists in this project"), and a missing scope can be fixed afterwards."""
+    r = subprocess.run(["gh", "project", "item-add", str(project), "--owner", owner, "--url", url],
+                       capture_output=True, text=True, encoding="utf-8")
+    if r.returncode != 0:
+        msg = (r.stderr or r.stdout).strip()
+        if "already exists" in msg:
+            return "already on the board"
+        print(f"    could not add to the board: {msg}")
+        return "not added to the board"
+    return "added to the board"
+
+
+def existing_issues(repo):
+    """title -> url of every issue the repository already has, so a rerun never makes a second copy."""
+    out = gh("issue", "list", "--repo", repo, "--state", "all", "--limit", "500", "--json", "title,url")
+    return {i["title"]: i["url"] for i in json.loads(out or "[]")}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo", required=True, help="owner/name of the repository that gets the issues")
@@ -55,14 +75,19 @@ def main():
     cards = json.loads(CARDS.read_text(encoding="utf-8"))
     state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
 
+    found = {}
     if not a.dry_run:
         gh("auth", "status")
+        found = existing_issues(a.repo)
         for name, color in COLORS.items():
             gh("label", "create", name, "--repo", a.repo, "--color", color, "--force", check=False)
 
     for i, c in enumerate(cards, 1):
-        if c["title"] in state:
-            print(f"[{i}/{len(cards)}] skip (already created): {c['title']}")
+        if c["title"] in state or c["title"] in found:
+            url = state.get(c["title"]) or found[c["title"]]
+            note = add_to_project(a.project, owner, url) if a.project and not a.dry_run else ""
+            state[c["title"]] = url
+            print(f"[{i}/{len(cards)}] already exists, skipped {url}  {c['title']}  {note}".rstrip())
             continue
         status_label = {"Done": "status:done", "In review": "status:in-review", "Backlog": "status:backlog"}[c["status"]]
         labels = sorted(set(c["labels"] + [status_label]))
@@ -81,11 +106,10 @@ def main():
         Path(path).unlink(missing_ok=True)
         if c["status"] == "Done":
             gh("issue", "close", url, "--reason", "completed")
-        if a.project:
-            gh("project", "item-add", str(a.project), "--owner", owner, "--url", url)
-        state[c["title"]] = url
+        state[c["title"]] = url          # recorded before the board step, so a failure there never causes a duplicate
         STATE.write_text(json.dumps(state, indent=1, ensure_ascii=False), encoding="utf-8")
-        print(f"[{i}/{len(cards)}] {c['status']:<9} {url}  {c['title']}")
+        note = add_to_project(a.project, owner, url) if a.project else ""
+        print(f"[{i}/{len(cards)}] {c['status']:<9} {url}  {c['title']}  {note}".rstrip())
     print("done" if not a.dry_run else "dry run only: nothing was created")
 
 
