@@ -431,3 +431,38 @@ def test_english_stories_are_never_asked_for_again(conn, make_learner):
     g = Sequence(ENGLISH)
     generate_story(conn, l, "en", call_groq_fn=g, use_cache=False)
     assert len(g.prompts) == 1
+
+
+# --- a tier asks once more when the length is far off ----------------------------------------------------------
+
+class Sequence:
+    def __init__(self, *texts):
+        self.texts, self.prompts = list(texts), []
+
+    def __call__(self, prompt):
+        self.prompts.append(prompt)
+        return f"plan\n{prompts.DELIMITER}\n{self.texts[min(len(self.prompts), len(self.texts)) - 1]}"
+
+
+LONG = " ".join(["Ana likes water and bread."] * 11)           # 55 words
+SHORT = "Ana: Hello."
+
+
+def test_a_story_far_from_the_tier_length_is_asked_for_once_more_and_the_closer_one_is_kept(conn, make_learner):
+    l = learner_with(conn, make_learner, "en", ["water", "bread", "friend"])
+    g = Sequence(SHORT, LONG)
+    r = generate_story(conn, l, "en", call_groq_fn=g, use_cache=False, difficulty={"length": 60, "own_words": 3, "uncommon_pct": 5})
+    assert len(g.prompts) == 2 and r.text == LONG
+    g = Sequence(LONG, SHORT)
+    r = generate_story(conn, l, "en", call_groq_fn=g, use_cache=False, difficulty={"length": 60, "own_words": 3, "uncommon_pct": 5})
+    assert len(g.prompts) == 1 and r.text == LONG            # already within 25%: no second call
+    g = Sequence(SHORT, "Ana: Hi.")
+    assert generate_story(conn, l, "en", call_groq_fn=g, use_cache=False, difficulty={"length": 60, "own_words": 3, "uncommon_pct": 5}).text in (SHORT, "Ana: Hi.")
+    assert len(g.prompts) == 2
+
+
+def test_without_a_tier_there_is_no_extra_call(conn, make_learner):
+    l = learner_with(conn, make_learner, "en", ["water"])
+    g = Sequence(SHORT, LONG)
+    generate_story(conn, l, "en", call_groq_fn=g, use_cache=False)
+    assert len(g.prompts) == 1

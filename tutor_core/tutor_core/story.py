@@ -130,4 +130,24 @@ def generate_story(
             second = ""
         if second.strip():
             passage = second
+    if difficulty:
+        passage = _closer_to_length(passage, prompt, difficulty, language, words, call_groq_fn or groq_module.call_groq)
     return remember(StoryResult(passage, True, None, **base))
+
+
+def _closer_to_length(passage, prompt, difficulty, language, words, call):
+    """With a tier, a story far from the length asked gets one more try, and the one closer to the target is kept (25 Oct:
+    Chinese Medium and Hard came out at 50 to 70% of the length). Nothing is hidden: the report measures whichever is returned."""
+    from . import difficulty as _d
+
+    def gap(text):
+        want = difficulty["length"] * (_d.CHARS_PER_WORD if language in _d._UNSPACED else 1)
+        return abs(_d.measure(text, language, words)["length"] - want) / want
+
+    if gap(passage) <= _d.LENGTH_TOLERANCE:
+        return passage
+    try:
+        second = extract_final_passage(call(prompt))
+    except Exception:
+        return passage
+    return second if second.strip() and gap(second) < gap(passage) else passage
