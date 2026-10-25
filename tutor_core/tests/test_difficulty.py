@@ -123,3 +123,11 @@ def test_verb_forms_count_as_everyday_when_a_lemmatizer_is_installed(monkeypatch
     with_lemmas = d.measure(text, "es", [])["uncommon_pct"]
     monkeypatch.setattr(d, "_lemma", lambda word, code: word)
     assert with_lemmas < d.measure(text, "es", [])["uncommon_pct"]
+
+
+def test_chinese_japanese_and_korean_prompts_state_the_size_per_sentence_and_in_all():
+    zh = build_story_prompt("Chinese (Simplified)", "水, 朋友", "narration", difficulty=d.TIERS["easy"])
+    assert "about 16 characters each, about 96 characters in all" in zh
+    ko = build_story_prompt("Korean", "물, 친구", "narration", difficulty=d.TIERS["hard"])
+    assert "about 10 words each, about 200 words in all" in ko
+    assert "in all" not in build_story_prompt("English", "water, bread", "narration", difficulty=d.TIERS["hard"]).split("Difficulty")[1].split("\n\n", 1)[1]

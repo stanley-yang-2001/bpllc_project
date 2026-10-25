@@ -12,6 +12,7 @@ time (the Story Studio "Regenerate" button) pass use_cache=False and never read 
 """
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, replace
 from typing import Optional
@@ -34,6 +35,8 @@ BAD_TYPE_MESSAGE = (
     "I can't write that kind of text. Try a story, a dialogue, a diary entry, a letter, a place, a daily routine or a "
     "funny anecdote, or name a short kind of text in plain words."
 )
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -108,13 +111,15 @@ def generate_story(
 
     try:
         raw = (call_groq_fn or groq_module.call_groq)(prompt)
-    except Exception:
+    except Exception as exc:
+        _log.warning("story generation failed (%s): %s", language, exc)
         return remember(StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base))
 
     passage = extract_final_passage(raw)
     # An empty passage (the model ran out of tokens, or returned nothing after the delimiter) must never reach the Agent
     # as an empty string: the Agent fills the gap by inventing its own story. It is a failure, cached briefly.
     if not passage.strip():
+        _log.warning("story generation returned no passage (%s); raw length %d", language, len(raw or ""))
         return remember(StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base))
     # The model sometimes answers in English (or mixes English in) when asked for another language (seen 23 Oct, Chinese).
     # Ask once more before the learner ever sees it; whatever the second try gives is returned and reported honestly.
