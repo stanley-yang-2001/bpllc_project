@@ -25,7 +25,7 @@ TIERS = {
 }
 TIER_NAMES = tuple(TIERS) + ("custom",)
 LIMITS = {"length": (20, 400), "own_words": (1, 30), "uncommon_pct": (0, 50)}   # (min, max), inclusive
-LENGTH_TOLERANCE = 0.35        # a story within 35% of the target length counts as meeting it
+LENGTH_TOLERANCE = 0.25        # a story within 25% of the target length counts as meeting it (24 Oct: Korean 134 words for 200 asked passed at 35%)
 UNCOMMON_SLACK = 5             # and one with at most this many points more uncommon words than asked
 CHARS_PER_WORD = 1.6           # Chinese and Japanese: a target of N words is about N * 1.6 characters
 _UNSPACED = ("zh", "ja")
@@ -154,6 +154,18 @@ def _own_found(text: str, code: str, vocab_words) -> int:
     return sum(1 for w in words if w in tokens)
 
 
+def _covered(piece: str, everyday: frozenset) -> bool:
+    """Can this chunk be cut into everyday words? The splitter keeps some phrases whole (喝牛奶, 回家路上, 很清); each part of
+    them is an everyday word, so the chunk is not an unusual word. Chunks over eight characters are not tried."""
+    n = len(piece)
+    if n > 8:
+        return False
+    ok = [True] + [False] * n
+    for end in range(1, n + 1):
+        ok[end] = any(ok[start] and piece[start:end] in everyday for start in range(max(0, end - 4), end))
+    return ok[n]
+
+
 def _uncommon_split(text: str, code: str, own: set) -> Optional[float]:
     tokens = splitter.split(_LABEL.sub("", text), code)
     if tokens is None:
@@ -164,7 +176,7 @@ def _uncommon_split(text: str, code: str, own: set) -> Optional[float]:
         if not t.content or t.surface.casefold() in own or t.base.casefold() in own:
             continue
         checked += 1
-        if t.surface not in everyday and t.base not in everyday:
+        if t.surface not in everyday and t.base not in everyday and not _covered(t.surface, everyday):
             uncommon += 1
     return round(100.0 * uncommon / checked, 1) if checked else 0.0
 

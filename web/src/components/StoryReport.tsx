@@ -47,7 +47,7 @@ export function StoryReport({ report, languageName }: { report: Report; language
         </Row>
         {report.model?.custom && <Row ok={null}>{t("report.ownModel", { model: report.model.name ?? "" })}</Row>}
         {v.mode === "unavailable" ? (
-          <Row ok={null}>{t("report.vocabUnavailable")}</Row>
+          d ? null : <Row ok={null}>{t("report.vocabUnavailable")}</Row>
         ) : v.mode === "informational" ? (
           <Row ok={null}>
             {outside.length === 0 ? t("report.allFromList") : t("report.outsideInfo", { words: outside.join(", ") })}

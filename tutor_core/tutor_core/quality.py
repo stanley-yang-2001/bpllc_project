@@ -359,7 +359,7 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
 
 # --- the report Story Studio shows (M6, commit 2 of 2) -----------------------------------------------------
 
-RULES_VERSION = 2            # bump when the pass rule changes, so a saved report stays interpretable
+RULES_VERSION = 3            # bump when the pass rule changes, so a saved report stays interpretable
 MAX_STRAYS_ENGLISH = 5       # tuning change #2: raised from 2
 READ_WORDS_PER_SECOND = 2    # a slow beginner pace
 _OUTSIDE_LIST_CAP = 30       # informational mode lists at most this many words
@@ -422,7 +422,13 @@ def report(text, language, vocab_words, difficulty=None):
     if mode == "strict":
         vocab_ok = (not failure) and count <= MAX_STRAYS_ENGLISH
 
-    passed = (structure_ok and lang_part["ok"] is not False and (mode != "strict" or vocab_ok is True))
+    section = None
+    if difficulty and not failure:
+        from . import difficulty as _difficulty
+        section = _difficulty.section(difficulty, text, language, vocab_words)
+    # A tier is a promise: a story that misses its length, own-word count or unusual-word share needs a look (rules version 3).
+    tier_ok = section is None or all(v is not False for v in section["met"].values())
+    passed = (structure_ok and lang_part["ok"] is not False and (mode != "strict" or vocab_ok is True) and tier_ok)
     out = {
         "rules_version": RULES_VERSION,
         "status": "pass" if passed else "fail",
@@ -434,9 +440,8 @@ def report(text, language, vocab_words, difficulty=None):
                        "limit": MAX_STRAYS_ENGLISH if mode == "strict" else None},
         "read_seconds": _read_seconds(text, unspaced=(lang.tier == 2)) if text else 1,
     }
-    if difficulty and not failure:
-        from . import difficulty as _difficulty
-        out["difficulty"] = _difficulty.section(difficulty, text, language, vocab_words)
+    if section is not None:
+        out["difficulty"] = section
     return out
 
 

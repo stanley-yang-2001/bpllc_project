@@ -99,7 +99,22 @@ def test_a_tier_replaces_the_template_sentence_count_and_the_strict_stray_rule()
     plain = report(text, "en", ["water", "bread"])
     tier = report(text, "en", ["water", "bread"], d.TIERS["medium"])
     assert plain["vocabulary"]["mode"] == "strict" and tier["vocabulary"]["mode"] == "informational"
-    assert tier["vocabulary"]["ok"] is None and tier["status"] == "pass"
+    assert tier["vocabulary"]["ok"] is None
+    assert tier["status"] == "fail" and tier["difficulty"]["met"]["length"] is False       # two lines is far from 110 words: needs a look (rules version 3)
+    assert report(text, "en", ["water", "bread"], d.resolve("custom", length=20, own_words=1, uncommon_pct=50))["difficulty"]["met"]["own_words"] is True
+
+
+def test_a_missed_own_word_target_needs_a_look():
+    text = "Ana: Hello, I want water.\nBen: Here is bread and cheese for you today.\nAna: Thank you, my friend.\nBen: You are welcome."
+    r = report(text, "en", ["water", "bread", "cheese", "milk", "apple"], d.resolve("custom", length=20, own_words=5, uncommon_pct=50))
+    assert r["difficulty"]["met"]["own_words"] is False and r["status"] == "fail"
+
+
+def test_a_chunk_the_splitter_keeps_whole_is_not_unusual_when_its_parts_are_everyday():
+    pytest.importorskip("rjieba")
+    text = "今天，孩子和朋友一起去海边。爸爸和妈妈在车上等他们。海水很清，太阳很暖。朋友笑着喝牛奶，玩水。回家路上，大家一起说今天很开心。"
+    assert d.measure(text, "zh", ["孩子"])["uncommon_pct"] < 6
+    assert d._covered("喝牛奶", d._everyday("zh")) and not d._covered("蜥蜴", d._everyday("zh"))
 
 
 def test_verb_forms_count_as_everyday_when_a_lemmatizer_is_installed(monkeypatch):

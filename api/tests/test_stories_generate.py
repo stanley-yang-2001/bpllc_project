@@ -74,7 +74,7 @@ def test_a_story_comes_back_with_type_topic_and_a_report(make_user, llm):
     body = r.json()
     assert body["story"] == DIALOGUE and body["language"] == "en"
     assert (body["story_type"], body["topic"]) == ("story", "a market day")
-    assert body["report"]["vocabulary"]["mode"] == "strict" and body["report"]["rules_version"] == 2
+    assert body["report"]["vocabulary"]["mode"] == "strict" and body["report"]["rules_version"] == 3
     assert body["report"]["status"] == "pass" and body["words_total"] == len(WORDS) and body["words_used"] == len(WORDS)
     assert len(llm.prompts) == 1 and "a market day" in llm.prompts[0]
 
