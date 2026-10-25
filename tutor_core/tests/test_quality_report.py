@@ -48,7 +48,7 @@ def stray_dialogue(n):
     words = ["zeppelin", "quokka", "gazebo", "ocarina", "pangolin", "trebuchet", "marmoset"][:n]     # rare on purpose: everyday words are not strays
     lines = ["Ana: Hello, friend.", "Ben: Please, water.", "Ana: Thank you.", "Ben: Goodbye."]
     for i, w in enumerate(words):
-        lines[i % 4] += f" {w}"
+        lines[i % 4] = lines[i % 4].rstrip(".") + f" {w}."
     return "\n".join(lines)
 
 
@@ -82,11 +82,11 @@ ES_VOCAB = ["hola", "agua", "amigo", "casa", "gracias", "adiós", "hoy"]
 ES = "Ana: Hola, amigo.\nLuis: Hola, agua, zepelín.\nAna: Gracias, amigo.\nLuis: Adiós, Ana."
 
 
-def test_a_spanish_story_in_spanish_passes_and_lists_words_without_scoring_them():
+def test_a_spanish_story_in_spanish_passes_and_counts_its_words_outside_the_list():
     r = rep(ES, "es", ES_VOCAB)
     v = r["vocabulary"]
-    assert r["status"] == "pass" and v["mode"] == "informational" and v["limit"] is None and v["ok"] is None
-    assert v["outside"] and v["outside_count"] == len(v["outside"])            # listed (zepelín), not a failure
+    assert r["status"] == "pass" and v["mode"] == "scored" and v["limit"] == 5 and v["ok"] is True
+    assert v["outside"] and v["outside_count"] == len(v["outside"])            # zepelín (rules version 4: counted, up to a tenth of the words)
     assert r["language"]["ok"] is True and r["language"]["verdict"] == "ok"
 
 
@@ -146,3 +146,52 @@ def test_one_heading_above_a_narration_is_not_a_speaker():
     r = quality.report(diary, "de", ["Wasser", "Brot"])
     assert r["structure"]["style"] == "narration" and r["structure"]["format_ok"] is True
     assert quality.report("Ana: Hola.\nLuis: Adiós.\nAna: Hasta luego.\nLuis: Chao.", "es", ["hola"])["structure"]["style"] == "dialogue"
+
+
+def test_a_story_cut_off_mid_word_does_not_have_the_right_shape():
+    cut = "Ana: Hello, friend.\nBen: Hello, water please.\nAna: Thank you.\nBen: Goodbye, fri"
+    r = rep(cut)
+    assert r["structure"]["format_ok"] is False and r["status"] == "fail"
+    assert quality.ends_complete('He said "yes."') and quality.ends_complete("끝났어요.") and quality.ends_complete("おわり。")
+    assert not quality.ends_complete("따뜻하게 잠") and not quality.ends_complete("")
+
+
+def test_spanish_with_many_rare_words_fails_in_scored_mode_but_a_tier_keeps_it_informational():
+    rare = ("Ana: Hola, amigo.\nLuis: El zepelín, la pangolina, el ocarina y el trebuchet vuelan.\n"
+            "Ana: El marmota, el quokka y el gazebo son raros.\nLuis: Adiós, Ana.")
+    r = rep(rare, "es", ES_VOCAB)
+    assert r["vocabulary"]["mode"] == "scored" and r["vocabulary"]["ok"] is False and r["status"] == "fail"
+    from tutor_core import difficulty
+    assert quality.report(rare, "es", ES_VOCAB, difficulty.TIERS["easy"])["vocabulary"]["mode"] == "informational"
+    assert rep(JA, "ja", ["みず"])["vocabulary"]["mode"] == "unavailable"            # no scored mode without a splitter-based rule
+
+
+def test_very_short_english_does_not_pass_as_a_latin_script_language():
+    for lang in ("es", "fr", "de", "it", "pt"):
+        r = quality.language_check("Hello my friend, I want some water, thank you very much.", {"es": "Spanish", "fr": "French", "de": "German", "it": "Italian", "pt": "Portuguese"}[lang])
+        assert r["ok"] is False and r["verdict"] in ("english", "mixed"), lang
+    assert quality.language_check("Hola amigo, quiero agua, gracias por todo.", "Spanish")["ok"] is True
+    assert quality.language_check("Bonjour mon ami, je veux de l'eau, merci beaucoup.", "French")["ok"] is True
+    assert quality.language_check("Hallo mein Freund, ich möchte Wasser, vielen Dank.", "German")["ok"] is True
+    assert quality.language_check("Ciao amico mio, voglio acqua, grazie mille.", "Italian")["ok"] is True
+    assert quality.language_check("Olá meu amigo, eu quero água, muito obrigado.", "Portuguese")["ok"] is True
+    assert quality.language_check("Hello, friend.", "English")["verdict"] == "not_checked"
+
+
+def test_a_sentence_that_stops_after_an_article_or_conjunction_is_caught():
+    for code, bad, good in (("es", "Luego hablamos sobre el jardín tranquilo y.", "Luego hablamos sobre el jardín tranquilo."),
+                            ("fr", "Je me suis réveillé très tôt dans le.", "Je me suis réveillé très tôt."),
+                            ("en", "We walked to the market and.", "We walked to the market.")):
+        assert quality.has_dangling_sentence(bad, code) and not quality.has_dangling_sentence(good, code)
+    assert not quality.has_dangling_sentence("今日は天気がいい。", "ja") and not quality.has_dangling_sentence("Ana: Hola.", "xx")
+
+
+def test_a_dangling_sentence_fails_the_shape_check_in_the_report():
+    text = "Hola Ana.\nHoy voy al mercado con mi amigo y.\nCompro pan y agua.\nLuego vuelvo a mi casa.\nMañana veo el río."
+    r = quality.report(text, "es", ["pan", "agua"])
+    assert r["structure"]["format_ok"] is False and r["status"] == "fail"
+
+
+def test_a_story_cut_off_mid_word_is_not_complete():
+    assert quality.ends_complete("그리고 우리는 웃었어요.") and not quality.ends_complete("집에 도착해서 창문을 열고 따뜻하게 잠")
+    assert quality.ends_complete('She said "hello."')

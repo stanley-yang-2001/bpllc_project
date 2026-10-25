@@ -1563,7 +1563,7 @@
                 "trace_as_metadata": true,
                 "track_in_telemetry": false,
                 "type": "str",
-                "value": "You are a language tutor with two tools: Add Word and Story Generator Tool.\n\n- If the user wants to add a word, call Add Word with just that word.\n- If the user asks for a story, passage, or dialogue, call Story Generator Tool\n  with the language the user names in their LATEST message as the language\n  argument. Any language name is valid, including English. Never refuse a\n  language, and never reuse the language from an earlier message.\n- If the user also says what kind of text they want (a dialogue, a diary entry,\n  a letter, a poem, ...) or what it should be about, pass the kind as story_type\n  and the subject as topic, each in a few plain words. Leave them out when the\n  user did not say; never invent them. The word \"story\" on its own is NOT a kind:\n  \"tell me a story\" or \"create a story in Spanish\" leaves story_type empty.\n\nRULES FOR YOUR REPLY AFTER A TOOL CALL:\n- The tool's output is the complete, final answer. Reply with that text exactly,\n  character for character. Do not translate, rewrite, expand, or summarize it.\n- Your reply must contain only the tool's output. No notes, no explanations,\n  no ellipses, no comments about the text. Never write your own story.\n- If the tool returns an error or \"trouble\" message, reply with that message and\n  nothing else. Do not try to answer yourself.\n\nIf the message needs no tool, reply briefly."
+                "value": "You are a language tutor with two tools: Add Word and Story Generator Tool.\n\n- If the user wants to add a word, call Add Word with just that word.\n- If the user asks for a story, passage, or dialogue, call Story Generator Tool\n  with the language the user names in their LATEST message as the language\n  argument. Any language name is valid, including English. Never refuse a\n  language, and never reuse the language from an earlier message.\n- If the user also says what kind of text they want (a dialogue, a diary entry,\n  a letter, a poem, ...) or what it should be about, pass the kind as story_type\n  and the subject as topic, each in a few plain words. Leave them out when the\n  user did not say; never invent them. The word \"story\" on its own is NOT a kind:\n  \"tell me a story\" or \"create a story in Spanish\" leaves story_type empty.\n- If the user asks for an easy, medium or hard story, pass that word as\n  difficulty. Leave it out otherwise; never invent it.\n\nRULES FOR YOUR REPLY AFTER A TOOL CALL:\n- The tool's output is the complete, final answer. Reply with that text exactly,\n  character for character. Do not translate, rewrite, expand, or summarize it.\n- Your reply must contain only the tool's output. No notes, no explanations,\n  no ellipses, no comments about the text. Never write your own story.\n- If the tool returns an error or \"trouble\" message, reply with that message and\n  nothing else. Do not try to answer yourself.\n\nIf the message needs no tool, reply briefly."
               },
               "tools": {
                 "_input_type": "HandleInput",
@@ -2114,6 +2114,7 @@
               "language",
               "story_type",
               "topic",
+              "difficulty",
               "learner_id",
               "active_language"
             ],
@@ -2123,7 +2124,7 @@
             "legacy": false,
             "lf_version": "1.12.2",
             "metadata": {
-              "code_hash": "99719b9be94e",
+              "code_hash": "0640540e4982",
               "dependencies": {
                 "dependencies": [
                   {
@@ -2187,7 +2188,7 @@
                 "show": true,
                 "title_case": false,
                 "type": "code",
-                "value": "\"\"\"\nStory Generator Tool — consolidated, single-call version of the Step 8 pipeline, built to\nbe used as ONE tool by the top-level Language Agent (Step 9).\n\nWhy this is ONE component: when a component is used as a Tool by another Agent, Langflow only\nreturns that component's own output; it does not execute anything wired downstream of it on the\ncanvas. The old Step 8 pipeline was four separate components chained together (word loader, guard,\nprompt builder, passage extractor), so exposing it as a tool would have leaked the hidden planning\nsummary straight to the learner. This module therefore does everything in one atomic operation. The\nfour Step 8 components were deleted on 18 October 2026; only the Word Loader stays, kept unwired on\nthe canvas for debugging (see tutor_core.tools.vocabulary_for_agent).\n\ngenerate_story_for_learner() takes an injectable call_groq_fn so it's testable without a\nreal network call (see tests/test_story_tool.py); call_groq() itself is the real\nimplementation, using the same request pattern already proven working in scripts/smoke_test.py\n(including the User-Agent header, without which Groq's Cloudflare protection blocks the\nrequest with an HTTP 1010).\n\nM3: the pipeline is tutor_core.story and the tool logic is tutor_core.tools.story_for_agent (tested in\napi/tests/test_tutor_core_story.py and test_tutor_tools.py). The story is built from the CALLING LEARNER's words in the\nchosen language only; `learner_id` and `active_language` are hidden inputs set by the API, and without a usable\nlearner the tool refuses (fail closed). The visible `language`, `story_type` and `topic` arguments are what the Agent\nfills in; the last two are optional and carry what the learner asked for in chat (\"a dialogue\", \"a letter about my trip\").\nA type or topic the tool cannot use is cleaned or refused inside tutor_core.prompts, never passed into the prompt as it came.\n\"\"\"\n\nfrom tutor_core.tools import story_for_agent\nfrom langflow.custom import Component\nfrom langflow.io import MessageTextInput, Output, StrInput\nfrom langflow.schema.message import Message\n\n\nclass StoryGeneratorTool(Component):\n    display_name = \"Story Generator Tool\"\n    description = (\n        \"Generates a vocabulary-constrained story or dialogue for the learner, ready to \"\n        \"use as a single tool for the top-level Language Agent. Handles vocabulary \"\n        \"lookup, the empty-vocabulary guard, prompt building, the Groq call, and stripping \"\n        \"the hidden planning summary — all in one atomic call.\"\n    )\n    icon = \"BookOpenCheck\"\n    name = \"StoryGeneratorTool\"\n\n    inputs = [\n        MessageTextInput(\n            name=\"language\",\n            display_name=\"Language\",\n            info=\"Name of the language for the story, e.g. 'Spanish', 'Chinese' ,'English' etc. Required.\",\n            tool_mode=True,\n        ),\n        MessageTextInput(\n            name=\"story_type\",\n            display_name=\"Story type\",\n            info=\"Optional. Only a kind of text the learner NAMED: dialogue, diary, letter, place, routine, anecdote, \"\n                 \"or a short kind in plain words (for example 'poem'). A plain request for 'a story' names no kind: \"\n                 \"leave this blank so the tutor chooses.\",\n            value=\"\",\n            tool_mode=True,\n        ),\n        MessageTextInput(\n            name=\"topic\",\n            display_name=\"Topic\",\n            info=\"Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). \"\n                 \"Leave blank to let the tutor choose.\",\n            value=\"\",\n            tool_mode=True,\n        ),\n        StrInput(\n            name=\"learner_id\",\n            display_name=\"Learner ID (hidden)\",\n            info=\"Set per request by the API through tweaks, as a STRING. The Agent never sees this field. Never name it user_id: \"\n                 \"Langflow reserves that name on every component.\",\n            value=\"\",\n            advanced=True,\n            tool_mode=False,\n        ),\n        StrInput(\n            name=\"active_language\",\n            display_name=\"Active language (hidden)\",\n            info=\"Set per request by the API through tweaks: the learner's selected language, as an ISO code.\",\n            value=\"\",\n            advanced=True,\n            tool_mode=False,\n        ),\n    ]\n\n    outputs = [\n        Output(display_name=\"Story\", name=\"story\", method=\"run\"),\n    ]\n\n    def run(self) -> Message:\n        message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,\n                                               self.story_type, self.topic))\n        self.status = message\n        return message"
+                "value": "\"\"\"\nStory Generator Tool — consolidated, single-call version of the Step 8 pipeline, built to\nbe used as ONE tool by the top-level Language Agent (Step 9).\n\nWhy this is ONE component: when a component is used as a Tool by another Agent, Langflow only\nreturns that component's own output; it does not execute anything wired downstream of it on the\ncanvas. The old Step 8 pipeline was four separate components chained together (word loader, guard,\nprompt builder, passage extractor), so exposing it as a tool would have leaked the hidden planning\nsummary straight to the learner. This module therefore does everything in one atomic operation. The\nfour Step 8 components were deleted on 18 October 2026; only the Word Loader stays, kept unwired on\nthe canvas for debugging (see tutor_core.tools.vocabulary_for_agent).\n\ngenerate_story_for_learner() takes an injectable call_groq_fn so it's testable without a\nreal network call (see tests/test_story_tool.py); call_groq() itself is the real\nimplementation, using the same request pattern already proven working in scripts/smoke_test.py\n(including the User-Agent header, without which Groq's Cloudflare protection blocks the\nrequest with an HTTP 1010).\n\nM3: the pipeline is tutor_core.story and the tool logic is tutor_core.tools.story_for_agent (tested in\napi/tests/test_tutor_core_story.py and test_tutor_tools.py). The story is built from the CALLING LEARNER's words in the\nchosen language only; `learner_id` and `active_language` are hidden inputs set by the API, and without a usable\nlearner the tool refuses (fail closed). The visible `language`, `story_type`, `topic` and `difficulty` arguments are what the Agent\nfills in; the last three are optional and carry what the learner asked for in chat (\"a dialogue\", \"a letter about my trip\", \"an easy story\").\nA type or topic the tool cannot use is cleaned or refused inside tutor_core.prompts, never passed into the prompt as it came.\n\"\"\"\n\nfrom tutor_core.tools import story_for_agent\nfrom langflow.custom import Component\nfrom langflow.io import MessageTextInput, Output, StrInput\nfrom langflow.schema.message import Message\n\n\nclass StoryGeneratorTool(Component):\n    display_name = \"Story Generator Tool\"\n    description = (\n        \"Generates a vocabulary-constrained story or dialogue for the learner, ready to \"\n        \"use as a single tool for the top-level Language Agent. Handles vocabulary \"\n        \"lookup, the empty-vocabulary guard, prompt building, the Groq call, and stripping \"\n        \"the hidden planning summary — all in one atomic call.\"\n    )\n    icon = \"BookOpenCheck\"\n    name = \"StoryGeneratorTool\"\n\n    inputs = [\n        MessageTextInput(\n            name=\"language\",\n            display_name=\"Language\",\n            info=\"Name of the language for the story, e.g. 'Spanish', 'Chinese' ,'English' etc. Required.\",\n            tool_mode=True,\n        ),\n        MessageTextInput(\n            name=\"story_type\",\n            display_name=\"Story type\",\n            info=\"Optional. Only a kind of text the learner NAMED: dialogue, diary, letter, place, routine, anecdote, \"\n                 \"or a short kind in plain words (for example 'poem'). A plain request for 'a story' names no kind: \"\n                 \"leave this blank so the tutor chooses.\",\n            value=\"\",\n            tool_mode=True,\n        ),\n        MessageTextInput(\n            name=\"topic\",\n            display_name=\"Topic\",\n            info=\"Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). \"\n                 \"Leave blank to let the tutor choose.\",\n            value=\"\",\n            tool_mode=True,\n        ),\n        MessageTextInput(\n            name=\"difficulty\",\n            display_name=\"Difficulty\",\n            info=\"Optional. Only if the learner asked for an easy, medium or hard story: pass easy, medium or hard. \"\n                 \"Leave blank otherwise.\",\n            value=\"\",\n            tool_mode=True,\n        ),\n        StrInput(\n            name=\"learner_id\",\n            display_name=\"Learner ID (hidden)\",\n            info=\"Set per request by the API through tweaks, as a STRING. The Agent never sees this field. Never name it user_id: \"\n                 \"Langflow reserves that name on every component.\",\n            value=\"\",\n            advanced=True,\n            tool_mode=False,\n        ),\n        StrInput(\n            name=\"active_language\",\n            display_name=\"Active language (hidden)\",\n            info=\"Set per request by the API through tweaks: the learner's selected language, as an ISO code.\",\n            value=\"\",\n            advanced=True,\n            tool_mode=False,\n        ),\n    ]\n\n    outputs = [\n        Output(display_name=\"Story\", name=\"story\", method=\"run\"),\n    ]\n\n    def run(self) -> Message:\n        message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,\n                                               self.story_type, self.topic, self.difficulty))\n        self.status = message\n        return message"
               },
               "is_refresh": false,
               "language": {
@@ -2256,6 +2257,12 @@
                         "default": "",
                         "description": "Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). Leave blank to let the tutor choose.",
                         "title": "Topic",
+                        "type": "string"
+                      },
+                      "difficulty": {
+                        "default": "",
+                        "description": "Optional. Only if the learner asked for an easy, medium or hard story: pass easy, medium or hard. Leave blank otherwise.",
+                        "title": "Difficulty",
                         "type": "string"
                       }
                     },
@@ -2355,6 +2362,32 @@
                 "list_add_label": "Add More",
                 "load_from_db": false,
                 "name": "topic",
+                "override_skip": false,
+                "placeholder": "",
+                "required": false,
+                "show": true,
+                "title_case": false,
+                "tool_mode": true,
+                "trace_as_input": true,
+                "trace_as_metadata": true,
+                "track_in_telemetry": false,
+                "type": "str",
+                "value": ""
+              },
+              "difficulty": {
+                "_input_type": "MessageTextInput",
+                "advanced": false,
+                "api_editable": false,
+                "display_name": "Difficulty",
+                "dynamic": false,
+                "info": "Optional. Only if the learner asked for an easy, medium or hard story: pass easy, medium or hard. Leave blank otherwise.",
+                "input_types": [
+                  "Message"
+                ],
+                "list": false,
+                "list_add_label": "Add More",
+                "load_from_db": false,
+                "name": "difficulty",
                 "override_skip": false,
                 "placeholder": "",
                 "required": false,

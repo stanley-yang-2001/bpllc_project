@@ -252,6 +252,17 @@ def test_requested_kind_and_topic_are_checked():
     check("the poem case does not apply the story-shape check", "story quality" not in results_by_name(evaluate_turn(t3, poem, VOCAB)))
 
 
+def test_requested_difficulty_is_checked():
+    d1 = {c["id"]: c["turns"][0] for c in CASES}["D1"]
+    fr = "Cher ami,\nJe vais au marché.\nJ'achète du pain.\nMerci.\nÀ bientôt,\nLéa"
+    good = response(fr, tool_block("story_generator_tool", {"language": "French", "story_type": "", "topic": "", "difficulty": "easy"}, fr))
+    check("an easy request that reaches the tool as easy passes the argument checks",
+          all(c["ok"] for c in evaluate_turn(d1, good, VOCAB) if c["check"] == "tool argument"))
+    dropped = response(fr, tool_block("story_generator_tool", {"language": "French", "story_type": "", "topic": "", "difficulty": ""}, fr))
+    check("an easy request whose difficulty was dropped fails",
+          not all(c["ok"] for c in evaluate_turn(d1, dropped, VOCAB) if c["check"] == "tool argument"))
+
+
 def test_case_catalogue():
     ids = [c["id"] for c in CASES]
     check("case ids are unique", len(ids) == len(set(ids)))
@@ -277,6 +288,7 @@ def main():
     test_no_tool_call_is_caught()
     test_reply_that_differs_from_the_tool_output_is_caught()
     test_english_story_quality_uses_the_vocabulary_rules()
+    test_requested_difficulty_is_checked()
     test_no_tool_expected()
     test_add_word_turns()
     test_empty_vocabulary_guard()
@@ -285,6 +297,7 @@ def main():
     test_duplicate_tool_calls_are_collapsed()
     test_request_error()
     test_requested_kind_and_topic_are_checked()
+    test_requested_difficulty_is_checked()
     test_case_catalogue()
     print()
     if failures:

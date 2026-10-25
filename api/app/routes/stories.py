@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import Field, BaseModel, field_validator, model_validator
 from tutor_core import difficulty, prompts, quality
 from tutor_core.languages import LANGUAGES, stories_enabled
 from tutor_core.story import generate_story
@@ -136,6 +136,7 @@ class SaveIn(DifficultyIn):
     body: str
     story_type: str | None = None
     topic: str | None = None
+    model: str | None = Field(default=None, max_length=120)      # the model name the page showed; used only if it is the learner's own, see save()
 
     @field_validator("body")
     @classmethod
@@ -162,6 +163,9 @@ def save(body: SaveIn, request: Request, user: dict = Depends(current_user)):
             raise AppError("library_full", f"Your library holds {MAX_STORIES} stories. Delete some to save more.", 422)
         words = load_words(conn, user["id"], body.language)
         report = quality.report(body.body, body.language, words, body.targets)
+        own = _own_model(request.app.state, conn, user["id"]) if body.model else None
+        if own and own["model"] == body.model:
+            report["model"] = {"custom": True, "name": own["model"]}      # remembered with the story; a name that is not the learner's own is ignored
         return stories.create(conn, user["id"], body.language, body.story_type, topic, body.body, report)
 
 

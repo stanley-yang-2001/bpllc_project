@@ -19,6 +19,11 @@ const CUSTOM_MAX = 40;
 const PRESETS = { easy: { length: 60, own_words: 3, uncommon_pct: 5 }, medium: { length: 110, own_words: 5, uncommon_pct: 10 }, hard: { length: 200, own_words: 8, uncommon_pct: 20 } } as const;
 const LIMITS = { length: [20, 400], own_words: [1, 30], uncommon_pct: [0, 50] } as const;       // the API checks the same limits
 type Tier = "" | "easy" | "medium" | "hard" | "custom";
+const ownModelName = (report: unknown): string | null => {
+  const m = (report as { model?: { custom?: boolean; name?: string } } | undefined)?.model;
+  return m?.custom ? m.name ?? null : null;
+};
+
 const whole = (text: string, [lo, hi]: readonly [number, number]): number | null => {
   const n = Number(text);
   return text.trim() !== "" && Number.isInteger(n) && n >= lo && n <= hi ? n : null;
@@ -200,7 +205,7 @@ export default function Studio() {
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              onClick={() => save.mutate({ language: story.language, body: story.story, story_type: story.story_type, topic: story.topic, ...requestedOf(story.report) })}
+              onClick={() => save.mutate({ language: story.language, body: story.story, story_type: story.story_type, topic: story.topic, ...requestedOf(story.report), ...(ownModelName(story.report) ? { model: ownModelName(story.report) } : {}) })}
               disabled={saved}
               loading={save.isPending}
               icon={<BookmarkPlus aria-hidden className="size-4" />}

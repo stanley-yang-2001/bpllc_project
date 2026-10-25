@@ -84,6 +84,9 @@ CASES = [
     {"id": "T3", "name": "A kind of the learner's own reaches the tool (a poem)", "turns": [
         _typed("Write a poem in Spanish", ["spanish", "español", "espanol"],
                [{"key": "story_type", "any_of": ["poem", "poema", "a poem"]}], quality=False)]},
+    {"id": "D1", "name": "A requested difficulty reaches the tool (an easy story)", "turns": [
+        _typed("Tell me an easy story in French", ["french", "français", "francais"],
+               [{"key": "difficulty", "any_of": ["easy"]}])]},
     {"id": "N1", "name": "A greeting needs no tool", "turns": [{"say": "hi", "tool": None}]},
     {"id": "N2", "name": "An unrelated question needs no tool", "turns": [
         {"say": "What's the weather like today?", "tool": None}]},

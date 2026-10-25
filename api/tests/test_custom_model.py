@@ -355,3 +355,13 @@ def test_the_admin_command_switches_an_account(make_user, capsys):
     assert admin.run(["off", "alice@example.com"], DB_URL) == 0
     assert admin.run(["on", "nobody@example.com"], DB_URL) == 1
     assert admin.run(["on"], DB_URL) == 2 and admin.run([], DB_URL) == 2
+
+
+def test_a_saved_story_remembers_the_learners_own_model_but_not_a_name_made_up(on, app, make_user, fake_call):
+    c = learner_with_model(make_user, fake_call)
+    story = c.post("/api/stories/generate", json={"language": "en"}, headers=HEADERS).json()
+    saved = c.post("/api/stories", json={"language": "en", "body": story["story"], "model": "gpt-x"}, headers=HEADERS)
+    assert saved.status_code == 201 and saved.json()["report"]["model"] == {"custom": True, "name": "gpt-x"}
+    other = c.post("/api/stories", json={"language": "en", "body": story["story"], "model": "something-else"}, headers=HEADERS)
+    assert "model" not in other.json()["report"]
+    assert "model" not in c.post("/api/stories", json={"language": "en", "body": story["story"]}, headers=HEADERS).json()["report"]

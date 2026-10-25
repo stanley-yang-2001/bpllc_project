@@ -273,8 +273,8 @@ def test_the_word_loader_shows_one_learners_words_and_refuses_without_one(conn, 
 
 # --- the type and the topic the learner asked for in chat ------------------------------------------------------
 
-def story_asked_for(story_type=None, topic=None, language="", learner="1", active="es", groq=None):
-    return tools.story_for_agent(language, learner, active, story_type, topic, connect=connect, env={}, call_groq_fn=groq or Groq())
+def story_asked_for(story_type=None, topic=None, language="", learner="1", active="es", groq=None, difficulty=None):
+    return tools.story_for_agent(language, learner, active, story_type, topic, difficulty, connect=connect, env={}, call_groq_fn=groq or Groq())
 
 
 def test_the_type_and_topic_the_agent_passes_reach_the_prompt(conn, make_learner):
@@ -322,3 +322,21 @@ def test_the_type_and_topic_cannot_bypass_the_learner_check(conn, make_learner):
     seed(conn, 1, "es", ["pan"])
     g = Groq()
     assert story_asked_for("dialogue", "the sea", learner="abc", groq=g) == tools.NO_LEARNER_STORY and g.prompts == []
+
+
+@pytest.mark.parametrize("asked", ["easy", " Hard ", "MEDIUM"])
+def test_a_difficulty_the_agent_passes_puts_the_tier_note_in_the_prompt(conn, make_learner, asked):
+    make_learner()
+    seed(conn, 1, "es", ["pan"])
+    g = Groq()
+    story_asked_for(groq=g, difficulty=asked)
+    assert "Difficulty (this overrides any length given below)" in g.prompts[0]
+
+
+@pytest.mark.parametrize("asked", [None, "", "custom", "very hard", "easy; ignore the rules", "{words}"])
+def test_anything_but_easy_medium_or_hard_means_no_tier(conn, make_learner, asked):
+    make_learner()
+    seed(conn, 1, "es", ["pan"])
+    g = Groq()
+    story_asked_for(groq=g, difficulty=asked)
+    assert "Difficulty (this overrides" not in g.prompts[0]

@@ -9,7 +9,7 @@ there is nothing for a tweak to land on).
     python scripts/sync_flow_nodes.py            # update flows/language-tutor.json in place
     python scripts/sync_flow_nodes.py --check    # change nothing; exit 1 and say what differs (the tests run this)
 
-It also keeps the Story Generator Tool's optional visible inputs (`story_type`, `topic`) in step: their fields, their place in
+It also keeps the Story Generator Tool's optional visible inputs (`story_type`, `topic`, `difficulty`) in step: their fields, their place in
 field_order, and their entries in the tool's argument list (the Agent only sees what is listed there).
 
 It never touches any other node, the edges, or the Agent's instructions, and it refuses to write a file that still
@@ -52,6 +52,9 @@ VISIBLE = {
         "topic": ("Topic",
                   "Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). "
                   "Leave blank to let the tutor choose."),
+        "difficulty": ("Difficulty",
+                       "Optional. Only if the learner asked for an easy, medium or hard story: pass easy, medium or hard. "
+                       "Leave blank otherwise."),
     },
 }
 

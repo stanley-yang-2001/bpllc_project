@@ -232,10 +232,10 @@ def test_the_direct_path_can_switch_the_cache_off(conn, make_learner):
 def test_one_learners_story_is_never_served_to_another(conn, make_learner):
     a = learner_with(conn, make_learner, "es", ["manzana"])
     b = learner_with(conn, make_learner, "es", ["pan"])
-    ga, gb = Groq(text="historia de Ana"), Groq(text="historia de Beto")
+    ga, gb = Groq(text="historia de Ana."), Groq(text="historia de Beto.")
     ra = generate_story(conn, a, "es", call_groq_fn=ga)
     rb = generate_story(conn, b, "es", call_groq_fn=gb)
-    assert (ra.text, rb.text) == ("historia de Ana", "historia de Beto")
+    assert (ra.text, rb.text) == ("historia de Ana.", "historia de Beto.")
     assert len(ga.prompts) == 1 and len(gb.prompts) == 1                     # b got a real call, not a's cached story
     assert "manzana" in ga.prompts[0] and "pan" in gb.prompts[0] and "manzana" not in gb.prompts[0]
     assert rb.cached is False
@@ -466,3 +466,12 @@ def test_without_a_tier_there_is_no_extra_call(conn, make_learner):
     g = Sequence(SHORT, LONG)
     generate_story(conn, l, "en", call_groq_fn=g, use_cache=False)
     assert len(g.prompts) == 1
+
+
+def test_a_story_cut_off_mid_sentence_is_asked_for_once_more_without_a_tier(conn, make_learner):
+    l = learner_with(conn, make_learner, "en", ["water"])
+    g = Sequence("Ana: Hello. Ben: Good mor", "Ana: Hello.")
+    r = generate_story(conn, l, "en", call_groq_fn=g, use_cache=False)
+    assert len(g.prompts) == 2 and r.text == "Ana: Hello."
+    g = Sequence("Ana: Hello.", "Ana: Other.")
+    assert generate_story(conn, l, "en", call_groq_fn=g, use_cache=False).text == "Ana: Hello." and len(g.prompts) == 1

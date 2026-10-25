@@ -129,14 +129,14 @@ def test_chinese_japanese_and_korean_prompts_state_the_size_per_sentence_and_in_
     zh = build_story_prompt("Chinese (Simplified)", "水, 朋友", "narration", difficulty=d.TIERS["easy"])
     assert "about 16 characters each, about 96 characters in all" in zh
     ko = build_story_prompt("Korean", "물, 친구", "narration", difficulty=d.TIERS["hard"])
-    assert "about 10 words each, about 320 words in all" in ko
+    assert "about 10 words each, about 300 words in all" in ko
     assert "in all" not in build_story_prompt("English", "water, bread", "narration", difficulty=d.TIERS["hard"]).split("Difficulty")[1].split("\n\n", 1)[1]
 
 
 def test_the_prompt_asks_for_more_where_the_model_is_known_to_fall_short_but_the_target_stays():
     assert [d.ask_size("en", n) for n in (60, 110, 200)] == [60, 110, 200]
     assert d.ask_size("zh", 110) == 132 and d.ask_size("zh", 200) == 260 and d.ask_size("zh", 60) == 60
-    assert d.ask_size("ja", 110) == 110 and d.ask_size("ja", 200) == 260 and d.ask_size("ko", 110) == 110 and d.ask_size("ko", 200) == 320
+    assert d.ask_size("ja", 110) == 110 and d.ask_size("ja", 200) == 260 and d.ask_size("ko", 110) == 110 and d.ask_size("ko", 200) == 300
     assert "about 416 characters" in d.prompt_note("zh", d.TIERS["hard"])
     assert d.resolve("hard")["length"] == 200            # what the report judges against is unchanged
 

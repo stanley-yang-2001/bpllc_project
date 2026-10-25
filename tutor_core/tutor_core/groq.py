@@ -14,7 +14,7 @@ import urllib.request
 # returned finish_reason="length" with content="" — an empty story. A larger budget plus a
 # low reasoning effort leaves room for the plan and the passage itself.
 DEFAULT_MODEL = "openai/gpt-oss-120b"      # the model Step 10 measured; override with GROQ_MODEL
-_MAX_COMPLETION_TOKENS = 3000      # Korean and Japanese use many tokens per word: a 200-word Korean story was cut short at 1500 (24 Oct)
+_MAX_COMPLETION_TOKENS = 4000      # Korean and Japanese use many tokens per word: a 200-word Korean story was cut short at 1500 (24 Oct)
 _REASONING_EFFORT = "low"
 
 

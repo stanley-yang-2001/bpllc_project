@@ -74,7 +74,7 @@ def ask_size(code: str, length: int) -> int:
     elif code == "ja" and length >= 150:
         factor = 1.3
     elif code == "ko" and length >= 150:
-        factor = 1.6
+        factor = 1.5
     return round(length * factor)
 
 

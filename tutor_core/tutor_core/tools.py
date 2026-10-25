@@ -98,11 +98,19 @@ def add_word_for_agent(word, learner_id, active_language, *, connect=None, env=N
     return f"'{result.word}' is already in your {name} vocabulary."
 
 
-def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, *, connect=None, env=None,
+def _tier(value):
+    """The targets of an easy, medium or hard story the Agent passed, or None for blank or anything else (never trusted as typed)."""
+    from .difficulty import TIERS, resolve
+    name = " ".join(str(value or "").split()).casefold()
+    return resolve(name) if name in TIERS else None
+
+
+def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, difficulty=None, *, connect=None, env=None,
                     call_groq_fn=None) -> str:
     """`language` is what the Agent passed (the learner may say "a story in French" while Spanish is active); blank means the
     hidden active language. `story_type` and `topic` are what the learner asked for in chat ("a dialogue", "a letter about my
-    trip"); both are optional, and blank means "choose for me". generate_story cleans them and refuses a type it cannot use."""
+    trip"); both are optional, and blank means "choose for me". generate_story cleans them and refuses a type it cannot use.
+    `difficulty` is "easy", "medium" or "hard" when the learner asked for that; anything else (or blank) means no tier."""
     learner = resolve_learner(learner_id, env)
     if learner is None:
         return NO_LEARNER_STORY
@@ -118,7 +126,8 @@ def story_for_agent(language, learner_id, active_language, story_type=None, topi
     try:                                    # generate_story itself declines a language whose story quality is not measured
         conn = _open(connect, env)
         try:
-            return generate_story(conn, learner, code, call_groq_fn=call_groq_fn, story_type=story_type, topic=topic).text
+            return generate_story(conn, learner, code, call_groq_fn=call_groq_fn, story_type=story_type, topic=topic,
+                              difficulty=_tier(difficulty)).text
         finally:
             conn.close()
     except Exception:  # noqa: BLE001

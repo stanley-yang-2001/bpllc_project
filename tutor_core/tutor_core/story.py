@@ -130,24 +130,34 @@ def generate_story(
             second = ""
         if second.strip():
             passage = second
-    if difficulty:
-        passage = _closer_to_length(passage, prompt, difficulty, language, words, call_groq_fn or groq_module.call_groq)
+    passage = _better_try(passage, prompt, difficulty, language, words, call_groq_fn or groq_module.call_groq)
     return remember(StoryResult(passage, True, None, **base))
 
 
-def _closer_to_length(passage, prompt, difficulty, language, words, call):
-    """With a tier, a story far from the length asked gets one more try, and the one closer to the target is kept (25 Oct:
-    Chinese Medium and Hard came out at 50 to 70% of the length). Nothing is hidden: the report measures whichever is returned."""
+def _better_try(passage, prompt, difficulty, language, words, call):
+    """One more try, kept only if it is better, when the story is cut off mid-sentence or (with a tier) far from the length asked
+    for (25 Oct: Chinese Medium and Hard came out at 50 to 70% of the length; a Korean story ended mid-word). Nothing is hidden:
+    the report measures whichever story is returned."""
     from . import difficulty as _d
+    from .quality import ends_complete, has_dangling_sentence
 
     def gap(text):
+        if not difficulty:
+            return 0.0
         want = difficulty["length"] * (_d.CHARS_PER_WORD if language in _d._UNSPACED else 1)
         return abs(_d.measure(text, language, words)["length"] - want) / want
 
-    if gap(passage) <= _d.LENGTH_TOLERANCE:
+    def bad(text):
+        return (not ends_complete(text)) or has_dangling_sentence(text, language) or gap(text) > _d.LENGTH_TOLERANCE
+
+    if not bad(passage):
         return passage
     try:
         second = extract_final_passage(call(prompt))
     except Exception:
         return passage
-    return second if second.strip() and gap(second) < gap(passage) else passage
+    if not second.strip():
+        return passage
+    def rank(text):
+        return (not ends_complete(text), has_dangling_sentence(text, language), gap(text))
+    return second if rank(second) < rank(passage) else passage

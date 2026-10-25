@@ -107,7 +107,7 @@ export const api = {
   storyOptions: () => request<StoryOptions>("GET", "/stories/options"),
   generateStory: (b: { language: string; story_type?: string; topic?: string } & DifficultyChoice) =>
     request<GeneratedStory>("POST", "/stories/generate", { json: b }),
-  saveStory: (b: { language: string; body: string; story_type?: string | null; topic?: string | null } & DifficultyChoice) =>
+  saveStory: (b: { language: string; body: string; story_type?: string | null; topic?: string | null; model?: string | null } & DifficultyChoice) =>
     request<SavedStory>("POST", "/stories", { json: b }),
   stories: (p: { language?: string; limit?: number; offset?: number }) => request<StoryPage>("GET", `/stories?${qs(p)}`),
   story: (id: number) => request<SavedStory>("GET", `/stories/${id}`),

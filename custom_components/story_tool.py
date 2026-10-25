@@ -19,8 +19,8 @@ request with an HTTP 1010).
 M3: the pipeline is tutor_core.story and the tool logic is tutor_core.tools.story_for_agent (tested in
 api/tests/test_tutor_core_story.py and test_tutor_tools.py). The story is built from the CALLING LEARNER's words in the
 chosen language only; `learner_id` and `active_language` are hidden inputs set by the API, and without a usable
-learner the tool refuses (fail closed). The visible `language`, `story_type` and `topic` arguments are what the Agent
-fills in; the last two are optional and carry what the learner asked for in chat ("a dialogue", "a letter about my trip").
+learner the tool refuses (fail closed). The visible `language`, `story_type`, `topic` and `difficulty` arguments are what the Agent
+fills in; the last three are optional and carry what the learner asked for in chat ("a dialogue", "a letter about my trip", "an easy story").
 A type or topic the tool cannot use is cleaned or refused inside tutor_core.prompts, never passed into the prompt as it came.
 """
 
@@ -65,6 +65,14 @@ class StoryGeneratorTool(Component):
             value="",
             tool_mode=True,
         ),
+        MessageTextInput(
+            name="difficulty",
+            display_name="Difficulty",
+            info="Optional. Only if the learner asked for an easy, medium or hard story: pass easy, medium or hard. "
+                 "Leave blank otherwise.",
+            value="",
+            tool_mode=True,
+        ),
         StrInput(
             name="learner_id",
             display_name="Learner ID (hidden)",
@@ -90,6 +98,6 @@ class StoryGeneratorTool(Component):
 
     def run(self) -> Message:
         message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,
-                                               self.story_type, self.topic))
+                                               self.story_type, self.topic, self.difficulty))
         self.status = message
         return message

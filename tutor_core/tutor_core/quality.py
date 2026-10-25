@@ -188,6 +188,26 @@ MIXED_VERDICT_RATIO = 0.2    # at least this share: English words left in a stor
 SCRIPT_MIN_RATIO = 0.5       # at least this share of letters must be in the language's own script
 
 
+SHORT_TEXT_TOKENS = 25
+
+
+def _short_text_verdict(tokens, language_name):
+    """A short text has too few English marker words to trip the ratio, so plain English could pass as Spanish (known gap, 25 Oct).
+    With the everyday lists: count words that are everyday in English but not in the requested language, and the other way round.
+    Returns "english" or "mixed", or None when the text looks like the requested language (or the lists cannot say)."""
+    from . import difficulty as _d
+    from .languages import LANGUAGES
+    code = next((c for c, lang in LANGUAGES.items() if lang.name.lower() == language_name), None)
+    if code is None or code == "en" or not _d.has_everyday_list(code) or not _d.has_everyday_list("en"):
+        return None
+    en, target = _d._everyday("en"), _d._everyday(code)
+    english_only = sum(1 for t in tokens if t in en and t not in target)
+    target_only = sum(1 for t in tokens if t in target and t not in en)
+    if english_only <= target_only or english_only < 3:
+        return None
+    return "english" if target_only == 0 else "mixed"
+
+
 def language_check(text, language, vocab=""):
     """Is `text` plausibly written in `language`? English is never checked here.
 
@@ -214,6 +234,10 @@ def language_check(text, language, vocab=""):
     if not tokens:
         return {"ok": False, "verdict": "no_text", "english_ratio": 0.0, "script_ratio": None}
     ratio = sum(1 for t in tokens if t in markers) / len(tokens)
+    if len(tokens) < SHORT_TEXT_TOKENS:
+        short = _short_text_verdict(tokens, name)
+        if short:
+            return {"ok": False, "verdict": short, "english_ratio": ratio, "script_ratio": None}
     if ratio >= ENGLISH_VERDICT_RATIO:
         verdict = "english"
     elif ratio >= MIXED_VERDICT_RATIO:
@@ -237,6 +261,39 @@ def _failure_result(reason):
         "oov_words": None, "oov_count": 0, "word_count": 0, "oov_rate": 0.0, "names": [],
         "longest_unit_words": 0, "mean_unit_words": 0.0, "language_check": None,
     }
+
+
+_CLOSERS = "\"'\u201d\u2019\u00bb\u300d\u300f)\uff09]*_ \t"
+_TERMINALS = ".!?\u2026\u3002\uff01\uff1f\u061f\u0964"
+
+
+def ends_complete(text: str) -> bool:
+    """Does the passage end like a finished sentence? A story cut off by the model's answer limit ends mid-word ("...따뜻하게 잠"),
+    which the length and word checks do not see (25 Oct, Korean Hard)."""
+    stripped = (text or "").rstrip().rstrip(_CLOSERS)
+    return bool(stripped) and stripped[-1] in _TERMINALS
+
+
+_DANGLING = {   # words that cannot end a sentence: the model stopped after one ("tranquilo y.", "dans le.", 25 Oct)
+    "en": {"the", "a", "an", "and", "of", "with"},
+    "es": {"y", "de", "del", "el", "la", "los", "las", "un", "una", "en", "con", "que", "o", "al", "por", "para"},
+    "fr": {"le", "la", "les", "de", "du", "des", "un", "une", "et", "dans", "que", "avec", "pour", "sur", "au", "aux"},
+    "de": {"und", "ein", "eine", "der", "den", "dem", "im", "oder"},
+    "it": {"il", "lo", "la", "gli", "le", "un", "una", "e", "di", "del", "della", "che", "con", "per", "in"},
+    "pt": {"o", "a", "os", "as", "um", "uma", "e", "de", "do", "da", "em", "com", "que", "para", "por"},
+}
+
+
+def has_dangling_sentence(text: str, code: str) -> bool:
+    """Does any sentence end on an article, preposition or conjunction? Only for languages with spaces and such a list."""
+    words = _DANGLING.get(code)
+    if not words:
+        return False
+    for sentence in re.split(r"[.!?\u2026]+", _norm(text)):
+        tokens = _TOKEN.findall(sentence)
+        if tokens and tokens[-1].lower() in words and len(tokens) > 1:
+            return True
+    return False
 
 
 def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10),
@@ -269,7 +326,7 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
     if labelled and labelled[0] and not any(labelled[1:]) and len(lines) > 1:
         labelled[0] = False       # one heading like "Montag Morgen:" above a narration is not a speaker (22 Oct, German diary)
     style = "dialogue" if sum(labelled) * 2 >= len(lines) and any(labelled) else "narration"
-    format_ok = all(labelled) if style == "dialogue" else not any(labelled)
+    format_ok = (all(labelled) if style == "dialogue" else not any(labelled)) and ends_complete(text)
 
     body_segments = []  # text with speaker labels removed
     label_names = set()
@@ -361,7 +418,7 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
 
 # --- the report Story Studio shows (M6, commit 2 of 2) -----------------------------------------------------
 
-RULES_VERSION = 3            # bump when the pass rule changes, so a saved report stays interpretable
+RULES_VERSION = 4            # bump when the pass rule changes, so a saved report stays interpretable
 MAX_STRAYS_ENGLISH = 5       # tuning change #2: raised from 2
 READ_WORDS_PER_SECOND = 2    # a slow beginner pace
 _OUTSIDE_LIST_CAP = 30       # informational mode lists at most this many words
@@ -392,7 +449,10 @@ def report(text, language, vocab_words, difficulty=None):
     lang = LANGUAGES.get(language)
     if lang is None:
         raise ValueError(f"unknown language code: {language!r}")
+    from . import difficulty as _d
     mode = "strict" if language == "en" else ("informational" if lang.tier == 1 else "unavailable")
+    if mode == "informational" and not difficulty and _d.has_everyday_list(language):
+        mode = "scored"           # rules version 4: with the everyday list, words outside the learner's list can be counted fairly
     if difficulty and mode == "strict":
         # A tier asks for everyday words beyond the learner's list, so the strict stray-word count would fail every such story
         # (24 Oct: "friend", "work", "thanks" counted). The tier's own unusual-word share replaces it; strays are listed only.
@@ -402,11 +462,11 @@ def report(text, language, vocab_words, difficulty=None):
 
     # check_passage's own `passed` is not used: the pass rule is applied below, per mode.
     # With a difficulty tier the length is the tier's business (reported below), so the sentence-count rule is not applied.
-    from . import difficulty as _d
     everyday = (lambda w: _d.is_everyday(w, language)) if _d.has_everyday_list(language) and lang.tier == 1 else None
     scored = check_passage(text, vocab, check_vocab=(mode != "unavailable"), max_oov=10 ** 9, everyday=everyday,
                            **({"length_range": (1, 10 ** 6)} if difficulty else {}))
     failure = scored["failure"]
+    scored["format_ok"] = scored["format_ok"] and not has_dangling_sentence(text, language)       # rules version 4
     structure_ok = (not failure) and (not scored["leaked_plan"]) and scored["length_ok"] and scored["format_ok"]
 
     if failure:
@@ -418,11 +478,17 @@ def report(text, language, vocab_words, difficulty=None):
     outside = None
     count = 0
     if mode != "unavailable" and not failure:
-        outside = scored["oov_words"] if mode == "strict" else scored["oov_words"][:_OUTSIDE_LIST_CAP]
+        outside = scored["oov_words"] if mode in ("strict", "scored") else scored["oov_words"][:_OUTSIDE_LIST_CAP]
         count = scored["oov_count"]
+    limit = None
     vocab_ok = None
     if mode == "strict":
-        vocab_ok = (not failure) and count <= MAX_STRAYS_ENGLISH
+        limit = MAX_STRAYS_ENGLISH
+        vocab_ok = (not failure) and count <= limit
+    elif mode == "scored":
+        # about one unusual word in ten, never fewer than the English limit (English: 5 in a 50-word story)
+        limit = None if failure else max(MAX_STRAYS_ENGLISH, -(-scored["word_count"] // 10))
+        vocab_ok = (not failure) and count <= limit
 
     section = None
     if difficulty and not failure:
@@ -430,7 +496,7 @@ def report(text, language, vocab_words, difficulty=None):
         section = _difficulty.section(difficulty, text, language, vocab_words)
     # A tier is a promise: a story that misses its length, own-word count or unusual-word share needs a look (rules version 3).
     tier_ok = section is None or all(v is not False for v in section["met"].values())
-    passed = (structure_ok and lang_part["ok"] is not False and (mode != "strict" or vocab_ok is True) and tier_ok)
+    passed = (structure_ok and lang_part["ok"] is not False and (mode not in ("strict", "scored") or vocab_ok is True) and tier_ok)
     out = {
         "rules_version": RULES_VERSION,
         "status": "pass" if passed else "fail",
@@ -439,7 +505,7 @@ def report(text, language, vocab_words, difficulty=None):
                       "length_ok": scored["length_ok"], "format_ok": scored["format_ok"],
                       "leaked_plan": scored["leaked_plan"]},
         "vocabulary": {"mode": mode, "ok": vocab_ok, "outside": outside, "outside_count": count,
-                       "limit": MAX_STRAYS_ENGLISH if mode == "strict" else None},
+                       "limit": limit},
         "read_seconds": _read_seconds(text, unspaced=(lang.tier == 2)) if text else 1,
     }
     if section is not None:
