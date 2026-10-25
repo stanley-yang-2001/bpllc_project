@@ -65,12 +65,26 @@ def _unit(language: str) -> str:
     return "characters" if language in _UNSPACED else "words"
 
 
+def ask_size(code: str, length: int) -> int:
+    """The size the prompt asks for, in words. Measured 25 Oct on Groq: longer Chinese and Japanese stories come out at about 70 to
+    80% of what is asked and long Korean ones at about 58%, so the prompt asks for more. The report still judges against `length`."""
+    factor = 1.0
+    if code == "zh":
+        factor = 1.2 if 100 <= length < 150 else (1.3 if length >= 150 else 1.0)
+    elif code == "ja" and length >= 150:
+        factor = 1.3
+    elif code == "ko" and length >= 150:
+        factor = 1.6
+    return round(length * factor)
+
+
 def prompt_note(language_code: str, targets: dict) -> str:
     """The note placed at the top of the story prompt. It states numbers only; nothing the learner typed goes into it."""
+    asked = ask_size(language_code, targets["length"])
     if language_code in _UNSPACED:
-        size = f"about {round(targets['length'] * CHARS_PER_WORD)} characters"
+        size = f"about {round(asked * CHARS_PER_WORD)} characters"
     else:
-        size = f"about {targets['length']} words"
+        size = f"about {asked} words"
     lines = [f"Difficulty (this overrides any length given below): write {size} in total, and do not stop early. A story that is much shorter than this is wrong.",
              f"Use at least {targets['own_words']} different words from the list (as many as the list allows).",
              "Every other word must be an everyday word that a beginner already knows."]

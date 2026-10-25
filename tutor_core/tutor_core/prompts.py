@@ -403,15 +403,16 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
     if difficulty:
         # The built-in templates ask for 5 to 9 sentences; with a tier that sentence count is replaced by the tier's own.
-        count = max(2, round(difficulty["length"] / 10))
-        from .difficulty import CHARS_PER_WORD, prompt_note
+        from .difficulty import CHARS_PER_WORD, ask_size, prompt_note
         from .languages import LANGUAGES
         name = (normalize_language(language) or "").casefold()
         code = next((c for c, lang in LANGUAGES.items() if lang.name.casefold() == name or c == name), "en")
+        asked = ask_size(code, difficulty["length"])
+        count = max(2, round(asked / 10))
         if code in ("zh", "ja"):       # 24 Oct: Chinese came out at 40 to 65% of the length asked; say the characters per sentence and in all
-            each = f"about {round(10 * CHARS_PER_WORD)} characters each, about {round(difficulty['length'] * CHARS_PER_WORD)} characters in all"
+            each = f"about {round(10 * CHARS_PER_WORD)} characters each, about {round(asked * CHARS_PER_WORD)} characters in all"
         elif code == "ko":
-            each = f"about 10 words each, about {difficulty['length']} words in all"
+            each = f"about 10 words each, about {asked} words in all"
         else:
             each = "about 10 words each"
         prompt = _LENGTH_PHRASE.sub(lambda m: f"{m.group(1)}im for about {count} {m.group(2)} ({each})", prompt)
