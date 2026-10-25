@@ -1,0 +1,750 @@
+[
+ {
+  "title": "Project start: repo, documentation, architecture diagrams",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-09-16",
+  "summary": "Initial commit, overview, use-case, class, state, workflow, concept and architecture diagrams, learning objectives, style guide.",
+  "done": [
+   "Repository and docs written",
+   "Learning objectives defined"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation"
+  ]
+ },
+ {
+  "title": "Environment check: Docker, Postgres, Groq (Steps 1–2, 4–5)",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-09-21",
+  "summary": "Docker compose stack with Langflow and Postgres; smoke test for Postgres and the Groq key; Language Agent.",
+  "done": [
+   "Compose stack runs",
+   "smoke_test.py checks Postgres and Groq"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation"
+  ]
+ },
+ {
+  "title": "Story pipeline components (Steps 6–8)",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-09-25",
+  "summary": "Word upload, story prompt builder, guard and final-passage extractor as Langflow components.",
+  "done": [
+   "Components built with tests"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation",
+   "langflow"
+  ]
+ },
+ {
+  "title": "Reliability work and deterministic router (Steps 8–9)",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-10-02",
+  "summary": "Fixes for empty story output and a deterministic routing step before the agent.",
+  "done": [
+   "Empty-string story fixed",
+   "Router tests"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation",
+   "langflow"
+  ]
+ },
+ {
+  "title": "Agent orchestration with Tool Result Relay (Step 9)",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-10-05",
+  "summary": "Agent picks the tool; the relay returns tool output verbatim; verified in the Playground.",
+  "done": [
+   "Relay verified",
+   "120b orchestrator measured"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation",
+   "langflow"
+  ]
+ },
+ {
+  "title": "Step 10: measure the tools (routing tests, story batch, language check)",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-10-08",
+  "summary": "Automated routing tests, story batch runner, vocabulary adherence checker, language-aware story prompt, story variety tuning; LO 8 verdict drafted.",
+  "done": [
+   "Routing runner",
+   "Story batch runner and rescore",
+   "Language-aware prompt measured",
+   "Variety tuning measured"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation",
+   "testing"
+  ]
+ },
+ {
+  "title": "Web app design v4 (React + FastAPI)",
+  "status": "Done",
+  "area": "foundation",
+  "date": "2026-10-10",
+  "summary": "Design document with milestones M0–M8, threat model, privacy decisions, confirmed decisions; revised for account preferences and translated policy.",
+  "done": [
+   "Design reviewed and decisions confirmed"
+  ],
+  "todo": [],
+  "labels": [
+   "foundation",
+   "design"
+  ]
+ },
+ {
+  "title": "M0: verify the Langflow assumptions",
+  "status": "Done",
+  "area": "M0",
+  "date": "2026-10-14",
+  "summary": "Each tool gets its own learner input per request (node-id tweak key, hidden input not named user_id); real responses saved as fixtures; chat deletion probe.",
+  "done": [
+   "Plan A verified on Langflow 1.12.2",
+   "Non-string tweak dropped silently: handled",
+   "Per-session chat deletion works"
+  ],
+  "todo": [],
+  "labels": [
+   "M0",
+   "langflow"
+  ]
+ },
+ {
+  "title": "M1: API skeleton and site shell",
+  "status": "Done",
+  "area": "M1",
+  "date": "2026-10-12",
+  "summary": "FastAPI app, React/Vite shell, compose service, health checks with Langflow and Groq lines, OpenAPI types.",
+  "done": [
+   "Health endpoints",
+   "Generated API types",
+   "Site shell"
+  ],
+  "todo": [],
+  "labels": [
+   "M1"
+  ]
+ },
+ {
+  "title": "M2: accounts and login",
+  "status": "Done",
+  "area": "M2",
+  "date": "2026-10-13",
+  "summary": "Email sign-up with consent, sessions, per-account password salt, login guard, isolation tests, privacy policy page.",
+  "done": [
+   "Sign-up and sign-in",
+   "Sessions and logout-all",
+   "Password change and account deletion",
+   "Isolation tests between learners"
+  ],
+  "todo": [],
+  "labels": [
+   "M2",
+   "privacy",
+   "security"
+  ]
+ },
+ {
+  "title": "M3: shared tutor_core and per-learner tools",
+  "status": "Done",
+  "area": "M3",
+  "date": "2026-10-14",
+  "summary": "Story, vocabulary and quality logic moved out of Langflow into tutor_core; Langflow tools refuse to run without a learner id; verified live (m3_check).",
+  "done": [
+   "tutor_core package",
+   "Fail-closed tools",
+   "m3_check passed 14 and 23 Oct"
+  ],
+  "todo": [],
+  "labels": [
+   "M3",
+   "langflow",
+   "security"
+  ]
+ },
+ {
+  "title": "M4: vocabulary page and API",
+  "status": "Done",
+  "area": "M4",
+  "date": "2026-10-13",
+  "summary": "Per-language word lists, search, add, edit, delete, CSV upload, starter words.",
+  "done": [
+   "Word API",
+   "Vocabulary page",
+   "CSV upload with limits"
+  ],
+  "todo": [],
+  "labels": [
+   "M4"
+  ]
+ },
+ {
+  "title": "M5: chat, chat deletion, token limiter",
+  "status": "Done",
+  "area": "M5",
+  "date": "2026-10-15",
+  "summary": "Live chat through Langflow, deleting an account removes its Langflow conversation, tokens-per-minute limiter, per-account password salt, privacy wording and prompt-privacy test.",
+  "done": [
+   "Chat page",
+   "Langflow session deletion confirmed 16 Oct",
+   "AI gate and tokens per minute",
+   "Salt per password"
+  ],
+  "todo": [],
+  "labels": [
+   "M5",
+   "privacy"
+  ]
+ },
+ {
+  "title": "M6: Story Studio and quality report",
+  "status": "Done",
+  "area": "M6",
+  "date": "2026-10-16",
+  "summary": "Story type and topic, quality report (language, structure, strays), token charge, save to library.",
+  "done": [
+   "Generate and save",
+   "Quality report shape documented",
+   "Report in nine languages"
+  ],
+  "todo": [],
+  "labels": [
+   "M6"
+  ]
+ },
+ {
+  "title": "M7: Library, Practice and demo walkthrough",
+  "status": "Done",
+  "area": "M7",
+  "date": "2026-10-16",
+  "summary": "Saved stories with badges, flashcards, fill-in-the-blank, demo seed account, browser tests.",
+  "done": [
+   "Library and Practice pages",
+   "Seed script",
+   "Playwright e2e",
+   "Demo walkthrough doc"
+  ],
+  "todo": [],
+  "labels": [
+   "M7",
+   "testing"
+  ]
+ },
+ {
+  "title": "M8: display names, preferences on the account, site language, themes, policy copies",
+  "status": "Done",
+  "area": "M8",
+  "date": "2026-10-17",
+  "summary": "Nine-language site catalog, seven theme presets and a custom colour wheel with a readability panel, account preferences (migration 0007), policy served as data with approved copies.",
+  "done": [
+   "Native language names",
+   "Preferences saved on the account",
+   "Themes with contrast check",
+   "Policy copies"
+  ],
+  "todo": [],
+  "labels": [
+   "M8",
+   "i18n",
+   "accessibility"
+  ]
+ },
+ {
+  "title": "Least-privilege database role for the Langflow tools (migration 0008)",
+  "status": "Done",
+  "area": "hardening",
+  "date": "2026-10-20",
+  "summary": "tutor_tools role can only SELECT/INSERT what the tools need; confirmed working on the author's machine.",
+  "done": [
+   "Migration 0008",
+   "TOOLS_DB_PASSWORD documented"
+  ],
+  "todo": [],
+  "labels": [
+   "hardening",
+   "security"
+  ]
+ },
+ {
+  "title": "Remove the old Step 8 canvas components",
+  "status": "Done",
+  "area": "hardening",
+  "date": "2026-10-19",
+  "summary": "Four components and their tests deleted; docs updated.",
+  "done": [
+   "Components removed"
+  ],
+  "todo": [],
+  "labels": [
+   "hardening"
+  ]
+ },
+ {
+  "title": "Non-English story prompt (target-language variant)",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-19",
+  "summary": "The prompt says the list is already in the target language; Spanish 14/15, French 15/15, Japanese 15/15.",
+  "done": [
+   "Prompt variant",
+   "Batch measured"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories"
+  ]
+ },
+ {
+  "title": "Chat story tool takes a kind and a topic",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-19",
+  "summary": "Dialogue, letter and a kind of the learner's own reach the tool (routing cases T1–T3); 'story' alone names no kind.",
+  "done": [
+   "Tool inputs",
+   "Routing cases"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "chat",
+   "stories"
+  ]
+ },
+ {
+  "title": "Settings shows the learner's User ID",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-21",
+  "summary": "Account card with the id used by the checking scripts.",
+  "done": [
+   "Row in nine languages"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "web"
+  ]
+ },
+ {
+  "title": "English stories: classic styles unless a kind is asked for",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-21",
+  "summary": "Richer kinds failed the stray-word check; random picks are narration or dialogue.",
+  "done": [
+   "Routing 18/18, English batch 13/15"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories"
+  ]
+ },
+ {
+  "title": "Five more languages switched on: German, Italian, Portuguese, Chinese, Korean",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-23",
+  "summary": "Each measured 15/15 in the requested language; checker fixed for non-English word lists (German 1/15 → 14/15).",
+  "done": [
+   "Live batches",
+   "Checker fix"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories",
+   "i18n"
+  ]
+ },
+ {
+  "title": "Custom topic, fill-in-the-blank for Chinese/Japanese/Korean, chat replies in study language",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "Write-your-own topic, cloze for all languages, account checkbox for chat replies in the study language (migration 0010).",
+  "done": [
+   "Studio topic",
+   "Cloze",
+   "Chat-language note (also English)",
+   "Regenerate a wrong-language story once"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories",
+   "chat"
+  ]
+ },
+ {
+  "title": "Story difficulty tiers (Easy / Medium / Hard / Custom)",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "Length, own words and unusual-word share asked and measured; report rows; Library badge; design in docs/DIFFICULTY-TIERS-DESIGN.md.",
+  "done": [
+   "Tier prompt note",
+   "Measured report section",
+   "Studio controls",
+   "Library badge"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories"
+  ]
+ },
+ {
+  "title": "One story call per chat reply",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "A reply showed three 'Used Story Generator Tool' chips; the API now keeps only the call matching the reply. Confirmed one chip.",
+  "done": [
+   "Patch 0017",
+   "Confirmed on the author's machine"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "chat"
+  ]
+ },
+ {
+  "title": "Everyday-word lists for nine languages (6000 each) and the stray rule",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "Lists kept in the backend (wordfreq, CC BY-SA 4.0); everyday words outside the learner's list are no longer strays; learners may still add any word.",
+  "done": [
+   "Lists for en, es, fr, de, it, pt, ja, zh, ko",
+   "Lemmas via simplemma",
+   "Quality rules version 2"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories"
+  ]
+ },
+ {
+  "title": "Chinese / Japanese / Korean word splitter and uncommon-word share",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "rjieba, janome, kiwipiepy; own words matched by word; boundary-aware fill-in-the-blank; chunks made of everyday words are not unusual.",
+  "done": [
+   "splitter.py",
+   "Own-word matching by token",
+   "Cloze boundaries",
+   "Patch 0020"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories",
+   "i18n"
+  ]
+ },
+ {
+  "title": "Privacy policy: your own AI model sentence and version bump",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "Sentence approved by the author; policy version 2026-10-24, every learner accepts again.",
+  "done": [
+   "Policy row and sharing item"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "privacy"
+  ]
+ },
+ {
+  "title": "Difficulty tiers tuned for zh/ja/ko (retry, bigger ask, token room)",
+  "status": "Done",
+  "area": "feature",
+  "date": "2026-10-25",
+  "summary": "From the author's runs of difficulty_check.py: 18 of 18 Chinese/Japanese/Korean Medium and Hard stories passed after patches 0021–0023.",
+  "done": [
+   "Tier misses show 'Needs a look' (rules 3)",
+   "Length tolerance 25%",
+   "One retry when far off",
+   "Prompt asks for more where the model falls short",
+   "3000-token answer budget"
+  ],
+  "todo": [],
+  "labels": [
+   "feature",
+   "stories"
+  ]
+ },
+ {
+  "title": "difficulty_check.py: generate and measure stories at each tier",
+  "status": "Done",
+  "area": "tooling",
+  "date": "2026-10-25",
+  "summary": "Signs up a throwaway learner, makes stories per language and tier through the real API, prints asked vs measured, deletes the learner.",
+  "done": [
+   "Script",
+   "Run by the author"
+  ],
+  "todo": [],
+  "labels": [
+   "tooling",
+   "testing"
+  ]
+ },
+ {
+  "title": "Repo cleanup and ENVIRONMENT.md",
+  "status": "Done",
+  "area": "tooling",
+  "date": "2026-10-24",
+  "summary": "Removed .env.example and relay_debug.log; docs/ENVIRONMENT.md lists every setting.",
+  "done": [
+   "Applied and pushed"
+  ],
+  "todo": [],
+  "labels": [
+   "tooling"
+  ]
+ },
+ {
+  "title": "Test suites: core, API, web, container, browser, routing matrix",
+  "status": "Done",
+  "area": "tooling",
+  "date": "2026-10-25",
+  "summary": "Automated tests (core 311, API 808, web 233) plus live checks (routing matrix 18/18, browser tests 52/52).",
+  "done": [
+   "How-we-test section in the To do doc"
+  ],
+  "todo": [],
+  "labels": [
+   "tooling",
+   "testing"
+  ]
+ },
+ {
+  "title": "Known gaps pass: heading above a narration, closing line, grammar rule",
+  "status": "In review",
+  "area": "known-gaps",
+  "date": "2026-10-25",
+  "summary": "'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).",
+  "done": [
+   "Heading rule with tests",
+   "Prompt rule with tests"
+  ],
+  "todo": [
+   "Measure German and Portuguese grammar on a live batch",
+   "Confirm the Korean closing line no longer appears"
+  ],
+  "labels": [
+   "known-gaps",
+   "stories"
+  ]
+ },
+ {
+  "title": "Your own AI model for stories (phase 1)",
+  "status": "In review",
+  "area": "feature",
+  "date": "2026-10-24",
+  "summary": "Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.",
+  "done": [
+   "Migration 0011",
+   "Settings card",
+   "Report line"
+  ],
+  "todo": [
+   "Set MODEL_KEY_SECRET and switch the account on",
+   "Test with a real key and a wrong key"
+  ],
+  "labels": [
+   "feature",
+   "privacy",
+   "security"
+  ]
+ },
+ {
+  "title": "Chat on your own model (phase 2)",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Needs a spike on the author's machine first (how the Agent calls a user-supplied model).",
+  "done": [],
+  "todo": [
+   "Spike",
+   "Design the key handling for chat",
+   "Build and test"
+  ],
+  "labels": [
+   "backlog",
+   "chat"
+  ]
+ },
+ {
+  "title": "Saved story remembers which model wrote it",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Store the model name with a saved story and show it in the Library.",
+  "done": [],
+  "todo": [
+   "Migration",
+   "Library row"
+  ],
+  "labels": [
+   "backlog",
+   "stories"
+  ]
+ },
+ {
+  "title": "Difficulty option for the chat story tool",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Let the chat tool pass a tier so a chat story can be Easy, Medium or Hard.",
+  "done": [],
+  "todo": [
+   "Tool input",
+   "Routing cases"
+  ],
+  "labels": [
+   "backlog",
+   "chat",
+   "stories"
+  ]
+ },
+ {
+  "title": "Language check: very short English text can pass as a Latin-script language",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "With few words no English marker fires. Needs a positive check (accents, function words) and tests.",
+  "done": [],
+  "todo": [
+   "Design a rule",
+   "Tests"
+  ],
+  "labels": [
+   "backlog",
+   "quality"
+  ]
+ },
+ {
+  "title": "Vocabulary adherence for non-English lists",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Strays are listed but not scored outside English. The everyday lists now make a scored rule possible.",
+  "done": [],
+  "todo": [
+   "Choose limits per language",
+   "Measure on batches"
+  ],
+  "labels": [
+   "backlog",
+   "quality"
+  ]
+ },
+ {
+  "title": "Native review of the nine-language site text and policy copies",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Translations are machine-written and not reviewed by native speakers; policy copies are shown only when approved.",
+  "done": [],
+  "todo": [
+   "Review each language",
+   "Approve policy copies"
+  ],
+  "labels": [
+   "backlog",
+   "i18n",
+   "privacy"
+  ]
+ },
+ {
+  "title": "Install splitter and lemma packages in the Langflow image",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Only the API image has the [cjk] and [lemmas] extras.",
+  "done": [],
+  "todo": [
+   "Update the Langflow image",
+   "Container tests"
+  ],
+  "labels": [
+   "backlog",
+   "tooling"
+  ]
+ },
+ {
+  "title": "Richer English kinds back into random picks",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "Regenerate once when the check fails so diary, letter and place stories can return to random choice.",
+  "done": [],
+  "todo": [
+   "Retry rule",
+   "Batch measurement"
+  ],
+  "labels": [
+   "backlog",
+   "stories"
+  ]
+ },
+ {
+  "title": "Merge the duplicated add-word INSERT",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "The same INSERT exists in two places.",
+  "done": [],
+  "todo": [
+   "Refactor with tests"
+  ],
+  "labels": [
+   "backlog",
+   "tech-debt"
+  ]
+ },
+ {
+  "title": "Push the branch and open the pull request",
+  "status": "Backlog",
+  "area": "backlog",
+  "date": "",
+  "summary": "The author pushes to the remote; the branch has 30+ local commits.",
+  "done": [],
+  "todo": [
+   "Push",
+   "Open PR",
+   "Review"
+  ],
+  "labels": [
+   "backlog",
+   "release"
+  ]
+ }
+]

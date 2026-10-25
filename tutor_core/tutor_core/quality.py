@@ -266,6 +266,8 @@ def check_passage(text, vocab, check_vocab=True, max_oov=0, length_range=(4, 10)
     leaked = bool(LEAK_PATTERN.search(text))
     lines = [ln for ln in text.splitlines() if ln.strip()]
     labelled = [_is_label(ln) for ln in lines]
+    if labelled and labelled[0] and not any(labelled[1:]) and len(lines) > 1:
+        labelled[0] = False       # one heading like "Montag Morgen:" above a narration is not a speaker (22 Oct, German diary)
     style = "dialogue" if sum(labelled) * 2 >= len(lines) and any(labelled) else "narration"
     format_ok = all(labelled) if style == "dialogue" else not any(labelled)
 

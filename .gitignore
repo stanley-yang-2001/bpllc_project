@@ -25,3 +25,4 @@ test-langflow.txt
 # Playwright output (regenerated on every run)
 web/test-results/
 web/playwright-report/
+docs/kanban/created.json

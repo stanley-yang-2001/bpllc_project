@@ -390,6 +390,18 @@ def choose_topic(rng=None, recent=None) -> str:
 _LENGTH_PHRASE = re.compile(r"([Aa])im for \d+ to \d+ (?:short )?(sentences|lines)(?: of back-and-forth conversation)?(?: \((?:up to )?[\d-]+ words each\))?")
 
 
+_FINISH_RULE = ("The passage ends with the story itself: no thanks, goodbye, notes or translation after the last sentence. "
+                "Before you answer, re-read it once for grammar: articles, verb endings, and gender and number agreement.")
+_BEGIN = "Begin: planning, then delimiter, then passage."
+
+
+def _with_finish_rule(prompt: str) -> str:
+    """25 Oct: a Korean story ended with a stray \"thank you\" line, and German and Portuguese stories had article and
+    agreement slips. A short rule before the final instruction, for target-language stories only."""
+    i = prompt.rfind(_BEGIN)
+    return prompt if i < 0 else prompt[:i] + _FINISH_RULE + "\n\n" + prompt[i:]
+
+
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
                        topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
                        difficulty: Optional[dict] = None) -> str:
@@ -401,6 +413,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured.
     difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt."""
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
+    if vocab_in_target and not is_english(normalize_language(language)):
+        prompt = _with_finish_rule(prompt)
     if difficulty:
         # The built-in templates ask for 5 to 9 sentences; with a tier that sentence count is replaced by the tier's own.
         from .difficulty import CHARS_PER_WORD, ask_size, prompt_note

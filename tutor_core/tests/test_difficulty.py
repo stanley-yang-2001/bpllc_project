@@ -139,3 +139,10 @@ def test_the_prompt_asks_for_more_where_the_model_is_known_to_fall_short_but_the
     assert d.ask_size("ja", 110) == 110 and d.ask_size("ja", 200) == 260 and d.ask_size("ko", 110) == 110 and d.ask_size("ko", 200) == 320
     assert "about 416 characters" in d.prompt_note("zh", d.TIERS["hard"])
     assert d.resolve("hard")["length"] == 200            # what the report judges against is unchanged
+
+
+def test_target_language_stories_end_with_the_story_and_get_a_grammar_rule_but_english_is_unchanged():
+    ko = build_story_prompt("Korean", "물, 친구", "narration", vocab_in_target=True)
+    assert "no thanks, goodbye, notes or translation" in ko and ko.index("re-read it once for grammar") < ko.index("Begin:")
+    assert "re-read it once" not in build_story_prompt("English", "water, bread", "narration", vocab_in_target=True)
+    assert "re-read it once" not in build_story_prompt("Korean", "물, 친구", "narration")

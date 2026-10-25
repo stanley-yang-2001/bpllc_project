@@ -139,3 +139,10 @@ def test_everyday_words_outside_the_list_are_not_strays():
     assert r["vocabulary"]["outside_count"] <= 2 and r["status"] == "pass"            # friend, works, finished: everyday
     rare = rep("Ana: Hello, I want water.\nBen: A quokka rides a zeppelin to the gazebo with an ocarina and pangolin and marmoset.\nAna: Thank you.\nBen: Goodbye.", "en", ["water"])
     assert rare["vocabulary"]["outside_count"] >= 6 and rare["status"] == "fail"
+
+
+def test_one_heading_above_a_narration_is_not_a_speaker():
+    diary = "Montag Morgen: Ich stehe früh auf.\nIch trinke Wasser und esse Brot.\nDann gehe ich mit meinem Freund zum Markt.\nWir kaufen Obst und Gemüse.\nAm Abend lese ich einen Brief."
+    r = quality.report(diary, "de", ["Wasser", "Brot"])
+    assert r["structure"]["style"] == "narration" and r["structure"]["format_ok"] is True
+    assert quality.report("Ana: Hola.\nLuis: Adiós.\nAna: Hasta luego.\nLuis: Chao.", "es", ["hola"])["structure"]["style"] == "dialogue"
