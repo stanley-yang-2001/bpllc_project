@@ -15,7 +15,7 @@ import psycopg2.errors
 from .languages import LANGUAGES
 from .words import WordError, validate_meaning, validate_word
 
-__all__ = ["AddResult", "VocabError", "WordError", "add_word", "load_words", "max_prompt_words", "sample_words"]
+__all__ = ["AddResult", "GENERAL", "VocabError", "WordError", "add_word", "clean_set_ids", "load_words", "max_prompt_words", "sample_words"]
 
 DEFAULT_MAX_PROMPT_WORDS = 150
 NO_SUCH_LEARNER = "I don't know whose vocabulary this is."
@@ -61,11 +61,34 @@ def add_word(conn, learner_id: int, language: str, word, meaning=None) -> AddRes
     return AddResult(text, language, added)
 
 
-def load_words(conn, learner_id: int, language: str) -> list[str]:
-    """This learner's words in this language, oldest first. Never anyone else's, never another language's."""
+GENERAL = 0        # in a list of set ids, 0 means the General set: the words that belong to no set of the learner's own
+
+
+def clean_set_ids(set_ids):
+    """None (all words) or a list of whole numbers (0 = General), at most 100, duplicates dropped; anything else is a caller bug."""
+    if set_ids is None:
+        return None
+    out = []
+    for value in list(set_ids)[:100]:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise VocabError("That set isn't valid.")
+        if value not in out:
+            out.append(value)
+    return out
+
+
+def load_words(conn, learner_id: int, language: str, set_ids=None) -> list[str]:
+    """This learner's words in this language, oldest first. Never anyone else's, never another language's.
+    `set_ids` None means every word; a list means only the words in those sets (0 = General). A set id that is not this
+    learner's matches nothing, because the learner id is part of the same query."""
     _check(learner_id, language)
+    wanted = clean_set_ids(set_ids)
+    sql, params = "SELECT word FROM tutor.words WHERE user_id = %s AND language = %s", [learner_id, language]
+    if wanted is not None:
+        sql += " AND ((set_id IS NULL AND %s) OR set_id = ANY(%s))"
+        params += [GENERAL in wanted, [i for i in wanted if i > 0]]
     with conn.cursor() as cur:
-        cur.execute("SELECT word FROM tutor.words WHERE user_id = %s AND language = %s ORDER BY id", (learner_id, language))
+        cur.execute(sql + " ORDER BY id", params)
         words = [row[0] for row in cur.fetchall()]
     conn.commit()
     return words

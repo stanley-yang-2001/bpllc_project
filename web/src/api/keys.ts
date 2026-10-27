@@ -3,3 +3,4 @@
 export const wordsKey = (userId: number, language: string, ...rest: (string | number)[]) =>
   ["words", userId, language, ...rest] as const;
 export const storiesKey = (userId: number, ...rest: (string | number)[]) => ["stories", userId, ...rest] as const;
+export const setsKey = (userId: number, language: string) => ["sets", userId, language] as const;

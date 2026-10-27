@@ -30,3 +30,20 @@ def save(conn, user_id: int, changes: dict) -> dict:
             values = [Json(v) if name == "custom_colors" and v is not None else v for name, v in changes.items()]
             cur.execute(f"UPDATE user_preferences SET {sets} WHERE user_id = %s", (*values, user_id))
     return get(conn, user_id)
+
+
+_NOT_NULLABLE = {"theme": "theme: cannot be empty", "ui_follows_study_language": "ui_follows_study_language: must be true or false",
+                 "chat_in_study_language": "chat_in_study_language: must be true or false"}
+
+
+def changes_from(sent: dict) -> dict:
+    """The columns to write for the fields a request actually sent. A field that may not be cleared refuses None; the colours may."""
+    from ..errors import validation_error
+    changes = {}
+    for key in _WRITABLE:
+        if key not in sent:
+            continue
+        if sent[key] is None and key in _NOT_NULLABLE:
+            raise validation_error(_NOT_NULLABLE[key])
+        changes[key] = sent[key]
+    return changes

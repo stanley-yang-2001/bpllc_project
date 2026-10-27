@@ -361,6 +361,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice/choices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Choices
+         * @description Multiple-choice cards from this learner's own words that have a meaning (nothing stored, no AI).
+         */
+        get: operations["choices_api_practice_choices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practice/cloze": {
         parameters: {
             query?: never;
@@ -396,6 +416,62 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/pronounce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pronounce */
+        post: operations["pronounce_api_pronounce_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sets */
+        get: operations["list_sets_api_sets_get"];
+        put?: never;
+        /** Create Set */
+        post: operations["create_set_api_sets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sets/{set_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Set
+         * @description Its words go back to General; none are deleted.
+         */
+        delete: operations["delete_set_api_sets__set_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Set */
+        patch: operations["rename_set_api_sets__set_id__patch"];
         trace?: never;
     };
     "/api/stories": {
@@ -475,6 +551,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Translate */
+        post: operations["translate_api_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/words": {
         parameters: {
             query?: never;
@@ -493,6 +586,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/words/define": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Define
+         * @description Writes meanings for up to 25 of the learner's words that have none and says how many are still without one, so the page
+         *     can ask again until it is 0. One model call per request.
+         */
+        post: operations["define_api_words_define_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/words/delete": {
         parameters: {
             query?: never;
@@ -504,6 +618,26 @@ export interface paths {
         put?: never;
         /** Delete Words */
         post: operations["delete_words_api_words_delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/words/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move Words
+         * @description Moves the learner's own words into one of their sets, or back to General. Words in another language than the set stay put.
+         */
+        post: operations["move_words_api_words_move_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -563,6 +697,8 @@ export interface components {
             message: string;
             /** Session Id */
             session_id: string;
+            /** Set Ids */
+            set_ids?: number[] | null;
         };
         /** ChatOut */
         ChatOut: {
@@ -572,6 +708,26 @@ export interface components {
             session_id: string;
             /** Tool Calls */
             tool_calls: components["schemas"]["ToolCallOut"][];
+        };
+        /** ChoiceOut */
+        ChoiceOut: {
+            /** Answer */
+            answer: string;
+            /** Choices */
+            choices: string[];
+            /** Direction */
+            direction: string;
+            /** Id */
+            id: number;
+            /** Prompt */
+            prompt: string;
+        };
+        /** ChoiceSet */
+        ChoiceSet: {
+            /** Items */
+            items: components["schemas"]["ChoiceOut"][];
+            /** Total */
+            total: number;
         };
         /** ClozeItem */
         ClozeItem: {
@@ -624,6 +780,20 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** DefineBody */
+        DefineBody: {
+            /** Ids */
+            ids?: number[] | null;
+            /** Language */
+            language: string;
+            /**
+             * Meaning Language
+             * @default en
+             */
+            meaning_language: string;
+            /** Set */
+            set?: string | null;
+        };
         /** DeleteBody */
         DeleteBody: {
             /** Ids */
@@ -667,6 +837,8 @@ export interface components {
             length?: number | null;
             /** Own Words */
             own_words?: number | null;
+            /** Set Ids */
+            set_ids?: number[] | null;
             /** Story Type */
             story_type?: string | null;
             /** Topic */
@@ -761,6 +933,13 @@ export interface components {
              */
             remove_key: boolean;
         };
+        /** MoveBody */
+        MoveBody: {
+            /** Ids */
+            ids: number[];
+            /** Set Id */
+            set_id?: number | null;
+        };
         /** PasswordChange */
         PasswordChange: {
             /** Current Password */
@@ -821,6 +1000,29 @@ export interface components {
             /** Native Language */
             native_language?: string | null;
         };
+        /** PronounceBody */
+        PronounceBody: {
+            /** Language */
+            language: string;
+            /** Texts */
+            texts: string[];
+        };
+        /** PronounceOut */
+        PronounceOut: {
+            /** Approximate */
+            approximate: boolean;
+            /** Items */
+            items: components["schemas"]["ReadingItem"][];
+            /** Kind */
+            kind: string;
+        };
+        /** ReadingItem */
+        ReadingItem: {
+            /** Reading */
+            reading: string | null;
+            /** Text */
+            text: string;
+        };
         /** RegisterBody */
         RegisterBody: {
             /** Accept Privacy */
@@ -847,6 +1049,8 @@ export interface components {
             language: string;
             /** Length */
             length?: number | null;
+            /** Model */
+            model?: string | null;
             /** Own Words */
             own_words?: number | null;
             /** Story Type */
@@ -864,6 +1068,38 @@ export interface components {
             ok?: boolean | null;
             /** Status */
             status?: string | null;
+        };
+        /** SetIn */
+        SetIn: {
+            /** Language */
+            language: string;
+            /** Name */
+            name: string;
+        };
+        /** SetList */
+        SetList: {
+            /** General Count */
+            general_count: number;
+            /** Items */
+            items: components["schemas"]["SetOut"][];
+            /** Total Count */
+            total_count: number;
+        };
+        /** SetOut */
+        SetOut: {
+            /** Count */
+            count: number;
+            /** Id */
+            id: number;
+            /** Language */
+            language: string;
+            /** Name */
+            name: string;
+        };
+        /** SetRename */
+        SetRename: {
+            /** Name */
+            name: string;
         };
         /** StatusOut */
         StatusOut: {
@@ -952,6 +1188,34 @@ export interface components {
             /** Output */
             output: string;
         };
+        /** TranslateBody */
+        TranslateBody: {
+            /** Language */
+            language: string;
+            /** Target Language */
+            target_language: string;
+            /** Texts */
+            texts: string[];
+            /**
+             * Words
+             * @default false
+             */
+            words: boolean;
+        };
+        /** TranslateOut */
+        TranslateOut: {
+            /** Items */
+            items: components["schemas"]["TranslationItem"][];
+            /** Target Language */
+            target_language: string;
+        };
+        /** TranslationItem */
+        TranslationItem: {
+            /** Text */
+            text: string;
+            /** Translation */
+            translation: string | null;
+        };
         /** UploadResult */
         UploadResult: {
             /** Added */
@@ -996,6 +1260,8 @@ export interface components {
             language: string;
             /** Meaning */
             meaning?: string | null;
+            /** Set Id */
+            set_id?: number | null;
             /** Word */
             word: string;
         };
@@ -1012,6 +1278,8 @@ export interface components {
             language: string;
             /** Meaning */
             meaning: string | null;
+            /** Set Id */
+            set_id?: number | null;
             /** Word */
             word: string;
         };
@@ -1626,6 +1894,40 @@ export interface operations {
             };
         };
     };
+    choices_api_practice_choices_get: {
+        parameters: {
+            query: {
+                language: string;
+                limit?: number;
+                direction?: string;
+                set?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChoiceSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cloze_api_practice_cloze_get: {
         parameters: {
             query: {
@@ -1662,6 +1964,7 @@ export interface operations {
             query: {
                 language: string;
                 limit?: number;
+                set?: string | null;
             };
             header?: never;
             path?: never;
@@ -1676,6 +1979,169 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlashcardSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pronounce_api_pronounce_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PronounceBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PronounceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sets_api_sets_get: {
+        parameters: {
+            query: {
+                language: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_set_api_sets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_set_api_sets__set_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_set_api_sets__set_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetOut"];
                 };
             };
             /** @description Validation Error */
@@ -1868,6 +2334,39 @@ export interface operations {
             };
         };
     };
+    translate_api_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TranslateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranslateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_words_api_words_get: {
         parameters: {
             query: {
@@ -1875,6 +2374,8 @@ export interface operations {
                 q?: string | null;
                 limit?: number;
                 offset?: number;
+                set?: string | null;
+                missing_meaning?: boolean;
             };
             header?: never;
             path?: never;
@@ -1935,6 +2436,39 @@ export interface operations {
             };
         };
     };
+    define_api_words_define_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefineBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_words_api_words_delete_post: {
         parameters: {
             query?: never;
@@ -1955,6 +2489,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    move_words_api_words_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

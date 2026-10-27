@@ -8,6 +8,7 @@ import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/Confirm";
 import { StoryReport } from "../components/StoryReport";
+import { StoryTools } from "../text/StoryTools";
 import { useToast } from "../components/Toast";
 import { useI18n } from "../i18n/I18nProvider";
 import { diffLabel, topicLabel, typeLabel } from "../i18n/labels";
@@ -25,6 +26,7 @@ function Opened({ id, languageName }: { id: number; languageName: string }) {
   return (
     <div className="mt-3 space-y-3">
       <p lang={story.data.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.data.body}</p>
+      <StoryTools text={story.data.body} language={story.data.language} id={`library-${id}`} />
       <StoryReport report={story.data.report} languageName={languageName} />
     </div>
   );

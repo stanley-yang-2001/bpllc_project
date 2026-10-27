@@ -23,6 +23,15 @@ export type StoryCard = Schemas["StoryCard"];
 export type FlashcardSet = Schemas["FlashcardSet"];
 export type ClozeSet = Schemas["ClozeSet"];
 export type ClozeItem = Schemas["ClozeItem"];
+export type WordSet = Schemas["SetOut"];
+export type Pronunciation = Schemas["PronounceOut"];
+export type Translation = Schemas["TranslateOut"];
+export type SetList = Schemas["SetList"];
+export type ChoiceSet = Schemas["ChoiceSet"];
+export type ChoiceCard = Schemas["ChoiceOut"];
+/** Which words to show or practise: every word, the General set, or one set by id (sent as "all", "general" or the number). */
+export type SetFilter = "all" | "general" | number;
+export interface DefineResult { defined: number; failed: number; remaining: number }
 
 /** Every non-2xx response from the API has the same body: {error: {code, message, retry_after?}}. */
 export class ApiError extends Error {
@@ -91,28 +100,42 @@ export const api = {
   logoutAll: () => request<void>("POST", "/auth/logout-all"),
   addLanguage: (language: string) => request<User>("POST", "/me/languages", { json: { language } }),
   languages: () => request<LanguageInfo[]>("GET", "/languages"),
-  words: (p: { language: string; q?: string; limit?: number; offset?: number }) =>
-    request<WordPage>("GET", `/words?${qs(p)}`),
-  addWord: (b: { language: string; word: string; meaning?: string }) => request<Word>("POST", "/words", { json: b }),
+  words: (p: { language: string; q?: string; limit?: number; offset?: number; set?: SetFilter; missing_meaning?: boolean }) =>
+    request<WordPage>("GET", `/words?${qs({ ...p, set: p.set === "all" ? undefined : p.set, missing_meaning: p.missing_meaning ? "true" : undefined })}`),
+  addWord: (b: { language: string; word: string; meaning?: string; set_id?: number | null }) => request<Word>("POST", "/words", { json: b }),
   editWord: (id: number, b: { word?: string; meaning?: string | null }) =>
     request<Word>("PATCH", `/words/${id}`, { json: b }),
   deleteWords: (ids: number[]) => request<{ deleted: number }>("POST", "/words/delete", { json: { ids } }),
+  sets: (language: string) => request<SetList>("GET", `/sets?${qs({ language })}`),
+  createSet: (b: { language: string; name: string }) => request<WordSet>("POST", "/sets", { json: b }),
+  renameSet: (id: number, name: string) => request<WordSet>("PATCH", `/sets/${id}`, { json: { name } }),
+  deleteSet: (id: number) => request<{ moved_to_general: number }>("DELETE", `/sets/${id}`),
+  /** set_id null = back to General */
+  moveWords: (ids: number[], set_id: number | null) => request<{ moved: number }>("POST", "/words/move", { json: { ids, set_id } }),
+  /** Asks the tutor to write meanings for up to 25 words with none; call again while `remaining` is above 0. */
+  defineWords: (b: { language: string; ids?: number[]; set?: SetFilter; meaning_language?: string }) =>
+    request<DefineResult>("POST", "/words/define", { json: { ...b, set: b.set === undefined ? undefined : String(b.set), meaning_language: b.meaning_language ?? "en" } }),
   uploadWords: (language: string, file: File) => {
     const form = new FormData();
     form.set("language", language);
     form.set("file", file);
     return request<UploadResult>("POST", "/words/upload", { form });
   },
-  chat: (b: { message: string; language: string; session_id: string }) => request<ChatReply>("POST", "/chat", { json: b }),
+  chat: (b: { message: string; language: string; session_id: string; set_ids?: number[] }) => request<ChatReply>("POST", "/chat", { json: b }),
   storyOptions: () => request<StoryOptions>("GET", "/stories/options"),
-  generateStory: (b: { language: string; story_type?: string; topic?: string } & DifficultyChoice) =>
+  generateStory: (b: { language: string; story_type?: string; topic?: string; set_ids?: number[] } & DifficultyChoice) =>
     request<GeneratedStory>("POST", "/stories/generate", { json: b }),
   saveStory: (b: { language: string; body: string; story_type?: string | null; topic?: string | null; model?: string | null } & DifficultyChoice) =>
     request<SavedStory>("POST", "/stories", { json: b }),
   stories: (p: { language?: string; limit?: number; offset?: number }) => request<StoryPage>("GET", `/stories?${qs(p)}`),
   story: (id: number) => request<SavedStory>("GET", `/stories/${id}`),
   deleteStory: (id: number) => request<void>("DELETE", `/stories/${id}`),
-  flashcards: (p: { language: string; limit?: number }) => request<FlashcardSet>("GET", `/practice/flashcards?${qs(p)}`),
+  flashcards: (p: { language: string; limit?: number; set?: SetFilter }) =>
+    request<FlashcardSet>("GET", `/practice/flashcards?${qs({ ...p, set: p.set === "all" ? undefined : p.set })}`),
+  choices: (p: { language: string; limit?: number; direction?: "meaning" | "word"; set?: SetFilter }) =>
+    request<ChoiceSet>("GET", `/practice/choices?${qs({ ...p, set: p.set === "all" ? undefined : p.set })}`),
   cloze: (storyId: number) => request<ClozeSet>("GET", `/practice/cloze?story_id=${storyId}`),
+  pronounce: (b: { language: string; texts: string[] }) => request<Pronunciation>("POST", "/pronounce", { json: b }),
+  translate: (b: { language: string; target_language: string; texts: string[]; words?: boolean }) => request<Translation>("POST", "/translate", { json: b }),
   health: () => request<Health>("GET", "/health"),
 };

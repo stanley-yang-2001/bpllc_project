@@ -13,6 +13,16 @@ import jwt
 from .errors import AppError
 
 MAX_PASSWORD_BYTES = 72          # bcrypt silently ignores anything after byte 72, so we reject instead
+MIN_PASSWORD_CHARS = 8
+
+
+def check_password_rules(v: str) -> str:
+    """The rules a new password must meet (sign-up and the account page share them)."""
+    if len(v) < MIN_PASSWORD_CHARS:
+        raise ValueError(f"must be at least {MIN_PASSWORD_CHARS} characters")
+    if len(v.encode()) > MAX_PASSWORD_BYTES:
+        raise ValueError(f"must be at most {MAX_PASSWORD_BYTES} bytes")
+    return v
 LOCK_AFTER = 5
 LOCK_WINDOW_SECONDS = 15 * 60
 

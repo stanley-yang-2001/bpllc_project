@@ -1,33 +1,63 @@
-# Workflow Diagram — Language Tutor with Langflow
+# Workflow Diagram — Language Tutor
+
+*Rewritten 27 October 2026. Two workflows now exist: a chat message through the Langflow Agent, and the direct
+requests the pages make.*
+
+## 1. A chat message (Agent path)
 
 ```mermaid
 flowchart TD
-    A[Learner sends chat message] --> B[Language Agent receives message<br/>Groq gpt-oss-120b]
-    B --> C{Agent decides intent}
+    A[Learner sends a chat message<br/>Chat page, optional set choice] --> B[POST /api/chat<br/>cookie gives the learner id, never the body]
+    B --> B1[AiGate slot: reserve tokens]
+    B1 --> B2[Record the Langflow session id in chat_sessions]
+    B2 --> B3[Read the chat-language preference]
+    B3 --> C[LangflowClient runs the flow<br/>hidden inputs: user id, language, set ids]
+    C --> D{Agent decides intent}
+    D -->|add a word| E[Add Word tool: insert into words, tutor_tools role]
+    D -->|story| F[Story Generator Tool: tutor_core generate_story]
+    D -->|other| G[Agent answers itself]
+    E --> Z
+    F --> Z
+    G --> Z[Tool Result Relay returns the tool output exactly,<br/>or the Agent's own text]
+    Z --> H[API parses reply and tool calls, settles the token count]
+    H --> I[Chat page shows the reply, a tool chip, and for a story:<br/>Save, Listen, Pronunciation, Translate]
+```
 
-    C -->|"add word" request| D[Call Add Word tool]
-    C -->|"story" request| E[Call Story Generator Tool]
+## 2. A story from Story Studio (direct path)
 
-    D --> D1[Add Word inserts word into Postgres words table]
-    D1 --> D2[Return confirmation to Language Agent]
-    D2 --> Z[Tool Result Relay swaps in the tool output unchanged,<br/>Chat Output shows it]
+```mermaid
+flowchart TD
+    A[Learner picks kind, topic, difficulty, sets] --> B[POST /api/stories/generate]
+    B --> C{Language on? Kind and topic valid? 5 words or more?}
+    C -->|no| X[Error shown on the page]
+    C -->|yes| D[AiRunner chooses: stub, own model, shared model]
+    D --> E[AiGate slot and token reservation]
+    E --> F[tutor_core generate_story:<br/>prompt, model call, language retry, length retry]
+    F --> G[quality.report on the learner's whole list]
+    G --> H[Page shows the story and the report]
+    H --> I{Save?}
+    I -->|yes| J[POST /api/stories: report rebuilt on the server, saved to the Library]
+    I -->|no| K[Nothing stored]
+    H --> T[Listen, Pronunciation, Translate: optional, nothing stored]
+```
 
-    E --> E0{Fresh cache entry for this language?}
-    E0 -->|Yes| E7[Return cached result]
-    E0 -->|No| E1[Load all known words from Postgres]
-    E1 --> E2{Vocabulary empty?}
-    E2 -->|Yes| E3[Return 'add words first' message]
-    E2 -->|No| E4[Build prompt: random narration or dialogue template]
-    E4 --> E5[Call Groq gpt-oss-120b<br/>retry on 429]
-    E5 --> E6[Strip hidden plan at ===STORY===]
-    E6 --> E8[Cache result and return passage]
-    E7 --> Z
-    E3 --> Z
-    E8 --> Z
+## 3. Words, practice and text tools (direct path)
+
+```mermaid
+flowchart LR
+    V[Vocabulary page] -->|add, edit, delete, move, upload CSV| W["/api/words, /api/sets"]
+    V -->|Write missing meanings, 25 per call| D["/api/words/define"]
+    D --> AR[AiRunner and AiGate] --> M[Model]
+    P[Practice page] -->|flashcards, choices, blanks| PR["/api/practice/*"]
+    PR --> DB[(Postgres)]
+    W --> DB
+    T[Pronunciation and Translate buttons] --> TX["/api/pronounce, /api/translate"]
+    TX -->|zh, ja, ko readings| LIB[pypinyin, pykakasi, korean-romanizer]
+    TX -->|IPA, translation| AR
+    S[Read aloud] --> BE[Browser speech engine, no server call]
 ```
 
 **Notes**
-- This traces one full round-trip of a chat message, matching Stories 3, 4, 5, and 6 from `OVERVIEW.md`.
-- Everything inside the `E` branch runs inside one component (`story_tool.py`), because Langflow's Tool Mode returns only the tool's own output.
-- The `E2` branch is the "vocabulary empty" guard called out in Story 5's acceptance criteria.
-- Step 9 fix: the Agent sometimes shortened or reworded the tool's result. The Tool Result Relay (`tool_result_relay.py`) now replaces the Agent's reply with the tool's exact output at node Z; without a tool call, the Agent's own text passes through. See `CHANGELOG.md`.
+- The Agent path exists so the chat can add words and write stories in conversation; every other feature uses the direct path because it is faster and gives exact controls.
+- The "vocabulary empty" guard (Story 5) and the Tool Result Relay (Step 9 fix) still apply on the chat path; the Studio has its own 5-word minimum.
+- Nothing from reading, pronunciation or translation is stored; meanings are stored only when the learner asks for them to be written.

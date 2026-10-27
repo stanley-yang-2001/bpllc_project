@@ -41,6 +41,15 @@ HIDDEN = {
 }
 
 
+# Hidden inputs of one node only: the sets of words the learner chose for a chat story (comma-separated ids, 0 = General).
+STORY_NODE = "StoryGeneratorTool-RQpvc"
+STORY_ONLY_HIDDEN = {
+    "set_ids": ("Word sets (hidden)",
+                "Set per request by the API through tweaks: the ids of the learner's word sets to use for a story, separated by commas "
+                "(0 is the General set). Blank means all of the learner's words."),
+}
+
+
 # (display name, info) of the extra VISIBLE inputs of a node, in the order they follow `language`; they must match the
 # MessageTextInput definitions in the component (api/tests/test_flow_file.py compares them with the component's source).
 VISIBLE = {
@@ -77,7 +86,7 @@ def tool_arg(display, info):
 
 def hidden_field(name):
     """A hidden text field in the format Langflow 1.12.2 generates for `StrInput(advanced=True, tool_mode=False)`."""
-    display, info = HIDDEN[name]
+    display, info = {**HIDDEN, **STORY_ONLY_HIDDEN}[name]
     return {
         "_input_type": "StrInput", "advanced": True, "api_editable": False, "display_name": display, "dynamic": False,
         "info": info, "list": False, "list_add_label": "Add More", "load_from_db": False, "name": name, "override_skip": False,
@@ -153,7 +162,7 @@ def sync(flow, write=True):
                     problems.append(f"{node_id}: the tool's argument list is missing or differs for {name}")
                     if write:
                         tool.setdefault("args", {})[name] = tool_arg(display, info)
-        for name in HIDDEN:
+        for name in (list(HIDDEN) + (list(STORY_ONLY_HIDDEN) if node_id == STORY_NODE else [])):
             if node["template"].get(name) != hidden_field(name):
                 problems.append(f"{node_id}: hidden field {name} is missing or differs")
                 if write:

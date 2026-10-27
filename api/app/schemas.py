@@ -38,7 +38,21 @@ class WordOut(BaseModel):
     language: str
     word: str
     meaning: str | None
+    set_id: int | None = None          # null: the General set
     created_at: datetime
+
+
+class SetOut(BaseModel):
+    id: int
+    language: str
+    name: str
+    count: int
+
+
+class SetList(BaseModel):
+    items: list[SetOut]
+    general_count: int
+    total_count: int
 
 
 class WordPage(BaseModel):
@@ -160,6 +174,19 @@ class FlashcardOut(BaseModel):
 
 class FlashcardSet(BaseModel):
     items: list[FlashcardOut]
+    total: int
+
+
+class ChoiceOut(BaseModel):
+    id: int
+    prompt: str
+    answer: str
+    choices: list[str]
+    direction: str
+
+
+class ChoiceSet(BaseModel):
+    items: list[ChoiceOut]
     total: int
 
 

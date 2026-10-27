@@ -746,5 +746,563 @@
    "backlog",
    "release"
   ]
+ },
+ {
+  "title": "Vocabulary sets (general plus your own)",
+  "status": "In review",
+  "area": "vocabulary",
+  "date": "2026-10-26",
+  "summary": "Learners group words into named sets; the original list is the General set.",
+  "done": [
+   "Migration 0012 and API for create, rename, delete, move",
+   "Vocabulary tabs, move menu, set column",
+   "Tests (API and web)"
+  ],
+  "todo": [
+   "Run on your machine and confirm"
+  ],
+  "labels": [
+   "vocabulary",
+   "feature"
+  ]
+ },
+ {
+  "title": "Choose sets for stories in Studio and Chat",
+  "status": "In review",
+  "area": "stories",
+  "date": "2026-10-26",
+  "summary": "Tick which sets feed a story; General is always available.",
+  "done": [
+   "set_ids through API, tutor_core and the chat story tool",
+   "Pickers in Studio and Chat",
+   "Flow re-synced"
+  ],
+  "todo": [
+   "Restart langflow and try a chat story from one set"
+  ],
+  "labels": [
+   "stories",
+   "chat",
+   "feature"
+  ]
+ },
+ {
+  "title": "Multiple choice practice",
+  "status": "In review",
+  "area": "practice",
+  "date": "2026-10-26",
+  "summary": "Four options per question from the learner's own words with meanings.",
+  "done": [
+   "GET /practice/choices, both directions, optional set",
+   "Practice card and tests"
+  ],
+  "todo": [
+   "Try it on your machine"
+  ],
+  "labels": [
+   "practice",
+   "feature"
+  ]
+ },
+ {
+  "title": "Tutor-written meanings",
+  "status": "In review",
+  "area": "vocabulary",
+  "date": "2026-10-26",
+  "summary": "The model writes meanings for new words and for every word without one.",
+  "done": [
+   "POST /words/define in batches of 25",
+   "Tick box when adding, Write missing meanings button"
+  ],
+  "todo": [
+   "Try with Groq on your machine"
+  ],
+  "labels": [
+   "vocabulary",
+   "ai",
+   "feature"
+  ]
+ },
+ {
+  "title": "Translate vocabulary and stories between two languages",
+  "status": "In review",
+  "area": "translate",
+  "date": "2026-10-26",
+  "summary": "Translate a word list entry or a story into another language, in chat, Library and Vocabulary.",
+  "done": [
+   "POST /api/translate and tutor_core.translation",
+   "TranslateBox on Vocabulary (selected words) and on stories in Studio, Library and Chat",
+   "Tests (core, API, web)"
+  ],
+  "todo": [
+   "Try on your machine with Groq in two language pairs",
+   "Check the privacy policy wording covers translated text"
+  ],
+  "labels": [
+   "translation",
+   "feature"
+  ]
+ },
+ {
+  "title": "Pronunciation guides (IPA, pinyin, romaji, romanization)",
+  "status": "In review",
+  "area": "pronunciation",
+  "date": "2026-10-26",
+  "summary": "Show how a word or story is read: IPA for English and other alphabetic languages, pinyin for Chinese, romaji and kana for Japanese, romanization for Korean.",
+  "done": [
+   "pinyin, romaji and Korean romanization from libraries",
+   "IPA written by the model for the six alphabetic languages",
+   "Show pronunciation on Vocabulary and on stories",
+   "Tests (core, API, web)"
+  ],
+  "todo": [
+   "Rebuild the API image",
+   "Check a few IPA lines from Groq",
+   "Decide whether to add a reviewed IPA dictionary later"
+  ],
+  "labels": [
+   "pronunciation",
+   "feature"
+  ]
+ },
+ {
+  "title": "Read aloud (text to speech)",
+  "status": "In review",
+  "area": "speech",
+  "date": "2026-10-26",
+  "summary": "A button to hear a word or a story in the study language.",
+  "done": [
+   "speak.ts: voice choice, chunking, slow rate, stop",
+   "SpeakButton on Vocabulary, flashcards, multiple choice, Studio, Library, Chat",
+   "11 tests with a fake speech engine"
+  ],
+  "todo": [
+   "Try it in your browser with each language you study",
+   "Decide whether to mention online voices in the privacy policy"
+  ],
+  "labels": [
+   "speech",
+   "accessibility",
+   "feature"
+  ]
+ },
+ {
+  "title": "SOLID refactor of the new and existing code",
+  "status": "In review",
+  "area": "architecture",
+  "date": "2026-10-27",
+  "summary": "Apply single-responsibility, open/closed and dependency-inversion where there was a real reason, without changing behaviour.",
+  "done": [
+   "AiRunner with model-source classes replaces four copies of the same choice",
+   "Thin routes; use cases in services; me.py split into public, account, me",
+   "langflow, quality and prompts split into packages behind the same names",
+   "Vocabulary, Practice and Settings pages split into small components",
+   "Suites green: core 334, API 869, root 91, web 269"
+  ],
+  "todo": [
+   "Apply patches 0026 to 0030 and rebuild",
+   "Re-run difficulty_check.py --show and the routing matrix on your machine"
+  ],
+  "labels": [
+   "architecture",
+   "refactor"
+  ]
+ },
+ {
+  "title": "Update the docs diagrams and add class diagrams",
+  "status": "In review",
+  "area": "documentation",
+  "date": "2026-10-27",
+  "summary": "Rewrite the architecture, use-case, concept, workflow and state diagrams for the current site; add back-end and front-end class diagrams and a database diagram.",
+  "done": [
+   "architecture, use case, concept map, workflow and state diagrams rewritten",
+   "class-diagram-backend.md (6 diagrams) and class-diagram-frontend.md (7 diagrams)",
+   "class-diagram.md is now an index plus the Langflow components",
+   "All 26 Mermaid blocks in docs/ render",
+   "Each class diagram ends with a ranked list of further splits"
+  ],
+  "todo": [
+   "Read the diagrams and check them against your own picture of the system",
+   "Run the card script to add the split cards below"
+  ],
+  "labels": [
+   "documentation",
+   "architecture"
+  ]
+ },
+ {
+  "title": "B1: Move the story-making use case out of the stories route",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "routes/stories.py holds the whole generate flow and the request models. Move the flow to services/story_generation.py and the models to schemas so the route only calls it.",
+  "done": [],
+  "todo": [
+   "Create services/story_generation.py with generate(user, request, runner)",
+   "Move GenerateIn, SaveIn and DifficultyIn to schemas",
+   "Keep the 869 API tests green; add tests for the service without HTTP"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B2: One set-filter clause instead of three copies",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "The same all/general/set-id SQL clause is written in vocab.list_words, vocab.words_without_meaning and practice._set_clause.",
+  "done": [],
+  "todo": [
+   "Add word_sets.filter_clause(set_filter)",
+   "Use it in the three places",
+   "Add one test for the clause (all, general, id, bad value)"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "dry"
+  ]
+ },
+ {
+  "title": "B3: Move the chat turn out of the chat route; give the chat client an interface",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "routes/chat.py holds the gate slot, session record, preference read and reply language, and reads calls_ai and stores_chat with getattr.",
+  "done": [],
+  "todo": [
+   "Add services/chat_turn.py",
+   "Add a ChatClient Protocol with calls_ai and stores_chat as real attributes",
+   "Make NoStoredChat, LangflowClient, StubChat and NotReadyChat satisfy it"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B4: Move the own-model settings logic out of the model route",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "routes/model.py does the test, save and remove steps with encryption and the address check inline.",
+  "done": [],
+  "todo": [
+   "Add services/model_settings.py",
+   "Keep the route to validation and the answer",
+   "Route the Test call through AiRunner's limiter rules if it fits"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B5: Split user_model.py into address guard, pinned HTTP, client and rate limit",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "services/user_model.py (160 lines) has four jobs: the SSRF address check, the pinned connections, the chat-completions call and the request limiter.",
+  "done": [],
+  "todo": [
+   "Create model_address.py, pinned_http.py, model_client.py, rate_limit.py",
+   "Keep user_model.py as a facade so imports and tests still work",
+   "Keep the security tests (private addresses, redirects) unchanged"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid",
+   "security"
+  ]
+ },
+ {
+  "title": "B6: Split vocab.py: CSV import and meaning helpers",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "services/vocab.py (172 lines) mixes word CRUD, meaning filling, CSV parsing and bulk insert.",
+  "done": [],
+  "todo": [
+   "Move parse_csv and bulk_add to csv_import.py",
+   "Move words_without_meaning and fill_meanings to meanings.py",
+   "Keep a facade for old imports"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B7: Turn practice.py into a practice package",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "services/practice.py (192 lines) holds flashcards, multiple choice and fill-in-the-blank. Each mode gets its own module so a new mode is a new file.",
+  "done": [],
+  "todo": [
+   "Create practice/flashcards.py, choices.py, cloze.py and a shared set clause",
+   "Re-export from practice/__init__.py"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B8: Split schemas.py by area",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "schemas.py (204 lines, 29 models) is one file for every response model.",
+  "done": [],
+  "todo": [
+   "Create schemas/user.py, words.py, stories.py, practice.py, system.py",
+   "Re-export from schemas/__init__.py",
+   "Regenerate web/openapi.json and schema.d.ts and check the diff is empty (npm run gen:api)"
+  ],
+  "labels": [
+   "backend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B9: Break up generate_story in tutor_core",
+  "status": "Backlog",
+  "area": "tutor-core",
+  "date": "2026-10-27",
+  "summary": "generate_story has 12 parameters and 82 lines: gate, cache, load, prompt, model call and two retry policies. _better_try reads the private difficulty._UNSPACED.",
+  "done": [],
+  "todo": [
+   "Extract a StoryCache class",
+   "Extract the language and length retries into a RetryPolicy",
+   "Add a StoryRequest dataclass for the parameters",
+   "Make the unspaced-language fact public in difficulty"
+  ],
+  "labels": [
+   "tutor-core",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B10: Turn check_passage into a list of small rules",
+  "status": "Backlog",
+  "area": "tutor-core",
+  "date": "2026-10-27",
+  "summary": "quality/passage.check_passage is the longest function in the repo (118 lines, 12 parameters). Each rule becomes a function; a runner combines them.",
+  "done": [],
+  "todo": [
+   "Extract structure, format, length and vocabulary rules",
+   "Keep the report's output shape identical (the rescore tests compare it)"
+  ],
+  "labels": [
+   "tutor-core",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "B11: One parser for Langflow tool output",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "custom_components/tool_result_relay.py and api/app/services/langflow/reply.py each parse a tool's recorded output with their own copy of output_to_text and the block walker.",
+  "done": [],
+  "todo": [
+   "Create tutor_core/tool_output.py",
+   "Use it in both places",
+   "Run sync_flow_nodes.py to update the flow and rebuild the langflow image",
+   "Re-run the routing matrix on your machine"
+  ],
+  "labels": [
+   "backend",
+   "langflow",
+   "refactor",
+   "dry"
+  ]
+ },
+ {
+  "title": "B12: Split security.py and difficulty.py into packages",
+  "status": "Backlog",
+  "area": "backend",
+  "date": "2026-10-27",
+  "summary": "security.py mixes password hashing, tokens and the login guard; difficulty.py mixes presets, the prompt note and measuring.",
+  "done": [],
+  "todo": [
+   "security/: passwords.py, tokens.py, login_guard.py",
+   "difficulty/: presets.py, measure.py, evaluate.py",
+   "Facades keep old imports working"
+  ],
+  "labels": [
+   "backend",
+   "tutor-core",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "F1: Split the API client by area",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "web/src/api/client.ts is one object with 43 calls, so every page depends on all of them.",
+  "done": [],
+  "todo": [
+   "Create api/words.ts, stories.ts, account.ts, practice.ts, text.ts, chat.ts, model.ts",
+   "Keep exporting the same api object",
+   "Keep the 269 web tests green"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "F2: Split Story Studio",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "Studio.tsx (232 lines) has 10 states, 5 queries and mutations, the difficulty presets and the custom-kind logic.",
+  "done": [],
+  "todo": [
+   "studio/OptionsForm, DifficultyPicker, GeneratedStory",
+   "useStoryGeneration hook",
+   "Studio.test.tsx must pass unchanged"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "F3: Split the Login page into LoginForm and RegisterForm",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "Login.tsx (187 lines) holds two forms and their field helpers.",
+  "done": [],
+  "todo": [
+   "auth/LoginForm, RegisterForm, fields.tsx",
+   "The page only picks the tab"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "F4: Serve the difficulty sizes from the API",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "The Easy, Medium and Hard numbers and limits are written in Studio.tsx and again in tutor_core/difficulty.py.",
+  "done": [],
+  "todo": [
+   "Add presets and limits to GET /api/stories/options",
+   "Read them in Studio",
+   "Add an API test and a web test"
+  ],
+  "labels": [
+   "frontend",
+   "backend",
+   "dry"
+  ]
+ },
+ {
+  "title": "F5: Split the Chat page",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "Chat.tsx (153 lines) holds the message list, the composer, the retry and the story-save button.",
+  "done": [],
+  "todo": [
+   "chat/MessageList, Composer, SaveStory",
+   "Fix: retry should use the sets ticked now, not the sets of the first send"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "F6: One StoryMeta component for kind, topic and difficulty",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "Studio and Library both render a story's kind, topic and difficulty with the same three label helpers.",
+  "done": [],
+  "todo": [
+   "components/StoryMeta",
+   "Use it in Studio and Library"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "dry"
+  ]
+ },
+ {
+  "title": "F7: Split the message table by area",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "i18n/messages.ts is one 471-line table for the whole site.",
+  "done": [],
+  "todo": [
+   "i18n/messages/ with common, vocab, studio, practice, settings, chat and auth",
+   "Merge in an index; keep the compile-time check for a missing translation"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "i18n"
+  ]
+ },
+ {
+  "title": "F8: Separate saving from holding in PreferencesProvider",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "PreferencesProvider.tsx (162 lines) holds the value, debounces saves, retries and writes the device copy.",
+  "done": [],
+  "todo": [
+   "useSavedPreferences hook for debounce, retry and device copy",
+   "The provider only holds and shares the value"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "solid"
+  ]
+ },
+ {
+  "title": "F9: Split Library and Privacy into parts",
+  "status": "Backlog",
+  "area": "frontend",
+  "date": "2026-10-27",
+  "summary": "Library.tsx (129 lines) holds the list, row, opened story and delete flow; Privacy.tsx (131 lines) holds a block renderer.",
+  "done": [],
+  "todo": [
+   "library/StoryRow, OpenedStory",
+   "privacy/PolicyBlocks"
+  ],
+  "labels": [
+   "frontend",
+   "refactor",
+   "solid"
+  ]
  }
 ]

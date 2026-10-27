@@ -47,7 +47,7 @@ class StubChat(NoStoredChat):
     def __init__(self, get_pool):
         self._get_pool = get_pool
 
-    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None) -> ChatResult:
+    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None) -> ChatResult:
         match = _ADD.search(message)
         if match:
             return self._add_word(user_id, language, match.group(1))

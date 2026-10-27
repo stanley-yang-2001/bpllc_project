@@ -10,18 +10,10 @@ from ..emails import normalize_email, validate_email
 from ..errors import AppError
 from ..policy import POLICY_VERSION
 from ..schemas import UserOut
-from ..security import MAX_PASSWORD_BYTES, create_token, hash_password, new_salt, verify_password
+from ..security import check_password_rules, create_token, hash_password, new_salt, verify_password
 from ..services import sessions, users
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-def check_password_rules(v: str) -> str:
-    if len(v) < 8:
-        raise ValueError("must be at least 8 characters")
-    if len(v.encode()) > MAX_PASSWORD_BYTES:
-        raise ValueError(f"must be at most {MAX_PASSWORD_BYTES} bytes")
-    return v
 
 
 class RegisterBody(BaseModel):

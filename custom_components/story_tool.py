@@ -90,6 +90,15 @@ class StoryGeneratorTool(Component):
             advanced=True,
             tool_mode=False,
         ),
+        StrInput(
+            name="set_ids",
+            display_name="Word sets (hidden)",
+            info="Set per request by the API through tweaks: the ids of the learner's word sets to use for a story, separated by commas "
+                 "(0 is the General set). Blank means all of the learner's words.",
+            value="",
+            advanced=True,
+            tool_mode=False,
+        ),
     ]
 
     outputs = [
@@ -98,6 +107,6 @@ class StoryGeneratorTool(Component):
 
     def run(self) -> Message:
         message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,
-                                               self.story_type, self.topic, self.difficulty))
+                                               self.story_type, self.topic, self.difficulty, set_ids=self.set_ids))
         self.status = message
         return message

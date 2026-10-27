@@ -221,3 +221,43 @@ def test_a_one_character_word_is_not_blanked_inside_a_longer_chinese_word():
     import random
     assert routes_service.make_cloze("我喜欢吃面包和水果。", "zh", {"面": "noodle"}, random.Random(1)) == []
     assert routes_service.make_cloze("我喜欢吃面包和水果。", "zh", {"面包": "bread"}, random.Random(1))[0]["answer"] == "面包"
+
+
+# --- multiple choice ------------------------------------------------------------------------------------------
+
+def test_choice_cards_show_a_word_with_four_meanings_one_of_them_right(make_user):
+    c = learner(make_user)
+    body = c.get("/api/practice/choices?language=en&limit=50").json()
+    assert len(body["items"]) == len(WORDS) and body["total"] == len(WORDS)
+    for item in body["items"]:
+        assert set(item) == {"id", "prompt", "answer", "choices", "direction"} and item["direction"] == "meaning"
+        assert WORDS[item["prompt"]] == item["answer"] and item["answer"] in item["choices"]
+        assert len(item["choices"]) == 4 and len(set(item["choices"])) == 4 and set(item["choices"]) <= set(WORDS.values())
+
+
+def test_choice_cards_can_ask_the_other_way_round(make_user):
+    c = learner(make_user)
+    for item in c.get("/api/practice/choices?language=en&direction=word").json()["items"]:
+        assert item["prompt"] in WORDS.values() and WORDS[item["answer"]] == item["prompt"] and set(item["choices"]) <= set(WORDS)
+    assert c.get("/api/practice/choices?language=en&direction=sideways").status_code == 422
+
+
+def test_choice_cards_never_repeat_the_same_meaning_twice_and_need_two_words(make_user):
+    c = learner(make_user, words={"alpha": "same", "beta": "same", "gamma": "other"})
+    for item in c.get("/api/practice/choices?language=en").json()["items"]:
+        assert len({x.casefold() for x in item["choices"]}) == len(item["choices"]) and item["answer"] in item["choices"]
+    one = learner(make_user, "bob", {"solo": "alone"})
+    assert one.get("/api/practice/choices?language=en").json() == {"items": [], "total": 1}
+
+
+def test_choice_cards_use_only_this_learners_words_and_the_chosen_set(make_user):
+    alice = learner(make_user)
+    learner(make_user, "bob", {"secret": "bobs word", "other": "bobs other"})
+    sid = alice.post("/api/sets", json={"language": "en", "name": "Food"}).json()["id"]
+    alice.post("/api/words/move", json={"ids": [w["id"] for w in alice.get("/api/words?language=en").json()["items"] if w["word"] in ("water", "bread", "house")], "set_id": sid})
+    everything = alice.get("/api/practice/choices?language=en&limit=50").json()
+    assert "bobs word" not in str(everything)
+    food = alice.get(f"/api/practice/choices?language=en&limit=50&set={sid}").json()
+    assert sorted(i["prompt"] for i in food["items"]) == ["bread", "house", "water"]
+    general = alice.get("/api/practice/flashcards?language=en&limit=50&set=general").json()
+    assert sorted(i["word"] for i in general["items"]) == ["friend", "goodbye", "hello"]

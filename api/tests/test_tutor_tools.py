@@ -340,3 +340,9 @@ def test_anything_but_easy_medium_or_hard_means_no_tier(conn, make_learner, aske
     g = Groq()
     story_asked_for(groq=g, difficulty=asked)
     assert "Difficulty (this overrides" not in g.prompts[0]
+
+
+def test_story_for_agent_reads_the_sets_the_api_chose_and_ignores_anything_else():
+    from tutor_core.tools import _set_ids
+    assert _set_ids("0,3") == [0, 3] and _set_ids(" 5 ") == [5] and _set_ids("") is None and _set_ids(None) is None
+    assert _set_ids("a,1") is None and _set_ids("1;2") is None and _set_ids("-1") is None and _set_ids(",".join(["1"] * 101)) is None

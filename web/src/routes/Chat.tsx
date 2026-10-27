@@ -8,7 +8,9 @@ import { useAuth } from "../auth/AuthContext";
 import { MAX_CHARS, SLOW_AFTER_MS, useChat } from "../chat/ChatContext";
 import { ToolTrace } from "../chat/ToolTrace";
 import { useToast } from "../components/Toast";
+import { StoryTools } from "../text/StoryTools";
 import { useI18n } from "../i18n/I18nProvider";
+import { nothingTicked, SetPicker, setIdsToSend, type SetChoice } from "../components/SetPicker";
 import { Badge, Button, Card, EmptyState, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
 
 const STORY_TOOL = "Story Generator Tool";
@@ -54,14 +56,16 @@ export default function Chat() {
   const { t, code } = useI18n();
   const { messages, sending, send, retry, newChat } = useChat();
   const [text, setText] = useState("");
+  const [sets, setSets] = useState<SetChoice>(null);       // null = every set (General always among them)
   const end = useRef<HTMLDivElement>(null);
   const name = info(active)?.native ?? active;
 
+  useEffect(() => { setSets(null); }, [active]);
   useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [messages, sending]);
 
   const submit = () => {
-    if (!text.trim() || sending) return;
-    send(text, active);
+    if (!text.trim() || sending || nothingTicked(sets)) return;
+    send(text, active, setIdsToSend(sets));
     setText("");
   };
 
@@ -94,7 +98,7 @@ export default function Chat() {
                 {m.error && (
                   <div className="flex flex-col items-end">
                     <ErrorText>{code(m.errorCode, m.error)}</ErrorText>
-                    <Button variant="ghost" className="mt-1" icon={<RotateCcw aria-hidden className="size-4" />} onClick={() => retry(m.id, active)} disabled={sending}>
+                    <Button variant="ghost" className="mt-1" icon={<RotateCcw aria-hidden className="size-4" />} onClick={() => retry(m.id, active, setIdsToSend(sets))} disabled={sending}>
                       {t("common.tryAgain")}
                     </Button>
                   </div>
@@ -106,7 +110,7 @@ export default function Chat() {
                 <div className="max-w-[85%] self-stretch">
                   <ToolTrace calls={m.toolCalls} />
                   {m.language && m.toolCalls.filter((c) => c.name === STORY_TOOL && !c.failed && c.output.trim() && !NOT_A_STORY.test(c.output)).map((c, i) => (
-                    <SaveStory key={i} call={c} language={m.language!} />
+                    <div key={i} className="mt-2 space-y-2"><StoryTools text={c.output} language={m.language!} id={`chat-${m.id}-${i}`} /><SaveStory call={c} language={m.language!} /></div>
                   ))}
                 </div>
               </div>
@@ -117,6 +121,7 @@ export default function Chat() {
         </div>
 
         <div>
+          <div className="mb-3"><SetPicker language={active} value={sets} onChange={setSets} idPrefix="chat-set" /></div>
           <label htmlFor="chat-message" className="sr-only">{t("chat.message")}</label>
           <div className="flex items-end gap-2">
             <textarea
@@ -135,7 +140,7 @@ export default function Chat() {
                 }
               }}
             />
-            <Button onClick={submit} disabled={sending || !text.trim()} icon={<SendHorizontal aria-hidden className="size-4" />}>
+            <Button onClick={submit} disabled={sending || !text.trim() || nothingTicked(sets)} icon={<SendHorizontal aria-hidden className="size-4" />}>
               {t("common.send")}
             </Button>
           </div>

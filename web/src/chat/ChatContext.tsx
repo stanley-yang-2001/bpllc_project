@@ -19,8 +19,8 @@ export interface ChatMessage {
 interface Value {
   messages: ChatMessage[];
   sending: boolean;
-  send: (text: string, language: string) => void;
-  retry: (id: number, language: string) => void;
+  send: (text: string, language: string, setIds?: number[]) => void;
+  retry: (id: number, language: string, setIds?: number[]) => void;
   newChat: () => void;
 }
 const Ctx = createContext<Value | null>(null);
@@ -51,11 +51,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   chatRef.current = chatCall.mutateAsync;
 
   const run = useCallback(
-    async (id: number, text: string, language: string) => {
+    async (id: number, text: string, language: string, setIds?: number[]) => {
       busy.current = true;
       setSending(true);
       try {
-        const r = await chatRef.current({ message: text, language, session_id: session.current });
+        const r = await chatRef.current({ message: text, language, session_id: session.current, ...(setIds ? { set_ids: setIds } : {}) });
         setMessages((m) => [
           ...m.map((x) => (x.id === id ? { ...x, error: undefined, errorCode: undefined } : x)),
           { id: nextId.current++, role: "tutor", text: r.reply, toolCalls: r.tool_calls, language },
@@ -77,23 +77,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   const send = useCallback(
-    (raw: string, language: string) => {
+    (raw: string, language: string, setIds?: number[]) => {
       const text = raw.trim();
       if (!text || busy.current) return;
       const id = nextId.current++;
       setMessages((m) => [...m, { id, role: "user", text, toolCalls: [] }]);
-      void run(id, text, language);
+      void run(id, text, language, setIds);
     },
     [run],
   );
 
   const retry = useCallback(
-    (id: number, language: string) => {
+    (id: number, language: string, setIds?: number[]) => {
       if (busy.current) return;
       const original = messages.find((m) => m.id === id);
       if (!original) return;
       setMessages((m) => m.map((x) => (x.id === id ? { ...x, error: undefined } : x)));
-      void run(id, original.text, language);
+      void run(id, original.text, language, setIds);
     },
     [messages, run],
   );

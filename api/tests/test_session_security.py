@@ -146,7 +146,7 @@ def test_every_route_requires_login_unless_explicitly_public(app):
     for method, path in _routes(app):
         if (method, path) in PUBLIC:
             continue
-        url = path.replace("{word_id}", "1").replace("{story_id}", "1").replace("{id}", "1")
+        url = path.replace("{word_id}", "1").replace("{story_id}", "1").replace("{set_id}", "1").replace("{id}", "1")
         assert "{" not in url, f"unhandled path parameter in {path}: extend this test"
         r = anon.request(method, url)
         assert r.status_code == 401, f"{method} {path} answered {r.status_code} without a login"

@@ -78,7 +78,7 @@ def test_the_story_tools_argument_list_names_the_same_three_arguments(flow):
 
 
 def test_the_visible_fields_follow_language_in_field_order(flow):
-    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language"]
+    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language", "set_ids"]
 
 
 def _component_inputs(filename):
@@ -187,7 +187,7 @@ def test_a_visible_field_out_of_place_in_field_order_is_reported_and_moved(flow)
     order.append("story_type")
     assert any("story_type is not right after language" in p for p in sync.sync(stale, write=False))
     sync.sync(stale, write=True)
-    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language"]
+    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language", "set_ids"]
 
 
 def test_the_other_tool_nodes_get_no_visible_extras(flow):

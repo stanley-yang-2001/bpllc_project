@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from ..db import connection
 from ..deps import current_user, require_language
 from ..errors import AppError, not_found
-from ..schemas import ClozeSet, FlashcardSet
+from ..schemas import ChoiceSet, ClozeSet, FlashcardSet
 from ..services import practice, stories
 from tutor_core.languages import LANGUAGES
 
@@ -14,10 +14,20 @@ MAX_ITEMS = practice.MAX_ITEMS
 
 
 @router.get("/flashcards", response_model=FlashcardSet)
-def flashcards(request: Request, language: str, limit: int = Query(20, ge=1, le=50), user: dict = Depends(current_user)):
+def flashcards(request: Request, language: str, limit: int = Query(20, ge=1, le=50), set: str | None = Query(None, max_length=12),
+               user: dict = Depends(current_user)):
     require_language(language)
     with connection(request.app.state.pool) as conn:
-        return practice.flashcards(conn, user["id"], language, limit)
+        return practice.flashcards(conn, user["id"], language, limit, set)
+
+
+@router.get("/choices", response_model=ChoiceSet)
+def choices(request: Request, language: str, limit: int = Query(10, ge=1, le=50), direction: str = Query("meaning", max_length=10),
+            set: str | None = Query(None, max_length=12), user: dict = Depends(current_user)):
+    """Multiple-choice cards from this learner's own words that have a meaning (nothing stored, no AI)."""
+    require_language(language)
+    with connection(request.app.state.pool) as conn:
+        return practice.choice_cards(conn, user["id"], language, limit, direction, set)
 
 
 @router.get("/cloze", response_model=ClozeSet)

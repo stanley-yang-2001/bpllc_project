@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from ..db import connection
 from ..deps import current_user, require_language
 from ..schemas import DeleteResult, UploadResult, WordOut, WordPage
-from ..services import vocab
+from ..services import vocab, word_sets
 
 router = APIRouter(prefix="/words", tags=["words"])
 
@@ -15,6 +15,7 @@ class WordIn(BaseModel):
     language: str
     word: str
     meaning: str | None = None
+    set_id: int | None = None          # the learner's own set to put the word in; none = General
 
 
 class WordPatch(BaseModel):
@@ -26,19 +27,25 @@ class DeleteBody(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=500)
 
 
+class MoveBody(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=500)
+    set_id: int | None = None          # null moves the words back to General
+
+
 @router.get("", response_model=WordPage)
 def list_words(request: Request, language: str, q: str | None = None, limit: int = Query(50, ge=1, le=200),
-               offset: int = Query(0, ge=0), user: dict = Depends(current_user)):
+               offset: int = Query(0, ge=0), set: str | None = Query(None, max_length=12),
+               missing_meaning: bool = False, user: dict = Depends(current_user)):
     require_language(language)
     with connection(request.app.state.pool) as conn:
-        return vocab.list_words(conn, user["id"], language, q, limit, offset)
+        return vocab.list_words(conn, user["id"], language, q, limit, offset, set, missing_meaning)
 
 
 @router.post("", status_code=201, response_model=WordOut)
 def add_word(body: WordIn, request: Request, user: dict = Depends(current_user)):
     require_language(body.language)
     with connection(request.app.state.pool) as conn:
-        return vocab.add_word(conn, user["id"], body.language, body.word, body.meaning)
+        return vocab.add_word(conn, user["id"], body.language, body.word, body.meaning, body.set_id)
 
 
 @router.patch("/{word_id}", response_model=WordOut)
@@ -46,6 +53,13 @@ def patch_word(word_id: int, body: WordPatch, request: Request, user: dict = Dep
     fields = body.model_dump(exclude_unset=True)
     with connection(request.app.state.pool) as conn:
         return vocab.update_word(conn, user["id"], word_id, fields)
+
+
+@router.post("/move")
+def move_words(body: MoveBody, request: Request, user: dict = Depends(current_user)):
+    """Moves the learner's own words into one of their sets, or back to General. Words in another language than the set stay put."""
+    with connection(request.app.state.pool) as conn:
+        return {"moved": word_sets.move_words(conn, user["id"], body.ids, body.set_id)}
 
 
 @router.post("/delete", response_model=DeleteResult)

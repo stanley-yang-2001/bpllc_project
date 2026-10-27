@@ -292,3 +292,14 @@ def test_the_chat_asks_for_the_study_language_only_when_the_learner_chose_it(mak
     c.patch("/api/me/preferences", json={"chat_in_study_language": False})
     say(c, "hola", language="es")
     assert recorder.calls[-1]["reply_language"] is None
+
+
+# --- word sets -----------------------------------------------------------------------------------------
+
+def test_the_chosen_sets_are_passed_to_the_tutor_and_bad_ones_are_refused(client, recorder):
+    register(client)
+    assert say(client, "a story", set_ids=[0, 3]).status_code == 200
+    assert recorder.calls[-1]["set_ids"] == [0, 3]
+    assert say(client, "a story").status_code == 200 and recorder.calls[-1]["set_ids"] is None
+    assert say(client, "a story", set_ids=[-1]).status_code == 422
+    assert say(client, "a story", set_ids=["x"]).status_code == 422

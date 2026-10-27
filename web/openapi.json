@@ -33,6 +33,21 @@
           "session_id": {
             "title": "Session Id",
             "type": "string"
+          },
+          "set_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Ids"
           }
         },
         "required": [
@@ -67,6 +82,63 @@
           "session_id"
         ],
         "title": "ChatOut",
+        "type": "object"
+      },
+      "ChoiceOut": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "prompt",
+          "answer",
+          "choices",
+          "direction"
+        ],
+        "title": "ChoiceOut",
+        "type": "object"
+      },
+      "ChoiceSet": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChoiceOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "ChoiceSet",
         "type": "object"
       },
       "ClozeItem": {
@@ -197,6 +269,51 @@
           "accent"
         ],
         "title": "CustomColors",
+        "type": "object"
+      },
+      "DefineBody": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 25,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "meaning_language": {
+            "default": "en",
+            "title": "Meaning Language",
+            "type": "string"
+          },
+          "set": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "DefineBody",
         "type": "object"
       },
       "DeleteBody": {
@@ -330,6 +447,21 @@
               }
             ],
             "title": "Own Words"
+          },
+          "set_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Ids"
           },
           "story_type": {
             "anyOf": [
@@ -616,6 +748,35 @@
         "title": "ModelIn",
         "type": "object"
       },
+      "MoveBody": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "set_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Id"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "MoveBody",
+        "type": "object"
+      },
       "PasswordChange": {
         "properties": {
           "current_password": {
@@ -812,6 +973,80 @@
         "title": "ProfilePatch",
         "type": "object"
       },
+      "PronounceBody": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "texts": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 60,
+            "minItems": 1,
+            "title": "Texts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "language",
+          "texts"
+        ],
+        "title": "PronounceBody",
+        "type": "object"
+      },
+      "PronounceOut": {
+        "properties": {
+          "approximate": {
+            "title": "Approximate",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReadingItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "approximate",
+          "items"
+        ],
+        "title": "PronounceOut",
+        "type": "object"
+      },
+      "ReadingItem": {
+        "properties": {
+          "reading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reading"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "reading"
+        ],
+        "title": "ReadingItem",
+        "type": "object"
+      },
       "RegisterBody": {
         "properties": {
           "accept_privacy": {
@@ -876,6 +1111,18 @@
               }
             ],
             "title": "Length"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
           },
           "own_words": {
             "anyOf": [
@@ -966,6 +1213,93 @@
           }
         },
         "title": "ServiceCheck",
+        "type": "object"
+      },
+      "SetIn": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "name"
+        ],
+        "title": "SetIn",
+        "type": "object"
+      },
+      "SetList": {
+        "properties": {
+          "general_count": {
+            "title": "General Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SetOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "general_count",
+          "total_count"
+        ],
+        "title": "SetList",
+        "type": "object"
+      },
+      "SetOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "language",
+          "name",
+          "count"
+        ],
+        "title": "SetOut",
+        "type": "object"
+      },
+      "SetRename": {
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SetRename",
         "type": "object"
       },
       "StatusOut": {
@@ -1209,6 +1543,85 @@
         "title": "ToolCallOut",
         "type": "object"
       },
+      "TranslateBody": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "target_language": {
+            "title": "Target Language",
+            "type": "string"
+          },
+          "texts": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 60,
+            "minItems": 1,
+            "title": "Texts",
+            "type": "array"
+          },
+          "words": {
+            "default": false,
+            "title": "Words",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "language",
+          "target_language",
+          "texts"
+        ],
+        "title": "TranslateBody",
+        "type": "object"
+      },
+      "TranslateOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TranslationItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "target_language": {
+            "title": "Target Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_language",
+          "items"
+        ],
+        "title": "TranslateOut",
+        "type": "object"
+      },
+      "TranslationItem": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "translation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translation"
+          }
+        },
+        "required": [
+          "text",
+          "translation"
+        ],
+        "title": "TranslationItem",
+        "type": "object"
+      },
       "UploadResult": {
         "properties": {
           "added": {
@@ -1343,6 +1756,17 @@
             ],
             "title": "Meaning"
           },
+          "set_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Id"
+          },
           "word": {
             "title": "Word",
             "type": "string"
@@ -1380,6 +1804,17 @@
               }
             ],
             "title": "Meaning"
+          },
+          "set_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Id"
           },
           "word": {
             "title": "Word",
@@ -2138,6 +2573,89 @@
         ]
       }
     },
+    "/api/practice/choices": {
+      "get": {
+        "description": "Multiple-choice cards from this learner's own words that have a meaning (nothing stored, no AI).",
+        "operationId": "choices_api_practice_choices_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "meaning",
+              "maxLength": 10,
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 12,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChoiceSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Choices",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
     "/api/practice/cloze": {
       "get": {
         "description": "Fill-in-the-blank items from one of THIS learner's saved stories, blanking only words from their own list.",
@@ -2205,6 +2723,23 @@
               "title": "Limit",
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 12,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
           }
         ],
         "responses": {
@@ -2232,6 +2767,219 @@
         "summary": "Flashcards",
         "tags": [
           "practice"
+        ]
+      }
+    },
+    "/api/pronounce": {
+      "post": {
+        "operationId": "pronounce_api_pronounce_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PronounceBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PronounceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pronounce",
+        "tags": [
+          "text tools"
+        ]
+      }
+    },
+    "/api/sets": {
+      "get": {
+        "operationId": "list_sets_api_sets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sets",
+        "tags": [
+          "sets"
+        ]
+      },
+      "post": {
+        "operationId": "create_set_api_sets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Set",
+        "tags": [
+          "sets"
+        ]
+      }
+    },
+    "/api/sets/{set_id}": {
+      "delete": {
+        "description": "Its words go back to General; none are deleted.",
+        "operationId": "delete_set_api_sets__set_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "title": "Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Set",
+        "tags": [
+          "sets"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_set_api_sets__set_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "set_id",
+            "required": true,
+            "schema": {
+              "title": "Set Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Set",
+        "tags": [
+          "sets"
         ]
       }
     },
@@ -2485,6 +3233,47 @@
         ]
       }
     },
+    "/api/translate": {
+      "post": {
+        "operationId": "translate_api_translate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranslateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Translate",
+        "tags": [
+          "text tools"
+        ]
+      }
+    },
     "/api/words": {
       "get": {
         "operationId": "list_words_api_words_get",
@@ -2535,6 +3324,33 @@
               "minimum": 0,
               "title": "Offset",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 12,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "missing_meaning",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Missing Meaning",
+              "type": "boolean"
             }
           }
         ],
@@ -2605,6 +3421,46 @@
         ]
       }
     },
+    "/api/words/define": {
+      "post": {
+        "description": "Writes meanings for up to 25 of the learner's words that have none and says how many are still without one, so the page\ncan ask again until it is 0. One model call per request.",
+        "operationId": "define_api_words_define_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefineBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Define",
+        "tags": [
+          "words"
+        ]
+      }
+    },
     "/api/words/delete": {
       "post": {
         "operationId": "delete_words_api_words_delete_post",
@@ -2641,6 +3497,46 @@
           }
         },
         "summary": "Delete Words",
+        "tags": [
+          "words"
+        ]
+      }
+    },
+    "/api/words/move": {
+      "post": {
+        "description": "Moves the learner's own words into one of their sets, or back to General. Words in another language than the set stay put.",
+        "operationId": "move_words_api_words_move_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move Words",
         "tags": [
           "words"
         ]

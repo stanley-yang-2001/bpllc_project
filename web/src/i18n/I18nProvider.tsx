@@ -28,7 +28,7 @@ export function errorMessage(locale: Locale, e: unknown, fallbackKey: MessageKey
   return e instanceof ApiError ? codeMessage(locale, e.code, e.message, fallbackKey) : translate(locale, fallbackKey);
 }
 
-type PluralBase = "report.outside" | "vocab.deleted";
+type PluralBase = "report.outside" | "vocab.deleted" | "sets.moved";
 export const htmlLang = (l: Locale) => (l === "zh" ? "zh-Hans" : l);
 
 interface Value {

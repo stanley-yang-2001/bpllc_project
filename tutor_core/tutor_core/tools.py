@@ -105,7 +105,19 @@ def _tier(value):
     return resolve(name) if name in TIERS else None
 
 
-def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, difficulty=None, *, connect=None, env=None,
+def _set_ids(value):
+    """The sets the API chose for this chat ("0,3" = General and set 3), or None (all words) for blank or anything not a clean list.
+    It is a hidden input set by the API, never by the Agent; an id that is not the learner's matches no words."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    parts = [p.strip() for p in text.split(",")]
+    if len(parts) > 100 or not all(p.isdigit() and len(p) < 10 for p in parts):
+        return None
+    return [int(p) for p in parts]
+
+
+def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, difficulty=None, *, set_ids=None, connect=None, env=None,
                     call_groq_fn=None) -> str:
     """`language` is what the Agent passed (the learner may say "a story in French" while Spanish is active); blank means the
     hidden active language. `story_type` and `topic` are what the learner asked for in chat ("a dialogue", "a letter about my
@@ -127,7 +139,7 @@ def story_for_agent(language, learner_id, active_language, story_type=None, topi
         conn = _open(connect, env)
         try:
             return generate_story(conn, learner, code, call_groq_fn=call_groq_fn, story_type=story_type, topic=topic,
-                              difficulty=_tier(difficulty)).text
+                              difficulty=_tier(difficulty), set_ids=_set_ids(set_ids)).text
         finally:
             conn.close()
     except Exception:  # noqa: BLE001

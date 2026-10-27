@@ -22,7 +22,7 @@ from .languages import LANGUAGES, stories_enabled
 from .quality import language_check
 from .prompts import (EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage,
                       resolve_story_type)
-from .vocab import _check, load_words, max_prompt_words, sample_words
+from .vocab import _check, clean_set_ids, load_words, max_prompt_words, sample_words
 
 _STORY_CACHE: dict = {}
 _SUCCESS_CACHE_TTL_SECONDS = 20
@@ -64,6 +64,7 @@ def generate_story(
     topic: Optional[str] = None,
     max_words: Optional[int] = None,
     difficulty: Optional[dict] = None,
+    set_ids=None,
     rng=None,
     clock=time.time,
 ) -> StoryResult:
@@ -84,7 +85,9 @@ def generate_story(
     else:
         story_type = None
     topic = clean_topic(topic) if topic else None
-    key = (learner_id, language, story_type or "", topic or "") + ((tuple(sorted(difficulty.items())),) if difficulty else ())
+    set_ids = clean_set_ids(set_ids)       # None = every word; else only the words in those sets (0 = General)
+    key = (learner_id, language, story_type or "", topic or "") + ((tuple(sorted(difficulty.items())),) if difficulty else ()) \
+        + ((tuple(sorted(set_ids)),) if set_ids is not None else ())
     now = clock()
 
     if use_cache and key in _STORY_CACHE:
@@ -92,7 +95,7 @@ def generate_story(
         if now - stamp < (_SUCCESS_CACHE_TTL_SECONDS if cached.ok else _FAILURE_CACHE_TTL_SECONDS):
             return replace(cached, cached=True)
 
-    words = load_words(conn, learner_id, language)
+    words = load_words(conn, learner_id, language, set_ids)
     if not words:
         return StoryResult(EMPTY_VOCABULARY_MESSAGE, False, "empty_vocabulary", language)
 

@@ -8,8 +8,10 @@ import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { StoryReport } from "../components/StoryReport";
+import { StoryTools } from "../text/StoryTools";
 import { diffLabel, topicLabel, typeLabel } from "../i18n/labels";
 import { useI18n } from "../i18n/I18nProvider";
+import { nothingTicked, SetPicker, setIdsToSend, type SetChoice } from "../components/SetPicker";
 import { Badge, Button, Card, ErrorText, inputCls, Notice, PageHeader } from "../components/ui";
 
 const CLASSIC = ["narration", "dialogue"];          // these two have no topic
@@ -60,6 +62,7 @@ export default function Studio() {
   const [customTopic, setCustomTopic] = useState("");
   const [tier, setTier] = useState<Tier>("");
   const [nums, setNums] = useState({ length: "110", own_words: "5", uncommon_pct: "10" });
+  const [sets, setSets] = useState<SetChoice>(null);       // null = every set (General always among them)
   const [story, setStory] = useState<GeneratedStory | null>(null);
   const [savedId, setSavedId] = useState<number | null>(null);
   const saved = savedId !== null;
@@ -73,7 +76,7 @@ export default function Studio() {
     },
   });
 
-  useEffect(() => { setStory(null); setSavedId(null); generate.reset(); save.reset(); }, [active]);   // a story belongs to one language
+  useEffect(() => { setSets(null); setStory(null); setSavedId(null); generate.reset(); save.reset(); }, [active]);   // a story belongs to one language
 
   const kind = type === CUSTOM ? customLabel(custom) ?? "" : type;       // "" = surprise me (or an unusable label, which blocks Make)
   const customBad = type === CUSTOM && !kind;
@@ -85,7 +88,7 @@ export default function Studio() {
   const choice: DifficultyChoice = tier === "" ? {} : tier === "custom"
     ? { difficulty: "custom", length: picked.length ?? undefined, own_words: picked.own_words ?? undefined, uncommon_pct: picked.uncommon_pct ?? undefined }
     : { difficulty: tier };
-  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !topicOn ? undefined : topicValue || undefined, ...choice });
+  const make = () => generate.mutate({ language: active, story_type: kind || undefined, topic: !topicOn ? undefined : topicValue || undefined, ...choice, ...(setIdsToSend(sets) ? { set_ids: setIdsToSend(sets) } : {}) });
   const enabled = lang?.stories_enabled !== false;
   const failure = generate.error instanceof ApiError ? generate.error : null;
 
@@ -175,8 +178,9 @@ export default function Studio() {
               )}
               {tier !== "" && <p className="mt-1 text-xs text-slate-600">{t("studio.diffNote")}</p>}
             </div>
+            <SetPicker language={active} value={sets} onChange={setSets} idPrefix="studio-set" />
             <div>
-              <Button onClick={make} loading={generate.isPending} disabled={customBad || topicBad || diffBad} icon={<Sparkles aria-hidden className="size-4" />}>
+              <Button onClick={make} loading={generate.isPending} disabled={customBad || topicBad || diffBad || nothingTicked(sets)} icon={<Sparkles aria-hidden className="size-4" />}>
                 {generate.isPending ? t("studio.writing") : t("studio.make")}
               </Button>
               {generate.isPending && <p role="status" className="mt-2 text-sm text-slate-600">{t("studio.wait")}</p>}
@@ -201,6 +205,7 @@ export default function Studio() {
             <span className="text-xs text-slate-600">{t("studio.builtFrom", { used: story.words_used, total: story.words_total })}</span>
           </div>
           <p lang={story.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.story}</p>
+          <StoryTools text={story.story} language={story.language} id="studio" />
           <StoryReport report={story.report} languageName={name} />
           <div className="flex flex-wrap gap-2">
             <Button

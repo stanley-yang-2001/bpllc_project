@@ -296,7 +296,7 @@ def test_real_whoami_run_parses_correctly():
     call = r.tool_calls[0]
     assert (call.name, call.args, call.failed) == ("Spike Who Am I", {"note": "x"}, False)
     assert call.output == r.reply                                   # the relay delivers the tool's output as the reply
-    assert lc.reply_text(resp) == r.reply and len(list(lc._walk_tool_blocks(resp))) == 2
+    assert lc.reply_text(resp) == r.reply and len(list(lc.walk_tool_blocks(resp))) == 2
 
 
 def test_real_greeting_run_parses_to_a_reply_without_tool_calls():
@@ -334,3 +334,10 @@ def test_a_reply_with_several_story_calls_keeps_only_the_one_it_shows():
     out = lc.parse_run_response(resp)
     stories = [c for c in out.tool_calls if c.name == "Story Generator Tool"]
     assert len(stories) == 1 and stories[0].output == "Anna: Hi.\nBen: Hello."
+
+
+def test_the_chosen_sets_reach_only_the_story_tool_as_a_string():
+    t = lc.build_tweaks(("AddWord-WhP5g", "StoryGeneratorTool-RQpvc"), 17, "es", [0, 3])
+    assert t["StoryGeneratorTool-RQpvc"]["set_ids"] == "0,3" and "set_ids" not in t["AddWord-WhP5g"]
+    assert "set_ids" not in lc.build_tweaks(("StoryGeneratorTool-RQpvc",), 17, "es")["StoryGeneratorTool-RQpvc"]
+    assert "set_ids" not in lc.build_tweaks(("StoryGeneratorTool-RQpvc",), 17, "es", [])["StoryGeneratorTool-RQpvc"]

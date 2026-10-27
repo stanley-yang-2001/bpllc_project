@@ -8,6 +8,7 @@ from tutor_core.languages import LANGUAGES
 from tutor_core.quality import word_forms
 
 from ..db import cursor
+from ..errors import validation_error
 
 MAX_ITEMS = 8
 CHOICES = 4                       # the answer plus up to three other words from the learner's own list
@@ -17,15 +18,57 @@ _SENTENCE = re.compile(r"(?<=[.!?…])\s+")
 MIN_WORDS_IN_SENTENCE = 3
 
 
-def flashcards(conn, user_id: int, language: str, limit: int) -> dict:
-    """Shuffled words that have a meaning (a card with nothing on its back is no use)."""
+def flashcards(conn, user_id: int, language: str, limit: int, set_filter=None) -> dict:
+    """Shuffled words that have a meaning (a card with nothing on its back is no use), optionally from one set only."""
+    extra, params = _set_clause(set_filter)
     with cursor(conn) as cur:
         cur.execute("SELECT id, word, meaning FROM tutor.words WHERE user_id = %s AND language = %s "
-                    "AND meaning IS NOT NULL AND btrim(meaning) <> '' ORDER BY random() LIMIT %s", (user_id, language, limit))
+                    "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra + " ORDER BY random() LIMIT %s", [user_id, language, *params, limit])
         items = cur.fetchall()
         cur.execute("SELECT count(*) AS n FROM tutor.words WHERE user_id = %s AND language = %s "
-                    "AND meaning IS NOT NULL AND btrim(meaning) <> ''", (user_id, language))
+                    "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra, [user_id, language, *params])
         return {"items": items, "total": cur.fetchone()["n"]}
+
+
+def _set_clause(set_filter):
+    """The same choices as the vocabulary page: None or "all", "general", or the number of one of the learner's own sets."""
+    if not set_filter or set_filter == "all":
+        return "", []
+    if set_filter == "general":
+        return " AND set_id IS NULL", []
+    if str(set_filter).isdigit():
+        return " AND set_id = %s", [int(set_filter)]
+    raise validation_error("Choose all, general or one of your sets.")
+
+
+def choice_cards(conn, user_id: int, language: str, limit: int, direction: str = "meaning", set_filter=None, rng=random) -> dict:
+    """Multiple choice from the learner's own words that have a meaning. direction "meaning": the word is shown and the options are
+    meanings; direction "word": the meaning is shown and the options are words. Each card has up to CHOICES different options
+    (the answer and other entries of the learner's own list); fewer than two entries in the set means nothing to choose between."""
+    if direction not in ("meaning", "word"):
+        raise validation_error("Choose meaning or word.")
+    extra, params = _set_clause(set_filter)
+    with cursor(conn) as cur:
+        cur.execute("SELECT id, word, meaning FROM tutor.words WHERE user_id = %s AND language = %s "
+                    "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra, [user_id, language, *params])
+        rows = cur.fetchall()
+    if len(rows) < 2:
+        return {"items": [], "total": len(rows)}
+    rng.shuffle(rows)
+    items = []
+    for row in rows[:limit]:
+        prompt, answer = (row["word"], row["meaning"]) if direction == "meaning" else (row["meaning"], row["word"])
+        pool = [(r["meaning"] if direction == "meaning" else r["word"]) for r in rows if r["id"] != row["id"]]
+        others = []
+        for text in rng.sample(pool, len(pool)):
+            if text.strip().casefold() != answer.strip().casefold() and text not in others:
+                others.append(text)
+            if len(others) == CHOICES - 1:
+                break
+        options = [answer] + others
+        rng.shuffle(options)
+        items.append({"id": row["id"], "prompt": prompt, "answer": answer, "choices": options, "direction": direction})
+    return {"items": items, "total": len(rows)}
 
 
 def can_cloze(language: str) -> bool:

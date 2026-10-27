@@ -935,3 +935,20 @@ English batches on Groq: the richer kinds failed the stray-word check on a one-w
 4. Whether to delete the legacy Step 8 components (17A item 9). **Decided and done (18 October 2026):** deleted.
 5. **How account deletion removes Langflow chat** (M5 acceptance item, mechanism proven by the probe). **Decided and implemented (15 October 2026): a `chat_sessions` table** (migration 0004, ids only, cascades with the user), so the existing guard tests cover it; deletion removes each session through the monitor API and confirms it is empty before the user row is deleted, and refuses with `chat_cleanup_failed` (503) if it cannot. Still true either way: "Download my data" and the privacy policy must say what chat is kept, and the probe did not examine Langflow's other run logs.
 
+
+## Word sets, read aloud, pronunciation and translation (patches 0027 to 0029, 26 October 2026)
+
+- **Sets:** the Vocabulary page has tabs (All, General, your own sets). General is every word with no set. Words move between sets with the "Move to…" menu on the selection bar. Story Studio and Chat have a "Words to use" tick list (General always among them); sending nothing means every set.
+- **Practice:** Multiple choice (four options, word to meaning or meaning to word, optional set) next to flashcards and fill-in-the-blank.
+- **Meanings:** a tick box when adding a word, and "Write missing meanings" for every word with none (25 words per model call; a meaning you wrote is never replaced).
+- **Read aloud:** the browser's own speech engine (`src/speech/`). Nothing goes to our server; some browsers use an online voice service. The button is not shown where the browser has no speech engine.
+- **Pronunciation and translation:** `src/text/`. Both are shown on request and never stored; Chinese, Japanese and Korean readings come from libraries on the server, IPA and translations from the model.
+
+## Structure (SOLID pass, 27 October 2026)
+
+Class diagrams for this structure: [`class-diagram-backend.md`](class-diagram-backend.md) and [`class-diagram-frontend.md`](class-diagram-frontend.md); the architecture, workflow and state diagrams are in the same folder.
+
+- **Model choice is one class, `AiRunner` (`api/app/services/ai_runner.py`).** Sources: `StubSource` (no AI), `OwnModelSource` (the learner's saved model, request limit, no shared budget), `SharedSource` (Groq through the shared limiter). Adding a source means a new class with `find`-style `applies/call` behaviour; the use cases do not change. Routes ask for it with `Depends(ai_runner_for)`.
+- **Use cases live in `services/`, routes parse and answer.** `text_tools.py` (pronounce, translate), `meanings.py` (write missing meanings), `word_sets.py`, `stories.py`.
+- **Packages hide their size, not their names.** `services/langflow/`, `tutor_core/quality/`, `tutor_core/prompts/` each have an `__init__` that re-exports the names the rest of the code and the tests use.
+- **Web pages compose.** `src/routes/*.tsx` hold page state and layout; `src/vocab/`, `src/practice/`, `src/settings/` hold the parts. A part gets what it shows and what to do as props, except where it owns its own request (the add-word form, the set bar, the meaning cell).

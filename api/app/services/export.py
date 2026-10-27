@@ -18,8 +18,11 @@ def build(conn, user_id: int) -> dict:
         out["profile"] = cur.fetchone()
         cur.execute("SELECT language, created_at FROM user_languages WHERE user_id = %s ORDER BY created_at, language", (user_id,))
         out["user_languages"] = cur.fetchall()
-        cur.execute("SELECT language, word, meaning, created_at FROM words WHERE user_id = %s ORDER BY language, word", (user_id,))
-        out["words"] = cur.fetchall()
+        cur.execute("SELECT w.language, w.word, w.meaning, s.name AS set_name, w.created_at FROM words w "
+                    "LEFT JOIN word_sets s ON s.id = w.set_id WHERE w.user_id = %s ORDER BY w.language, w.word", (user_id,))
+        out["words"] = cur.fetchall()           # set_name null = the General set
+        cur.execute("SELECT language, name, created_at FROM word_sets WHERE user_id = %s ORDER BY language, name", (user_id,))
+        out["word_sets"] = cur.fetchall()
         cur.execute("SELECT active_language, ui_follows_study_language, chat_in_study_language, theme, custom_colors, updated_at "
                     "FROM user_preferences WHERE user_id = %s", (user_id,))
         out["user_preferences"] = cur.fetchone()          # null when never saved

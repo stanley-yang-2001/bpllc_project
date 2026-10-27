@@ -315,3 +315,34 @@ def test_custom_difficulty_is_saved_and_shows_on_the_card(llm, make_user):
     assert saved.status_code == 201 and saved.json()["report"]["difficulty"]["requested"]["length"] == 30
     card = c.get("/api/stories", headers=HEADERS).json()["items"][0]
     assert card["difficulty"] == "custom"
+
+
+# --- sets ------------------------------------------------------------------------------------------------
+
+def test_a_story_uses_only_the_words_of_the_chosen_sets(make_user, llm):
+    c = learner(make_user, words=["alpha", "bravo", "charlie", "delta", "foxtrot"])
+    sid = c.post("/api/sets", json={"language": "en", "name": "Food"}).json()["id"]
+    for w in ("kiwi", "lemon", "mango", "nectarine", "olive"):
+        assert c.post("/api/words", json={"language": "en", "word": w, "set_id": sid}).status_code == 201
+    r = gen(c, set_ids=[sid])
+    assert r.status_code == 200 and r.json()["words_total"] == 5
+    assert "mango" in llm.prompts[-1] and "charlie" not in llm.prompts[-1]
+    r = gen(c, set_ids=[0])
+    assert r.status_code == 200 and "charlie" in llm.prompts[-1] and "mango" not in llm.prompts[-1]
+    assert gen(c).json()["words_total"] == 10                                        # no choice: every word, as before
+    assert gen(c, set_ids=[0, sid]).json()["words_total"] == 10
+
+
+def test_chosen_sets_with_too_few_words_say_so_and_never_reach_the_model(make_user, llm):
+    c = learner(make_user)
+    sid = c.post("/api/sets", json={"language": "en", "name": "Tiny"}).json()["id"]
+    r = gen(c, set_ids=[sid])
+    assert r.status_code == 422 and r.json()["error"]["code"] == "not_enough_words" and "sets you chose" in r.json()["error"]["message"]
+    assert gen(c, set_ids=[-3]).status_code == 422 and llm.prompts == []
+
+
+def test_somebody_elses_set_id_gives_no_words(make_user, llm):
+    a, b = learner(make_user, "alice"), learner(make_user, "bob")
+    sid = a.post("/api/sets", json={"language": "en", "name": "Mine"}).json()["id"]
+    a.post("/api/words", json={"language": "en", "word": "secretword", "set_id": sid})
+    assert gen(b, set_ids=[sid]).status_code == 422 and llm.prompts == []

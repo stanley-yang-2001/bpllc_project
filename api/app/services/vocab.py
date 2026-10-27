@@ -8,16 +8,29 @@ from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
 from ..errors import conflict, not_found, validation_error
+from . import word_sets
 
-WORD_COLS = "id, language, word, meaning, created_at"
+WORD_COLS = "id, language, word, meaning, set_id, created_at"
 
 
 def _escape_like(text: str) -> str:
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def list_words(conn, user_id: int, language: str, q: str | None, limit: int, offset: int) -> dict:
+def list_words(conn, user_id: int, language: str, q: str | None, limit: int, offset: int, set_filter: str | None = None,
+               missing_meaning: bool = False) -> dict:
+    """set_filter: None or "all" = every word; "general" = words in no set; a number = that set (the learner's own)."""
     where, params = "user_id = %s AND language = %s", [user_id, language]
+    if set_filter and set_filter != "all":
+        if set_filter == "general":
+            where += " AND set_id IS NULL"
+        elif set_filter.isdigit():
+            where += " AND set_id = %s"
+            params.append(int(set_filter))
+        else:
+            raise validation_error("Choose all, general or one of your sets.")
+    if missing_meaning:
+        where += " AND (meaning IS NULL OR btrim(meaning) = '')"
     if q and q.strip():
         like = f"%{_escape_like(q.strip().lower())}%"
         where += " AND (lower(word) LIKE %s OR lower(coalesce(meaning, '')) LIKE %s)"
@@ -36,12 +49,14 @@ def _clean(word, meaning, language):
         raise validation_error(str(e))
 
 
-def add_word(conn, user_id: int, language: str, word: str, meaning) -> dict:
+def add_word(conn, user_id: int, language: str, word: str, meaning, set_id: int | None = None) -> dict:
     word, meaning = _clean(word, meaning, language)
+    if set_id is not None:
+        word_sets.owned(conn, user_id, set_id, language)          # a set that is not this learner's, or another language's: not found
     with cursor(conn) as cur:
         try:
-            cur.execute(f"INSERT INTO words (user_id, language, word, meaning) VALUES (%s, %s, %s, %s) RETURNING {WORD_COLS}",
-                        (user_id, language, word, meaning))
+            cur.execute(f"INSERT INTO words (user_id, language, word, meaning, set_id) VALUES (%s, %s, %s, %s, %s) RETURNING {WORD_COLS}",
+                        (user_id, language, word, meaning, set_id))
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             raise conflict(f"'{word}' is already in your list.")
@@ -66,6 +81,39 @@ def update_word(conn, user_id: int, word_id: int, fields: dict) -> dict:
             conn.rollback()
             raise conflict(f"'{new_word}' is already in your list.")
         return cur.fetchone()
+
+
+def words_without_meaning(conn, user_id: int, language: str, ids, set_filter, limit: int) -> dict:
+    """The learner's own words that have no meaning yet: {"items": [{"id", "word"}] (at most `limit`), "remaining": how many in all}.
+    `ids` limits it to those words (only the learner's own ever match); otherwise the set choice works as on the vocabulary page."""
+    where, params = "user_id = %s AND language = %s AND (meaning IS NULL OR btrim(meaning) = '')", [user_id, language]
+    if ids is not None:
+        where += " AND id = ANY(%s)"
+        params.append(list(ids))
+    elif set_filter and set_filter != "all":
+        if set_filter == "general":
+            where += " AND set_id IS NULL"
+        elif set_filter.isdigit():
+            where += " AND set_id = %s"
+            params.append(int(set_filter))
+        else:
+            raise validation_error("Choose all, general or one of your sets.")
+    with cursor(conn) as cur:
+        cur.execute(f"SELECT id, word FROM words WHERE {where} ORDER BY id LIMIT %s", [*params, limit])
+        items = cur.fetchall()
+        cur.execute(f"SELECT count(*) AS n FROM words WHERE {where}", params)
+        return {"items": items, "remaining": cur.fetchone()["n"]}
+
+
+def fill_meanings(conn, user_id: int, pairs) -> int:
+    """Sets each meaning only where the word still has none and belongs to this learner; returns how many were set."""
+    done = 0
+    with cursor(conn) as cur:
+        for word_id, meaning in pairs:
+            cur.execute("UPDATE words SET meaning = %s WHERE id = %s AND user_id = %s AND (meaning IS NULL OR btrim(meaning) = '')",
+                        (meaning, word_id, user_id))
+            done += cur.rowcount
+    return done
 
 
 def delete_words(conn, user_id: int, ids: list[int]) -> int:
