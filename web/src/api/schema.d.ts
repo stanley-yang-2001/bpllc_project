@@ -597,8 +597,7 @@ export interface paths {
         put?: never;
         /**
          * Define
-         * @description Writes meanings for up to 25 of the learner's words that have none and says how many are still without one, so the page
-         *     can ask again until it is 0. One model call per request.
+         * @description Writes meanings for up to 25 of the learner's words that have none and says how many are still without one.
          */
         post: operations["define_api_words_define_post"];
         delete?: never;

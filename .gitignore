@@ -26,3 +26,4 @@ test-langflow.txt
 web/test-results/
 web/playwright-report/
 docs/kanban/created.json
+test-reports/

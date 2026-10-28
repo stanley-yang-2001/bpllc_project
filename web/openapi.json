@@ -2116,7 +2116,7 @@
         },
         "summary": "Languages",
         "tags": [
-          "me"
+          "public"
         ]
       }
     },
@@ -2211,7 +2211,7 @@
         },
         "summary": "Delete Account",
         "tags": [
-          "me"
+          "account"
         ]
       }
     },
@@ -2252,7 +2252,7 @@
         },
         "summary": "Change Email",
         "tags": [
-          "me"
+          "account"
         ]
       }
     },
@@ -2271,7 +2271,7 @@
         },
         "summary": "Export My Data",
         "tags": [
-          "me"
+          "account"
         ]
       }
     },
@@ -2454,7 +2454,7 @@
         },
         "summary": "Change Password",
         "tags": [
-          "me"
+          "account"
         ]
       }
     },
@@ -2518,7 +2518,7 @@
         },
         "summary": "Meta",
         "tags": [
-          "me"
+          "public"
         ]
       }
     },
@@ -2569,7 +2569,7 @@
         },
         "summary": "Policy Copy",
         "tags": [
-          "me"
+          "public"
         ]
       }
     },
@@ -3423,7 +3423,7 @@
     },
     "/api/words/define": {
       "post": {
-        "description": "Writes meanings for up to 25 of the learner's words that have none and says how many are still without one, so the page\ncan ask again until it is 0. One model call per request.",
+        "description": "Writes meanings for up to 25 of the learner's words that have none and says how many are still without one.",
         "operationId": "define_api_words_define_post",
         "requestBody": {
           "content": {

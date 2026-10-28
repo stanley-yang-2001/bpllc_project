@@ -37,7 +37,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **F8: Separate saving from holding in PreferencesProvider** (2026-10-27) — PreferencesProvider.tsx (162 lines) holds the value, debounces saves, retries and writes the device copy.
 - **F9: Split Library and Privacy into parts** (2026-10-27) — Library.tsx (129 lines) holds the list, row, opened story and delete flow; Privacy.tsx (131 lines) holds a block renderer.
 
-## In review (11)
+## In review (12)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -50,6 +50,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Read aloud (text to speech)** (2026-10-26) — A button to hear a word or a story in the study language.
 - **SOLID refactor of the new and existing code** (2026-10-27) — Apply single-responsibility, open/closed and dependency-inversion where there was a real reason, without changing behaviour.
 - **Update the docs diagrams and add class diagrams** (2026-10-27) — Rewrite the architecture, use-case, concept, workflow and state diagrams for the current site; add back-end and front-end class diagrams and a database diagram.
+- **One command that runs every test (run-checks.bat)** (2026-10-28) — scripts/run_all_checks.py runs the unit, stack and live checks and prints one table; Python suites run in a throwaway container with their own Postgres.
 
 ## Done (33)
 

@@ -4,3 +4,4 @@
 web/dist
 .env
 *.patch
+test-reports

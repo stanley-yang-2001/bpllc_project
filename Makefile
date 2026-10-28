@@ -2,7 +2,11 @@
 PYTHON ?= python3
 
 # Needs a Postgres reachable at TEST_DATABASE_URL for the API tests (default matches api/tests/conftest.py).
-.PHONY: check test-core test-scripts test-langflow test-api test-web typecheck-web check-api-types gen-api dev-api dev-web up
+.PHONY: check-all check test-core test-scripts test-langflow test-api test-web typecheck-web check-api-types gen-api dev-api dev-web up
+
+# Every check in one table, Python suites in a throwaway container (see docs/TESTING.md). Add ARGS="--stack" or ARGS="--live".
+check-all:
+	$(PYTHON) scripts/run_all_checks.py $(ARGS)
 
 check: test-core test-scripts test-api typecheck-web test-web check-api-types
 	@echo "all checks passed"

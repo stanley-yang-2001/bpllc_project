@@ -1304,5 +1304,25 @@
    "refactor",
    "solid"
   ]
+ },
+ {
+  "title": "One command that runs every test (run-checks.bat)",
+  "status": "In review",
+  "area": "testing",
+  "date": "2026-10-28",
+  "summary": "scripts/run_all_checks.py runs the unit, stack and live checks and prints one table; Python suites run in a throwaway container with their own Postgres.",
+  "done": [
+   "Runner with unit, stack and live groups, --only/--skip/--list/--fail-fast, logs and summary.json",
+   "docker-compose.test.yml and api/Dockerfile.test (own Postgres, cannot touch real data)",
+   "text_tools_check.py for pronunciation and translation; difficulty_check exits non-zero on a miss",
+   "docs/TESTING.md; runner tests; stale API types found and regenerated"
+  ],
+  "todo": [
+   "Run run-checks.bat on your machine (Docker mode), then --stack --up, then --live --quick",
+   "Report any check that fails for a reason that is not a real bug"
+  ],
+  "labels": [
+   "testing"
+  ]
  }
 ]

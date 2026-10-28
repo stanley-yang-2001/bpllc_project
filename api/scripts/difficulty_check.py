@@ -144,7 +144,8 @@ def main():
         print("  ".join(str(r[c_]).ljust(w) for c_, w in zip(cols, widths)))
     good = sum(1 for r in rows if r["status"] == "pass")
     print(f"\n{good} of {len(rows)} stories passed their tier")
+    return 0 if good == len(rows) else 1        # lets a test runner see a miss; reading the table is still the real check
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
