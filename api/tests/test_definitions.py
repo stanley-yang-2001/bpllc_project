@@ -110,3 +110,43 @@ def test_another_learners_words_are_never_touched_or_sent(make_user, llm):
 def test_it_needs_login(app):
     from fastapi.testclient import TestClient
     assert TestClient(app, headers=HEADERS).post("/api/words/define", json={"language": "es"}).status_code == 401
+
+
+def test_the_default_is_the_learners_own_language_and_follows_what_they_changed_it_to(make_user, llm):
+    c = learner(make_user)
+    assert c.patch("/api/me", json={"native_language": "fr"}, headers=HEADERS).status_code == 200
+    define(c)
+    assert "meaning in French" in llm.prompts[-1]
+
+
+def test_study_language_meanings_ask_for_simple_words_of_that_language(make_user, llm):
+    c = learner(make_user)
+    define(c, meaning_mode="study")
+    p = llm.prompts[-1]
+    assert "meaning in Spanish" in p and "simple everyday Spanish words" in p and "without using the word itself" in p
+
+
+def test_both_asks_for_the_learners_language_then_the_study_language_joined_by_a_slash(make_user, llm):
+    c = learner(make_user)
+    define(c, meaning_mode="both")
+    p = llm.prompts[-1]
+    assert "meaning in English, then ` / `, then the same meaning in Spanish" in p
+
+
+def test_both_for_someone_who_studies_their_own_language_is_just_that_language(make_user, llm):
+    c = learner(make_user)
+    c.patch("/api/me", json={"native_language": "es"}, headers=HEADERS)
+    define(c, meaning_mode="both")
+    assert "then ` / `" not in llm.prompts[-1] and "meaning in Spanish" in llm.prompts[-1]
+
+
+def test_the_saved_choice_is_used_when_the_request_names_none_and_a_request_that_names_one_wins(make_user, llm):
+    c = learner(make_user)
+    assert c.patch("/api/me/preferences", json={"meaning_mode": "study"}, headers=HEADERS).status_code == 200
+    define(c)
+    assert "simple everyday Spanish words" in llm.prompts[-1]
+    other = learner(make_user, "bob")                 # a fresh list: the first learner's words all have meanings now
+    other.patch("/api/me/preferences", json={"meaning_mode": "study"}, headers=HEADERS)
+    define(other, meaning_mode="native")
+    assert "meaning in English" in llm.prompts[-1] and "simple everyday" not in llm.prompts[-1]
+    assert define(c, meaning_mode="klingon").status_code == 422

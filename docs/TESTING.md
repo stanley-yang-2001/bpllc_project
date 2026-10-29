@@ -43,6 +43,12 @@ The Python suites do not run against your database. The API tests drop and rebui
 
 `--native` runs the Python suites with your own Python instead of Docker. It refuses to start unless `TEST_DATABASE_URL` is set, because the API tests **drop the `tutor` schema** in that database. Point it only at a throwaway one.
 
+## Notes from the first real run (28 October)
+
+* `root` leaves out `tests/test_m3_check.py::test_the_command` and the five Langflow files; `container-tests` runs them inside the Langflow container, with `test_run_all_checks.py` skipped there.
+* A long check that prints nothing shows "still running" every minute; the log is written line by line, so you can open it while it runs.
+* `e2e` needs the real stack. Against a plain dev server the two nginx header checks and the "dark before any script" check cannot pass; that is expected there.
+
 ## Reading the result
 
 * A **SKIP** means the check could not run (no Docker, stack not up, `AI_MODE` is `stub`): the note says why. It is not a failure.

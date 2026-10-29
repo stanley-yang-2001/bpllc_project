@@ -25,10 +25,14 @@ export async function login(page: Page, local: string, password = PASSWORD) {
 export const nav = (page: Page, name: string) => page.getByRole("navigation", { name: "Main" }).getByRole("link", { name, exact: true });
 export const loginButton = (page: Page) => page.getByRole("button", { name: "Log in", exact: true }).last();
 
+/** The cell that holds a word. Its accessible name also carries the read-aloud button's label, so match the word's own text. */
+export const wordCell = (page: Page, word: string) =>
+  page.locator("td span[lang]").filter({ hasText: new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) });
+
 export async function addWord(page: Page, word: string, meaning?: string) {
   await nav(page, "Vocabulary").click();
   await page.getByLabel("Word", { exact: true }).fill(word);
   if (meaning) await page.getByLabel("Meaning (optional)").fill(meaning);
   await page.getByRole("button", { name: "Add word" }).click();
-  await expect(page.getByRole("cell", { name: word, exact: true })).toBeVisible();
+  await expect(wordCell(page, word)).toBeVisible();
 }

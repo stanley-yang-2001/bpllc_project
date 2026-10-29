@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { translate } from "../i18n/I18nProvider";
-import { chunks, NORMAL_RATE, SLOW_RATE, speak, voiceFor } from "./speak";
+import { chooseVoice, chosenVoiceName, chunks, NORMAL_RATE, SLOW_RATE, speak, voiceFor, voicesFor, whenVoicesLoaded } from "./speak";
 import { SpeakButton } from "./SpeakButton";
 
 vi.mock("../i18n/I18nProvider", async (orig) => ({
@@ -13,7 +13,7 @@ vi.mock("../i18n/I18nProvider", async (orig) => ({
 interface Spoken { text: string; lang: string; rate: number; voice: unknown; finish: () => void }
 let spoken: Spoken[];
 let cancelled: number;
-let voices: { lang: string; name: string }[];
+let voices: { lang: string; name: string; localService?: boolean; default?: boolean }[];
 
 function installFakeSpeech() {
   spoken = []; cancelled = 0;
@@ -32,7 +32,7 @@ function installFakeSpeech() {
 }
 
 beforeEach(() => { voices = [{ lang: "es-MX", name: "Mexican" }, { lang: "en-US", name: "US" }, { lang: "zh-CN", name: "Mandarin" }]; installFakeSpeech(); });
-afterEach(() => { vi.unstubAllGlobals(); Reflect.deleteProperty(window, "speechSynthesis"); });
+afterEach(() => { vi.unstubAllGlobals(); Reflect.deleteProperty(window, "speechSynthesis"); window.localStorage.clear(); });
 
 describe("chunks", () => {
   it("splits lines and sentences, keeps short texts whole, and drops blank lines", () => {
@@ -58,6 +58,41 @@ describe("voiceFor", () => {
     expect(voiceFor("ja")).toBeNull();
     voices = [];
     expect(voiceFor("en")).toBeUndefined();
+  });
+});
+
+describe("choosing a voice", () => {
+  const asVoices = (v: typeof voices) => v as unknown as SpeechSynthesisVoice[];
+  it("lists only voices of the language, best first: exact region, natural voices, then offline ones", () => {
+    const all = asVoices([
+      { lang: "es-MX", name: "Plain Mexican", localService: true }, { lang: "es-ES", name: "Plain Spain", localService: true },
+      { lang: "es-ES", name: "Microsoft Elvira Online (Natural)", localService: false }, { lang: "en-US", name: "US" },
+    ]);
+    expect(voicesFor("es", all).map((v) => v.name)).toEqual(["Microsoft Elvira Online (Natural)", "Plain Spain", "Plain Mexican"]);
+  });
+  it("never gives Mandarin a Cantonese voice", () => {
+    const all = asVoices([{ lang: "zh-HK", name: "Sinji" }, { lang: "zh-CN", name: "Huihui" }, { lang: "yue-HK", name: "Cantonese" }, { lang: "zh-TW", name: "Hanhan" }]);
+    expect(voicesFor("zh", all).map((v) => v.name)).toEqual(["Huihui", "Hanhan"]);
+    expect(voicesFor("zh", asVoices([{ lang: "zh-HK", name: "Sinji" }]))).toEqual([]);
+  });
+  it("uses the voice the learner picked for that language on this device, and falls back when it is gone", () => {
+    voices = [{ lang: "es-ES", name: "Alpha" }, { lang: "es-MX", name: "Beta" }];
+    expect(voiceFor("es")).toMatchObject({ name: "Alpha" });
+    chooseVoice("es", "Beta");
+    expect(chosenVoiceName("es")).toBe("Beta");
+    expect(voiceFor("es")).toMatchObject({ name: "Beta" });
+    chooseVoice("es", "Gone");
+    expect(voiceFor("es")).toMatchObject({ name: "Alpha" });
+    chooseVoice("es", "");
+    expect(chosenVoiceName("es")).toBe("");
+  });
+  it("waits for the browser to load its voices, and does not hang when there are none", async () => {
+    vi.useFakeTimers();
+    voices = [];
+    const waited = whenVoicesLoaded(1000);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(waited).resolves.toBeUndefined();
+    vi.useRealTimers();
   });
 });
 
@@ -104,11 +139,16 @@ describe("SpeakButton", () => {
     await userEvent.click(screen.getByRole("button", { name: "Listen slowly" }));
     expect(spoken[0].rate).toBe(SLOW_RATE);
   });
-  it("says when the device has no voice for the language, but still tries", async () => {
+  it("says when the device has no voice for the language, and reads nothing with a wrong one", async () => {
     show(<SpeakButton text="パン" language="ja" />);
     await userEvent.click(screen.getByRole("button", { name: /Listen to/ }));
-    expect(await screen.findByText(/No voice for this language/)).toBeInTheDocument();
-    expect(spoken[0].lang).toBe("ja-JP");
+    expect(await screen.findByText(/no voice for this language/)).toBeInTheDocument();
+    expect(spoken).toHaveLength(0);
+  });
+  it("reads with the matching voice, whatever the browser would have picked", async () => {
+    show(<SpeakButton text="hola" language="es" />);
+    await userEvent.click(screen.getByRole("button", { name: /Listen to/ }));
+    expect(spoken[0]).toMatchObject({ lang: "es-MX", voice: { name: "Mexican" } });
   });
   it("goes back to idle when the reading ends", async () => {
     show(<SpeakButton text="bread" language="en" />);

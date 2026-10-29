@@ -2,7 +2,7 @@ import { Square, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button } from "../components/ui";
-import { NORMAL_RATE, SLOW_RATE, speak, speechSupported, voiceFor } from "./speak";
+import { NORMAL_RATE, SLOW_RATE, speak, speechSupported } from "./speak";
 
 /** One read-aloud button (an icon for a word, a labelled pair for a story). Renders nothing when the browser has no speech engine.
  * Only one text is read at a time across the page: starting another stops the first (speak() cancels the queue). */
@@ -18,10 +18,11 @@ export function SpeakButton({ text, language, label, slow = false }: { text: str
 
   const run = (m: "normal" | "slow") => {
     if (mode === m) { stop.current(); setMode("idle"); return; }
-    setProblem(voiceFor(language) === null ? "voice" : null);
+    setProblem(null);
     setMode(m);
     stop.current = speak(text, language, m === "slow" ? SLOW_RATE : NORMAL_RATE, {
       onEnd: () => alive.current && setMode("idle"),
+      onNoVoice: () => { if (alive.current) { setMode("idle"); setProblem("voice"); } },
       onError: () => { if (alive.current) { setMode("idle"); setProblem("error"); } },
     });
   };

@@ -29,11 +29,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import queue
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 from dataclasses import dataclass, field
@@ -55,9 +57,11 @@ LANGFLOW_ONLY_TESTS = [
     "tests/test_tool_result_relay.py",
     "tests/test_tool_wrappers.py",
 ]
-NATIVE_DESELECT = "tests/test_m3_check.py::test_the_command"
+# Runs the m3 script against a fake Langflow at /app/scripts, which imports Langflow: it belongs to `container-tests`, not to `root`.
+ROOT_DESELECT = ["tests/test_m3_check.py::test_the_command"]
 # `make test-scripts` runs these on the host; the `root` stage already covers them under pytest, so the container-tests stage skips them.
-HOST_ONLY_TESTS = ["test_spike_tweaks.py", "test_capture_fixtures.py", "test_cli_end_to_end.py", "test_groq_language_model.py"]
+HOST_ONLY_TESTS = ["test_spike_tweaks.py", "test_capture_fixtures.py", "test_cli_end_to_end.py", "test_groq_language_model.py",
+                   "test_run_all_checks.py"]      # the last one reads files (compose file, .bat) that the Langflow container does not have
 
 
 @dataclass
@@ -99,9 +103,33 @@ class Runner:
                 return 127
             start = time.time()
             assert proc.stdout is not None
-            for raw in iter(proc.stdout.readline, b""):
+            lines: "queue.Queue[bytes | None]" = queue.Queue()
+
+            def pump() -> None:
+                for raw in iter(proc.stdout.readline, b""):      # type: ignore[union-attr]
+                    lines.put(raw)
+                lines.put(None)
+
+            threading.Thread(target=pump, daemon=True).start()
+            beat = start
+            while True:
+                try:
+                    raw = lines.get(timeout=5)
+                except queue.Empty:        # nothing printed for a while: check the time limit, and say we are alive
+                    now = time.time()
+                    if timeout and now - start > timeout:
+                        proc.kill()
+                        f.write(f"\n[stopped after {timeout} seconds]\n")
+                        return 124
+                    if now - beat >= 60 and not self.args.verbose:
+                        print(f"        ... {self.current} still running ({int(now - start)}s)", flush=True)
+                        beat = now
+                    continue
+                if raw is None:
+                    break
                 line = raw.decode("utf-8", "replace")
                 f.write(line)
+                f.flush()
                 if self.args.verbose:
                     sys.stdout.write("    " + line)
                 if timeout and time.time() - start > timeout:
@@ -161,8 +189,7 @@ def stage_api(r: Runner) -> Result:
 
 def stage_root(r: Runner) -> Result:
     ignore = [f"--ignore={p}" for p in LANGFLOW_ONLY_TESTS]
-    if r.args.native:       # this one runs the m3 script at /app/scripts and needs the `langflow` database user: only inside the test container
-        ignore.append("--deselect=" + NATIVE_DESELECT)
+    ignore += [f"--deselect={t}" for t in ROOT_DESELECT]
     return finish(r, r.in_tests(".", ["-m", "pytest", "tests", "-q", "-p", "no:cacheprovider", *ignore]))
 
 
@@ -254,13 +281,13 @@ def stage_stack_health(r: Runner) -> Result:
 
 
 def stage_flow_sync(r: Runner) -> Result:
-    return finish(r, r.sh(r.compose("exec", "-T", "langflow", "python", "/app/scripts/sync_flow_nodes.py", "--check")))
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "langflow", "python", "/app/scripts/sync_flow_nodes.py", "--check")))
 
 
 def stage_container_tests(r: Runner) -> Result:
     skip = "|".join(f"*/{n}" for n in HOST_ONLY_TESTS)
     loop = f'rc=0; for t in /app/tests/test_*.py; do case "$t" in {skip}) continue;; esac; echo "== $t"; python "$t" || rc=1; done; exit $rc'
-    return finish(r, r.sh(r.compose("exec", "-T", "langflow", "sh", "-c", loop), timeout=1800))
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "langflow", "sh", "-c", loop), timeout=1800))
 
 
 def stage_e2e(r: Runner) -> Result:
@@ -271,21 +298,21 @@ def stage_e2e(r: Runner) -> Result:
 # ---- live stages ------------------------------------------------------------------------------------------------------
 
 def stage_m3(r: Runner) -> Result:
-    return finish(r, r.sh(r.compose("exec", "-T", "langflow", "python", "/app/scripts/m3_check.py", "--flow-id", "language-tutor", "--pause", str(r.args.pause)), timeout=3600))
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "langflow", "python", "/app/scripts/m3_check.py", "--flow-id", "language-tutor", "--pause", str(r.args.pause)), timeout=3600))
 
 
 def stage_routing(r: Runner) -> Result:
-    return finish(r, r.sh(r.compose("exec", "-T", "langflow", "python", "/app/scripts/run_routing_tests.py", "--flow-id", "language-tutor", "--delay", str(r.args.pause)), timeout=5400))
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "langflow", "python", "/app/scripts/run_routing_tests.py", "--flow-id", "language-tutor", "--delay", str(r.args.pause)), timeout=5400))
 
 
 def stage_difficulty(r: Runner) -> Result:
     langs, tiers = ("en,zh", "medium") if r.args.quick else ("en,es,fr,zh,ja,ko", "easy,medium,hard")
-    cmd = r.compose("exec", "-T", "api", "python", "scripts/difficulty_check.py", "--base", "http://localhost:8000", "--languages", langs, "--tiers", tiers, "--delay", str(r.args.pause), "--show")
+    cmd = r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/difficulty_check.py", "--base", "http://localhost:8000", "--languages", langs, "--tiers", tiers, "--delay", str(r.args.pause), "--show")
     return finish(r, r.sh(cmd, timeout=7200))
 
 
 def stage_text_tools(r: Runner) -> Result:
-    return finish(r, r.sh(r.compose("exec", "-T", "api", "python", "scripts/text_tools_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/text_tools_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
 
 
 STAGES: list[Stage] = [

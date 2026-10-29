@@ -1324,5 +1324,26 @@
   "labels": [
    "testing"
   ]
+ },
+ {
+  "title": "Read-aloud voices and meanings in the learner's chosen language",
+  "status": "In review",
+  "area": "words",
+  "date": "2026-10-29",
+  "summary": "A voice is chosen per language (never a wrong-language one) with a clear message when none is installed, and tutor-written meanings can be in the learner's language, the study language, or both.",
+  "done": [
+   "Voice picked by region, natural voices first; waits for the browser's voice list",
+   "Settings card to choose and test a voice per language",
+   "meaning_mode preference (migration 0013), selector on the Vocabulary page, prompts for study-language and both",
+   "Test-run fixes: word cell lookup, set-tab contrast, stale tool tests, runner heartbeat"
+  ],
+  "todo": [
+   "Apply, rebuild, run run-checks.bat again and send the table",
+   "Try read-aloud in Edge and Chrome for Japanese; try each meaning choice on real Groq"
+  ],
+  "labels": [
+   "words",
+   "speech"
+  ]
  }
 ]

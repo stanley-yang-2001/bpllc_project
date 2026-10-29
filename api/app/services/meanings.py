@@ -17,14 +17,14 @@ def _stub(prompt: str) -> str:
 
 
 def write_missing(pool, runner: AiRunner, user_id: int, language: str, ids: list[int] | None, set_filter: str | None,
-                  meaning_language: str) -> dict:
+                  meaning_languages: list[str]) -> dict:
     """One batch (at most 25 words) and how many words are still without a meaning, so the page can ask again until it is 0."""
     with connection(pool) as conn:
         todo = vocab.words_without_meaning(conn, user_id, language, ids, set_filter, definitions.MAX_BATCH)
     if not todo["items"]:
         return {"defined": 0, "failed": 0, "remaining": todo["remaining"]}
     words = [w["word"] for w in todo["items"]]
-    prompt = definitions.build_prompt(words, LANGUAGES[language].name, LANGUAGES[meaning_language].name)
+    prompt = definitions.build_prompt(words, LANGUAGES[language].name, [LANGUAGES[c].name for c in meaning_languages])
     raw = runner.run(user_id, prompt, tokens=DEFINE_TOKENS, stub=_stub,
                      failed_message="The tutor couldn't write the meanings. Please try again in a moment.")
     meanings = definitions.parse(raw, words)

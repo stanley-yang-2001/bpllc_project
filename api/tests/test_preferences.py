@@ -21,7 +21,7 @@ def test_first_save_creates_the_row_with_defaults_for_the_rest(client):
     register(client, "alice")
     r = patch(client, theme="dark")
     assert r.status_code == 200
-    assert r.json() == {"active_language": None, "ui_follows_study_language": False, "chat_in_study_language": False, "theme": "dark", "custom_colors": None}
+    assert r.json() == {"active_language": None, "ui_follows_study_language": False, "chat_in_study_language": False, "meaning_mode": "native", "theme": "dark", "custom_colors": None}
     assert client.get("/api/me").json()["preferences"] == r.json()
 
 
@@ -30,7 +30,7 @@ def test_partial_updates_leave_the_other_fields_alone(client):
     client.post("/api/me/languages", json={"language": "es"})
     patch(client, theme="ocean", custom_colors=COLORS, ui_follows_study_language=True, active_language="es")
     r = patch(client, theme="forest")
-    assert r.json() == {"active_language": "es", "ui_follows_study_language": True, "chat_in_study_language": False, "theme": "forest", "custom_colors": COLORS}
+    assert r.json() == {"active_language": "es", "ui_follows_study_language": True, "chat_in_study_language": False, "meaning_mode": "native", "theme": "forest", "custom_colors": COLORS}
     r = patch(client, ui_follows_study_language=False)
     assert r.json()["theme"] == "forest" and r.json()["custom_colors"] == COLORS and r.json()["ui_follows_study_language"] is False
 
@@ -160,3 +160,14 @@ def test_chat_in_study_language_is_off_by_default_saved_alone_and_never_null(cli
     assert r.json()["chat_in_study_language"] is True and r.json()["theme"] == "dark"
     assert patch(client, theme="forest").json()["chat_in_study_language"] is True        # other saves leave it alone
     assert patch(client, chat_in_study_language=None).status_code == 422
+
+
+def test_meaning_mode_defaults_to_the_learners_own_language_and_only_takes_the_three_choices(client):
+    register(client, "alice")
+    r = patch(client, theme="dark")
+    assert r.json()["meaning_mode"] == "native"
+    assert patch(client, meaning_mode="both").json()["meaning_mode"] == "both"
+    assert patch(client, theme="forest").json()["meaning_mode"] == "both"            # other saves leave it alone
+    assert patch(client, meaning_mode="study").json()["meaning_mode"] == "study"
+    assert patch(client, meaning_mode="klingon").status_code == 422
+    assert patch(client, meaning_mode=None).status_code == 422

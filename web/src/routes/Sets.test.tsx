@@ -59,8 +59,29 @@ describe("meanings written by the tutor", () => {
     renderApp("/vocabulary");
     await userEvent.click(await screen.findByRole("button", { name: "Write missing meanings" }));
     await waitFor(() => expect(calls.filter((c) => c.path === "/words/define")).toHaveLength(2));
-    expect(calls.find((c) => c.path === "/words/define")!.body).toMatchObject({ language: "en", set: "all", meaning_language: "en" });
+    expect(calls.find((c) => c.path === "/words/define")!.body).toMatchObject({ language: "en", set: "all", meaning_mode: "native" });
     expect(await screen.findByText("Meanings written: 30.")).toBeInTheDocument();
+  });
+
+  it("lets the learner choose the language of the meanings, saves it on the account and sends it with the request", async () => {
+    const learner = { ...ALICE, native_language: "es", languages: ["en"] };            // Spanish speaker studying English
+    const { calls } = mockApi({ ...base, "GET /me": learner, "GET /words": page([W(1, "bread")]),
+      "PATCH /me/preferences": { active_language: null, ui_follows_study_language: false, chat_in_study_language: false, meaning_mode: "both", theme: "system", custom_colors: null },
+      "POST /words/define": { defined: 1, failed: 0, remaining: 0 } });
+    renderApp("/vocabulary");
+    const choice = await screen.findByLabelText("Write meanings in");
+    expect([...choice.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["My language (Español)", "The language I study (English)", "Both (Español and English)"]);
+    await userEvent.selectOptions(choice, "both");
+    await waitFor(() => expect(calls.find((c) => c.method === "PATCH" && c.path === "/me/preferences")!.body).toEqual({ meaning_mode: "both" }));
+    await userEvent.click(screen.getByRole("button", { name: "Write missing meanings" }));
+    await waitFor(() => expect(calls.find((c) => c.path === "/words/define")!.body).toMatchObject({ meaning_mode: "both" }));
+  });
+
+  it("does not offer Both when the learner studies their own language", async () => {
+    mockApi({ ...base, "GET /words": page([W(1, "bread")]) });                           // native English, studying English
+    renderApp("/vocabulary");
+    const choice = await screen.findByLabelText("Write meanings in");
+    expect([...choice.querySelectorAll("option")].map((o) => o.textContent)).toEqual(["My language (English)", "The language I study (English)"]);
   });
 
   it("stops when a request writes nothing, instead of asking forever", async () => {

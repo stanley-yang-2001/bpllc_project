@@ -11,6 +11,7 @@ import { MyModelSection } from "../settings/MyModelSection";
 import { Section } from "../settings/Section";
 import { ServiceRow } from "../settings/ServiceRow";
 import { SiteLanguageSection } from "../settings/SiteLanguageSection";
+import { VoiceSection } from "../settings/VoiceSection";
 
 /** The settings page: the sections live in `../settings/`, this only puts them in order. */
 export default function Settings() {
@@ -37,6 +38,7 @@ export default function Settings() {
         <PasswordSection />
         <AppearanceSection />
         <SiteLanguageSection />
+        <VoiceSection />
         <MyModelSection />
         <DataSection />
 

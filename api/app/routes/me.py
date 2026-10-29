@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -66,6 +67,7 @@ class PreferencesPatch(BaseModel):
     active_language: str | None = None
     ui_follows_study_language: bool | None = None
     chat_in_study_language: bool | None = None
+    meaning_mode: Literal["native", "study", "both"] | None = None
     theme: str | None = None
     custom_colors: ColorsIn | None = None
 

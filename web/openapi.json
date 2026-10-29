@@ -293,9 +293,31 @@
             "type": "string"
           },
           "meaning_language": {
-            "default": "en",
-            "title": "Meaning Language",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning Language"
+          },
+          "meaning_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "native",
+                  "study",
+                  "both"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning Mode"
           },
           "set": {
             "anyOf": [
@@ -864,6 +886,15 @@
               }
             ]
           },
+          "meaning_mode": {
+            "enum": [
+              "native",
+              "study",
+              "both"
+            ],
+            "title": "Meaning Mode",
+            "type": "string"
+          },
           "theme": {
             "title": "Theme",
             "type": "string"
@@ -877,6 +908,7 @@
           "active_language",
           "ui_follows_study_language",
           "chat_in_study_language",
+          "meaning_mode",
           "theme",
           "custom_colors"
         ],
@@ -918,6 +950,22 @@
                 "type": "null"
               }
             ]
+          },
+          "meaning_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "native",
+                  "study",
+                  "both"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning Mode"
           },
           "theme": {
             "anyOf": [

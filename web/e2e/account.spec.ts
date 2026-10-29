@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addWord, emailOf, login, loginButton, nav, PASSWORD, register, unique } from "./helpers";
+import { addWord, wordCell, emailOf, login, loginButton, nav, PASSWORD, register, unique } from "./helpers";
 
 test.describe("sign-up collects name and email, and consent", () => {
   test("the form asks for exactly name, email and password, and blocks without the checkbox", async ({ page }) => {
@@ -123,7 +123,7 @@ test.describe("settings", () => {
     await addWord(tab1, "doomed");
     const tab2 = await context.newPage();
     await tab2.goto("/vocabulary");
-    await expect(tab2.getByRole("cell", { name: "doomed", exact: true })).toBeVisible();
+    await expect(wordCell(tab2, "doomed")).toBeVisible();
 
     await nav(tab1, "Settings").click();
     await tab1.getByRole("button", { name: "Delete account" }).click();
@@ -161,14 +161,14 @@ test.describe("dialogs, keyboard", () => {
     await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByRole("cell", { name: "uno", exact: true })).toBeVisible();   // nothing deleted
+    await expect(wordCell(page, "uno")).toBeVisible();   // nothing deleted
     await expect(opener).toBeFocused();                                                  // focus handed back
 
     await opener.click();
     await page.getByRole("dialog").getByRole("button", { name: "Delete word" }).click();
-    await expect(page.getByRole("cell", { name: "uno", exact: true })).toHaveCount(0);
+    await expect(wordCell(page, "uno")).toHaveCount(0);
     await expect(page.getByText("Deleted 1 word")).toBeVisible();
-    await expect(page.getByRole("cell", { name: "dos", exact: true })).toBeVisible();
+    await expect(wordCell(page, "dos")).toBeVisible();
   });
 
   test("keyboard focus never lands on the page behind an open dialog", async ({ page }) => {

@@ -37,7 +37,7 @@ def inputs_of(cls):
 
 def test_what_the_agent_can_see():
     print("what the Agent can see")
-    for cls, visible in ((add_word.AddWord, ["word"]), (story_tool.StoryGeneratorTool, ["language", "story_type", "topic"]),
+    for cls, visible in ((add_word.AddWord, ["word"]), (story_tool.StoryGeneratorTool, ["difficulty", "language", "story_type", "topic"]),
                          (word_loader.WordLoader, [])):
         tool_inputs = sorted(n for n, i in inputs_of(cls).items() if getattr(i, "tool_mode", False))
         check(f"{cls.__name__}: the Agent can fill in only {visible}", tool_inputs == visible, str(tool_inputs))
@@ -60,19 +60,19 @@ def test_the_wrappers_hand_over_the_right_values():
     print("what the wrappers pass on")
     seen = {}
     add_word.add_word_for_agent = lambda *a: (seen.setdefault("add", a), "added")[1]
-    story_tool.story_for_agent = lambda *a: (seen.setdefault("story", a), "a story")[1]
+    story_tool.story_for_agent = lambda *a, **kw: (seen.setdefault("story", a), seen.setdefault("story_kw", kw), "a story")[2]
     word_loader.vocabulary_for_agent = lambda *a: (seen.setdefault("list", a), "uno, dos")[1]
 
     out = add_word.AddWord(word="bread", learner_id="17", active_language="es").run()
     check("Add Word passes (word, learner_id, active_language) and returns the text", seen["add"] == ("bread", "17", "es") and out == "added", str(seen))
-    out = story_tool.StoryGeneratorTool(language="French", story_type="dialogue", topic="a market", learner_id="17",
-                                        active_language="es").run()
-    check("Story tool passes (language, learner_id, active_language, story_type, topic) and returns the story as a message",
-          seen["story"] == ("French", "17", "es", "dialogue", "a market") and out.text == "a story", str(seen))
+    out = story_tool.StoryGeneratorTool(language="French", story_type="dialogue", topic="a market", difficulty="easy", learner_id="17",
+                                        active_language="es", set_ids="0,4").run()
+    check("Story tool passes (language, learner_id, active_language, story_type, topic, difficulty) and set_ids, and returns the story as a message",
+          seen["story"] == ("French", "17", "es", "dialogue", "a market", "easy") and seen["story_kw"] == {"set_ids": "0,4"} and out.text == "a story", str(seen))
     seen.clear()
     story_tool.StoryGeneratorTool(language="French", learner_id="17", active_language="es").run()
     check("with no type or topic the Story tool passes them on blank (None or an empty string), and the tool then chooses",
-          seen["story"][:3] == ("French", "17", "es") and all(not v for v in seen["story"][3:]) and len(seen["story"]) == 5, str(seen))
+          seen["story"][:3] == ("French", "17", "es") and all(not v for v in seen["story"][3:]) and len(seen["story"]) == 6, str(seen))
     out = word_loader.WordLoader(learner_id="17", active_language="es").run()
     check("Word Loader passes (learner_id, active_language)", seen["list"] == ("17", "es") and out.text == "uno, dos", str(seen))
 

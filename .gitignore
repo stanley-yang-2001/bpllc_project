@@ -27,3 +27,4 @@ web/test-results/
 web/playwright-report/
 docs/kanban/created.json
 test-reports/
+test-results/

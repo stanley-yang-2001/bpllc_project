@@ -78,7 +78,8 @@ def test_the_files_it_names_exist():
         assert (ROOT / p).is_file(), p
     for n in rc.HOST_ONLY_TESTS:
         assert (ROOT / "tests" / n).is_file(), n
-    assert (ROOT / rc.NATIVE_DESELECT.split("::")[0]).is_file()
+    for node in rc.ROOT_DESELECT:
+        assert (ROOT / node.split("::")[0]).is_file(), node
     assert (ROOT / rc.TEST_COMPOSE).is_file()
     assert (ROOT / "run-checks.bat").is_file()
 

@@ -785,11 +785,10 @@ export interface components {
             ids?: number[] | null;
             /** Language */
             language: string;
-            /**
-             * Meaning Language
-             * @default en
-             */
-            meaning_language: string;
+            /** Meaning Language */
+            meaning_language?: string | null;
+            /** Meaning Mode */
+            meaning_mode?: ("native" | "study" | "both") | null;
             /** Set */
             set?: string | null;
         };
@@ -971,6 +970,11 @@ export interface components {
             /** Chat In Study Language */
             chat_in_study_language: boolean;
             custom_colors: components["schemas"]["CustomColors"] | null;
+            /**
+             * Meaning Mode
+             * @enum {string}
+             */
+            meaning_mode: "native" | "study" | "both";
             /** Theme */
             theme: string;
             /** Ui Follows Study Language */
@@ -987,6 +991,8 @@ export interface components {
             /** Chat In Study Language */
             chat_in_study_language?: boolean | null;
             custom_colors?: components["schemas"]["ColorsIn"] | null;
+            /** Meaning Mode */
+            meaning_mode?: ("native" | "study" | "both") | null;
             /** Theme */
             theme?: string | null;
             /** Ui Follows Study Language */

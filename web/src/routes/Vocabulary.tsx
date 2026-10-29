@@ -19,6 +19,8 @@ import { useBulkActions } from "../vocab/useBulkActions";
 import { useDebounced } from "../vocab/useDebounced";
 import { WordTable } from "../vocab/WordTable";
 import { useToast } from "../components/Toast";
+import { usePreferences } from "../prefs/PreferencesProvider";
+import { MeaningLanguage } from "../vocab/MeaningLanguage";
 
 const LIMIT = 50;
 
@@ -27,6 +29,7 @@ export default function Vocabulary() {
   const qc = useQueryClient();
   const toast = useToast();
   const { t, err } = useI18n();
+  const { prefs } = usePreferences();
   const { user, setUser } = useAuth();
   const { active, setActive, all, info } = useActiveLanguage();
   const [search, setSearch] = useState("");
@@ -64,7 +67,7 @@ export default function Vocabulary() {
   });
 
   const define = useMutation({
-    mutationFn: () => defineLoop({ language: active, set: setFilter }, (done, left) => setProgress({ done, left })),
+    mutationFn: () => defineLoop({ language: active, set: setFilter, meaning_mode: prefs.meaning_mode }, (done, left) => setProgress({ done, left })),
     onSuccess: (r) => {
       toast(r.done === 0 && r.failed === 0 ? t("vocab.defineNone") : t("vocab.defineDone", { count: r.done }));
       void qc.invalidateQueries({ queryKey: wordsKey(user!.id, active) });
@@ -114,6 +117,7 @@ export default function Vocabulary() {
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Button variant="secondary" aria-pressed={showReading} loading={reading.isFetching && showReading} icon={<Type aria-hidden className="size-4" />} onClick={() => setShowReading(!showReading)}>{showReading ? t("reading.hide") : t("reading.show")}</Button>
+            <MeaningLanguage />
             <Button variant="secondary" loading={define.isPending} icon={<Sparkles aria-hidden className="size-4" />} onClick={() => define.mutate()}>{t("vocab.defineMissing")}</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden aria-label={t("vocab.csvFile")} onChange={(e) => { const f = e.target.files?.[0]; if (f) csv.mutate(f); }} />
             <Button variant="secondary" loading={csv.isPending} icon={<Upload aria-hidden className="size-4" />} onClick={() => fileRef.current?.click()}>{t("vocab.uploadCsv")}</Button>

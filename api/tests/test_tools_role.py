@@ -87,7 +87,8 @@ def test_a_password_with_a_quote_in_it_is_stored_as_typed(conn):
     # nothing in the password is treated as SQL; ' and " and \ are only refused by config (URL safety), not by the database
     try:
         set_tools_password(DB_URL, "it's\"a\\pw;DROP")
-        c = psycopg2.connect(host="localhost", dbname=psycopg2.extensions.parse_dsn(DB_URL)["dbname"], user=TOOLS_ROLE, password="it's\"a\\pw;DROP")
+        dsn = psycopg2.extensions.parse_dsn(DB_URL)           # the same server the tests use (a test container is not "localhost")
+        c = psycopg2.connect(host=dsn.get("host", "localhost"), port=dsn.get("port", "5432"), dbname=dsn["dbname"], user=TOOLS_ROLE, password="it's\"a\\pw;DROP")
         c.close()
     finally:
         set_tools_password(DB_URL, "")

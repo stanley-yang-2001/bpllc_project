@@ -37,7 +37,7 @@ export function SetBar({ language, filter, onFilter }: { language: string; filte
   const tab = (key: string, label: string, count: number | undefined, on: boolean, go: () => void) => (
     <button key={key} type="button" aria-pressed={on} onClick={go}
       className={`rounded-full border px-3 py-1 text-sm ${on ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-surface text-slate-700 hover:bg-slate-100/70"}`}>
-      {label}{count !== undefined && <span className="ml-1 opacity-80">({count})</span>}
+      {label}{count !== undefined && <span className="ml-1">({count})</span>}
     </button>
   );
   return (

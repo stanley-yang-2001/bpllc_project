@@ -15,12 +15,33 @@ _LINE = re.compile(r"^\s*(?:[-*\d.)\s]*)(.+?)\s*[|→]\s*(.+?)\s*$")
 _FENCE = re.compile(r"^`{3}.*$", re.M)
 
 
-def build_prompt(words: list[str], language_name: str, meaning_language_name: str) -> str:
+MEANING_MODES = ("native", "study", "both")      # in the learner's own language, in the language being studied, or both
+
+
+def meaning_languages(mode: str, native: str, study: str) -> list[str]:
+    """The language codes a meaning is written in for a mode. Both collapses to one when the learner's own language IS the study
+    language, so nobody gets "water / water"."""
+    if mode == "study":
+        return [study]
+    if mode == "both" and native != study:
+        return [native, study]
+    return [native]
+
+
+def build_prompt(words: list[str], language_name: str, meaning_language_name: "str | list[str]") -> str:
+    """`meaning_language_name` is one language name, or two (the meaning is written in both, joined by " / ")."""
+    names = [meaning_language_name] if isinstance(meaning_language_name, str) else list(meaning_language_name)
     listed = "\n".join(words)
+    if len(names) == 2:
+        how = (f"write a short, plain meaning in {names[0]}, then ` / `, then the same meaning in {names[1]}: at most "
+               f"{MAX_MEANING_CHARS // 3} characters for each language, one line")
+    else:
+        how = f"write a short, plain meaning in {names[0]}: at most {MAX_MEANING_CHARS // 2} characters, one line"
+        if names[0] == language_name:
+            how += f", in simple everyday {language_name} words a learner knows, without using the word itself"
     return (
-        f"You are helping someone learn {language_name}. For each {language_name} word or phrase below, write a short, plain meaning "
-        f"in {meaning_language_name}: at most {MAX_MEANING_CHARS // 2} characters, one line, no examples, no quotation marks, "
-        "no explanation of grammar.\n"
+        f"You are helping someone learn {language_name}. For each {language_name} word or phrase below, {how}, no examples, "
+        "no quotation marks, no explanation of grammar.\n"
         "Answer with exactly one line per entry, in the same order, in this form:\n"
         "word | meaning\n"
         "Copy each word exactly as given. Write nothing else: no heading, no numbering, no notes.\n\n"

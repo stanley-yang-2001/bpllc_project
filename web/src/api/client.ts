@@ -113,8 +113,8 @@ export const api = {
   /** set_id null = back to General */
   moveWords: (ids: number[], set_id: number | null) => request<{ moved: number }>("POST", "/words/move", { json: { ids, set_id } }),
   /** Asks the tutor to write meanings for up to 25 words with none; call again while `remaining` is above 0. */
-  defineWords: (b: { language: string; ids?: number[]; set?: SetFilter; meaning_language?: string }) =>
-    request<DefineResult>("POST", "/words/define", { json: { ...b, set: b.set === undefined ? undefined : String(b.set), meaning_language: b.meaning_language ?? "en" } }),
+  defineWords: (b: { language: string; ids?: number[]; set?: SetFilter; meaning_mode?: "native" | "study" | "both" }) =>
+    request<DefineResult>("POST", "/words/define", { json: { ...b, set: b.set === undefined ? undefined : String(b.set) } }),
   uploadWords: (language: string, file: File) => {
     const form = new FormData();
     form.set("language", language);

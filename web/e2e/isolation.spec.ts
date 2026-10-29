@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { wordCell } from "./helpers";
 
 /** Real browser, real nginx + API + database. These are the "user B must never see user A" scenarios. */
 
@@ -28,7 +29,7 @@ async function addWord(page: Page, word: string) {
   await nav(page, "Vocabulary").click();
   await page.getByLabel("Word", { exact: true }).fill(word);
   await page.getByRole("button", { name: "Add word" }).click();
-  await expect(page.getByRole("cell", { name: word, exact: true })).toBeVisible();
+  await expect(wordCell(page, word)).toBeVisible();
 }
 
 /** The top navigation only (the Home page also has cards linking to the same places). */
@@ -64,7 +65,7 @@ test.describe("two people, two browsers", () => {
 
     await a.page.reload();                                              // and A's word is untouched
     await nav(a.page, "Vocabulary").click();
-    await expect(a.page.getByRole("cell", { name: secret, exact: true })).toBeVisible();
+    await expect(wordCell(a.page, secret)).toBeVisible();
     await a.context.close(); await b.context.close();
   });
 });

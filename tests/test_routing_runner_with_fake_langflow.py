@@ -147,7 +147,11 @@ def reply_for(message, session, learner, language):
         text = out
         if STATE["bug"] == "rewrite_reply":
             text = out.splitlines()[0] + " ... (Note: intentionally short)"
-        return build_response(text, [tool("story_generator_tool", {"language": shown_arg}, out)])
+        args = {"language": shown_arg}
+        tier = re.search(r"\b(easy|medium|hard)\b", low)
+        if tier:                                       # the tool's optional difficulty, passed only when the learner named one
+            args["difficulty"] = tier.group(1)
+        return build_response(text, [tool("story_generator_tool", args, out)])
     if "story" in low:
         return build_response("Which language would you like?", [])
     return build_response("Hi! Ask me for a story or add a word.", [])

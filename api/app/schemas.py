@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -20,6 +20,7 @@ class PreferencesOut(BaseModel):
     active_language: str | None
     ui_follows_study_language: bool
     chat_in_study_language: bool
+    meaning_mode: Literal["native", "study", "both"]
     theme: str
     custom_colors: CustomColors | None
 

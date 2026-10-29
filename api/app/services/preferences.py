@@ -1,13 +1,13 @@
-"""Display preferences kept on the account (design 3H): the theme, the five custom colours, whether the site follows
-the study language, and the language being studied now. No row means defaults."""
+"""Preferences kept on the account (design 3H): the theme, the five custom colours, whether the site follows
+the study language, the language of tutor-written meanings, and the language being studied now. No row means defaults."""
 from __future__ import annotations
 
 from psycopg2.extras import Json
 
 from ..db import cursor
 
-COLUMNS = "active_language, ui_follows_study_language, chat_in_study_language, theme, custom_colors"
-_WRITABLE = ("active_language", "ui_follows_study_language", "chat_in_study_language", "theme", "custom_colors")
+COLUMNS = "active_language, ui_follows_study_language, chat_in_study_language, meaning_mode, theme, custom_colors"
+_WRITABLE = ("active_language", "ui_follows_study_language", "chat_in_study_language", "meaning_mode", "theme", "custom_colors")
 
 
 def get(conn, user_id: int) -> dict | None:
@@ -33,7 +33,8 @@ def save(conn, user_id: int, changes: dict) -> dict:
 
 
 _NOT_NULLABLE = {"theme": "theme: cannot be empty", "ui_follows_study_language": "ui_follows_study_language: must be true or false",
-                 "chat_in_study_language": "chat_in_study_language: must be true or false"}
+                 "chat_in_study_language": "chat_in_study_language: must be true or false",
+                 "meaning_mode": "meaning_mode: must be native, study or both"}
 
 
 def changes_from(sent: dict) -> dict:

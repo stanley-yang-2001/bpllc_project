@@ -8,6 +8,8 @@ import { useAuth } from "../auth/AuthContext";
 import { useToast } from "../components/Toast";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, Card, ErrorText, inputCls } from "../components/ui";
+import { usePreferences } from "../prefs/PreferencesProvider";
+import { MeaningLanguage } from "./MeaningLanguage";
 
 type Props = { language: string; languageName: string; sets: WordSet[]; filter: SetFilter; onChanged: () => void };
 
@@ -17,6 +19,7 @@ export function AddWordForm({ language, languageName, sets, filter, onChanged }:
   const toast = useToast();
   const { user } = useAuth();
   const { t, err } = useI18n();
+  const { prefs } = usePreferences();
   const [wantMeaning, setWantMeaning] = useState(false);
   const [picked, setPicked] = useState("");
   const form = useForm<{ word: string; meaning: string }>({ defaultValues: { word: "", meaning: "" } });
@@ -27,7 +30,7 @@ export function AddWordForm({ language, languageName, sets, filter, onChanged }:
     mutationFn: async (v: { word: string; meaning: string }) => {
       const target = picked !== "" ? Number(picked) : typeof filter === "number" ? filter : null;
       const w = await api.addWord({ language, word: v.word, meaning: v.meaning || undefined, ...(target !== null ? { set_id: target } : {}) });
-      if (wantMeaning && !v.meaning) await api.defineWords({ ids: [w.id], language }).catch(() => undefined);   // the word is kept even if the tutor can't answer now
+      if (wantMeaning && !v.meaning) await api.defineWords({ ids: [w.id], language, meaning_mode: prefs.meaning_mode }).catch(() => undefined);   // the word is kept even if the tutor can't answer now
       return w;
     },
     onSuccess: (w) => {
@@ -57,10 +60,13 @@ export function AddWordForm({ language, languageName, sets, filter, onChanged }:
           </div>
         )}
         <Button type="submit" loading={add.isPending} icon={<Plus aria-hidden className="size-4" />}>{t("vocab.addWord")}</Button>
-        <label className="flex w-full items-center gap-2 text-sm text-slate-700">
-          <input type="checkbox" className="size-4 rounded accent-brand-600" checked={wantMeaning} onChange={(e) => setWantMeaning(e.target.checked)} />
-          {t("vocab.defineAdd")}
-        </label>
+        <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" className="size-4 rounded accent-brand-600" checked={wantMeaning} onChange={(e) => setWantMeaning(e.target.checked)} />
+            {t("vocab.defineAdd")}
+          </label>
+          {wantMeaning && <MeaningLanguage />}
+        </div>
       </form>
       <ErrorText>{add.error ? err(add.error) : undefined}</ErrorText>
       <p className="mt-3 text-xs text-slate-500">{t("vocab.storedHint")} {t("vocab.defineHint")}</p>
