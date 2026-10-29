@@ -21,6 +21,7 @@ import { WordTable } from "../vocab/WordTable";
 import { useToast } from "../components/Toast";
 import { usePreferences } from "../prefs/PreferencesProvider";
 import { MeaningLanguage } from "../vocab/MeaningLanguage";
+import { StarterPacks } from "../vocab/StarterPacks";
 
 const LIMIT = 50;
 
@@ -105,6 +106,8 @@ export default function Vocabulary() {
           </div>
         )}
       />
+
+      {words.data && words.data.total < 60 && !q && setFilter === "all" && <div className="mb-6"><StarterPacks language={active} /></div>}
 
       <AddWordForm language={active} languageName={langName} sets={sets} filter={setFilter} onChanged={refreshSets} />
 

@@ -23,4 +23,4 @@ pronounce = ["pypinyin", "pykakasi", "korean-romanizer"]
 include = ["tutor_core*"]
 
 [tool.setuptools.package-data]
-tutor_core = ["data/*.txt"]
+tutor_core = ["data/*.txt", "data/*.json"]

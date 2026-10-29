@@ -4,6 +4,7 @@ import csv
 import io
 
 import psycopg2.errors
+from tutor_core import starter
 from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
@@ -170,3 +171,28 @@ def bulk_add(conn, user_id: int, language: str, rows: list[tuple[int, str, str]]
         if added:
             cur.execute("INSERT INTO user_languages (user_id, language) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user_id, language))
     return {"added": added, "duplicates": duplicates, "invalid_count": len(invalid), "invalid": invalid[:20]}
+
+
+def starter_packs(conn, user_id: int, language: str) -> list[dict]:
+    """The ready-made packs for this language and how many of their words the learner does not have yet."""
+    if not starter.has_packs(language):
+        return []
+    with cursor(conn) as cur:
+        cur.execute("SELECT word FROM words WHERE user_id = %s AND language = %s", (user_id, language))
+        have = {r["word"] for r in cur.fetchall()}
+    out = []
+    for pack in starter.pack_ids():
+        words = [w for w, _ in starter.pack_words(pack, language)]
+        out.append({"id": pack, "total": len(words), "remaining": sum(1 for w in words if validate_word(w, language) not in have)})
+    return out
+
+
+def add_starter_pack(conn, user_id: int, language: str, pack: str, with_gloss: bool) -> dict:
+    """Adds a pack's words that the learner does not have (existing words are never touched). With `with_gloss` the short English
+    gloss is stored as the meaning, free and ready for practice; without it the words have no meaning yet, to be written by the tutor."""
+    pairs = starter.pack_words(pack, language)
+    if not pairs:
+        raise not_found("That pack isn't available for this language.")
+    rows = [(i + 1, w, (g or "") if with_gloss else "") for i, (w, g) in enumerate(pairs)]
+    result = bulk_add(conn, user_id, language, rows)
+    return {"added": result["added"], "duplicates": result["duplicates"], "with_meaning": bool(with_gloss and language != "en")}

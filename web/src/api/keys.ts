@@ -6,3 +6,4 @@ export const storiesKey = (userId: number, ...rest: (string | number)[]) => ["st
 export const setsKey = (userId: number, language: string) => ["sets", userId, language] as const;
 /** What the learner has practised (counts, streak). Dropped whenever an answer is recorded. */
 export const progressKey = (userId: number, language: string) => ["practice", userId, "progress", language] as const;
+export const starterKey = (userId: number, language: string) => ["starter", userId, language] as const;

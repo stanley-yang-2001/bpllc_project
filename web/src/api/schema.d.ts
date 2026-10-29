@@ -683,6 +683,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/words/starter-packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Starter Packs
+         * @description Ready-made packs of everyday words for this language, and how many of each the learner does not have yet.
+         */
+        get: operations["starter_packs_api_words_starter_packs_get"];
+        put?: never;
+        /** Add Starter Pack */
+        post: operations["add_starter_pack_api_words_starter_packs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/words/upload": {
         parameters: {
             query?: never;
@@ -1176,6 +1197,38 @@ export interface components {
         SetRename: {
             /** Name */
             name: string;
+        };
+        /** StarterAdded */
+        StarterAdded: {
+            /** Added */
+            added: number;
+            /** Duplicates */
+            duplicates: number;
+            /** With Meaning */
+            with_meaning: boolean;
+        };
+        /** StarterBody */
+        StarterBody: {
+            /** Language */
+            language: string;
+            /** Pack */
+            pack: string;
+        };
+        /** StarterPackList */
+        StarterPackList: {
+            /** Gloss Available */
+            gloss_available: boolean;
+            /** Items */
+            items: components["schemas"]["StarterPackOut"][];
+        };
+        /** StarterPackOut */
+        StarterPackOut: {
+            /** Id */
+            id: string;
+            /** Remaining */
+            remaining: number;
+            /** Total */
+            total: number;
         };
         /** StatusOut */
         StatusOut: {
@@ -2662,6 +2715,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    starter_packs_api_words_starter_packs_get: {
+        parameters: {
+            query: {
+                language: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarterPackList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_starter_pack_api_words_starter_packs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StarterBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarterAdded"];
                 };
             };
             /** @description Validation Error */

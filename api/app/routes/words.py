@@ -5,8 +5,10 @@ from pydantic import BaseModel, Field
 
 from ..db import connection
 from ..deps import current_user, require_language
-from ..schemas import DeleteResult, UploadResult, WordOut, WordPage
-from ..services import vocab, word_sets
+from ..schemas import DeleteResult, StarterAdded, StarterPackList, UploadResult, WordOut, WordPage
+from ..services import preferences, vocab, word_sets
+from tutor_core import definitions
+from tutor_core.languages import LANGUAGES
 
 router = APIRouter(prefix="/words", tags=["words"])
 
@@ -27,6 +29,11 @@ class DeleteBody(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=500)
 
 
+class StarterBody(BaseModel):
+    language: str
+    pack: str = Field(max_length=20)
+
+
 class MoveBody(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=500)
     set_id: int | None = None          # null moves the words back to General
@@ -39,6 +46,29 @@ def list_words(request: Request, language: str, q: str | None = None, limit: int
     require_language(language)
     with connection(request.app.state.pool) as conn:
         return vocab.list_words(conn, user["id"], language, q, limit, offset, set, missing_meaning)
+
+
+def _gloss_ok(conn, user: dict, language: str) -> bool:
+    """A pack's English gloss is stored as the meaning only when English is the one language this learner wants meanings in."""
+    saved = preferences.get(conn, user["id"])
+    mode = (saved or {}).get("meaning_mode") or "native"
+    native = user.get("native_language")
+    return language != "en" and definitions.meaning_languages(mode, native if native in LANGUAGES else "en", language) == ["en"]
+
+
+@router.get("/starter-packs", response_model=StarterPackList)
+def starter_packs(request: Request, language: str, user: dict = Depends(current_user)):
+    """Ready-made packs of everyday words for this language, and how many of each the learner does not have yet."""
+    require_language(language)
+    with connection(request.app.state.pool) as conn:
+        return {"items": vocab.starter_packs(conn, user["id"], language), "gloss_available": _gloss_ok(conn, user, language)}
+
+
+@router.post("/starter-packs", response_model=StarterAdded)
+def add_starter_pack(body: StarterBody, request: Request, user: dict = Depends(current_user)):
+    require_language(body.language)
+    with connection(request.app.state.pool) as conn:
+        return vocab.add_starter_pack(conn, user["id"], body.language, body.pack, _gloss_ok(conn, user, body.language))
 
 
 @router.post("", status_code=201, response_model=WordOut)

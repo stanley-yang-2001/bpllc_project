@@ -1439,6 +1439,92 @@
         "title": "SetRename",
         "type": "object"
       },
+      "StarterAdded": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "with_meaning": {
+            "title": "With Meaning",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "added",
+          "duplicates",
+          "with_meaning"
+        ],
+        "title": "StarterAdded",
+        "type": "object"
+      },
+      "StarterBody": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "pack": {
+            "maxLength": 20,
+            "title": "Pack",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "pack"
+        ],
+        "title": "StarterBody",
+        "type": "object"
+      },
+      "StarterPackList": {
+        "properties": {
+          "gloss_available": {
+            "title": "Gloss Available",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/StarterPackOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "gloss_available"
+        ],
+        "title": "StarterPackList",
+        "type": "object"
+      },
+      "StarterPackOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "total",
+          "remaining"
+        ],
+        "title": "StarterPackOut",
+        "type": "object"
+      },
       "StatusOut": {
         "properties": {
           "status": {
@@ -3772,6 +3858,88 @@
           }
         },
         "summary": "Move Words",
+        "tags": [
+          "words"
+        ]
+      }
+    },
+    "/api/words/starter-packs": {
+      "get": {
+        "description": "Ready-made packs of everyday words for this language, and how many of each the learner does not have yet.",
+        "operationId": "starter_packs_api_words_starter_packs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarterPackList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Starter Packs",
+        "tags": [
+          "words"
+        ]
+      },
+      "post": {
+        "operationId": "add_starter_pack_api_words_starter_packs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StarterBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarterAdded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Starter Pack",
         "tags": [
           "words"
         ]

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Layers, Library, MessageCircle, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { wordsKey } from "../api/keys";
@@ -7,7 +8,8 @@ import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
-import { Button, Card, PageHeader, Skeleton } from "../components/ui";
+import { Card, PageHeader, Skeleton } from "../components/ui";
+import { FirstRunGuide } from "../vocab/FirstRunGuide";
 
 const actions = [
   { to: "/vocabulary", title: "nav.vocabulary", text: "home.vocabulary.text", icon: BookOpen },
@@ -23,20 +25,18 @@ export default function Home() {
   const { t } = useI18n();
   const count = useQuery({ queryKey: wordsKey(user!.id, active, "", 0, "count"), queryFn: () => api.words({ language: active, limit: 1 }) });
   const name = info(active)?.native ?? active;
+  const [justStarted, setJustStarted] = useState<string | null>(null);        // the language a pack was just added to: keep the guide (and its message) up
+  const showGuide = count.data?.total === 0 || justStarted === active;
   return (
     <div>
       <PageHeader title={t("home.welcome", { name: user?.display_name ?? "" })} description={t("home.studying", { language: name })} />
+
+      {showGuide && <FirstRunGuide language={active} onAdded={() => setJustStarted(active)} />}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>
           <p className="text-sm font-medium text-slate-600">{t("home.words", { language: name })}</p>
           {count.data ? <p className="mt-1 text-4xl font-semibold tracking-tight text-slate-900">{count.data.total}</p> : <Skeleton className="mt-2 h-10 w-20" />}
-          {count.data?.total === 0 && (
-            <div className="mt-3">
-              <p className="mb-3 text-sm text-slate-600">{t("home.empty")}</p>
-              <Link to="/vocabulary"><Button icon={<BookOpen aria-hidden className="size-4" />}>{t("home.addFirst")}</Button></Link>
-            </div>
-          )}
         </Card>
         <Card>
           <p className="text-sm font-medium text-slate-600">{t("home.languages")}</p>

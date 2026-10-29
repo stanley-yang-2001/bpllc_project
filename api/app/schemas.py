@@ -191,6 +191,23 @@ class ChoiceSet(BaseModel):
     total: int
 
 
+class StarterPackOut(BaseModel):
+    id: str                     # basics, food, people or numbers
+    total: int
+    remaining: int              # words of the pack the learner does not have yet
+
+
+class StarterPackList(BaseModel):
+    items: list[StarterPackOut]
+    gloss_available: bool       # true when the pack words would come with a ready-made English meaning for this learner
+
+
+class StarterAdded(BaseModel):
+    added: int
+    duplicates: int
+    with_meaning: bool          # false: the words have no meaning yet; the tutor can write them in the learner's chosen language
+
+
 class AnswerIn(BaseModel):
     word_id: int
     correct: bool
