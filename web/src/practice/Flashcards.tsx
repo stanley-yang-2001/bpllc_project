@@ -8,17 +8,19 @@ import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
 import { CARDS } from "./constants";
+import { useAnswerRecorder } from "./useRecorder";
 
-/** Nothing here is stored: a score is shown and forgotten (design: practice results are not stored). `round` makes a
- * fresh shuffle each time the learner starts again; the cache is dropped as soon as the page is left. */
-export function Flashcards({ language, set, onDone }: { language: string; set: SetFilter; onDone: () => void }) {
+/** Each answer is remembered (see useAnswerRecorder) so words come back when they are due. `due` asks for the words that are due
+ * now. `round` makes a fresh draw each time the learner starts again; the cache is dropped as soon as the page is left. */
+export function Flashcards({ language, set, due = false, onDone }: { language: string; set: SetFilter; due?: boolean; onDone: () => void }) {
   const { user } = useAuth();
   const { t, err } = useI18n();
   const [round, setRound] = useState(0);
-  const cards = useQuery({ queryKey: ["practice", user!.id, "flashcards", language, String(set), round], queryFn: () => api.flashcards({ language, limit: CARDS, set }), gcTime: 0, staleTime: Infinity });
+  const cards = useQuery({ queryKey: ["practice", user!.id, "flashcards", language, String(set), due, round], queryFn: () => api.flashcards({ language, limit: CARDS, set, due }), gcTime: 0, staleTime: Infinity });
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(false);
   const [known, setKnown] = useState(0);
+  const { record, failed } = useAnswerRecorder(language);
   const again = () => { setRound((r) => r + 1); setIndex(0); setShown(false); setKnown(0); };
 
   if (cards.isPending) return <Skeleton className="h-40 w-full" />;
@@ -26,15 +28,17 @@ export function Flashcards({ language, set, onDone }: { language: string; set: S
   const items = cards.data.items;
   if (items.length === 0)
     return (
-      <EmptyState icon={<Layers aria-hidden className="size-5" />} title={t("practice.flashcards.noneTitle")}
-        action={<Link to="/vocabulary" className="text-sm font-medium text-brand-600 underline dark:text-brand-200">{t("practice.flashcards.addMeanings")}</Link>}>
-        {t("practice.flashcards.noneBody")}
+      <EmptyState icon={<Layers aria-hidden className="size-5" />} title={due ? t("practice.due.noneTitle") : t("practice.flashcards.noneTitle")}
+        action={due ? <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
+          : <Link to="/vocabulary" className="text-sm font-medium text-brand-600 underline dark:text-brand-200">{t("practice.flashcards.addMeanings")}</Link>}>
+        {due ? t("practice.due.noneBody") : t("practice.flashcards.noneBody")}
       </EmptyState>
     );
   if (index >= items.length)
     return (
       <div className="space-y-3 text-center" role="status">
         <p className="text-lg font-semibold text-slate-900">{t("practice.flashcards.score", { known, total: items.length })}</p>
+        {failed && <ErrorText>{t("practice.saveFailed")}</ErrorText>}
         <div className="flex justify-center gap-2">
           <Button onClick={again} icon={<RotateCcw aria-hidden className="size-4" />}>{t("practice.again")}</Button>
           <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
@@ -42,7 +46,7 @@ export function Flashcards({ language, set, onDone }: { language: string; set: S
       </div>
     );
   const card = items[index];
-  const next = (knew: boolean) => { if (knew) setKnown(known + 1); setShown(false); setIndex(index + 1); };
+  const next = (knew: boolean) => { record(card.id, knew); if (knew) setKnown(known + 1); setShown(false); setIndex(index + 1); };
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">{t("practice.cardOf", { n: index + 1, total: items.length })}</p>

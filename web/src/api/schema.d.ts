@@ -361,6 +361,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Answers
+         * @description Remember which words the learner got right or wrong, so the due ones come back (spaced repetition).
+         */
+        post: operations["record_answers_api_practice_answers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practice/choices": {
         parameters: {
             query?: never;
@@ -370,7 +390,7 @@ export interface paths {
         };
         /**
          * Choices
-         * @description Multiple-choice cards from this learner's own words that have a meaning (nothing stored, no AI).
+         * @description Multiple-choice cards from this learner's own words that have a meaning (made on the spot, no AI).
          */
         get: operations["choices_api_practice_choices_get"];
         put?: never;
@@ -408,8 +428,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Flashcards */
+        /**
+         * Flashcards
+         * @description due=true: only the words that are due now, then words never practised.
+         */
         get: operations["flashcards_api_practice_flashcards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/practice/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Progress */
+        get: operations["get_progress_api_practice_progress_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -681,6 +721,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnswerIn */
+        AnswerIn: {
+            /** Correct */
+            correct: boolean;
+            /** Word Id */
+            word_id: number;
+        };
+        /** AnswersIn */
+        AnswersIn: {
+            /** Answers */
+            answers: components["schemas"]["AnswerIn"][];
+        };
         /** Body_upload_api_words_upload_post */
         Body_upload_api_words_upload_post: {
             /** File */
@@ -740,6 +792,8 @@ export interface components {
             choices: string[];
             /** Hint */
             hint: string;
+            /** Word Id */
+            word_id?: number | null;
         };
         /** ClozeSet */
         ClozeSet: {
@@ -1004,6 +1058,23 @@ export interface components {
             display_name?: string | null;
             /** Native Language */
             native_language?: string | null;
+        };
+        /** ProgressOut */
+        ProgressOut: {
+            /** Due */
+            due: number;
+            /** Known */
+            known: number;
+            /** Language */
+            language: string;
+            /** Learning */
+            learning: number;
+            /** New */
+            new: number;
+            /** Practised Today */
+            practised_today: boolean;
+            /** Streak */
+            streak: number;
         };
         /** PronounceBody */
         PronounceBody: {
@@ -1899,6 +1970,37 @@ export interface operations {
             };
         };
     };
+    record_answers_api_practice_answers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     choices_api_practice_choices_get: {
         parameters: {
             query: {
@@ -1906,6 +2008,7 @@ export interface operations {
                 limit?: number;
                 direction?: string;
                 set?: string | null;
+                due?: boolean;
             };
             header?: never;
             path?: never;
@@ -1970,6 +2073,7 @@ export interface operations {
                 language: string;
                 limit?: number;
                 set?: string | null;
+                due?: boolean;
             };
             header?: never;
             path?: never;
@@ -1984,6 +2088,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlashcardSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_progress_api_practice_progress_get: {
+        parameters: {
+            query: {
+                language: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressOut"];
                 };
             };
             /** @description Validation Error */

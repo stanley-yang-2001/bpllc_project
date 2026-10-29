@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CustomColors(BaseModel):
@@ -191,12 +191,32 @@ class ChoiceSet(BaseModel):
     total: int
 
 
+class AnswerIn(BaseModel):
+    word_id: int
+    correct: bool
+
+
+class AnswersIn(BaseModel):
+    answers: list[AnswerIn] = Field(max_length=50)
+
+
+class ProgressOut(BaseModel):
+    language: str
+    new: int                    # words with a meaning never practised yet
+    learning: int               # practised, not yet in box 4
+    known: int                  # box 4 or 5
+    due: int                    # practised and due now (new words are not counted here)
+    streak: int                 # days in a row, UTC days
+    practised_today: bool
+
+
 class ClozeItem(BaseModel):
     before: str
     after: str
     answer: str
     hint: str
     choices: list[str]
+    word_id: int | None = None          # the learner's word this blank is for, so the answer can be remembered
 
 
 class ClozeSet(BaseModel):

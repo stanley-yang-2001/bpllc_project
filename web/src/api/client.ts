@@ -28,6 +28,8 @@ export type Pronunciation = Schemas["PronounceOut"];
 export type Translation = Schemas["TranslateOut"];
 export type SetList = Schemas["SetList"];
 export type ChoiceSet = Schemas["ChoiceSet"];
+export type PracticeProgress = Schemas["ProgressOut"];
+export interface Answer { word_id: number; correct: boolean }
 export type ChoiceCard = Schemas["ChoiceOut"];
 /** Which words to show or practise: every word, the General set, or one set by id (sent as "all", "general" or the number). */
 export type SetFilter = "all" | "general" | number;
@@ -130,10 +132,12 @@ export const api = {
   stories: (p: { language?: string; limit?: number; offset?: number }) => request<StoryPage>("GET", `/stories?${qs(p)}`),
   story: (id: number) => request<SavedStory>("GET", `/stories/${id}`),
   deleteStory: (id: number) => request<void>("DELETE", `/stories/${id}`),
-  flashcards: (p: { language: string; limit?: number; set?: SetFilter }) =>
-    request<FlashcardSet>("GET", `/practice/flashcards?${qs({ ...p, set: p.set === "all" ? undefined : p.set })}`),
-  choices: (p: { language: string; limit?: number; direction?: "meaning" | "word"; set?: SetFilter }) =>
-    request<ChoiceSet>("GET", `/practice/choices?${qs({ ...p, set: p.set === "all" ? undefined : p.set })}`),
+  flashcards: (p: { language: string; limit?: number; set?: SetFilter; due?: boolean }) =>
+    request<FlashcardSet>("GET", `/practice/flashcards?${qs({ ...p, set: p.set === "all" ? undefined : p.set, due: p.due ? "true" : undefined })}`),
+  choices: (p: { language: string; limit?: number; direction?: "meaning" | "word"; set?: SetFilter; due?: boolean }) =>
+    request<ChoiceSet>("GET", `/practice/choices?${qs({ ...p, set: p.set === "all" ? undefined : p.set, due: p.due ? "true" : undefined })}`),
+  recordAnswers: (answers: Answer[]) => request<void>("POST", "/practice/answers", { json: { answers } }),
+  practiceProgress: (language: string) => request<PracticeProgress>("GET", `/practice/progress?${qs({ language })}`),
   cloze: (storyId: number) => request<ClozeSet>("GET", `/practice/cloze?story_id=${storyId}`),
   pronounce: (b: { language: string; texts: string[] }) => request<Pronunciation>("POST", "/pronounce", { json: b }),
   translate: (b: { language: string; target_language: string; texts: string[]; words?: boolean }) => request<Translation>("POST", "/translate", { json: b }),

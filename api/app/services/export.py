@@ -21,6 +21,11 @@ def build(conn, user_id: int) -> dict:
         cur.execute("SELECT w.language, w.word, w.meaning, s.name AS set_name, w.created_at FROM words w "
                     "LEFT JOIN word_sets s ON s.id = w.set_id WHERE w.user_id = %s ORDER BY w.language, w.word", (user_id,))
         out["words"] = cur.fetchall()           # set_name null = the General set
+        cur.execute("SELECT w.language, w.word, p.box, p.due_at, p.right_count, p.wrong_count, p.last_answered_at FROM word_progress p "
+                    "JOIN words w ON w.id = p.word_id WHERE p.user_id = %s ORDER BY w.language, w.word", (user_id,))
+        out["word_progress"] = cur.fetchall()           # which words you practised and how they went
+        cur.execute("SELECT day, answers FROM practice_days WHERE user_id = %s ORDER BY day", (user_id,))
+        out["practice_days"] = cur.fetchall()
         cur.execute("SELECT language, name, created_at FROM word_sets WHERE user_id = %s ORDER BY language, name", (user_id,))
         out["word_sets"] = cur.fetchall()
         cur.execute("SELECT active_language, ui_follows_study_language, chat_in_study_language, meaning_mode, theme, custom_colors, updated_at "

@@ -8,18 +8,21 @@ import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
 import { CARDS } from "./constants";
+import { useAnswerRecorder } from "./useRecorder";
 
 export type Direction = "meaning" | "word";
 
-/** Four options per question, made from the learner's own words that have a meaning. Nothing is stored. */
-export function Choices({ language, set, direction, onDone }: { language: string; set: SetFilter; direction: Direction; onDone: () => void }) {
+/** Four options per question, made from the learner's own words that have a meaning. Each answer is remembered (useAnswerRecorder);
+ * `due` asks about the words that are due now. */
+export function Choices({ language, set, direction, due = false, onDone }: { language: string; set: SetFilter; direction: Direction; due?: boolean; onDone: () => void }) {
   const { user } = useAuth();
   const { t, err } = useI18n();
   const [round, setRound] = useState(0);
-  const cards = useQuery({ queryKey: ["practice", user!.id, "choices", language, String(set), direction, round], queryFn: () => api.choices({ language, limit: CARDS, direction, set }), gcTime: 0, staleTime: Infinity });
+  const cards = useQuery({ queryKey: ["practice", user!.id, "choices", language, String(set), direction, due, round], queryFn: () => api.choices({ language, limit: CARDS, direction, set, due }), gcTime: 0, staleTime: Infinity });
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [right, setRight] = useState(0);
+  const { record, failed } = useAnswerRecorder(language);
   const again = () => { setRound((r) => r + 1); setIndex(0); setPicked(null); setRight(0); };
 
   if (cards.isPending) return <Skeleton className="h-40 w-full" />;
@@ -27,15 +30,17 @@ export function Choices({ language, set, direction, onDone }: { language: string
   const items = cards.data.items;
   if (items.length === 0)
     return (
-      <EmptyState icon={<ListChecks aria-hidden className="size-5" />} title={t("practice.choice.noneTitle")}
-        action={<Link to="/vocabulary" className="text-sm font-medium text-brand-600 underline dark:text-brand-200">{t("practice.flashcards.addMeanings")}</Link>}>
-        {t("practice.choice.noneBody")}
+      <EmptyState icon={<ListChecks aria-hidden className="size-5" />} title={due && cards.data.total >= 2 ? t("practice.due.noneTitle") : t("practice.choice.noneTitle")}
+        action={due && cards.data.total >= 2 ? <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
+          : <Link to="/vocabulary" className="text-sm font-medium text-brand-600 underline dark:text-brand-200">{t("practice.flashcards.addMeanings")}</Link>}>
+        {due && cards.data.total >= 2 ? t("practice.due.noneBody") : t("practice.choice.noneBody")}
       </EmptyState>
     );
   if (index >= items.length)
     return (
       <div className="space-y-3 text-center" role="status">
         <p className="text-lg font-semibold text-slate-900">{t("practice.choice.score", { right, total: items.length })}</p>
+        {failed && <ErrorText>{t("practice.saveFailed")}</ErrorText>}
         <div className="flex justify-center gap-2">
           <Button onClick={again} icon={<RotateCcw aria-hidden className="size-4" />}>{t("practice.again")}</Button>
           <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
@@ -46,6 +51,7 @@ export function Choices({ language, set, direction, onDone }: { language: string
   const choose = (c: string) => {
     if (picked !== null) return;
     setPicked(c);
+    record(item.id, c === item.answer);
     if (c === item.answer) setRight(right + 1);
   };
   const wordSide = direction === "meaning";        // the question is a word; the options are meanings

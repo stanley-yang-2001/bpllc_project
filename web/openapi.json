@@ -1,6 +1,41 @@
 {
   "components": {
     "schemas": {
+      "AnswerIn": {
+        "properties": {
+          "correct": {
+            "title": "Correct",
+            "type": "boolean"
+          },
+          "word_id": {
+            "title": "Word Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "word_id",
+          "correct"
+        ],
+        "title": "AnswerIn",
+        "type": "object"
+      },
+      "AnswersIn": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerIn"
+            },
+            "maxItems": 50,
+            "title": "Answers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "title": "AnswersIn",
+        "type": "object"
+      },
       "Body_upload_api_words_upload_post": {
         "properties": {
           "file": {
@@ -165,6 +200,17 @@
           "hint": {
             "title": "Hint",
             "type": "string"
+          },
+          "word_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Word Id"
           }
         },
         "required": [
@@ -1019,6 +1065,49 @@
           }
         },
         "title": "ProfilePatch",
+        "type": "object"
+      },
+      "ProgressOut": {
+        "properties": {
+          "due": {
+            "title": "Due",
+            "type": "integer"
+          },
+          "known": {
+            "title": "Known",
+            "type": "integer"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "learning": {
+            "title": "Learning",
+            "type": "integer"
+          },
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
+          "practised_today": {
+            "title": "Practised Today",
+            "type": "boolean"
+          },
+          "streak": {
+            "title": "Streak",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "language",
+          "new",
+          "learning",
+          "known",
+          "due",
+          "streak",
+          "practised_today"
+        ],
+        "title": "ProgressOut",
         "type": "object"
       },
       "PronounceBody": {
@@ -2621,9 +2710,44 @@
         ]
       }
     },
+    "/api/practice/answers": {
+      "post": {
+        "description": "Remember which words the learner got right or wrong, so the due ones come back (spaced repetition).",
+        "operationId": "record_answers_api_practice_answers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswersIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Answers",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
     "/api/practice/choices": {
       "get": {
-        "description": "Multiple-choice cards from this learner's own words that have a meaning (nothing stored, no AI).",
+        "description": "Multiple-choice cards from this learner's own words that have a meaning (made on the spot, no AI).",
         "operationId": "choices_api_practice_choices_get",
         "parameters": [
           {
@@ -2673,6 +2797,16 @@
                 }
               ],
               "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Due",
+              "type": "boolean"
             }
           }
         ],
@@ -2749,6 +2883,7 @@
     },
     "/api/practice/flashcards": {
       "get": {
+        "description": "due=true: only the words that are due now, then words never practised.",
         "operationId": "flashcards_api_practice_flashcards_get",
         "parameters": [
           {
@@ -2788,6 +2923,16 @@
               ],
               "title": "Set"
             }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Due",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2813,6 +2958,48 @@
           }
         },
         "summary": "Flashcards",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/progress": {
+      "get": {
+        "operationId": "get_progress_api_practice_progress_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Progress",
         "tags": [
           "practice"
         ]

@@ -1,4 +1,5 @@
-"""Practice material made from a learner's own words (M7). Nothing here is stored: a result is shown and forgotten."""
+"""Practice material made from a learner's own words (M7). The material is made on the spot and never stored; what the learner
+got right or wrong is remembered by services/progress.py so that words come back when they are due."""
 from __future__ import annotations
 
 import random
@@ -9,6 +10,7 @@ from tutor_core.quality import word_forms
 
 from ..db import cursor
 from ..errors import validation_error
+from . import progress
 
 MAX_ITEMS = 8
 CHOICES = 4                       # the answer plus up to three other words from the learner's own list
@@ -18,10 +20,14 @@ _SENTENCE = re.compile(r"(?<=[.!?…])\s+")
 MIN_WORDS_IN_SENTENCE = 3
 
 
-def flashcards(conn, user_id: int, language: str, limit: int, set_filter=None) -> dict:
-    """Shuffled words that have a meaning (a card with nothing on its back is no use), optionally from one set only."""
+def flashcards(conn, user_id: int, language: str, limit: int, set_filter=None, due: bool = False) -> dict:
+    """Shuffled words that have a meaning (a card with nothing on its back is no use), optionally from one set only.
+    With due=True: only the words that are due now (oldest first), then words never practised."""
     extra, params = _set_clause(set_filter)
     with cursor(conn) as cur:
+        if due:
+            rows = progress.due_rows(cur, user_id, language, extra.replace("set_id", "w.set_id"), params)
+            return {"items": rows[:limit], "total": len(rows)}
         cur.execute("SELECT id, word, meaning FROM tutor.words WHERE user_id = %s AND language = %s "
                     "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra + " ORDER BY random() LIMIT %s", [user_id, language, *params, limit])
         items = cur.fetchall()
@@ -41,10 +47,12 @@ def _set_clause(set_filter):
     raise validation_error("Choose all, general or one of your sets.")
 
 
-def choice_cards(conn, user_id: int, language: str, limit: int, direction: str = "meaning", set_filter=None, rng=random) -> dict:
+def choice_cards(conn, user_id: int, language: str, limit: int, direction: str = "meaning", set_filter=None, rng=random,
+                 due: bool = False) -> dict:
     """Multiple choice from the learner's own words that have a meaning. direction "meaning": the word is shown and the options are
     meanings; direction "word": the meaning is shown and the options are words. Each card has up to CHOICES different options
-    (the answer and other entries of the learner's own list); fewer than two entries in the set means nothing to choose between."""
+    (the answer and other entries of the learner's own list); fewer than two entries in the set means nothing to choose between.
+    With due=True the questions are the words that are due (then never-practised ones); the other options still come from the whole set."""
     if direction not in ("meaning", "word"):
         raise validation_error("Choose meaning or word.")
     extra, params = _set_clause(set_filter)
@@ -52,11 +60,14 @@ def choice_cards(conn, user_id: int, language: str, limit: int, direction: str =
         cur.execute("SELECT id, word, meaning FROM tutor.words WHERE user_id = %s AND language = %s "
                     "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra, [user_id, language, *params])
         rows = cur.fetchall()
+        asked = progress.due_rows(cur, user_id, language, extra.replace("set_id", "w.set_id"), params) if due else None
     if len(rows) < 2:
-        return {"items": [], "total": len(rows)}
-    rng.shuffle(rows)
+        return {"items": [], "total": len(asked if asked is not None else rows)}
+    if asked is None:
+        rng.shuffle(rows)
+        asked = rows
     items = []
-    for row in rows[:limit]:
+    for row in asked[:limit]:
         prompt, answer = (row["word"], row["meaning"]) if direction == "meaning" else (row["meaning"], row["word"])
         pool = [(r["meaning"] if direction == "meaning" else r["word"]) for r in rows if r["id"] != row["id"]]
         others = []
@@ -68,7 +79,7 @@ def choice_cards(conn, user_id: int, language: str, limit: int, direction: str =
         options = [answer] + others
         rng.shuffle(options)
         items.append({"id": row["id"], "prompt": prompt, "answer": answer, "choices": options, "direction": direction})
-    return {"items": items, "total": len(rows)}
+    return {"items": items, "total": len(asked)}
 
 
 def can_cloze(language: str) -> bool:
@@ -87,6 +98,13 @@ def _vocabulary(conn, user_id: int, language: str) -> dict[str, str]:
     with cursor(conn) as cur:
         cur.execute("SELECT word, meaning FROM tutor.words WHERE user_id = %s AND language = %s ORDER BY id", (user_id, language))
         return {r["word"].lower(): (r["meaning"] or "") for r in cur.fetchall() if len(_TOKEN.findall(r["word"])) == 1}
+
+
+def _word_ids(conn, user_id: int, language: str) -> dict[str, int]:
+    """The same single-word entries as _vocabulary, word -> id, so an answer can be remembered against the learner's word."""
+    with cursor(conn) as cur:
+        cur.execute("SELECT id, word FROM tutor.words WHERE user_id = %s AND language = %s ORDER BY id", (user_id, language))
+        return {r["word"].lower(): r["id"] for r in cur.fetchall() if len(_TOKEN.findall(r["word"])) == 1}
 
 
 def _units(body: str):
@@ -121,7 +139,7 @@ def _boundaries(unit: str, language: str):
     return marks
 
 
-def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Random, language: str = "") -> list[dict]:
+def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Random, language: str = "", ids: dict[str, int] | None = None) -> list[dict]:
     """Chinese, Japanese and Korean: no splitter, so look for the learner's own words inside each sentence. The longest word
     wins where two overlap (学校 before 学), the earliest not-yet-used word in a sentence is blanked, and whatever is stuck to
     it (a Korean ending, a Japanese particle) stays in the text around the blank."""
@@ -153,16 +171,17 @@ def _make_cloze_by_word(body: str, vocabulary: dict[str, str], rng: random.Rando
             picks = rng.sample([x for x in vocabulary if x != w], min(CHOICES - 1, len(vocabulary) - 1))
             choices = [w] + picks
             rng.shuffle(choices)
-            items.append({"before": unit[:i], "after": unit[i + len(w):], "answer": w, "hint": vocabulary[w], "choices": choices})
+            items.append({"before": unit[:i], "after": unit[i + len(w):], "answer": w, "hint": vocabulary[w], "choices": choices,
+                          "word_id": (ids or {}).get(w)})
             if len(items) == MAX_ITEMS:
                 return items
     return items
 
 
-def make_cloze(body: str, language: str, vocabulary: dict[str, str], rng: random.Random | None = None) -> list[dict]:
+def make_cloze(body: str, language: str, vocabulary: dict[str, str], rng: random.Random | None = None, ids: dict[str, int] | None = None) -> list[dict]:
     rng = rng or random.Random()
     if _unspaced(language):
-        return _make_cloze_by_word(body, vocabulary, rng, language)
+        return _make_cloze_by_word(body, vocabulary, rng, language, ids)
     english = language == "en"
     base_of = {w: w for w in vocabulary}
     if english:
@@ -185,7 +204,7 @@ def make_cloze(body: str, language: str, vocabulary: dict[str, str], rng: random
                 choices = [m.group(0)] + picks
                 rng.shuffle(choices)
                 items.append({"before": unit[:m.start()], "after": unit[m.end():], "answer": m.group(0),
-                              "hint": vocabulary[base], "choices": choices})
+                              "hint": vocabulary[base], "choices": choices, "word_id": (ids or {}).get(base)})
                 break
         if len(items) == MAX_ITEMS:
             break

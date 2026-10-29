@@ -6,7 +6,7 @@ import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
 const CARDS = { items: [{ id: 1, word: "water", meaning: "a drink" }, { id: 2, word: "bread", meaning: "baked food" }, { id: 3, word: "house", meaning: "a home" }], total: 3 };
-const item = (answer: string, over: Record<string, unknown> = {}) => ({ before: "Ana: I want ", after: " please.", answer, hint: "a drink", choices: [answer, "bread", "house"], ...over });
+const item = (answer: string, over: Record<string, unknown> = {}) => ({ before: "Ana: I want ", after: " please.", answer, hint: "a drink", choices: [answer, "bread", "house"], word_id: null, ...over });
 const CLOZE = { story_id: 5, language: "en", items: [item("water"), item("bread", { before: "Ben: Here is some ", after: ".", hint: "baked food", choices: ["water", "bread", "house"] })] };
 const STORIES = { items: [{ id: 5, language: "en", story_type: "dialogue", topic: null, body: "Ana: Hello.\nBen: Hi.", passed: true, created_at: "2026-10-16T10:00:00Z" }], total: 1, limit: 100, offset: 0 };
 const base = { "GET /me": ALICE, "GET /languages": LANGS, "GET /stories": STORIES };
@@ -145,5 +145,104 @@ describe("practice page", () => {
     await screen.findByText("Card 1 of 3");
     await userEvent.selectOptions(screen.getByLabelText("Active language"), "es");
     expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+  });
+  describe("remembered results and review", () => {
+    const PROGRESS = { language: "en", new: 2, learning: 1, known: 3, due: 4, streak: 5, practised_today: true };
+    const ANSWERS = (calls: { method: string; path: string; body: any }[]) => calls.filter((c) => c.method === "POST" && c.path === "/practice/answers").map((c) => c.body.answers[0]);
+
+    it("shows what is due, new, learning and known, and the streak", async () => {
+      mockApi({ ...base, "GET /practice/progress": PROGRESS });
+      renderApp("/practice");
+      expect(await screen.findByText("Your progress")).toBeInTheDocument();
+      for (const [label, n] of [["Due now", "4"], ["New", "2"], ["Learning", "1"], ["Known", "3"]]) expect(screen.getByText(label).nextElementSibling).toHaveTextContent(n);
+      expect(screen.getByText("5-day streak")).toBeInTheDocument();
+    });
+
+    it("hides the progress card when no word has a meaning yet, and when it cannot be loaded", async () => {
+      mockApi({ ...base, "GET /practice/progress": { ...PROGRESS, new: 0, learning: 0, known: 0, due: 0, streak: 0 } });
+      const { ui } = renderApp("/practice");
+      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+      expect(screen.queryByText("Your progress")).not.toBeInTheDocument();
+      ui.unmount();
+      mockApi({ ...base, "GET /practice/progress": err(500, "internal", "boom") });
+      renderApp("/practice");
+      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+      expect(screen.queryByText("Your progress")).not.toBeInTheDocument();
+    });
+
+    it("Review due words starts flashcards for the due words only", async () => {
+      const { calls } = mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/flashcards": CARDS });
+      renderApp("/practice");
+      await userEvent.click(await screen.findByRole("button", { name: "Review due words" }));
+      expect(await screen.findByText("water")).toBeInTheDocument();
+      expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&limit=10&due=true");
+    });
+
+    it("says nothing is due instead of offering a review button", async () => {
+      mockApi({ ...base, "GET /practice/progress": { ...PROGRESS, due: 0, new: 0 } });
+      renderApp("/practice");
+      expect(await screen.findByText(/Nothing is due right now/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Review due words" })).not.toBeInTheDocument();
+    });
+
+    it("the 'only due words' box applies to multiple choice too", async () => {
+      const choices = { items: [{ id: 7, prompt: "water", answer: "a drink", choices: ["a drink", "x", "y", "z"], direction: "meaning" }], total: 1 };
+      const { calls } = mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/choices": choices });
+      renderApp("/practice");
+      await userEvent.click(await screen.findByLabelText("Only words due for review"));
+      await userEvent.click(screen.getByRole("button", { name: "Start multiple choice" }));
+      await screen.findByText("water");
+      expect(calls.find((c) => c.path.startsWith("/practice/choices"))!.path).toContain("due=true");
+    });
+
+    it("explains an empty due round and goes back", async () => {
+      mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/flashcards": { items: [], total: 0 } });
+      renderApp("/practice");
+      await userEvent.click(await screen.findByRole("button", { name: "Review due words" }));
+      expect(await screen.findByText("Nothing due right now")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+    });
+
+    it("records each flashcard answer as it is given", async () => {
+      const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/answers": { status: 204 } });
+      renderApp("/practice");
+      await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
+      for (const knew of [true, false]) {
+        await userEvent.click(await screen.findByRole("button", { name: "Show meaning" }));
+        await userEvent.click(screen.getByRole("button", { name: knew ? "I knew it" : "Not yet" }));
+      }
+      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 1, correct: true }, { word_id: 2, correct: false }]));
+    });
+
+    it("records multiple-choice answers once each, even if the learner clicks again", async () => {
+      const choices = { items: [{ id: 7, prompt: "water", answer: "a drink", choices: ["a drink", "x", "y", "z"], direction: "meaning" }], total: 1 };
+      const { calls } = mockApi({ ...base, "GET /practice/choices": choices, "POST /practice/answers": { status: 204 } });
+      renderApp("/practice");
+      await userEvent.click(await screen.findByRole("button", { name: "Start multiple choice" }));
+      await userEvent.click(await screen.findByRole("button", { name: "x" }));
+      await userEvent.click(screen.getByRole("button", { name: "a drink" }));
+      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 7, correct: false }]));
+    });
+
+    it("records fill-in-the-blank answers against the word, and skips a blank with no word", async () => {
+      const cloze = { ...CLOZE, items: [item("water", { word_id: 3 }), item("bread", { word_id: null, choices: ["water", "bread", "house"] })] };
+      const { calls } = mockApi({ ...base, "GET /practice/cloze": cloze, "POST /practice/answers": { status: 204 } });
+      renderApp("/practice?story=5");
+      await userEvent.click(await screen.findByRole("button", { name: "water" }));
+      await userEvent.click(screen.getByRole("button", { name: "Next" }));
+      await userEvent.click(await screen.findByRole("button", { name: "bread" }));
+      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 3, correct: true }]));
+    });
+
+    it("tells the learner on the result screen when answers could not be saved", async () => {
+      mockApi({ ...base, "GET /practice/flashcards": { items: [CARDS.items[0]], total: 1 }, "POST /practice/answers": err(500, "internal", "boom") });
+      renderApp("/practice");
+      await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Show meaning" }));
+      await userEvent.click(screen.getByRole("button", { name: "I knew it" }));
+      expect(await screen.findByText("You knew 1 of 1")).toBeInTheDocument();
+      expect(await screen.findByText(/couldn't be saved this time/)).toBeInTheDocument();
+    });
   });
 });

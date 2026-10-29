@@ -12,6 +12,7 @@ import { Badge, Button, Card, ErrorText, inputCls, PageHeader, Skeleton } from "
 import { Blanks } from "../practice/Blanks";
 import { Choices, type Direction } from "../practice/Choices";
 import { Flashcards } from "../practice/Flashcards";
+import { ProgressCard } from "../practice/ProgressCard";
 
 export default function Practice() {
   const { active, info } = useActiveLanguage();
@@ -24,23 +25,25 @@ export default function Practice() {
   const [mode, setMode] = useState<"cards" | "choice" | null>(null);
   const [direction, setDirection] = useState<Direction>("meaning");
   const [setPick, setSetPick] = useState("all");                 // "all", "general" or a set id
+  const [dueOnly, setDueOnly] = useState(false);                 // only words that are due for review (then never-practised ones)
   const sets = useQuery({ queryKey: setsKey(user!.id, active), queryFn: () => api.sets(active) });
   const filter: SetFilter = setPick === "all" || setPick === "general" ? setPick : Number(setPick);
   const stories = useQuery({ queryKey: storiesKey(user!.id, "practice-list", active), queryFn: () => api.stories({ language: active, limit: 100 }) });
-  useEffect(() => { setMode(null); setSetPick("all"); }, [active]);
+  useEffect(() => { setMode(null); setSetPick("all"); setDueOnly(false); }, [active]);
 
   const back = () => { setMode(null); setParams({}); };
   return (
     <div>
       <PageHeader title={t("nav.practice")} description={t("practice.description")} actions={<Badge tone="brand"><span lang={active}>{name}</span></Badge>} />
       {mode === "cards" ? (
-        <Card><Flashcards language={active} set={filter} onDone={back} /></Card>
+        <Card><Flashcards language={active} set={filter} due={dueOnly} onDone={back} /></Card>
       ) : mode === "choice" ? (
-        <Card><Choices language={active} set={filter} direction={direction} onDone={back} /></Card>
+        <Card><Choices language={active} set={filter} direction={direction} due={dueOnly} onDone={back} /></Card>
       ) : storyId !== null ? (
         <Card><Blanks storyId={storyId} onDone={back} /></Card>
       ) : (
         <>
+        <ProgressCard language={active} onReview={() => { setDueOnly(true); setMode("cards"); }} />
         {(sets.data?.items.length ?? 0) > 0 && (
           <div className="mb-4 max-w-xs">
             <label htmlFor="practice-set" className="mb-1 block text-sm font-medium text-slate-700">{t("practice.set")}</label>
@@ -51,6 +54,9 @@ export default function Practice() {
             </select>
           </div>
         )}
+        <label className="mb-4 flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={dueOnly} onChange={(e) => setDueOnly(e.target.checked)} />{t("practice.dueOnly")}
+        </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="space-y-3">
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><ListChecks aria-hidden className="size-5" />{t("practice.choice.title")}</h2>

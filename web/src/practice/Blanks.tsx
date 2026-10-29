@@ -5,8 +5,9 @@ import { api, type ClozeItem } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, ErrorText, Skeleton } from "../components/ui";
+import { useAnswerRecorder } from "./useRecorder";
 
-/** Fill in the blank in a saved story, one word at a time. Nothing is stored. */
+/** Fill in the blank in a saved story, one word at a time. Each answer is remembered against the learner's word. */
 export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => void }) {
   const { user } = useAuth();
   const { t, err } = useI18n();
@@ -14,6 +15,7 @@ export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => voi
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<string | null>(null);
   const [right, setRight] = useState(0);
+  const { record, failed } = useAnswerRecorder(set.data?.language ?? "");
   useEffect(() => { setIndex(0); setPicked(null); setRight(0); }, [storyId]);
 
   if (set.isPending) return <Skeleton className="h-40 w-full" />;
@@ -23,6 +25,7 @@ export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => voi
     return (
       <div className="space-y-3 text-center" role="status">
         <p className="text-lg font-semibold text-slate-900">{t("practice.cloze.score", { right, total: items.length })}</p>
+        {failed && <ErrorText>{t("practice.saveFailed")}</ErrorText>}
         <div className="flex justify-center gap-2">
           <Button onClick={() => { setIndex(0); setPicked(null); setRight(0); }} icon={<RotateCcw aria-hidden className="size-4" />}>{t("common.tryAgain")}</Button>
           <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
@@ -33,6 +36,7 @@ export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => voi
   const choose = (choice: string) => {
     if (picked !== null) return;
     setPicked(choice);
+    record(item.word_id, choice === item.answer);
     if (choice === item.answer) setRight(right + 1);
   };
   return (
