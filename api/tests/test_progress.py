@@ -206,3 +206,40 @@ TODAY = date(2026, 10, 29)
 ])
 def test_streak(days, expected):
     assert progress.streak(days, TODAY) == expected
+
+
+# --- dictation: any word, with or without a meaning -------------------------------------------------------------
+
+def test_dictation_offers_words_with_and_without_meanings(make_user):
+    c, ids = learner(make_user)
+    c.post("/api/words", json={"language": "en", "word": "nomeaning"})
+    body = c.get("/api/practice/dictation?language=en&limit=50").json()
+    got = {x["word"]: x["meaning"] for x in body["items"]}
+    assert got == {**WORDS, "nomeaning": None} and body["total"] == 5
+    assert set(body["items"][0]) == {"id", "word", "meaning"}
+
+
+def test_dictation_is_this_learners_words_in_this_language_and_limited(make_user):
+    c, _ = learner(make_user)
+    c.post("/api/words", json={"language": "es", "word": "hola"})
+    learner(make_user, "bob", {"secret": "x"})
+    body = c.get("/api/practice/dictation?language=en&limit=2").json()
+    assert len(body["items"]) == 2 and body["total"] == 4
+    assert all(x["word"] in WORDS for x in body["items"])
+
+
+def test_dictation_due_mode_skips_words_that_are_resting(make_user):
+    c, ids = learner(make_user)
+    c.post("/api/words", json={"language": "en", "word": "nomeaning"})
+    answer(c, (ids["hello"], True))
+    got = [x["word"] for x in c.get("/api/practice/dictation?language=en&limit=50&due=true").json()["items"]]
+    assert "hello" not in got and "nomeaning" in got and len(got) == 4
+
+
+def test_dictation_respects_the_set_filter_and_needs_login(app, make_user):
+    c, ids = learner(make_user)
+    s = c.post("/api/sets", json={"language": "en", "name": "food"}).json()["id"]
+    c.post("/api/words/move", json={"ids": [ids["bread"]], "set_id": s})
+    assert [x["word"] for x in c.get(f"/api/practice/dictation?language=en&set={s}").json()["items"]] == ["bread"]
+    assert c.get("/api/practice/dictation?language=en&set=oops").status_code == 422
+    assert TestClient(app, headers=HEADERS).get("/api/practice/dictation?language=en").status_code == 401

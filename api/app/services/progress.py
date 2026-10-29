@@ -54,10 +54,10 @@ def record(conn, user_id: int, answers: list[tuple[int, bool]]) -> None:
                     (user_id, len(answers)))
 
 
-def due_rows(cur, user_id: int, language: str, extra: str = "", params: list | None = None) -> list[dict]:
-    """Words with a meaning that are due now (oldest first), then words never practised (shuffled)."""
+def due_rows(cur, user_id: int, language: str, extra: str = "", params: list | None = None, need_meaning: bool = True) -> list[dict]:
+    """Words with a meaning (any word when need_meaning is False) that are due now (oldest first), then words never practised (shuffled)."""
     cur.execute(f"SELECT w.id, w.word, w.meaning FROM tutor.words w LEFT JOIN tutor.word_progress p ON p.word_id = w.id "
-                f"WHERE w.user_id = %s AND w.language = %s AND {_HAS_MEANING}{extra} AND (p.word_id IS NULL OR p.due_at <= now()) "
+                f"WHERE w.user_id = %s AND w.language = %s{f' AND {_HAS_MEANING}' if need_meaning else ''}{extra} AND (p.word_id IS NULL OR p.due_at <= now()) "
                 "ORDER BY (p.word_id IS NULL), p.due_at, random()", [user_id, language, *(params or [])])
     return cur.fetchall()
 

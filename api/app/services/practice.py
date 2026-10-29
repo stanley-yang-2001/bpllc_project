@@ -36,6 +36,21 @@ def flashcards(conn, user_id: int, language: str, limit: int, set_filter=None, d
         return {"items": items, "total": cur.fetchone()["n"]}
 
 
+def dictation(conn, user_id: int, language: str, limit: int, set_filter=None, due: bool = False) -> dict:
+    """Words to hear and type. Any word will do (a meaning is not needed), so words with no meaning are included; a word is returned
+    with its meaning when it has one. With due=True: the words that are due now, then words never practised."""
+    extra, params = _set_clause(set_filter)
+    with cursor(conn) as cur:
+        if due:
+            rows = progress.due_rows(cur, user_id, language, extra.replace("set_id", "w.set_id"), params, need_meaning=False)
+            return {"items": rows[:limit], "total": len(rows)}
+        cur.execute("SELECT id, word, NULLIF(btrim(meaning), '') AS meaning FROM tutor.words WHERE user_id = %s AND language = %s" + extra
+                    + " ORDER BY random() LIMIT %s", [user_id, language, *params, limit])
+        items = cur.fetchall()
+        cur.execute("SELECT count(*) AS n FROM tutor.words WHERE user_id = %s AND language = %s" + extra, [user_id, language, *params])
+        return {"items": items, "total": cur.fetchone()["n"]}
+
+
 def _set_clause(set_filter):
     """The same choices as the vocabulary page: None or "all", "general", or the number of one of the learner's own sets."""
     if not set_filter or set_filter == "all":

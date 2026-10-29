@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from ..db import connection
 from ..deps import current_user, require_language
 from ..errors import AppError, not_found
-from ..schemas import AnswersIn, ChoiceSet, ClozeSet, FlashcardSet, ProgressOut
+from ..schemas import AnswersIn, ChoiceSet, ClozeSet, DictationSet, FlashcardSet, ProgressOut
 from ..services import practice, progress, stories
 from tutor_core.languages import LANGUAGES
 
@@ -29,6 +29,15 @@ def choices(request: Request, language: str, limit: int = Query(10, ge=1, le=50)
     require_language(language)
     with connection(request.app.state.pool) as conn:
         return practice.choice_cards(conn, user["id"], language, limit, direction, set, due=due)
+
+
+@router.get("/dictation", response_model=DictationSet)
+def dictation(request: Request, language: str, limit: int = Query(10, ge=1, le=50), set: str | None = Query(None, max_length=12),
+              due: bool = False, user: dict = Depends(current_user)):
+    """Words to hear and type. The browser reads them aloud, so the server only picks them (any word, a meaning is not needed)."""
+    require_language(language)
+    with connection(request.app.state.pool) as conn:
+        return practice.dictation(conn, user["id"], language, limit, set, due)
 
 
 @router.post("/answers", status_code=204)

@@ -421,6 +421,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice/dictation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dictation
+         * @description Words to hear and type. The browser reads them aloud, so the server only picks them (any word, a meaning is not needed).
+         */
+        get: operations["dictation_api_practice_dictation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practice/flashcards": {
         parameters: {
             query?: never;
@@ -876,6 +896,22 @@ export interface components {
         DeleteResult: {
             /** Deleted */
             deleted: number;
+        };
+        /** DictationOut */
+        DictationOut: {
+            /** Id */
+            id: number;
+            /** Meaning */
+            meaning?: string | null;
+            /** Word */
+            word: string;
+        };
+        /** DictationSet */
+        DictationSet: {
+            /** Items */
+            items: components["schemas"]["DictationOut"][];
+            /** Total */
+            total: number;
         };
         /** EmailChange */
         EmailChange: {
@@ -2107,6 +2143,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClozeSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dictation_api_practice_dictation_get: {
+        parameters: {
+            query: {
+                language: string;
+                limit?: number;
+                set?: string | null;
+                due?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DictationSet"];
                 };
             };
             /** @description Validation Error */

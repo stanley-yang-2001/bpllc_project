@@ -415,6 +415,56 @@
         "title": "DeleteResult",
         "type": "object"
       },
+      "DictationOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "meaning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "word"
+        ],
+        "title": "DictationOut",
+        "type": "object"
+      },
+      "DictationSet": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DictationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "DictationSet",
+        "type": "object"
+      },
       "EmailChange": {
         "properties": {
           "email": {
@@ -2962,6 +3012,88 @@
           }
         },
         "summary": "Cloze",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/dictation": {
+      "get": {
+        "description": "Words to hear and type. The browser reads them aloud, so the server only picks them (any word, a meaning is not needed).",
+        "operationId": "dictation_api_practice_dictation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 12,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Due",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictationSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dictation",
         "tags": [
           "practice"
         ]

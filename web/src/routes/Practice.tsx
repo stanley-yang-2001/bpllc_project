@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { GraduationCap, Layers, ListChecks, TextCursorInput } from "lucide-react";
+import { GraduationCap, Headphones, Layers, ListChecks, TextCursorInput } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type SetFilter } from "../api/client";
@@ -11,8 +11,11 @@ import { topicLabel, typeLabel } from "../i18n/labels";
 import { Badge, Button, Card, ErrorText, inputCls, PageHeader, Skeleton } from "../components/ui";
 import { Blanks } from "../practice/Blanks";
 import { Choices, type Direction } from "../practice/Choices";
+import { Dictation } from "../practice/Dictation";
 import { Flashcards } from "../practice/Flashcards";
 import { ProgressCard } from "../practice/ProgressCard";
+import { speechSupported, voiceFor } from "../speech/speak";
+import { useVoices } from "../speech/useVoices";
 
 export default function Practice() {
   const { active, info } = useActiveLanguage();
@@ -20,9 +23,12 @@ export default function Practice() {
   const { t, err } = useI18n();
   const [params, setParams] = useSearchParams();
   const name = info(active)?.native ?? active;
+  useVoices();                                                      // re-render when the device finishes loading its voices
+  const canSpeak = speechSupported();
+  const noVoice = canSpeak && voiceFor(active) === null;            // the device lists voices but none fit this language (undefined = not loaded yet)
   const storyParam = Number(params.get("story"));
   const storyId = Number.isInteger(storyParam) && storyParam > 0 ? storyParam : null;
-  const [mode, setMode] = useState<"cards" | "choice" | null>(null);
+  const [mode, setMode] = useState<"cards" | "choice" | "dictation" | null>(null);
   const [direction, setDirection] = useState<Direction>("meaning");
   const [setPick, setSetPick] = useState("all");                 // "all", "general" or a set id
   const [dueOnly, setDueOnly] = useState(false);                 // only words that are due for review (then never-practised ones)
@@ -37,6 +43,8 @@ export default function Practice() {
       <PageHeader title={t("nav.practice")} description={t("practice.description")} actions={<Badge tone="brand"><span lang={active}>{name}</span></Badge>} />
       {mode === "cards" ? (
         <Card><Flashcards language={active} set={filter} due={dueOnly} onDone={back} /></Card>
+      ) : mode === "dictation" ? (
+        <Card><Dictation language={active} set={filter} due={dueOnly} onDone={back} /></Card>
       ) : mode === "choice" ? (
         <Card><Choices language={active} set={filter} direction={direction} due={dueOnly} onDone={back} /></Card>
       ) : storyId !== null ? (
@@ -74,6 +82,13 @@ export default function Practice() {
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Layers aria-hidden className="size-5" />{t("practice.flashcards.title")}</h2>
             <p className="text-sm text-slate-600">{t("practice.flashcards.text", { language: name })}</p>
             <Button onClick={() => setMode("cards")}>{t("practice.flashcards.start")}</Button>
+          </Card>
+          <Card className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Headphones aria-hidden className="size-5" />{t("practice.dictation.title")}</h2>
+            <p className="text-sm text-slate-600">{t("practice.dictation.text")}</p>
+            {!canSpeak || noVoice
+              ? <p role="status" className="text-sm text-slate-600">{canSpeak ? t("practice.dictation.noVoice", { language: name }) : t("practice.dictation.noSpeech")}</p>
+              : <Button onClick={() => setMode("dictation")}>{t("practice.dictation.start")}</Button>}
           </Card>
           <Card className="space-y-3">
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><TextCursorInput aria-hidden className="size-5" />{t("practice.cloze.title")}</h2>

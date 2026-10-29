@@ -178,6 +178,17 @@ class FlashcardSet(BaseModel):
     total: int
 
 
+class DictationOut(BaseModel):
+    id: int
+    word: str
+    meaning: str | None = None
+
+
+class DictationSet(BaseModel):
+    items: list[DictationOut]
+    total: int
+
+
 class ChoiceOut(BaseModel):
     id: int
     prompt: str
