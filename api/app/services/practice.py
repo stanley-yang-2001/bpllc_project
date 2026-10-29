@@ -10,7 +10,7 @@ from tutor_core.quality import word_forms
 
 from ..db import cursor
 from ..errors import validation_error
-from . import progress
+from . import progress, word_sets
 
 MAX_ITEMS = 8
 CHOICES = 4                       # the answer plus up to three other words from the learner's own list
@@ -23,10 +23,10 @@ MIN_WORDS_IN_SENTENCE = 3
 def flashcards(conn, user_id: int, language: str, limit: int, set_filter=None, due: bool = False) -> dict:
     """Shuffled words that have a meaning (a card with nothing on its back is no use), optionally from one set only.
     With due=True: only the words that are due now (oldest first), then words never practised."""
-    extra, params = _set_clause(set_filter)
+    extra, params = word_sets.filter_clause(set_filter)
     with cursor(conn) as cur:
         if due:
-            rows = progress.due_rows(cur, user_id, language, extra.replace("set_id", "w.set_id"), params)
+            rows = progress.due_rows(cur, user_id, language, *word_sets.filter_clause(set_filter, "w.set_id"))
             return {"items": rows[:limit], "total": len(rows)}
         cur.execute("SELECT id, word, meaning FROM tutor.words WHERE user_id = %s AND language = %s "
                     "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra + " ORDER BY random() LIMIT %s", [user_id, language, *params, limit])
@@ -39,27 +39,16 @@ def flashcards(conn, user_id: int, language: str, limit: int, set_filter=None, d
 def dictation(conn, user_id: int, language: str, limit: int, set_filter=None, due: bool = False) -> dict:
     """Words to hear and type. Any word will do (a meaning is not needed), so words with no meaning are included; a word is returned
     with its meaning when it has one. With due=True: the words that are due now, then words never practised."""
-    extra, params = _set_clause(set_filter)
+    extra, params = word_sets.filter_clause(set_filter)
     with cursor(conn) as cur:
         if due:
-            rows = progress.due_rows(cur, user_id, language, extra.replace("set_id", "w.set_id"), params, need_meaning=False)
+            rows = progress.due_rows(cur, user_id, language, *word_sets.filter_clause(set_filter, "w.set_id"), need_meaning=False)
             return {"items": rows[:limit], "total": len(rows)}
         cur.execute("SELECT id, word, NULLIF(btrim(meaning), '') AS meaning FROM tutor.words WHERE user_id = %s AND language = %s" + extra
                     + " ORDER BY random() LIMIT %s", [user_id, language, *params, limit])
         items = cur.fetchall()
         cur.execute("SELECT count(*) AS n FROM tutor.words WHERE user_id = %s AND language = %s" + extra, [user_id, language, *params])
         return {"items": items, "total": cur.fetchone()["n"]}
-
-
-def _set_clause(set_filter):
-    """The same choices as the vocabulary page: None or "all", "general", or the number of one of the learner's own sets."""
-    if not set_filter or set_filter == "all":
-        return "", []
-    if set_filter == "general":
-        return " AND set_id IS NULL", []
-    if str(set_filter).isdigit():
-        return " AND set_id = %s", [int(set_filter)]
-    raise validation_error("Choose all, general or one of your sets.")
 
 
 def choice_cards(conn, user_id: int, language: str, limit: int, direction: str = "meaning", set_filter=None, rng=random,
@@ -70,12 +59,12 @@ def choice_cards(conn, user_id: int, language: str, limit: int, direction: str =
     With due=True the questions are the words that are due (then never-practised ones); the other options still come from the whole set."""
     if direction not in ("meaning", "word"):
         raise validation_error("Choose meaning or word.")
-    extra, params = _set_clause(set_filter)
+    extra, params = word_sets.filter_clause(set_filter)
     with cursor(conn) as cur:
         cur.execute("SELECT id, word, meaning FROM tutor.words WHERE user_id = %s AND language = %s "
                     "AND meaning IS NOT NULL AND btrim(meaning) <> ''" + extra, [user_id, language, *params])
         rows = cur.fetchall()
-        asked = progress.due_rows(cur, user_id, language, extra.replace("set_id", "w.set_id"), params) if due else None
+        asked = progress.due_rows(cur, user_id, language, *word_sets.filter_clause(set_filter, "w.set_id")) if due else None
     if len(rows) < 2:
         return {"items": [], "total": len(asked if asked is not None else rows)}
     if asked is None:

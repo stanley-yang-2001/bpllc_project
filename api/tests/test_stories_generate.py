@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.errors import AppError
-from app.routes.stories import STORY_TOKENS
+from app.services.story_generation import STORY_TOKENS
 from app.services.ai_gate import AiGate
 from tutor_core import prompts
 from conftest import HEADERS, register

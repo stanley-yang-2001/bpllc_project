@@ -546,8 +546,7 @@ export interface paths {
         put?: never;
         /**
          * Save
-         * @description Saves a story to the library. The report is made here, from the learner's own words; a report or a pass sent by the
-         *     page is never read (it is not even a field).
+         * @description Saves a story to the library (the report is made on the server).
          */
         post: operations["save_api_stories_post"];
         delete?: never;

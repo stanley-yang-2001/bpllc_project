@@ -22,14 +22,8 @@ def list_words(conn, user_id: int, language: str, q: str | None, limit: int, off
                missing_meaning: bool = False) -> dict:
     """set_filter: None or "all" = every word; "general" = words in no set; a number = that set (the learner's own)."""
     where, params = "user_id = %s AND language = %s", [user_id, language]
-    if set_filter and set_filter != "all":
-        if set_filter == "general":
-            where += " AND set_id IS NULL"
-        elif set_filter.isdigit():
-            where += " AND set_id = %s"
-            params.append(int(set_filter))
-        else:
-            raise validation_error("Choose all, general or one of your sets.")
+    extra, extra_params = word_sets.filter_clause(set_filter)
+    where, params = where + extra, params + extra_params
     if missing_meaning:
         where += " AND (meaning IS NULL OR btrim(meaning) = '')"
     if q and q.strip():
@@ -91,14 +85,9 @@ def words_without_meaning(conn, user_id: int, language: str, ids, set_filter, li
     if ids is not None:
         where += " AND id = ANY(%s)"
         params.append(list(ids))
-    elif set_filter and set_filter != "all":
-        if set_filter == "general":
-            where += " AND set_id IS NULL"
-        elif set_filter.isdigit():
-            where += " AND set_id = %s"
-            params.append(int(set_filter))
-        else:
-            raise validation_error("Choose all, general or one of your sets.")
+    else:
+        extra, extra_params = word_sets.filter_clause(set_filter)
+        where, params = where + extra, params + extra_params
     with cursor(conn) as cur:
         cur.execute(f"SELECT id, word FROM words WHERE {where} ORDER BY id LIMIT %s", [*params, limit])
         items = cur.fetchall()

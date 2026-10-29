@@ -144,3 +144,19 @@ def test_download_my_data_includes_sets(make_user):
     assert r.status_code == 200
     data = r.json()
     assert data["word_sets"][0]["name"] == "Food" and data["words"][0]["set_name"] == "Food"
+
+
+# --- the one set-filter clause (used by the vocabulary list, "write missing meanings" and practice) -----------------------
+
+def test_filter_clause_all_general_id_and_a_bad_value():
+    import pytest
+    from app.errors import AppError
+    from app.services.word_sets import filter_clause
+    assert filter_clause(None) == ("", []) and filter_clause("all") == ("", []) and filter_clause("") == ("", [])
+    assert filter_clause("general") == (" AND set_id IS NULL", [])
+    assert filter_clause("12") == (" AND set_id = %s", [12]) and filter_clause(12) == (" AND set_id = %s", [12])
+    assert filter_clause("general", "w.set_id") == (" AND w.set_id IS NULL", [])
+    assert filter_clause("3", "w.set_id") == (" AND w.set_id = %s", [3])
+    for bad in ("nope", "1; DROP TABLE x", "-1", "1.5"):
+        with pytest.raises(AppError):
+            filter_clause(bad)

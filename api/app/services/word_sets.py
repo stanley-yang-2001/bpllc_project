@@ -80,6 +80,19 @@ def delete(conn, user_id: int, set_id: int) -> int:
     return moved
 
 
+def filter_clause(set_filter, column: str = "set_id") -> tuple[str, list]:
+    """The one meaning of the set choice, as a piece of SQL to add to a WHERE that already limits to the learner's own words:
+    None or "all" = every word (nothing added), "general" = words in no set, a number = that set. `column` is for queries that
+    name the table. Anything else is refused. Returns (" AND ...", params)."""
+    if not set_filter or set_filter == "all":
+        return "", []
+    if set_filter == "general":
+        return f" AND {column} IS NULL", []
+    if str(set_filter).isdigit():
+        return f" AND {column} = %s", [int(set_filter)]
+    raise validation_error("Choose all, general or one of your sets.")
+
+
 def owned(conn, user_id: int, set_id: int, language: str | None = None) -> dict:
     """The learner's own set (optionally in that language), or a 'not found'."""
     with cursor(conn) as cur:
