@@ -90,7 +90,7 @@ export interface paths {
         /**
          * Chat
          * @description One chat turn. Made as the logged-in user and nobody else: the id comes from the session cookie, never
-         *     from the body, and the Langflow session id is built from it here.
+         *     from the body, and the Langflow session id is built from it in the service.
          */
         post: operations["chat_api_chat_post"];
         delete?: never;

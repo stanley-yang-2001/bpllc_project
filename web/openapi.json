@@ -2442,7 +2442,7 @@
     },
     "/api/chat": {
       "post": {
-        "description": "One chat turn. Made as the logged-in user and nobody else: the id comes from the session cookie, never\nfrom the body, and the Langflow session id is built from it here.",
+        "description": "One chat turn. Made as the logged-in user and nobody else: the id comes from the session cookie, never\nfrom the body, and the Langflow session id is built from it in the service.",
         "operationId": "chat_api_chat_post",
         "requestBody": {
           "content": {
