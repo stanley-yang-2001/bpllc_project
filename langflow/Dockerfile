@@ -2,6 +2,9 @@
 #
 # Build context is ./tutor_core (see docker-compose.yml), so only the package is sent to the builder.
 #
+# The [lemmas,cjk] extras (simplemma; Chinese, Japanese and Korean word splitters) are installed so a story is checked the same in
+# chat as in the API image. tests/test_langflow_extras.py (make test-langflow) fails if one is missing.
+#
 # NOT verified by the author: the base image's user and Python layout (it could not be built where this was written).
 # The build is therefore written to FAIL LOUDLY rather than yield an image whose tools cannot import tutor_core:
 #   * it prints which interpreter it installs into and checks the user exists;
@@ -21,8 +24,8 @@ RUN set -eux; \
     echo "Installing tutor_core into: ${PY}"; \
     "${PY}" --version; \
     id "${RUN_AS_USER}"; \
-    ( "${PY}" -m pip install --no-cache-dir /tmp/tutor_core \
-      || uv pip install --python "${PY}" --no-cache /tmp/tutor_core ); \
+    ( "${PY}" -m pip install --no-cache-dir "/tmp/tutor_core[lemmas,cjk]" \
+      || uv pip install --python "${PY}" --no-cache "/tmp/tutor_core[lemmas,cjk]" ); \
     rm -rf /tmp/tutor_core
 USER ${RUN_AS_USER}
 

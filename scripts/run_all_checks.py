@@ -52,6 +52,7 @@ PASS, FAIL, SKIP = "PASS", "FAIL", "SKIP"
 
 # These import Langflow itself, which is only in the Langflow container: the "container tests" stage runs them there.
 LANGFLOW_ONLY_TESTS = [
+    "tests/test_langflow_extras.py",
     "tests/test_routing_checks.py",
     "tests/test_routing_learner_db.py",
     "tests/test_routing_runner_with_fake_langflow.py",
