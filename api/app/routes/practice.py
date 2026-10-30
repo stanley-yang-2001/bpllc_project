@@ -73,8 +73,8 @@ def cloze(request: Request, story_id: int, user: dict = Depends(current_user)):
         language = story["language"]
         if not practice.can_cloze(language):
             raise AppError("language_unavailable", f"Fill-in-the-blank isn't available for {LANGUAGES[language].name} yet.", 422)
-        items = practice.make_cloze(story["body"], language, practice._vocabulary(conn, user["id"], language),
-                                    ids=practice._word_ids(conn, user["id"], language))
+        items = practice.make_cloze(story["body"], language, practice.vocabulary_of(conn, user["id"], language),
+                                    ids=practice.word_ids_of(conn, user["id"], language))
     if not items:
         raise AppError("no_blanks", "This story has no words from your list to practise. Try another story.", 422)
     return {"story_id": story_id, "language": language, "items": items}
