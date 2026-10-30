@@ -475,3 +475,63 @@ def test_a_story_cut_off_mid_sentence_is_asked_for_once_more_without_a_tier(conn
     assert len(g.prompts) == 2 and r.text == "Ana: Hello."
     g = Sequence("Ana: Hello.", "Ana: Other.")
     assert generate_story(conn, l, "en", call_groq_fn=g, use_cache=False).text == "Ana: Hello." and len(g.prompts) == 1
+
+
+# --- English stories with too many words outside the learner's list: one more try (backlog: richer kinds back into random picks) ----
+
+class Queue:
+    """Answers one text per call, in order; the last one repeats."""
+
+    def __init__(self, *texts):
+        self.texts, self.prompts = list(texts), []
+
+    def __call__(self, prompt):
+        self.prompts.append(prompt)
+        text = self.texts.pop(0) if len(self.texts) > 1 else self.texts[0]
+        return f"plan\n{prompts.DELIMITER}\n{text}"
+
+
+STRAYY = "Zebra galloped across quartz meadows. Pelican wandered beneath crimson lanterns. Violins drifted over marble fountains. Cobalt dragons whispered towards velvet horizons."
+CLEAN = "I see the cat. The cat sees the dog. We like the dog. The dog likes me."
+
+
+def _english(conn, make_learner):
+    return learner_with(conn, make_learner, "en", ["cat", "dog", "see", "like"])
+
+
+def test_an_english_story_with_too_many_strays_gets_one_more_try_and_the_better_one_is_kept(conn, make_learner):
+    l = _english(conn, make_learner)
+    groq = Queue(STRAYY, CLEAN)
+    r = generate_story(conn, l, "en", call_groq_fn=groq, use_cache=False, story_type="narration")
+    assert len(groq.prompts) == 2 and r.text == CLEAN
+
+
+def test_a_second_try_that_is_no_better_is_not_kept(conn, make_learner):
+    l = _english(conn, make_learner)
+    groq = Queue(STRAYY, STRAYY.replace("Zebra", "Zebras"))
+    r = generate_story(conn, l, "en", call_groq_fn=groq, use_cache=False, story_type="narration")
+    assert len(groq.prompts) == 2 and r.text == STRAYY
+
+
+def test_a_clean_english_story_costs_no_second_call(conn, make_learner):
+    l = _english(conn, make_learner)
+    groq = Queue(CLEAN)
+    generate_story(conn, l, "en", call_groq_fn=groq, use_cache=False, story_type="narration")
+    assert len(groq.prompts) == 1
+
+
+def test_other_languages_are_never_retried_for_strays(conn, make_learner):
+    l = learner_with(conn, make_learner, "es", ["casa", "agua"])
+    groq = Queue("Zorro galopa sobre praderas cuarzo. Pelícano vaga bajo faroles carmesí. Violines flotan sobre fuentes mármol.")
+    generate_story(conn, l, "es", call_groq_fn=groq, use_cache=False, story_type="narration")
+    assert len(groq.prompts) == 1
+
+
+def test_random_english_kinds_are_classic_unless_the_switch_is_on(monkeypatch):
+    rng = random.Random(1)
+    monkeypatch.delenv("TUTOR_RICH_RANDOM", raising=False)
+    kinds = {prompts.describe_prompt(prompts.build_story_prompt("English", "cat, dog", None, None, random.Random(i)))[0] for i in range(60)}
+    assert kinds <= {"narration", "dialogue"}
+    monkeypatch.setenv("TUTOR_RICH_RANDOM", "1")
+    kinds = {prompts.describe_prompt(prompts.build_story_prompt("English", "cat, dog", None, None, random.Random(i)))[0] for i in range(120)}
+    assert kinds - {"narration", "dialogue"}

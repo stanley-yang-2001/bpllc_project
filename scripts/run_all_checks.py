@@ -321,6 +321,10 @@ def stage_pos(r: Runner) -> Result:
     return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/pos_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
 
 
+def stage_rich_kinds(r: Runner) -> Result:
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/rich_kinds_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
+
+
 def stage_text_tools(r: Runner) -> Result:
     return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/text_tools_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
 
@@ -343,13 +347,14 @@ STAGES: list[Stage] = [
     Stage("difficulty-live", "live", "stories at each difficulty (difficulty_check)", "stories miss their length, own-word or unusual-word targets, or come back in the wrong language", stage_difficulty, ("stack", "live-ai")),
     Stage("meanings-live", "live", "meanings in the chosen language (meanings_check)", "the tutor writes meanings in the wrong language for the own / studied / both choice", stage_meanings, ("stack", "live-ai")),
     Stage("pos-live", "live", "parts of speech per language (pos_check)", "the tutor labels words with the wrong category, or one outside the language's own list", stage_pos, ("stack", "live-ai")),
+    Stage("rich-kinds-live", "live", "richer English kinds stay near your words (rich_kinds_check)", "diary, letter, place, routine, anecdote or story texts use too many words outside the list", stage_rich_kinds, ("stack", "live-ai")),
     Stage("text-tools-live", "live", "pronunciation and translation (text_tools_check)", "pinyin, romaji, Korean, IPA or translations come back wrong", stage_text_tools, ("stack", "live-ai")),
 ]
 BY_ID = {s.id: s for s in STAGES}
 
 # What the current round of changes (patches 0033 and 0034) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
-ROUND_LIVE = ("pos-live", "meanings-live", "text-tools-live")
+ROUND_LIVE = ("pos-live", "rich-kinds-live", "meanings-live", "text-tools-live")
 ROUND_MANUAL = [
     "Vocabulary: the Part of speech column. Pick a label for one word by hand; press 'Label parts of speech' and see the rest get labels; switch to Japanese and check the choices include i-adjective and na-adjective (not plain adjective).",
     "Practice > Parts of speech: answer a round in English, then in a language with its own categories (Japanese or Chinese); check a wrong answer shows the right category.",

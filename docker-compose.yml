@@ -24,10 +24,12 @@ services:
       - ADMIN_DATABASE_URL=postgresql://langflow:${POSTGRES_PASSWORD:-langflow}@postgres:5432/langflow
       - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-120b}
       - MAX_PROMPT_WORDS=${MAX_PROMPT_WORDS:-150}
+      - TUTOR_RICH_RANDOM=${TUTOR_RICH_RANDOM:-}      # 1: a random English story may be any kind (see api/scripts/rich_kinds_check.py)
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
       # Leave it empty in anything that is not your own machine; with it empty, a request without a learner is refused.
       - TUTOR_DEV_USER_ID=${TUTOR_DEV_USER_ID:-}
       - TUTOR_DEV_LANGUAGE=${TUTOR_DEV_LANGUAGE:-en}
+      - TUTOR_RICH_RANDOM=${TUTOR_RICH_RANDOM:-}
     volumes:
       - ./flows:/app/flows
       - ./custom_components:/app/custom_components

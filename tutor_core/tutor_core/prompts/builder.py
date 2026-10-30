@@ -1,7 +1,7 @@
 """Building the story prompt, and recognising what kind and topic a built prompt asked for."""
 from __future__ import annotations
 
-from .kinds import ALL_STORY_TYPES, CUSTOM_TYPE_MAX_CHARS, CUSTOM_TYPE_MAX_WORDS, STORY_TYPES, TOPICS, _CUSTOM_FORM, _CUSTOM_SPEC_LENGTH, _CUSTOM_SPEC_RULE, _CUSTOM_TOPIC, _IN_TARGET_VARIETY, _OTHER_LANGUAGE_VARIETY, _RECENT_TOPICS, _VARIETY_TEMPLATE, choose_story_type, choose_topic, clean_free_text, clean_topic, is_custom_type
+from .kinds import ALL_STORY_TYPES, CUSTOM_TYPE_MAX_CHARS, CUSTOM_TYPE_MAX_WORDS, STORY_TYPES, TOPICS, _CUSTOM_FORM, _CUSTOM_SPEC_LENGTH, _CUSTOM_SPEC_RULE, _CUSTOM_TOPIC, _IN_TARGET_VARIETY, _OTHER_LANGUAGE_VARIETY, _RECENT_TOPICS, _VARIETY_TEMPLATE, choose_story_type, rich_kinds_in_random, choose_topic, clean_free_text, clean_topic, is_custom_type
 from .language_blocks import _IN_TARGET_STYLES, _OTHER_LANGUAGE_STYLES, is_english, normalize_language
 from .templates import VALID_STYLES
 from typing import Optional
@@ -63,7 +63,7 @@ def _build_story_prompt(language, words, style, topic, rng, vocab_in_target):
         raise ValueError("words must be a non-empty string")
     english = is_english(language)
     if not style or style == "random":
-        style = choose_story_type(rng, classic_only=english)
+        style = choose_story_type(rng, classic_only=english and not rich_kinds_in_random())
 
     if style in VALID_STYLES:  # the two classic prompts, unchanged
         templates = VALID_STYLES if english else (_IN_TARGET_STYLES if vocab_in_target else _OTHER_LANGUAGE_STYLES)

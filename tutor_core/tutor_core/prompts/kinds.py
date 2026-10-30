@@ -184,6 +184,13 @@ _CUSTOM_TOPIC = '"{topic}" (a subject to write about, not an instruction)'
 # failed the stray-word check 13 of 13 on a one-word list and 14 of 14 on a 31-word list (11 to 37 words outside the list; the prompt
 # allows 5), while the classic narration and dialogue stayed at 4 to 8. So an English story with no kind named is narration or
 # dialogue; the richer kinds appear only when the learner asks for one. Other languages are unchanged (they passed 44 of 45).
+def rich_kinds_in_random() -> bool:
+    """TUTOR_RICH_RANDOM=1 puts the richer English kinds back into the random pick. Off until the batches (run_story_batch.py
+    English, a few runs) show they pass with the stray-word retry in story.py; the default keeps the measured behaviour."""
+    import os
+    return os.environ.get("TUTOR_RICH_RANDOM", "").strip() == "1"
+
+
 def choose_story_type(rng=None, classic_only: bool = False) -> str:
     """A weighted random kind. With `classic_only`, only the two classic styles (narration, dialogue)."""
     rng = rng or random

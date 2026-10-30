@@ -134,7 +134,38 @@ def generate_story(
         if second.strip():
             passage = second
     passage = _better_try(passage, prompt, difficulty, language, words, call_groq_fn or groq_module.call_groq)
+    passage = _fewer_strays(passage, prompt, language, words, call_groq_fn or groq_module.call_groq)
     return remember(StoryResult(passage, True, None, **base))
+
+
+STRAY_LIMIT = 5        # the prompt allows about this many words outside the learner's list (English)
+
+
+def _fewer_strays(passage, prompt, language, words, call):
+    """English only: one more try, kept only if it has fewer words outside the learner's list, when the story has more than the
+    prompt allows. This is what lets the richer kinds (diary, letter, place ...) come back into random picks: in the 21 Oct 2026
+    batches they failed this check 27 of 27 times, while narration and dialogue did not. Without a switch nothing changes in
+    which kinds are picked; this retry only costs a second call when a story has too many strays."""
+    if language != "en":
+        return passage
+    from . import difficulty as _d
+    from .quality import check_passage
+    everyday = _d._everyday("en")
+    vocab = ", ".join(words)
+
+    def strays(text):
+        return check_passage(text, vocab, check_vocab=True, max_oov=STRAY_LIMIT, everyday=lambda w: w in everyday)["oov_count"]
+
+    first = strays(passage)
+    if first <= STRAY_LIMIT:
+        return passage
+    try:
+        second = extract_final_passage(call(prompt))
+    except Exception:
+        return passage
+    if not second.strip() or strays(second) >= first:
+        return passage
+    return second
 
 
 def _better_try(passage, prompt, difficulty, language, words, call):
