@@ -30,6 +30,8 @@ def stub(app):
 
 class Recorder:
     """A tutor that records exactly what the route asked of it."""
+    stores_chat = False
+    calls_ai = False
 
     def __init__(self, result=None, error=None):
         self.calls, self.result, self.error = [], result or ChatResult("ok"), error
@@ -190,6 +192,8 @@ def test_tutor_errors_keep_their_status_and_code(make_user, app, error, status, 
 
 def test_an_unexpected_crash_in_the_tutor_is_a_clean_500(make_user, app):
     class Boom:
+        stores_chat = calls_ai = False
+
         def run(self, **kw):
             raise RuntimeError("secret internals")
 
@@ -210,6 +214,8 @@ def test_a_second_request_from_the_same_learner_is_refused_while_the_first_runs(
     started, release = threading.Event(), threading.Event()
 
     class Slow:
+        stores_chat = calls_ai = False
+
         def run(self, **kw):
             started.set()
             release.wait(5)

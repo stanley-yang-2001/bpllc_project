@@ -153,6 +153,7 @@ def test_clients_that_hold_no_chat_refuse_when_there_is_something_to_delete():
 
 class Recorder:
     stores_chat = True
+    calls_ai = False
 
     def __init__(self, error=None):
         self.calls, self.error, self.deleted = [], error, []

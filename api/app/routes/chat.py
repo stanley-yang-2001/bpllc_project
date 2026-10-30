@@ -3,24 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field, BaseModel, field_validator
 
-from ..db import connection
 from ..deps import current_user, require_language
 from ..schemas import ChatOut
-from tutor_core.languages import LANGUAGES
-
-from ..services import chat_sessions, preferences
-from ..services.langflow_client import build_session_id
+from ..services.chat_turn import CHAT_BASE_TOKENS, estimate_tokens, run_turn      # noqa: F401  (re-exported: the tests import estimate_tokens from here)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 MAX_CHARS = 2000
-# Reserved from the token budget before a turn runs, then replaced by the count Langflow reports. The base is above
-# the real turns captured on 14 Oct 2026 (618 for a greeting, 1344 for a story request) because the Agent may call
-# the model more than once; the message adds about one token per three characters.
-CHAT_BASE_TOKENS = 1500
-
-
-def estimate_tokens(message: str) -> int:
-    return CHAT_BASE_TOKENS + -(-len(message) // 3)
 
 
 class ChatIn(BaseModel):
@@ -50,23 +38,9 @@ class ChatIn(BaseModel):
 @router.post("", response_model=ChatOut)
 def chat(body: ChatIn, request: Request, user: dict = Depends(current_user)):
     """One chat turn. Made as the logged-in user and nobody else: the id comes from the session cookie, never
-    from the body, and the Langflow session id is built from it here."""
+    from the body, and the Langflow session id is built from it in the service."""
     require_language(body.language)
-    session_id = build_session_id(user["id"], body.session_id)
-    state = request.app.state
-    with state.ai_gate.slot(user["id"], tokens=estimate_tokens(body.message) if getattr(state.chat, "calls_ai", False) else 0) as ticket:
-        if getattr(state.chat, "stores_chat", False):
-            # noted BEFORE the run, so even a failed turn (Langflow may already hold the question) can be deleted later
-            with connection(state.pool) as conn:
-                chat_sessions.record(conn, user["id"], session_id)
-        reply_language = None
-        with connection(state.pool) as conn:
-            prefs = preferences.get(conn, user["id"])
-        if prefs and prefs["chat_in_study_language"]:
-            reply_language = LANGUAGES[body.language].name           # the model's own sentences only; tool messages stay as the tool wrote them
-        result = state.chat.run(user_id=user["id"], language=body.language, message=body.message, session_id=session_id,
-                                reply_language=reply_language, set_ids=body.set_ids)
-        ticket.settle(result.tokens)
+    result, session_id = run_turn(request.app.state, user["id"], body.language, body.message, body.session_id, body.set_ids)
     return {"reply": result.reply,
             "tool_calls": [{"name": c.name, "args": c.args, "output": c.output, "failed": c.failed} for c in result.tool_calls],
-            "session_id": body.session_id}
+            "session_id": session_id}
