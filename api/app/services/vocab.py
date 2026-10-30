@@ -4,7 +4,7 @@ import csv
 import io
 
 import psycopg2.errors
-from tutor_core import pos as pos_rules, starter
+from tutor_core import pos as pos_rules, starter, vocab as tutor_vocab
 from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
@@ -162,14 +162,12 @@ def bulk_add(conn, user_id: int, language: str, rows: list[tuple[int, str, str]]
             except WordError as e:
                 invalid.append({"row": n, "reason": str(e)})
                 continue
-            cur.execute("INSERT INTO words (user_id, language, word, meaning) VALUES (%s, %s, %s, %s) "
-                        "ON CONFLICT (user_id, language, word) DO NOTHING RETURNING id", (user_id, language, w, m))
-            if cur.fetchone():
+            if tutor_vocab.insert_word(cur, user_id, language, w, m):
                 added += 1
             else:
                 duplicates += 1
         if added:
-            cur.execute("INSERT INTO user_languages (user_id, language) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user_id, language))
+            tutor_vocab.note_language(cur, user_id, language)
     return {"added": added, "duplicates": duplicates, "invalid_count": len(invalid), "invalid": invalid[:20]}
 
 

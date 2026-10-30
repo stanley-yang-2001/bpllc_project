@@ -39,18 +39,28 @@ def _check(learner_id, language) -> None:
         raise VocabError("That language isn't supported.")
 
 
+def insert_word(cur, learner_id: int, language: str, text: str, note: str) -> bool:
+    """The one INSERT for a new word (the chat tool and the API's CSV import both use it). `text` and `note` are already validated.
+    False: the word was already in this learner's list for that language."""
+    cur.execute("INSERT INTO tutor.words (user_id, language, word, meaning) VALUES (%s, %s, %s, %s) "
+                "ON CONFLICT (user_id, language, word) DO NOTHING", (learner_id, language, text, note))
+    return cur.rowcount == 1
+
+
+def note_language(cur, learner_id: int, language: str) -> None:
+    """So the Vocabulary page offers the language the learner just started using."""
+    cur.execute("INSERT INTO tutor.user_languages (user_id, language) VALUES (%s, %s) ON CONFLICT DO NOTHING", (learner_id, language))
+
+
 def add_word(conn, learner_id: int, language: str, word, meaning=None) -> AddResult:
     """Store one word for one learner. Raises WordError (the word is unusable) or VocabError (learner or language)."""
     _check(learner_id, language)
     text, note = validate_word(word, language), validate_meaning(meaning)
     try:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO tutor.words (user_id, language, word, meaning) VALUES (%s, %s, %s, %s) "
-                        "ON CONFLICT (user_id, language, word) DO NOTHING", (learner_id, language, text, note))
-            added = cur.rowcount == 1
-            if added:       # so the Vocabulary page offers the language the learner just started using
-                cur.execute("INSERT INTO tutor.user_languages (user_id, language) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-                            (learner_id, language))
+            added = insert_word(cur, learner_id, language, text, note)
+            if added:
+                note_language(cur, learner_id, language)
         conn.commit()
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
