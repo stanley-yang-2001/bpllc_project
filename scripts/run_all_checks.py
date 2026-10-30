@@ -7,6 +7,7 @@ project folder:
     python scripts/run_all_checks.py --stack         # + the running stack: flow sync, container tests, browser tests
     python scripts/run_all_checks.py --live          # + the slow checks that call Groq (stories, chat routing, readings)
     python scripts/run_all_checks.py --all --up      # everything, starting the stack first
+    python scripts/run_all_checks.py --round         # everything this round of changes needs, then a checklist of what to try by hand
     python scripts/run_all_checks.py --list          # what exists, and what each one is for
     python scripts/run_all_checks.py --only core,api # just these;  --skip web-build  leaves one out
 
@@ -311,6 +312,10 @@ def stage_difficulty(r: Runner) -> Result:
     return finish(r, r.sh(cmd, timeout=7200))
 
 
+def stage_meanings(r: Runner) -> Result:
+    return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/meanings_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
+
+
 def stage_text_tools(r: Runner) -> Result:
     return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/text_tools_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
 
@@ -331,9 +336,24 @@ STAGES: list[Stage] = [
     Stage("m3-live", "live", "per-learner tools fail closed (m3_check)", "a learner could reach another learner's words through the Agent", stage_m3, ("stack", "live-ai")),
     Stage("routing-live", "live", "chat routing matrix", "the Agent picks the wrong tool or passes the wrong arguments", stage_routing, ("stack", "live-ai")),
     Stage("difficulty-live", "live", "stories at each difficulty (difficulty_check)", "stories miss their length, own-word or unusual-word targets, or come back in the wrong language", stage_difficulty, ("stack", "live-ai")),
+    Stage("meanings-live", "live", "meanings in the chosen language (meanings_check)", "the tutor writes meanings in the wrong language for the own / studied / both choice", stage_meanings, ("stack", "live-ai")),
     Stage("text-tools-live", "live", "pronunciation and translation (text_tools_check)", "pinyin, romaji, Korean, IPA or translations come back wrong", stage_text_tools, ("stack", "live-ai")),
 ]
 BY_ID = {s.id: s for s in STAGES}
+
+# What the current round of changes (patches 0033 and 0034) needs: the unit and stack checks, plus only the live checks that touch what
+# changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
+ROUND_LIVE = ("meanings-live", "text-tools-live")
+ROUND_MANUAL = [
+    "Read aloud in Edge/Chrome: open Vocabulary with Japanese as the active language, press a word's speaker button. It should speak Japanese, or say plainly that this device has no Japanese voice.",
+    "Settings > Read aloud: pick a different voice for a language, press the sample, then read a word with it. A wrongly pronounced word (for example Spanish 'se nama') should sound right with a Spanish voice.",
+    "Vocabulary > meaning language: try 'my language', 'the language I study' and 'both', press 'Write missing meanings' each time, and look at what comes back.",
+    "Home with an empty list (a new account): the three-step guide and the starter packs show. Add a pack, then use 'Write missing meanings'.",
+    "Practice: the progress card shows Due now / New / Learning / Known. Answer a round, come back: those words rest and 'Review due words' only offers the rest.",
+    "Practice > Dictation: press Listen (and the slow one), type the word with a missing accent, then a wrong word. Check the three messages. In a browser with no voice for the language the card should say so instead of offering Start.",
+    "Download my data (Settings): the file lists word_progress and practice_days.",
+    "Privacy policy: the approved wording says practice results are not stored; they now are (per word: box, due date, counts). Decide the wording and bump policy.POLICY_VERSION when you approve it.",
+]
 STACK_UP_STAGE = Stage("stack-up", "stack", "start the stack", "docker compose up failed", stage_stack_up, ("docker",))
 
 
@@ -341,7 +361,7 @@ STACK_UP_STAGE = Stage("stack-up", "stack", "start the stack", "docker compose u
 
 def selected(args: argparse.Namespace) -> list[Stage]:
     groups = {"unit"}
-    if args.stack or args.live or args.all:
+    if args.stack or args.live or args.all or args.round:
         groups.add("stack")
     if args.live or args.all:
         groups.add("live")
@@ -352,7 +372,7 @@ def selected(args: argparse.Namespace) -> list[Stage]:
             raise SystemExit(f"unknown check(s): {', '.join(unknown)}. See --list.")
         chosen = [BY_ID[w] for w in wanted]
     else:
-        chosen = [s for s in STAGES if s.group in groups]
+        chosen = [s for s in STAGES if s.group in groups or (args.round and s.id in ROUND_LIVE)]
     skipped = {x.strip() for x in (args.skip or "").split(",") if x.strip()}
     unknown = skipped - set(BY_ID)
     if unknown:
@@ -431,6 +451,7 @@ def parse(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--stack", action="store_true", help="also the checks that need the running stack (no Groq calls)")
     ap.add_argument("--live", action="store_true", help="also the slow checks that call Groq (includes --stack)")
     ap.add_argument("--all", action="store_true", help="everything (same as --live)")
+    ap.add_argument("--round", action="store_true", help="everything the current round of changes needs (unit + stack + its live checks, stack rebuilt first), then a checklist to try by hand")
     ap.add_argument("--up", action="store_true", help="run `docker compose up -d --build` first and wait for the stack")
     ap.add_argument("--only", help="comma-separated check ids (see --list); runs just those")
     ap.add_argument("--skip", help="comma-separated check ids to leave out")
@@ -442,7 +463,10 @@ def parse(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--npm-ci", action="store_true", help="reinstall the web packages even if they look current")
     ap.add_argument("--verbose", action="store_true", help="show each check's output as it runs")
     ap.add_argument("--keep-test-db", action="store_true", help="leave the throwaway test containers running afterwards")
-    return ap.parse_args(argv)
+    args = ap.parse_args(argv)
+    if args.round:
+        args.up = True                  # the round adds a migration and new screens: the stack must be rebuilt to test them
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -505,6 +529,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{passed} passed, {len(failed)} failed, {len(skipped)} skipped.  Logs and summary.json: {report_dir}")
     if skipped:
         print("A skipped check did not run; the table says why. It is not a failure.")
+    if args.round:
+        checklist = "To try by hand (the automatic checks cannot hear or see these):\n" + "\n".join(f"  [ ] {i}. {line}" for i, line in enumerate(ROUND_MANUAL, 1))
+        print("\n" + checklist)
+        (report_dir / "manual-checklist.txt").write_text(checklist + "\n", encoding="utf-8")
     (report_dir / "summary.json").write_text(json.dumps([{"check": n, "result": st, "seconds": round(t, 1), "detail": d} for n, st, t, d in rows], indent=1), encoding="utf-8")
     return 1 if failed else 0
 

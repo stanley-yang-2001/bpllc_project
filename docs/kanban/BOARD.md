@@ -3,7 +3,7 @@
 Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uploads). Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.
 
 
-## Backlog (31)
+## Backlog (29)
 
 - **Chat on your own model (phase 2)** (no date) — Needs a spike on the author's machine first (how the Agent calls a user-supplied model).
 - **Saved story remembers which model wrote it** (no date) — Store the model name with a saved story and show it in the Library.
@@ -15,8 +15,6 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Richer English kinds back into random picks** (no date) — Regenerate once when the check fails so diary, letter and place stories can return to random choice.
 - **Merge the duplicated add-word INSERT** (no date) — The same INSERT exists in two places.
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
-- **B1: Move the story-making use case out of the stories route** (2026-10-27) — routes/stories.py holds the whole generate flow and the request models. Move the flow to services/story_generation.py and the models to schemas so the route only calls it.
-- **B2: One set-filter clause instead of three copies** (2026-10-27) — The same all/general/set-id SQL clause is written in vocab.list_words, vocab.words_without_meaning and practice._set_clause.
 - **B3: Move the chat turn out of the chat route; give the chat client an interface** (2026-10-27) — routes/chat.py holds the gate slot, session record, preference read and reply language, and reads calls_ai and stores_chat with getattr.
 - **B4: Move the own-model settings logic out of the model route** (2026-10-27) — routes/model.py does the test, save and remove steps with encryption and the address check inline.
 - **B5: Split user_model.py into address guard, pinned HTTP, client and rate limit** (2026-10-27) — services/user_model.py (160 lines) has four jobs: the SSRF address check, the pinned connections, the chat-completions call and the request limiter.
@@ -37,7 +35,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **F8: Separate saving from holding in PreferencesProvider** (2026-10-27) — PreferencesProvider.tsx (162 lines) holds the value, debounces saves, retries and writes the device copy.
 - **F9: Split Library and Privacy into parts** (2026-10-27) — Library.tsx (129 lines) holds the list, row, opened story and delete flow; Privacy.tsx (131 lines) holds a block renderer.
 
-## In review (13)
+## In review (19)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -52,6 +50,12 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Update the docs diagrams and add class diagrams** (2026-10-27) — Rewrite the architecture, use-case, concept, workflow and state diagrams for the current site; add back-end and front-end class diagrams and a database diagram.
 - **One command that runs every test (run-checks.bat)** (2026-10-28) — scripts/run_all_checks.py runs the unit, stack and live checks and prints one table; Python suites run in a throwaway container with their own Postgres.
 - **Read-aloud voices and meanings in the learner's chosen language** (2026-10-29) — A voice is chosen per language (never a wrong-language one) with a clear message when none is installed, and tutor-written meanings can be in the learner's language, the study language, or both.
+- **B1: Move the story-making use case out of the stories route** (2026-10-29) — routes/stories.py holds the whole generate flow and the request models. Move the flow to services/story_generation.py and the models to schemas so the route only calls it.
+- **B2: One set-filter clause instead of three copies** (2026-10-29) — The same all/general/set-id SQL clause is written in vocab.list_words, vocab.words_without_meaning and practice._set_clause.
+- **Remembered practice with spaced review** (2026-10-29) — Practice remembers right and wrong answers per word (Leitner boxes), brings words back when due, and shows a progress card with a streak.
+- **Starter word packs and first-run guide** (2026-10-29) — One click adds 12 everyday words from four packs in any of the nine languages; Home guides a new learner through three steps.
+- **Dictation practice** (2026-10-29) — Hear a word read aloud and type it; tells right, missing accent and wrong; says plainly when the device has no voice.
+- **Checks on GitHub and a --round flag** (2026-10-29) — A GitHub Actions workflow runs the checks on every push; run-checks.bat --round runs everything the current round needs and prints a checklist for manual tries.
 
 ## Done (33)
 

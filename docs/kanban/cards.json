@@ -932,15 +932,17 @@
  },
  {
   "title": "B1: Move the story-making use case out of the stories route",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-29",
   "summary": "routes/stories.py holds the whole generate flow and the request models. Move the flow to services/story_generation.py and the models to schemas so the route only calls it.",
-  "done": [],
-  "todo": [
+  "done": [
    "Create services/story_generation.py with generate(user, request, runner)",
    "Move GenerateIn, SaveIn and DifficultyIn to schemas",
    "Keep the 869 API tests green; add tests for the service without HTTP"
+  ],
+  "todo": [
+   "Run run-checks.bat and confirm it is green on your machine"
   ],
   "labels": [
    "backend",
@@ -950,15 +952,17 @@
  },
  {
   "title": "B2: One set-filter clause instead of three copies",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-29",
   "summary": "The same all/general/set-id SQL clause is written in vocab.list_words, vocab.words_without_meaning and practice._set_clause.",
-  "done": [],
-  "todo": [
+  "done": [
    "Add word_sets.filter_clause(set_filter)",
    "Use it in the three places",
    "Add one test for the clause (all, general, id, bad value)"
+  ],
+  "todo": [
+   "Run run-checks.bat and confirm it is green on your machine"
   ],
   "labels": [
    "backend",
@@ -1344,6 +1348,88 @@
   "labels": [
    "words",
    "speech"
+  ]
+ },
+ {
+  "title": "Remembered practice with spaced review",
+  "status": "In review",
+  "area": "fullstack",
+  "date": "2026-10-29",
+  "summary": "Practice remembers right and wrong answers per word (Leitner boxes), brings words back when due, and shows a progress card with a streak.",
+  "done": [
+   "Migration 0014: word_progress and practice_days",
+   "POST /practice/answers, GET /practice/progress, due=true on practice routes",
+   "Progress card, Review due words, only-due option",
+   "In the data download and deleted with the account",
+   "API, web and browser tests"
+  ],
+  "todo": [
+   "Decide the privacy policy wording and bump POLICY_VERSION",
+   "Try it on your machine (run-checks.bat --round)"
+  ],
+  "labels": [
+   "fullstack",
+   "practice"
+  ]
+ },
+ {
+  "title": "Starter word packs and first-run guide",
+  "status": "In review",
+  "area": "fullstack",
+  "date": "2026-10-29",
+  "summary": "One click adds 12 everyday words from four packs in any of the nine languages; Home guides a new learner through three steps.",
+  "done": [
+   "Four packs x nine languages, validated by tests",
+   "GET/POST /words/starter-packs",
+   "Guide on Home, packs on Vocabulary",
+   "English gloss only for learners who want English meanings"
+  ],
+  "todo": [
+   "Native-speaker check of the packs (written here, not reviewed by a speaker)"
+  ],
+  "labels": [
+   "fullstack",
+   "onboarding"
+  ]
+ },
+ {
+  "title": "Dictation practice",
+  "status": "In review",
+  "area": "frontend",
+  "date": "2026-10-29",
+  "summary": "Hear a word read aloud and type it; tells right, missing accent and wrong; says plainly when the device has no voice.",
+  "done": [
+   "GET /practice/dictation",
+   "Dictation screen with normal and slow playback",
+   "Answers remembered, due mode"
+  ],
+  "todo": [
+   "Try it in Edge with Japanese and Spanish voices"
+  ],
+  "labels": [
+   "frontend",
+   "practice",
+   "speech"
+  ]
+ },
+ {
+  "title": "Checks on GitHub and a --round flag",
+  "status": "In review",
+  "area": "tooling",
+  "date": "2026-10-29",
+  "summary": "A GitHub Actions workflow runs the checks on every push; run-checks.bat --round runs everything the current round needs and prints a checklist for manual tries.",
+  "done": [
+   ".github/workflows/checks.yml",
+   "meanings_check.py live check",
+   "e2e spec for the new screens",
+   "--round flag with ROUND_LIVE and ROUND_MANUAL"
+  ],
+  "todo": [
+   "Confirm the workflow goes green after you push"
+  ],
+  "labels": [
+   "tooling",
+   "testing"
   ]
  }
 ]

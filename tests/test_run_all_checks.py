@@ -144,3 +144,31 @@ if __name__ == "__main__":
                 failed += 1
                 print(f"  FAIL  {name}: {e!r}")
     sys.exit(1 if failed else 0)
+
+
+# --- --round: the checks for the current round of changes ------------------------------------------------------------------
+
+def test_round_is_unit_and_stack_plus_only_its_live_checks_with_the_stack_started():
+    got = ids("--round")
+    assert got[0] == "stack-up"
+    assert {"api", "web-unit", "e2e", "flow-sync"} <= set(got)
+    assert [i for i in got if i.endswith("-live")] == list(rc.ROUND_LIVE)
+    assert "m3-live" not in got and "routing-live" not in got and "difficulty-live" not in got
+
+
+def test_round_can_still_be_trimmed_and_live_adds_the_rest():
+    assert "e2e" not in ids("--round", "--skip", "e2e")
+    assert ids("--round", "--live")[0] == "stack-up" and "routing-live" in ids("--round", "--live")
+
+
+def test_round_live_names_are_real_live_stages_and_the_checklist_is_filled_in():
+    assert all(rc.BY_ID[i].group == "live" for i in rc.ROUND_LIVE)
+    assert len(rc.ROUND_MANUAL) >= 6 and all(len(line) > 40 for line in rc.ROUND_MANUAL)
+
+
+def test_round_prints_the_checklist_and_saves_it(monkeypatch, capsys):
+    monkeypatch.setattr(rc, "STAGES", [])
+    monkeypatch.setattr(rc, "selected", lambda a: [rc.Stage("fake", "unit", "fake", "why", lambda r: rc.Result(rc.PASS, ""))])
+    assert rc.main(["--round"]) == 0
+    out = capsys.readouterr().out
+    assert "To try by hand" in out and "[ ] 1." in out

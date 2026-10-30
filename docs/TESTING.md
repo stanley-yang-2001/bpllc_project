@@ -7,6 +7,7 @@ run-checks.bat                      # the unit checks (about 3 to 6 minutes the 
 run-checks.bat --stack              # + the running stack: flow in step, container tests, browser tests
 run-checks.bat --live               # + the slow checks that call Groq
 run-checks.bat --all --up           # everything, starting the stack first
+run-checks.bat --round              # everything the current round of changes needs, then a checklist to try by hand
 run-checks.bat --list               # every check and what its failure means
 ```
 
@@ -35,7 +36,12 @@ run-checks.bat --list               # every check and what its failure means
 | `m3-live` | live | a learner's tools fail closed: the Agent cannot reach another learner's words |
 | `routing-live` | live | the chat routing matrix: the right tool and arguments for each request |
 | `difficulty-live` | live | stories at Easy, Medium and Hard in all nine languages hit their targets (`--quick`: English and Chinese at Medium) |
+| `meanings-live` | live | the tutor writes meanings in the language chosen: your own, the studied one, both, or one picked for a click |
 | `text-tools-live` | live | pinyin, romaji, Korean romanization, English IPA, and translation |
+
+## `--round`: the checks for the current round
+
+`run-checks.bat --round` is one flag for "everything I need to test after applying the latest patches". It rebuilds the stack (`--up` is implied: the round adds migration 0014 and new screens), runs the unit and stack checks, runs only the live checks that touch what changed (`meanings-live`, `text-tools-live`; the others passed earlier, add `--live` to repeat them), and ends with a checklist of what to try by hand (hearing Japanese read aloud, the voice chooser, each meaning language, the first-run guide and starter packs, Due practice, dictation, the data download, the privacy wording). The checklist is also saved as `manual-checklist.txt` in the report folder. `--skip` and `--pause` still work with it. The list of live checks and the checklist are `ROUND_LIVE` and `ROUND_MANUAL` in `scripts/run_all_checks.py`; they are rewritten at the start of each round.
 
 ## Your data is not touched
 
