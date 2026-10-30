@@ -173,8 +173,8 @@ def fake_call(monkeypatch):
         return fake.answer
     fake.error, fake.answer, fake.seen = None, "Plan: x\n===STORY===\n" + DIALOGUE, seen
     monkeypatch.setattr(user_model, "call_model", fake)
-    monkeypatch.setattr("app.routes.model.call_model", fake)
-    monkeypatch.setattr("app.routes.model.check_base_url", lambda url, allow=False, r=None: None)
+    monkeypatch.setattr("app.services.model_settings.call_model", fake)
+    monkeypatch.setattr("app.services.model_settings.check_base_url", lambda url, allow=False, r=None: None)
     return fake
 
 
