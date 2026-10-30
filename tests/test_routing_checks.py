@@ -244,6 +244,7 @@ def test_requested_kind_and_topic_are_checked():
     letter = response(fr, tool_block("story_generator_tool", {"language": "French", "story_type": "letter", "topic": "a trip to the market"}, fr))
     check("a letter about a market passes both extra argument checks",
           [c["ok"] for c in evaluate_turn(t2, letter, VOCAB) if c["check"] == "tool argument"] == [True, True, True])
+    check("a letter that ends with a signature is not judged by the story-shape check", "story quality" not in results_by_name(evaluate_turn(t2, letter, VOCAB)))
     no_topic = response(fr, tool_block("story_generator_tool", {"language": "French", "story_type": "letter", "topic": ""}, fr))
     check("the same letter with the subject dropped fails on the topic",
           [c["ok"] for c in evaluate_turn(t2, no_topic, VOCAB) if c["check"] == "tool argument"] == [True, True, False])

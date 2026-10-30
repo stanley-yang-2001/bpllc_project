@@ -80,7 +80,8 @@ CASES = [
                [{"key": "story_type", "any_of": ["dialogue", "dialogo", "diálogo", "conversation", "conversación", "conversacion"]}])]},
     {"id": "T2", "name": "A requested kind and subject reach the tool (a letter about a market)", "turns": [
         _typed("Write a letter in French about a trip to the market", ["french", "français", "francais"],
-               [{"key": "story_type", "any_of": ["letter", "lettre"]}, {"key": "topic", "contains": ["market", "marché", "marche"]}])]},
+               [{"key": "story_type", "any_of": ["letter", "lettre"]}, {"key": "topic", "contains": ["market", "marché", "marche"]}],
+               quality=False)]},      # a letter ends with a signature ("Pierre"), which the story-shape check calls an unfinished sentence
     {"id": "T3", "name": "A kind of the learner's own reaches the tool (a poem)", "turns": [
         _typed("Write a poem in Spanish", ["spanish", "español", "espanol"],
                [{"key": "story_type", "any_of": ["poem", "poema", "a poem"]}], quality=False)]},

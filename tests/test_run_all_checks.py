@@ -73,7 +73,14 @@ def test_every_stage_has_a_group_a_reason_and_a_unique_id():
         assert s.group in ("unit", "stack", "live") and s.title and s.why and callable(s.run)
 
 
+def _in_the_langflow_container():
+    """The Langflow container holds only scripts/, tests/ and custom_components/, not the compose files or the web app."""
+    return not (ROOT / "docker-compose.test.yml").exists()
+
+
 def test_the_files_it_names_exist():
+    if _in_the_langflow_container():
+        return
     for p in rc.LANGFLOW_ONLY_TESTS:
         assert (ROOT / p).is_file(), p
     for n in rc.HOST_ONLY_TESTS:
@@ -95,6 +102,8 @@ def test_nothing_outside_the_langflow_list_needs_langflow():
 
 
 def test_test_compose_never_mounts_the_real_database():
+    if _in_the_langflow_container():
+        return
     text = (ROOT / rc.TEST_COMPOSE).read_text(encoding="utf-8")
     assert "test-db" in text and "tmpfs" in text
     assert "postgres:5432" not in text and "pgdata" not in text
