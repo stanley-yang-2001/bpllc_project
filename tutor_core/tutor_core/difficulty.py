@@ -28,7 +28,12 @@ LIMITS = {"length": (20, 400), "own_words": (1, 30), "uncommon_pct": (0, 50)}   
 LENGTH_TOLERANCE = 0.25        # a story within 25% of the target length counts as meeting it (24 Oct: Korean 134 words for 200 asked passed at 35%)
 UNCOMMON_SLACK = 5             # and one with at most this many points more uncommon words than asked
 CHARS_PER_WORD = 1.6           # Chinese and Japanese: a target of N words is about N * 1.6 characters
-_UNSPACED = ("zh", "ja")
+UNSPACED = ("zh", "ja")        # Chinese and Japanese put no spaces between words, so sizes are in characters
+
+
+def is_unspaced(language: str) -> bool:
+    return language in UNSPACED
+
 _DATA = Path(__file__).parent / "data"
 _TOKEN = re.compile(r"[^\W\d_]+(?:['’\-][^\W\d_]+)*")
 _LABEL = re.compile(r"^\s*[^\W\d_][^\W\d_'\-]*(?:\s[^\W\d_][^\W\d_'\-]*)?\s*[:：]\s*", re.M)    # "Ana:" or "アナ：" at the start of a line
@@ -62,7 +67,7 @@ def resolve(tier, length=None, own_words=None, uncommon_pct=None) -> Optional[di
 
 
 def _unit(language: str) -> str:
-    return "characters" if language in _UNSPACED else "words"
+    return "characters" if is_unspaced(language) else "words"
 
 
 def ask_size(code: str, length: int) -> int:
@@ -81,7 +86,7 @@ def ask_size(code: str, length: int) -> int:
 def prompt_note(language_code: str, targets: dict) -> str:
     """The note placed at the top of the story prompt. It states numbers only; nothing the learner typed goes into it."""
     asked = ask_size(language_code, targets["length"])
-    if language_code in _UNSPACED:
+    if is_unspaced(language_code):
         size = f"about {round(asked * CHARS_PER_WORD)} characters"
     else:
         size = f"about {asked} words"
@@ -226,7 +231,7 @@ def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:
 def measure(text: str, language_code: str, vocab_words) -> dict:
     """What the finished story measures: {"length", "length_unit", "own_words", "uncommon_pct" (None when it cannot be measured)}."""
     text = (text or "").strip()
-    if language_code in _UNSPACED:
+    if is_unspaced(language_code):
         length = sum(1 for ch in _LABEL.sub("", text) if ch.isalpha())
     else:
         length = len(_tokens(text))
@@ -236,7 +241,7 @@ def measure(text: str, language_code: str, vocab_words) -> dict:
 
 def evaluate(targets: dict, measured: dict, language_code: str, list_size: int) -> dict:
     """Did each measure meet its target? True / False, or None when the measure does not apply (no everyday list)."""
-    want_len = targets["length"] * (CHARS_PER_WORD if language_code in _UNSPACED else 1)
+    want_len = targets["length"] * (CHARS_PER_WORD if is_unspaced(language_code) else 1)
     length_ok = abs(measured["length"] - want_len) <= LENGTH_TOLERANCE * want_len
     own_ok = measured["own_words"] >= min(targets["own_words"], max(list_size, 0))
     uncommon = measured["uncommon_pct"]

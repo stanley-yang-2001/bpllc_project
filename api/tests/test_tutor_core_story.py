@@ -8,7 +8,7 @@ import random
 
 import pytest
 
-from tutor_core import prompts, story, vocab
+from tutor_core import prompts, story, story_cache, vocab
 from tutor_core.languages import LANGUAGES
 from tutor_core.story import EMPTY_VOCABULARY_MESSAGE, FAILURE_FALLBACK_MESSAGE, generate_story
 
@@ -199,7 +199,7 @@ def test_a_failure_is_remembered_only_briefly(conn, make_learner):
     l = learner_with(conn, make_learner, "es", ["pan"])
     g, now = Groq(error=RuntimeError("429")), [1000.0]
     generate_story(conn, l, "es", call_groq_fn=g, clock=lambda: now[0])
-    now[0] += story._FAILURE_CACHE_TTL_SECONDS - 1
+    now[0] += story_cache.FAILURE_TTL_SECONDS - 1
     again = generate_story(conn, l, "es", call_groq_fn=g, clock=lambda: now[0])
     assert len(g.prompts) == 1 and again.cached is True                       # the Agent's repeat calls do not re-hit Groq
     now[0] += 2
@@ -211,7 +211,7 @@ def test_a_success_is_reused_for_a_while_then_refreshed(conn, make_learner):
     l = learner_with(conn, make_learner, "es", ["pan"])
     g, now = Groq(), [1000.0]
     first = generate_story(conn, l, "es", call_groq_fn=g, clock=lambda: now[0])
-    now[0] += story._SUCCESS_CACHE_TTL_SECONDS - 1
+    now[0] += story_cache.SUCCESS_TTL_SECONDS - 1
     second = generate_story(conn, l, "es", call_groq_fn=g, clock=lambda: now[0])
     assert (first.cached, second.cached, len(g.prompts)) == (False, True, 1) and second.text == first.text
     now[0] += 2

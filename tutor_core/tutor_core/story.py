@@ -3,12 +3,9 @@
     load THIS learner's words in THIS language  ->  guard against an empty list  ->  cap the list for the prompt
     ->  build the prompt  ->  call Groq  ->  return only the passage, plus which type and topic were used.
 
-The short-lived cache exists only because the top-level Agent has been seen calling the story tool 3 to 5 times for
-one request. It is keyed by (learner, language, type, topic): the earlier language-only key would have served one
-learner's story, built from their words, to another learner. Successes and failures are cached for different times: a
-success is reusable for a while, a failure only briefly, so repeated Agent calls during a rate limit do not each re-run
-the retry loop but a genuine retry a bit later still gets a real attempt. Callers that must produce a NEW story every
-time (the Story Studio "Regenerate" button) pass use_cache=False and never read or write the cache.
+The short-lived cache (story_cache.py) exists because the top-level Agent has been seen calling the story tool 3 to 5 times
+for one request. Callers that must produce a NEW story every time (the Story Studio "Regenerate" button) pass use_cache=False
+and never read or write it. What happens when the first story is not good enough is in story_retries.py.
 """
 from __future__ import annotations
 
@@ -18,15 +15,13 @@ from dataclasses import dataclass, replace
 from typing import Optional
 
 from . import groq as groq_module
+from .story_cache import StoryCache
+from .story_retries import STRAY_LIMIT, RetryPolicy      # noqa: F401  (STRAY_LIMIT: the old import path)
 from .languages import LANGUAGES, stories_enabled
-from .quality import language_check
-from .prompts import (EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage,
-                      resolve_story_type)
+from .prompts import EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage, resolve_story_type
 from .vocab import _check, clean_set_ids, load_words, max_prompt_words, sample_words
 
-_STORY_CACHE: dict = {}
-_SUCCESS_CACHE_TTL_SECONDS = 20
-_FAILURE_CACHE_TTL_SECONDS = 15
+_STORY_CACHE = StoryCache()
 
 FAILURE_FALLBACK_MESSAGE = (
     "I'm having trouble generating a story right now — please try again in a moment."
@@ -51,6 +46,23 @@ class StoryResult:
     words_total: int = 0            # the learner's full list (the quality check uses this one)
     words_used: int = 0             # what went into the prompt after the cap
     difficulty: Optional[dict] = None   # the targets asked for (tutor_core.difficulty.resolve), or None
+
+
+@dataclass(frozen=True)
+class StoryRequest:
+    """Everything that decides which story is wanted (and so which cached story may be reused)."""
+    learner_id: int
+    language: str                           # ISO 639-1 code
+    story_type: Optional[str] = None        # resolved: a built-in type or the learner's own label, or None for "choose for me"
+    topic: Optional[str] = None
+    max_words: Optional[int] = None
+    difficulty: Optional[dict] = None
+    set_ids: Optional[list] = None          # None = every word; else only the words in those sets (0 = General)
+
+    def cache_key(self) -> tuple:
+        return (self.learner_id, self.language, self.story_type or "", self.topic or "") \
+            + ((tuple(sorted(self.difficulty.items())),) if self.difficulty else ()) \
+            + ((tuple(sorted(self.set_ids)),) if self.set_ids is not None else ())
 
 
 def generate_story(
@@ -84,114 +96,42 @@ def generate_story(
             return StoryResult(BAD_TYPE_MESSAGE, False, "bad_type", language)
     else:
         story_type = None
-    topic = clean_topic(topic) if topic else None
-    set_ids = clean_set_ids(set_ids)       # None = every word; else only the words in those sets (0 = General)
-    key = (learner_id, language, story_type or "", topic or "") + ((tuple(sorted(difficulty.items())),) if difficulty else ()) \
-        + ((tuple(sorted(set_ids)),) if set_ids is not None else ())
+    request = StoryRequest(learner_id, language, story_type, clean_topic(topic) if topic else None, max_words, difficulty, clean_set_ids(set_ids))
+    call = call_groq_fn or groq_module.call_groq
     now = clock()
 
-    if use_cache and key in _STORY_CACHE:
-        stamp, cached = _STORY_CACHE[key]
-        if now - stamp < (_SUCCESS_CACHE_TTL_SECONDS if cached.ok else _FAILURE_CACHE_TTL_SECONDS):
-            return replace(cached, cached=True)
+    if use_cache and (cached := _STORY_CACHE.fresh(request.cache_key(), now)) is not None:
+        return replace(cached, cached=True)
+    result = _make_story(conn, request, call, rng)
+    return _STORY_CACHE.remember(request.cache_key(), now, result) if use_cache and result.reason != "empty_vocabulary" else result
 
-    words = load_words(conn, learner_id, language, set_ids)
+
+def _make_story(conn, request: StoryRequest, call, rng) -> StoryResult:
+    language = request.language
+    words = load_words(conn, request.learner_id, language, request.set_ids)
     if not words:
         return StoryResult(EMPTY_VOCABULARY_MESSAGE, False, "empty_vocabulary", language)
 
-    used = sample_words(words, max_words if max_words is not None else max_prompt_words(), rng)
+    used = sample_words(words, request.max_words if request.max_words is not None else max_prompt_words(), rng)
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
-    prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), story_type, topic, rng, vocab_in_target=True, difficulty=difficulty)
+    prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), request.story_type, request.topic, rng, vocab_in_target=True,
+                                difficulty=request.difficulty)
     picked_type, picked_topic = describe_prompt(prompt)
-    base = dict(language=language, story_type=picked_type, topic=picked_topic,
-                words_total=len(words), words_used=len(used), difficulty=difficulty)
-
-    def remember(result: StoryResult) -> StoryResult:
-        if use_cache:
-            _STORY_CACHE[key] = (now, result)
-        return result
+    base = dict(language=language, story_type=picked_type, topic=picked_topic, words_total=len(words), words_used=len(used),
+                difficulty=request.difficulty)
 
     try:
-        raw = (call_groq_fn or groq_module.call_groq)(prompt)
+        raw = call(prompt)
     except Exception as exc:
         _log.warning("story generation failed (%s): %s", language, exc)
-        return remember(StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base))
+        return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
 
     passage = extract_final_passage(raw)
     # An empty passage (the model ran out of tokens, or returned nothing after the delimiter) must never reach the Agent
     # as an empty string: the Agent fills the gap by inventing its own story. It is a failure, cached briefly.
     if not passage.strip():
         _log.warning("story generation returned no passage (%s); raw length %d", language, len(raw or ""))
-        return remember(StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base))
-    # The model sometimes answers in English (or mixes English in) when asked for another language (seen 23 Oct, Chinese).
-    # Ask once more before the learner ever sees it; whatever the second try gives is returned and reported honestly.
-    if language != "en" and language_check(passage, LANGUAGES[language].name, "")["verdict"] not in ("ok", "not_checked"):
-        try:
-            second = extract_final_passage((call_groq_fn or groq_module.call_groq)(prompt))
-        except Exception:
-            second = ""
-        if second.strip():
-            passage = second
-    passage = _better_try(passage, prompt, difficulty, language, words, call_groq_fn or groq_module.call_groq)
-    passage = _fewer_strays(passage, prompt, language, words, call_groq_fn or groq_module.call_groq)
-    return remember(StoryResult(passage, True, None, **base))
-
-
-STRAY_LIMIT = 5        # the prompt allows about this many words outside the learner's list (English)
-
-
-def _fewer_strays(passage, prompt, language, words, call):
-    """English only: one more try, kept only if it has fewer words outside the learner's list, when the story has more than the
-    prompt allows. This is what lets the richer kinds (diary, letter, place ...) come back into random picks: in the 21 Oct 2026
-    batches they failed this check 27 of 27 times, while narration and dialogue did not. Without a switch nothing changes in
-    which kinds are picked; this retry only costs a second call when a story has too many strays."""
-    if language != "en":
-        return passage
-    from . import difficulty as _d
-    from .quality import check_passage
-    everyday = _d._everyday("en")
-    vocab = ", ".join(words)
-
-    def strays(text):
-        return check_passage(text, vocab, check_vocab=True, max_oov=STRAY_LIMIT, everyday=lambda w: w in everyday)["oov_count"]
-
-    first = strays(passage)
-    if first <= STRAY_LIMIT:
-        return passage
-    try:
-        second = extract_final_passage(call(prompt))
-    except Exception:
-        return passage
-    if not second.strip() or strays(second) >= first:
-        return passage
-    return second
-
-
-def _better_try(passage, prompt, difficulty, language, words, call):
-    """One more try, kept only if it is better, when the story is cut off mid-sentence or (with a tier) far from the length asked
-    for (25 Oct: Chinese Medium and Hard came out at 50 to 70% of the length; a Korean story ended mid-word). Nothing is hidden:
-    the report measures whichever story is returned."""
-    from . import difficulty as _d
-    from .quality import ends_complete, has_dangling_sentence
-
-    def gap(text):
-        if not difficulty:
-            return 0.0
-        want = difficulty["length"] * (_d.CHARS_PER_WORD if language in _d._UNSPACED else 1)
-        return abs(_d.measure(text, language, words)["length"] - want) / want
-
-    def bad(text):
-        return (not ends_complete(text)) or has_dangling_sentence(text, language) or gap(text) > _d.LENGTH_TOLERANCE
-
-    if not bad(passage):
-        return passage
-    try:
-        second = extract_final_passage(call(prompt))
-    except Exception:
-        return passage
-    if not second.strip():
-        return passage
-    def rank(text):
-        return (not ends_complete(text), has_dangling_sentence(text, language), gap(text))
-    return second if rank(second) < rank(passage) else passage
+        return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
+    passage = RetryPolicy(language, prompt, words, request.difficulty, call).improve(passage)
+    return StoryResult(passage, True, None, **base)
