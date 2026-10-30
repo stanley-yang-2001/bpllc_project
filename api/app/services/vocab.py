@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import csv
-import io
-
 import psycopg2.errors
-from tutor_core import pos as pos_rules, starter, vocab as tutor_vocab
+from tutor_core import pos as pos_rules, starter
 from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
 from ..errors import conflict, not_found, validation_error
 from . import word_sets
+from .csv_import import bulk_add, parse_csv                                       # noqa: F401  (old import path)
+from .word_fill import fill_meanings, fill_pos, words_without_meaning, words_without_pos      # noqa: F401  (old import path)
 
 WORD_COLS = "id, language, word, meaning, pos, set_id, created_at"
 
@@ -89,86 +88,10 @@ def update_word(conn, user_id: int, word_id: int, fields: dict) -> dict:
         return cur.fetchone()
 
 
-def words_without_meaning(conn, user_id: int, language: str, ids, set_filter, limit: int) -> dict:
-    """The learner's own words that have no meaning yet: {"items": [{"id", "word"}] (at most `limit`), "remaining": how many in all}.
-    `ids` limits it to those words (only the learner's own ever match); otherwise the set choice works as on the vocabulary page."""
-    where, params = "user_id = %s AND language = %s AND (meaning IS NULL OR btrim(meaning) = '')", [user_id, language]
-    if ids is not None:
-        where += " AND id = ANY(%s)"
-        params.append(list(ids))
-    else:
-        extra, extra_params = word_sets.filter_clause(set_filter)
-        where, params = where + extra, params + extra_params
-    with cursor(conn) as cur:
-        cur.execute(f"SELECT id, word FROM words WHERE {where} ORDER BY id LIMIT %s", [*params, limit])
-        items = cur.fetchall()
-        cur.execute(f"SELECT count(*) AS n FROM words WHERE {where}", params)
-        return {"items": items, "remaining": cur.fetchone()["n"]}
-
-
-def fill_meanings(conn, user_id: int, pairs) -> int:
-    """Sets each meaning only where the word still has none and belongs to this learner; returns how many were set."""
-    done = 0
-    with cursor(conn) as cur:
-        for word_id, meaning in pairs:
-            cur.execute("UPDATE words SET meaning = %s WHERE id = %s AND user_id = %s AND (meaning IS NULL OR btrim(meaning) = '')",
-                        (meaning, word_id, user_id))
-            done += cur.rowcount
-    return done
-
-
 def delete_words(conn, user_id: int, ids: list[int]) -> int:
     with cursor(conn) as cur:
         cur.execute("DELETE FROM words WHERE user_id = %s AND id = ANY(%s)", (user_id, ids))
         return cur.rowcount
-
-
-def parse_csv(raw: bytes, max_bytes: int, max_rows: int) -> list[tuple[int, str, str]]:
-    """Return [(row_number, word, meaning)]. Row numbers match the file (header is row 1)."""
-    if len(raw) > max_bytes:
-        raise validation_error(f"File is larger than {max_bytes // 1000} KB.")
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        raise validation_error("File must be UTF-8 text.")
-    reader = csv.reader(io.StringIO(text))
-    header = next(reader, None)
-    if not header:
-        raise validation_error("File is empty.")
-    cols = [c.strip().lower() for c in header]
-    if "word" not in cols:
-        raise validation_error("The first row must have a 'word' column.")
-    wi = cols.index("word")
-    mi = next((cols.index(n) for n in ("meaning", "definition") if n in cols), None)
-    rows = []
-    for n, row in enumerate(reader, start=2):
-        if not any(cell.strip() for cell in row):
-            continue
-        if len(rows) >= max_rows:
-            raise validation_error(f"More than {max_rows} rows.")
-        word = row[wi] if wi < len(row) else ""
-        meaning = row[mi] if mi is not None and mi < len(row) else ""
-        rows.append((n, word, meaning))
-    return rows
-
-
-def bulk_add(conn, user_id: int, language: str, rows: list[tuple[int, str, str]]) -> dict:
-    added = duplicates = 0
-    invalid: list[dict] = []
-    with cursor(conn) as cur:
-        for n, word, meaning in rows:
-            try:
-                w, m = validate_word(word, language), validate_meaning(meaning)
-            except WordError as e:
-                invalid.append({"row": n, "reason": str(e)})
-                continue
-            if tutor_vocab.insert_word(cur, user_id, language, w, m):
-                added += 1
-            else:
-                duplicates += 1
-        if added:
-            tutor_vocab.note_language(cur, user_id, language)
-    return {"added": added, "duplicates": duplicates, "invalid_count": len(invalid), "invalid": invalid[:20]}
 
 
 def starter_packs(conn, user_id: int, language: str) -> list[dict]:
@@ -196,27 +119,3 @@ def add_starter_pack(conn, user_id: int, language: str, pack: str, with_gloss: b
     return {"added": result["added"], "duplicates": result["duplicates"], "with_meaning": bool(with_gloss and language != "en")}
 
 
-def words_without_pos(conn, user_id: int, language: str, ids, set_filter, limit: int) -> dict:
-    """Like words_without_meaning, for words that have no part of speech yet."""
-    where, params = "user_id = %s AND language = %s AND pos IS NULL", [user_id, language]
-    if ids is not None:
-        where += " AND id = ANY(%s)"
-        params.append(list(ids))
-    else:
-        extra, extra_params = word_sets.filter_clause(set_filter)
-        where, params = where + extra, params + extra_params
-    with cursor(conn) as cur:
-        cur.execute(f"SELECT id, word FROM words WHERE {where} ORDER BY id LIMIT %s", [*params, limit])
-        items = cur.fetchall()
-        cur.execute(f"SELECT count(*) AS n FROM words WHERE {where}", params)
-        return {"items": items, "remaining": cur.fetchone()["n"]}
-
-
-def fill_pos(conn, user_id: int, pairs) -> int:
-    """Sets each label only where the word still has none and belongs to this learner; returns how many were set."""
-    done = 0
-    with cursor(conn) as cur:
-        for word_id, code in pairs:
-            cur.execute("UPDATE words SET pos = %s WHERE id = %s AND user_id = %s AND pos IS NULL", (code, word_id, user_id))
-            done += cur.rowcount
-    return done
