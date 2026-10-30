@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Plus, Search, SearchX, Sparkles, Type, Upload } from "lucide-react";
+import { BookOpen, Plus, Search, SearchX, Sparkles, Tags, Type, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { setsKey, wordsKey } from "../api/keys";
 import { api, type SetFilter, type UploadResult } from "../api/client";
@@ -11,7 +11,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { Button, Card, EmptyState, ErrorText, inputCls, PageHeader, Skeleton } from "../components/ui";
 import { AddWordForm } from "../vocab/AddWordForm";
 import { BulkBar } from "../vocab/BulkBar";
-import { defineLoop } from "../vocab/defineLoop";
+import { defineLoop, labelLoop } from "../vocab/defineLoop";
 import { Pager } from "../vocab/Pager";
 import { SetBar } from "../vocab/SetBar";
 import { UploadNotice } from "../vocab/UploadNotice";
@@ -76,6 +76,15 @@ export default function Vocabulary() {
     onSettled: () => setProgress(null),
   });
 
+  const label = useMutation({
+    mutationFn: () => labelLoop({ language: active, set: setFilter }, (done, left) => setProgress({ done, left })),
+    onSuccess: (r) => {
+      toast(r.done === 0 && r.failed === 0 ? t("vocab.labelNone") : t("vocab.labelDone", { count: r.done }));
+      void qc.invalidateQueries({ queryKey: wordsKey(user!.id, active) });
+    },
+    onSettled: () => setProgress(null),
+  });
+
   const addLang = useMutation({
     mutationFn: (code: string) => api.addLanguage(code),
     onSuccess: (u, code) => { setUser(u); setActive(code); setNewLang(""); },
@@ -122,15 +131,16 @@ export default function Vocabulary() {
             <Button variant="secondary" aria-pressed={showReading} loading={reading.isFetching && showReading} icon={<Type aria-hidden className="size-4" />} onClick={() => setShowReading(!showReading)}>{showReading ? t("reading.hide") : t("reading.show")}</Button>
             <MeaningLanguage />
             <Button variant="secondary" loading={define.isPending} icon={<Sparkles aria-hidden className="size-4" />} onClick={() => define.mutate()}>{t("vocab.defineMissing")}</Button>
+            <Button variant="secondary" loading={label.isPending} icon={<Tags aria-hidden className="size-4" />} onClick={() => label.mutate()}>{t("vocab.labelMissing")}</Button>
             <input ref={fileRef} type="file" accept=".csv,text/csv" hidden aria-label={t("vocab.csvFile")} onChange={(e) => { const f = e.target.files?.[0]; if (f) csv.mutate(f); }} />
             <Button variant="secondary" loading={csv.isPending} icon={<Upload aria-hidden className="size-4" />} onClick={() => fileRef.current?.click()}>{t("vocab.uploadCsv")}</Button>
           </div>
         </div>
 
-        {(progress || define.error || move.error) && (
+        {(progress || define.error || label.error || move.error) && (
           <div className="space-y-1 border-b border-slate-200 px-4 py-2">
             {progress && <p role="status" className="text-sm text-slate-700">{t("vocab.defining", { done: progress.done, left: progress.left })}</p>}
-            <ErrorText>{define.error ? err(define.error) : move.error ? err(move.error) : undefined}</ErrorText>
+            <ErrorText>{define.error ? err(define.error) : label.error ? err(label.error) : move.error ? err(move.error) : undefined}</ErrorText>
           </div>
         )}
         {selected.size > 0 && (

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from ..db import connection
 from ..deps import current_user, require_language
 from ..errors import AppError, not_found
-from ..schemas import AnswersIn, ChoiceSet, ClozeSet, DictationSet, FlashcardSet, ProgressOut
+from ..schemas import AnswersIn, ChoiceSet, ClozeSet, DictationSet, FlashcardSet, PosSet, ProgressOut
 from ..services import practice, progress, stories
 from tutor_core.languages import LANGUAGES
 
@@ -38,6 +38,15 @@ def dictation(request: Request, language: str, limit: int = Query(10, ge=1, le=5
     require_language(language)
     with connection(request.app.state.pool) as conn:
         return practice.dictation(conn, user["id"], language, limit, set, due)
+
+
+@router.get("/pos", response_model=PosSet)
+def pos_practice(request: Request, language: str, limit: int = Query(10, ge=1, le=50), set: str | None = Query(None, max_length=12),
+                 due: bool = False, user: dict = Depends(current_user)):
+    """Which part of speech is this word? From the learner's own labelled words (made on the spot, no AI)."""
+    require_language(language)
+    with connection(request.app.state.pool) as conn:
+        return practice.pos_cards(conn, user["id"], language, limit, set, due)
 
 
 @router.post("/answers", status_code=204)

@@ -4,14 +4,14 @@ import csv
 import io
 
 import psycopg2.errors
-from tutor_core import starter
+from tutor_core import pos as pos_rules, starter
 from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
 from ..errors import conflict, not_found, validation_error
 from . import word_sets
 
-WORD_COLS = "id, language, word, meaning, set_id, created_at"
+WORD_COLS = "id, language, word, meaning, pos, set_id, created_at"
 
 
 def _escape_like(text: str) -> str:
@@ -44,14 +44,24 @@ def _clean(word, meaning, language):
         raise validation_error(str(e))
 
 
-def add_word(conn, user_id: int, language: str, word: str, meaning, set_id: int | None = None) -> dict:
+def _clean_pos(language: str, code):
+    """None or "" = no label; otherwise a code from this language's own list."""
+    if code is None or code == "":
+        return None
+    if not pos_rules.valid(language, code):
+        raise validation_error("Choose a part of speech from the list for this language.")
+    return code
+
+
+def add_word(conn, user_id: int, language: str, word: str, meaning, set_id: int | None = None, pos: str | None = None) -> dict:
     word, meaning = _clean(word, meaning, language)
+    pos = _clean_pos(language, pos)
     if set_id is not None:
         word_sets.owned(conn, user_id, set_id, language)          # a set that is not this learner's, or another language's: not found
     with cursor(conn) as cur:
         try:
-            cur.execute(f"INSERT INTO words (user_id, language, word, meaning, set_id) VALUES (%s, %s, %s, %s, %s) RETURNING {WORD_COLS}",
-                        (user_id, language, word, meaning, set_id))
+            cur.execute(f"INSERT INTO words (user_id, language, word, meaning, set_id, pos) VALUES (%s, %s, %s, %s, %s, %s) RETURNING {WORD_COLS}",
+                        (user_id, language, word, meaning, set_id, pos))
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             raise conflict(f"'{word}' is already in your list.")
@@ -69,9 +79,10 @@ def update_word(conn, user_id: int, word_id: int, fields: dict) -> dict:
         new_word = fields.get("word", current["word"])
         new_meaning = fields["meaning"] if "meaning" in fields else current["meaning"]
         new_word, new_meaning = _clean(new_word, new_meaning, current["language"])
+        new_pos = _clean_pos(current["language"], fields["pos"]) if "pos" in fields else current["pos"]
         try:
-            cur.execute(f"UPDATE words SET word = %s, meaning = %s WHERE id = %s AND user_id = %s RETURNING {WORD_COLS}",
-                        (new_word, new_meaning, word_id, user_id))
+            cur.execute(f"UPDATE words SET word = %s, meaning = %s, pos = %s WHERE id = %s AND user_id = %s RETURNING {WORD_COLS}",
+                        (new_word, new_meaning, new_pos, word_id, user_id))
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             raise conflict(f"'{new_word}' is already in your list.")
@@ -185,3 +196,29 @@ def add_starter_pack(conn, user_id: int, language: str, pack: str, with_gloss: b
     rows = [(i + 1, w, (g or "") if with_gloss else "") for i, (w, g) in enumerate(pairs)]
     result = bulk_add(conn, user_id, language, rows)
     return {"added": result["added"], "duplicates": result["duplicates"], "with_meaning": bool(with_gloss and language != "en")}
+
+
+def words_without_pos(conn, user_id: int, language: str, ids, set_filter, limit: int) -> dict:
+    """Like words_without_meaning, for words that have no part of speech yet."""
+    where, params = "user_id = %s AND language = %s AND pos IS NULL", [user_id, language]
+    if ids is not None:
+        where += " AND id = ANY(%s)"
+        params.append(list(ids))
+    else:
+        extra, extra_params = word_sets.filter_clause(set_filter)
+        where, params = where + extra, params + extra_params
+    with cursor(conn) as cur:
+        cur.execute(f"SELECT id, word FROM words WHERE {where} ORDER BY id LIMIT %s", [*params, limit])
+        items = cur.fetchall()
+        cur.execute(f"SELECT count(*) AS n FROM words WHERE {where}", params)
+        return {"items": items, "remaining": cur.fetchone()["n"]}
+
+
+def fill_pos(conn, user_id: int, pairs) -> int:
+    """Sets each label only where the word still has none and belongs to this learner; returns how many were set."""
+    done = 0
+    with cursor(conn) as cur:
+        for word_id, code in pairs:
+            cur.execute("UPDATE words SET pos = %s WHERE id = %s AND user_id = %s AND pos IS NULL", (code, word_id, user_id))
+            done += cur.rowcount
+    return done

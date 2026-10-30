@@ -36,12 +36,13 @@ run-checks.bat --list               # every check and what its failure means
 | `m3-live` | live | a learner's tools fail closed: the Agent cannot reach another learner's words |
 | `routing-live` | live | the chat routing matrix: the right tool and arguments for each request |
 | `difficulty-live` | live | stories at Easy, Medium and Hard in all nine languages hit their targets (`--quick`: English and Chinese at Medium) |
+| `pos-live` | live | the tutor labels words with the right part of speech in English, Spanish, German, Japanese, Chinese and Korean, and only with that language's own categories |
 | `meanings-live` | live | the tutor writes meanings in the language chosen: your own, the studied one, both, or one picked for a click |
 | `text-tools-live` | live | pinyin, romaji, Korean romanization, English IPA, and translation |
 
 ## `--round`: the checks for the current round
 
-`run-checks.bat --round` is one flag for "everything I need to test after applying the latest patches". It rebuilds the stack (`--up` is implied: the round adds migration 0014 and new screens), runs the unit and stack checks, runs only the live checks that touch what changed (`meanings-live`, `text-tools-live`; the others passed earlier, add `--live` to repeat them), and ends with a checklist of what to try by hand (hearing Japanese read aloud, the voice chooser, each meaning language, the first-run guide and starter packs, Due practice, dictation, the data download, the privacy wording). The checklist is also saved as `manual-checklist.txt` in the report folder. `--skip` and `--pause` still work with it. The list of live checks and the checklist are `ROUND_LIVE` and `ROUND_MANUAL` in `scripts/run_all_checks.py`; they are rewritten at the start of each round.
+`run-checks.bat --round` is one flag for "everything I need to test after applying the latest patches". It rebuilds the stack (`--up` is implied: the round adds migrations 0014 and 0015 and new screens), runs the unit and stack checks, runs only the live checks that touch what changed (`pos-live`, `meanings-live`, `text-tools-live`; the others passed earlier, add `--live` to repeat them), and ends with a checklist of what to try by hand (hearing Japanese read aloud, the voice chooser, each meaning language, the first-run guide and starter packs, Due practice, dictation, parts of speech, the data download, the privacy wording). The checklist is also saved as `manual-checklist.txt` in the report folder. `--skip` and `--pause` still work with it. The list of live checks and the checklist are `ROUND_LIVE` and `ROUND_MANUAL` in `scripts/run_all_checks.py`; they are rewritten at the start of each round.
 
 ## Your data is not touched
 

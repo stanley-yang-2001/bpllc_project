@@ -40,6 +40,7 @@ class WordOut(BaseModel):
     language: str
     word: str
     meaning: str | None
+    pos: str | None = None             # part of speech: a code from the language's own list (tutor_core.pos), or none
     set_id: int | None = None          # null: the General set
     created_at: datetime
 
@@ -176,6 +177,24 @@ class FlashcardOut(BaseModel):
 
 class FlashcardSet(BaseModel):
     items: list[FlashcardOut]
+    total: int
+
+
+class PosCategories(BaseModel):
+    language: str
+    items: list[str]
+
+
+class PosCard(BaseModel):
+    id: int
+    word: str
+    answer: str
+    options: list[str]
+    meaning: str | None = None
+
+
+class PosSet(BaseModel):
+    items: list[PosCard]
     total: int
 
 

@@ -18,7 +18,7 @@ def build(conn, user_id: int) -> dict:
         out["profile"] = cur.fetchone()
         cur.execute("SELECT language, created_at FROM user_languages WHERE user_id = %s ORDER BY created_at, language", (user_id,))
         out["user_languages"] = cur.fetchall()
-        cur.execute("SELECT w.language, w.word, w.meaning, s.name AS set_name, w.created_at FROM words w "
+        cur.execute("SELECT w.language, w.word, w.meaning, w.pos, s.name AS set_name, w.created_at FROM words w "
                     "LEFT JOIN word_sets s ON s.id = w.set_id WHERE w.user_id = %s ORDER BY w.language, w.word", (user_id,))
         out["words"] = cur.fetchall()           # set_name null = the General set
         cur.execute("SELECT w.language, w.word, p.box, p.due_at, p.right_count, p.wrong_count, p.last_answered_at FROM word_progress p "

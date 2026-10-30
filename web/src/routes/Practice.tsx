@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { GraduationCap, Headphones, Layers, ListChecks, TextCursorInput } from "lucide-react";
+import { GraduationCap, Headphones, Layers, ListChecks, Tags, TextCursorInput } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type SetFilter } from "../api/client";
@@ -13,6 +13,7 @@ import { Blanks } from "../practice/Blanks";
 import { Choices, type Direction } from "../practice/Choices";
 import { Dictation } from "../practice/Dictation";
 import { Flashcards } from "../practice/Flashcards";
+import { PosPractice } from "../practice/PosPractice";
 import { ProgressCard } from "../practice/ProgressCard";
 import { speechSupported, voiceFor } from "../speech/speak";
 import { useVoices } from "../speech/useVoices";
@@ -28,7 +29,7 @@ export default function Practice() {
   const noVoice = canSpeak && voiceFor(active) === null;            // the device lists voices but none fit this language (undefined = not loaded yet)
   const storyParam = Number(params.get("story"));
   const storyId = Number.isInteger(storyParam) && storyParam > 0 ? storyParam : null;
-  const [mode, setMode] = useState<"cards" | "choice" | "dictation" | null>(null);
+  const [mode, setMode] = useState<"cards" | "choice" | "dictation" | "pos" | null>(null);
   const [direction, setDirection] = useState<Direction>("meaning");
   const [setPick, setSetPick] = useState("all");                 // "all", "general" or a set id
   const [dueOnly, setDueOnly] = useState(false);                 // only words that are due for review (then never-practised ones)
@@ -43,6 +44,8 @@ export default function Practice() {
       <PageHeader title={t("nav.practice")} description={t("practice.description")} actions={<Badge tone="brand"><span lang={active}>{name}</span></Badge>} />
       {mode === "cards" ? (
         <Card><Flashcards language={active} set={filter} due={dueOnly} onDone={back} /></Card>
+      ) : mode === "pos" ? (
+        <Card><PosPractice language={active} set={filter} due={dueOnly} onDone={back} /></Card>
       ) : mode === "dictation" ? (
         <Card><Dictation language={active} set={filter} due={dueOnly} onDone={back} /></Card>
       ) : mode === "choice" ? (
@@ -82,6 +85,11 @@ export default function Practice() {
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Layers aria-hidden className="size-5" />{t("practice.flashcards.title")}</h2>
             <p className="text-sm text-slate-600">{t("practice.flashcards.text", { language: name })}</p>
             <Button onClick={() => setMode("cards")}>{t("practice.flashcards.start")}</Button>
+          </Card>
+          <Card className="space-y-3">
+            <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Tags aria-hidden className="size-5" />{t("practice.pos.title")}</h2>
+            <p className="text-sm text-slate-600">{t("practice.pos.text")}</p>
+            <Button onClick={() => setMode("pos")}>{t("practice.pos.start")}</Button>
           </Card>
           <Card className="space-y-3">
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Headphones aria-hidden className="size-5" />{t("practice.dictation.title")}</h2>

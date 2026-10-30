@@ -1431,5 +1431,29 @@
    "tooling",
    "testing"
   ]
+ },
+ {
+  "title": "Parts of speech for words, tutor labelling and practice",
+  "status": "In review",
+  "area": "vocabulary",
+  "date": "2026-10-30",
+  "summary": "Each word can carry a part of speech from its language's own list; the tutor can label the unlabelled ones; Practice has a parts-of-speech round.",
+  "done": [
+   "migration 0015",
+   "pos rules for nine languages",
+   "POST /api/words/label",
+   "Vocabulary column and button",
+   "Practice > Parts of speech",
+   "pos_check.py live check",
+   "e2e spec"
+  ],
+  "todo": [
+   "Run run-checks.bat --round and try labelling in English and Japanese",
+   "Decide the privacy wording (words go to the model; practice results are stored)"
+  ],
+  "labels": [
+   "vocabulary",
+   "practice"
+  ]
  }
 ]

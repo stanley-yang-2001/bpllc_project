@@ -735,6 +735,46 @@
         "title": "InvalidRow",
         "type": "object"
       },
+      "LabelBody": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "maxItems": 25,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "set": {
+            "anyOf": [
+              {
+                "maxLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "LabelBody",
+        "type": "object"
+      },
       "LanguageBody": {
         "properties": {
           "language": {
@@ -953,6 +993,90 @@
           "doc"
         ],
         "title": "PolicyOut",
+        "type": "object"
+      },
+      "PosCard": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "meaning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "word",
+          "answer",
+          "options"
+        ],
+        "title": "PosCard",
+        "type": "object"
+      },
+      "PosCategories": {
+        "properties": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "items"
+        ],
+        "title": "PosCategories",
+        "type": "object"
+      },
+      "PosSet": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PosCard"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PosSet",
         "type": "object"
       },
       "PreferencesOut": {
@@ -2029,6 +2153,17 @@
             ],
             "title": "Meaning"
           },
+          "pos": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos"
+          },
           "set_id": {
             "anyOf": [
               {
@@ -2077,6 +2212,17 @@
               }
             ],
             "title": "Meaning"
+          },
+          "pos": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos"
           },
           "set_id": {
             "anyOf": [
@@ -2147,6 +2293,17 @@
               }
             ],
             "title": "Meaning"
+          },
+          "pos": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos"
           },
           "word": {
             "anyOf": [
@@ -3181,6 +3338,88 @@
         ]
       }
     },
+    "/api/practice/pos": {
+      "get": {
+        "description": "Which part of speech is this word? From the learner's own labelled words (made on the spot, no AI).",
+        "operationId": "pos_practice_api_practice_pos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 12,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Due",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosSet"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pos Practice",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
     "/api/practice/progress": {
       "get": {
         "operationId": "get_progress_api_practice_progress_get",
@@ -3955,6 +4194,46 @@
         ]
       }
     },
+    "/api/words/label": {
+      "post": {
+        "description": "Labels up to 25 of the learner's words that have no part of speech, using the categories of that language.",
+        "operationId": "label_api_words_label_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabelBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Label",
+        "tags": [
+          "words"
+        ]
+      }
+    },
     "/api/words/move": {
       "post": {
         "description": "Moves the learner's own words into one of their sets, or back to General. Words in another language than the set stay put.",
@@ -3990,6 +4269,49 @@
           }
         },
         "summary": "Move Words",
+        "tags": [
+          "words"
+        ]
+      }
+    },
+    "/api/words/parts-of-speech": {
+      "get": {
+        "description": "The categories words of this language can be labelled with (each language has its own list).",
+        "operationId": "parts_of_speech_api_words_parts_of_speech_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosCategories"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parts Of Speech",
         "tags": [
           "words"
         ]

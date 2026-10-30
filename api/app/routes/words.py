@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 
 from ..db import connection
 from ..deps import current_user, require_language
-from ..schemas import DeleteResult, StarterAdded, StarterPackList, UploadResult, WordOut, WordPage
+from ..schemas import DeleteResult, PosCategories, StarterAdded, StarterPackList, UploadResult, WordOut, WordPage
 from ..services import preferences, vocab, word_sets
-from tutor_core import definitions
+from tutor_core import definitions, pos
 from tutor_core.languages import LANGUAGES
 
 router = APIRouter(prefix="/words", tags=["words"])
@@ -18,11 +18,13 @@ class WordIn(BaseModel):
     word: str
     meaning: str | None = None
     set_id: int | None = None          # the learner's own set to put the word in; none = General
+    pos: str | None = None             # part of speech, a code from the language's list
 
 
 class WordPatch(BaseModel):
     word: str | None = None
     meaning: str | None = None
+    pos: str | None = None             # null or "" clears the label
 
 
 class DeleteBody(BaseModel):
@@ -56,6 +58,13 @@ def _gloss_ok(conn, user: dict, language: str) -> bool:
     return language != "en" and definitions.meaning_languages(mode, native if native in LANGUAGES else "en", language) == ["en"]
 
 
+@router.get("/parts-of-speech", response_model=PosCategories)
+def parts_of_speech(language: str, _: dict = Depends(current_user)):
+    """The categories words of this language can be labelled with (each language has its own list)."""
+    require_language(language)
+    return {"language": language, "items": list(pos.categories(language))}
+
+
 @router.get("/starter-packs", response_model=StarterPackList)
 def starter_packs(request: Request, language: str, user: dict = Depends(current_user)):
     """Ready-made packs of everyday words for this language, and how many of each the learner does not have yet."""
@@ -75,7 +84,7 @@ def add_starter_pack(body: StarterBody, request: Request, user: dict = Depends(c
 def add_word(body: WordIn, request: Request, user: dict = Depends(current_user)):
     require_language(body.language)
     with connection(request.app.state.pool) as conn:
-        return vocab.add_word(conn, user["id"], body.language, body.word, body.meaning, body.set_id)
+        return vocab.add_word(conn, user["id"], body.language, body.word, body.meaning, body.set_id, body.pos)
 
 
 @router.patch("/{word_id}", response_model=WordOut)

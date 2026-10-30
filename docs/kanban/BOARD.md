@@ -35,7 +35,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **F8: Separate saving from holding in PreferencesProvider** (2026-10-27) — PreferencesProvider.tsx (162 lines) holds the value, debounces saves, retries and writes the device copy.
 - **F9: Split Library and Privacy into parts** (2026-10-27) — Library.tsx (129 lines) holds the list, row, opened story and delete flow; Privacy.tsx (131 lines) holds a block renderer.
 
-## In review (19)
+## In review (20)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -56,6 +56,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Starter word packs and first-run guide** (2026-10-29) — One click adds 12 everyday words from four packs in any of the nine languages; Home guides a new learner through three steps.
 - **Dictation practice** (2026-10-29) — Hear a word read aloud and type it; tells right, missing accent and wrong; says plainly when the device has no voice.
 - **Checks on GitHub and a --round flag** (2026-10-29) — A GitHub Actions workflow runs the checks on every push; run-checks.bat --round runs everything the current round needs and prints a checklist for manual tries.
+- **Parts of speech for words, tutor labelling and practice** (2026-10-30) — Each word can carry a part of speech from its language's own list; the tutor can label the unlabelled ones; Practice has a parts-of-speech round.
 
 ## Done (33)
 

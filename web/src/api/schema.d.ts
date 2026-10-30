@@ -461,6 +461,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice/pos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pos Practice
+         * @description Which part of speech is this word? From the learner's own labelled words (made on the spot, no AI).
+         */
+        get: operations["pos_practice_api_practice_pos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practice/progress": {
         parameters: {
             query?: never;
@@ -682,6 +702,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/words/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Label
+         * @description Labels up to 25 of the learner's words that have no part of speech, using the categories of that language.
+         */
+        post: operations["label_api_words_label_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/words/move": {
         parameters: {
             query?: never;
@@ -696,6 +736,26 @@ export interface paths {
          * @description Moves the learner's own words into one of their sets, or back to General. Words in another language than the set stay put.
          */
         post: operations["move_words_api_words_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/words/parts-of-speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Parts Of Speech
+         * @description The categories words of this language can be labelled with (each language has its own list).
+         */
+        get: operations["parts_of_speech_api_words_parts_of_speech_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -993,6 +1053,15 @@ export interface components {
             /** Row */
             row: number;
         };
+        /** LabelBody */
+        LabelBody: {
+            /** Ids */
+            ids?: number[] | null;
+            /** Language */
+            language: string;
+            /** Set */
+            set?: string | null;
+        };
         /** LanguageBody */
         LanguageBody: {
             /** Language */
@@ -1072,6 +1141,33 @@ export interface components {
             language: string;
             /** Version */
             version: string;
+        };
+        /** PosCard */
+        PosCard: {
+            /** Answer */
+            answer: string;
+            /** Id */
+            id: number;
+            /** Meaning */
+            meaning?: string | null;
+            /** Options */
+            options: string[];
+            /** Word */
+            word: string;
+        };
+        /** PosCategories */
+        PosCategories: {
+            /** Items */
+            items: string[];
+            /** Language */
+            language: string;
+        };
+        /** PosSet */
+        PosSet: {
+            /** Items */
+            items: components["schemas"]["PosCard"][];
+            /** Total */
+            total: number;
         };
         /** PreferencesOut */
         PreferencesOut: {
@@ -1424,6 +1520,8 @@ export interface components {
             language: string;
             /** Meaning */
             meaning?: string | null;
+            /** Pos */
+            pos?: string | null;
             /** Set Id */
             set_id?: number | null;
             /** Word */
@@ -1442,6 +1540,8 @@ export interface components {
             language: string;
             /** Meaning */
             meaning: string | null;
+            /** Pos */
+            pos?: string | null;
             /** Set Id */
             set_id?: number | null;
             /** Word */
@@ -1462,6 +1562,8 @@ export interface components {
         WordPatch: {
             /** Meaning */
             meaning?: string | null;
+            /** Pos */
+            pos?: string | null;
             /** Word */
             word?: string | null;
         };
@@ -2223,6 +2325,40 @@ export interface operations {
             };
         };
     };
+    pos_practice_api_practice_pos_get: {
+        parameters: {
+            query: {
+                language: string;
+                limit?: number;
+                set?: string | null;
+                due?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosSet"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_progress_api_practice_progress_get: {
         parameters: {
             query: {
@@ -2764,6 +2900,39 @@ export interface operations {
             };
         };
     };
+    label_api_words_label_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LabelBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     move_words_api_words_move_post: {
         parameters: {
             query?: never;
@@ -2784,6 +2953,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    parts_of_speech_api_words_parts_of_speech_get: {
+        parameters: {
+            query: {
+                language: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PosCategories"];
                 };
             };
             /** @description Validation Error */

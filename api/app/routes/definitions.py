@@ -13,10 +13,16 @@ from tutor_core.languages import LANGUAGES
 from ..deps import current_user, require_language
 from ..errors import validation_error
 from ..db import connection
-from ..services import meanings, preferences
+from ..services import meanings, pos_labels, preferences
 from ..services.ai_runner import AiRunner, ai_runner_for
 
 router = APIRouter(prefix="/words", tags=["words"])
+
+
+class LabelBody(BaseModel):
+    language: str
+    ids: list[int] | None = Field(default=None, max_length=definitions.MAX_BATCH)   # these words; none = the next unlabelled words
+    set: str | None = Field(default=None, max_length=12)                            # with no ids: all, general or one set
 
 
 class DefineBody(BaseModel):
@@ -34,6 +40,13 @@ def define(body: DefineBody, request: Request, user: dict = Depends(current_user
     if body.meaning_language is not None and body.meaning_language not in LANGUAGES:
         raise validation_error("Choose one of the site languages for the meanings.")
     return meanings.write_missing(request.app.state.pool, runner, user["id"], body.language, body.ids, body.set, _languages(request, user, body))
+
+
+@router.post("/label")
+def label(body: LabelBody, request: Request, user: dict = Depends(current_user), runner: AiRunner = Depends(ai_runner_for)):
+    """Labels up to 25 of the learner's words that have no part of speech, using the categories of that language."""
+    require_language(body.language)
+    return pos_labels.label_missing(request.app.state.pool, runner, user["id"], body.language, body.ids, body.set)
 
 
 def _languages(request: Request, user: dict, body: DefineBody) -> list[str]:

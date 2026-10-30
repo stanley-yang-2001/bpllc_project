@@ -7,3 +7,4 @@ export const setsKey = (userId: number, language: string) => ["sets", userId, la
 /** What the learner has practised (counts, streak). Dropped whenever an answer is recorded. */
 export const progressKey = (userId: number, language: string) => ["practice", userId, "progress", language] as const;
 export const starterKey = (userId: number, language: string) => ["starter", userId, language] as const;
+export const posKey = (language: string) => ["pos-categories", language] as const;          // the same for everyone, so not per learner
