@@ -12,7 +12,7 @@ import { Button, Card, EmptyState, ErrorText, inputCls, PageHeader, Skeleton } f
 import { AddWordForm } from "../vocab/AddWordForm";
 import { BulkBar } from "../vocab/BulkBar";
 import { defineLoop, labelLoop } from "../vocab/defineLoop";
-import { Pager } from "../vocab/Pager";
+import { Pager } from "../components/Pager";
 import { SetBar } from "../vocab/SetBar";
 import { UploadNotice } from "../vocab/UploadNotice";
 import { useBulkActions } from "../vocab/useBulkActions";

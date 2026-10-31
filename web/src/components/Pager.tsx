@@ -1,9 +1,10 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "../i18n/I18nProvider";
-import { Badge, Button } from "../components/ui";
+import { Badge, Button } from "./ui";
 
 type Props = { offset: number; limit: number; total: number; onOffset: (n: number) => void };
 
+/** Previous / range / Next under a list. Shown only when there is more than one page. Used by Vocabulary and Library. */
 export function Pager({ offset, limit, total, onOffset }: Props) {
   const { t } = useI18n();
   if (total <= limit) return null;

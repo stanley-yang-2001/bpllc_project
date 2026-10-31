@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { Badge, Card, EmptyState, ErrorText, PageHeader, Skeleton } from "../components/ui";
 import { useI18n } from "../i18n/I18nProvider";
-import { Pager } from "../library/Pager";
+import { Pager } from "../components/Pager";
 import { StoryRow } from "../library/StoryRow";
 import { LIMIT, useLibrary } from "../library/useLibrary";
 

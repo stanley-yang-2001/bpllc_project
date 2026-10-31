@@ -1,5 +1,5 @@
-import { BookmarkPlus, GraduationCap, RefreshCw } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BookmarkPlus, RefreshCw } from "lucide-react";
+import { PracticeLink } from "../components/PracticeLink";
 import { StoryReport } from "../components/StoryReport";
 import { StoryMeta } from "../components/StoryMeta";
 import { Button, Card, ErrorText } from "../components/ui";
@@ -33,11 +33,7 @@ export function GeneratedStory({ g, languageName, onAnother }: { g: StoryGenerat
         >
           {saved ? t("chat.saved") : t("studio.save")}
         </Button>
-        {saved && (
-          <Link to={`/practice?story=${savedId}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-surface px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-100/70">
-            <GraduationCap aria-hidden className="size-4" />{t("studio.practice")}
-          </Link>
-        )}
+        {saved && savedId !== null && <PracticeLink storyId={savedId} />}
         <Button variant="ghost" onClick={onAnother} disabled={generate.isPending} icon={<RefreshCw aria-hidden className="size-4" />}>{t("studio.another")}</Button>
       </div>
       {save.error && <ErrorText>{err(save.error, "common.saveFailed")}</ErrorText>}

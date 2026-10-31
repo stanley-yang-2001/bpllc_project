@@ -1,6 +1,6 @@
-import { BookOpen, GraduationCap, Trash2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { BookOpen, Trash2 } from "lucide-react";
 import type { StoryCard } from "../api/client";
+import { PracticeLink } from "../components/PracticeLink";
 import { StoryMeta } from "../components/StoryMeta";
 import { Badge, Button } from "../components/ui";
 import { useI18n } from "../i18n/I18nProvider";
@@ -24,9 +24,7 @@ export function StoryRow({ story, languageName, open, onToggle, onDelete, deleti
       {open && <OpenedStory id={story.id} languageName={languageName} />}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" onClick={onToggle} aria-expanded={open} icon={<BookOpen aria-hidden className="size-4" />}>{open ? t("common.close") : t("common.open")}</Button>
-        <Link to={`/practice?story=${story.id}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-surface px-3.5 py-2 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-100/70">
-          <GraduationCap aria-hidden className="size-4" />{t("studio.practice")}
-        </Link>
+        <PracticeLink storyId={story.id} />
         <Button variant="ghost" onClick={onDelete} loading={deleting} icon={<Trash2 aria-hidden className="size-4" />} aria-label={t("library.deleteAria")}>{t("common.delete")}</Button>
       </div>
     </li>

@@ -9,7 +9,7 @@ import { I18nProvider } from "../i18n/I18nProvider";
 import { PreferencesProvider } from "../prefs/PreferencesProvider";
 import { ALICE, mockApi } from "../test/helpers";
 import { defineLoop } from "./defineLoop";
-import { Pager } from "./Pager";
+import { Pager } from "../components/Pager";
 import { UploadNotice } from "./UploadNotice";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
