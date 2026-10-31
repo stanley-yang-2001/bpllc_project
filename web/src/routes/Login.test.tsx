@@ -40,6 +40,19 @@ describe("login page", () => {
     expect(await screen.findByText("Welcome, Alice")).toBeInTheDocument();
   });
 
+  it("keeps what was typed when switching between the two tabs, and clears the server's message", async () => {
+    mockApi({ ...loggedOut, "POST /auth/login": err(401, "invalid_credentials", "Wrong email or password.") });
+    renderApp("/login");
+    await userEvent.type(await screen.findByLabelText("Email"), "alice@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "wrong-password");
+    await userEvent.click(screen.getByRole("button", { name: "Log in" }));
+    expect(await screen.findByText("Wrong email or password.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Create account" }));
+    expect(screen.queryByText("Wrong email or password.")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Log in" }));
+    expect(screen.getByLabelText("Email")).toHaveValue("alice@example.com");
+  });
+
   it("registration asks for name and email, enforces the rules, and needs the privacy checkbox", async () => {
     const { calls } = mockApi({ ...loggedOut, "POST /auth/register": { ...ALICE, languages: ["es"] }, "GET /words": { items: [], total: 0, limit: 1, offset: 0 } });
     renderApp("/login");
