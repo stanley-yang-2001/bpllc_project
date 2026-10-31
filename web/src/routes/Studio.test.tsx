@@ -1,11 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
+import { ALICE, DIFFICULTY, err, LANGS, mockApi, renderApp } from "../test/helpers";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
-const OPTIONS = { types: ["narration", "dialogue", "story", "diary"], topics: ["a market day", "a rainy day"] };
+const OPTIONS = { types: ["narration", "dialogue", "story", "diary"], topics: ["a market day", "a rainy day"], difficulty: DIFFICULTY };
 const REPORT = {
   rules_version: 1, status: "pass", language: { requested: "en", ok: true, verdict: "english" },
   structure: { ok: true, leaked_plan: false, units: 4 },
@@ -194,6 +194,18 @@ describe("Story Studio", () => {
       await make();
       await screen.findByText(/Hello, friend\./);
       expect(generated(calls)[0].body).toEqual({ language: "en", difficulty: "hard" });
+    });
+
+    it("shows the sizes and limits the API sends, not numbers of its own", async () => {
+      const odd = { presets: { ...DIFFICULTY.presets, hard: { length: 333, own_words: 9, uncommon_pct: 22 } }, limits: { length: [30, 500], own_words: [2, 40], uncommon_pct: [1, 60] } };
+      mockApi({ ...base, "GET /stories/options": { ...OPTIONS, difficulty: odd } });
+      renderApp("/studio");
+      const pick = await screen.findByLabelText("Difficulty");
+      await userEvent.selectOptions(pick, "Hard");
+      expect(screen.getByText(/About 333 words, at least 9 of your words/)).toBeInTheDocument();
+      await userEvent.selectOptions(pick, "Custom");
+      expect(screen.getByLabelText(/Length \(words\)/)).toHaveAttribute("max", "500");
+      expect(screen.getByLabelText(/Length \(words\)/)).toHaveAttribute("min", "30");
     });
 
     it("takes the learner's own numbers, inside the limits, and keeps Make off until they are valid", async () => {

@@ -972,6 +972,35 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * DifficultyLimits
+         * @description Each limit is [smallest, largest], both allowed.
+         */
+        DifficultyLimits: {
+            /** Length */
+            length: number[];
+            /** Own Words */
+            own_words: number[];
+            /** Uncommon Pct */
+            uncommon_pct: number[];
+        };
+        /** DifficultyOptions */
+        DifficultyOptions: {
+            limits: components["schemas"]["DifficultyLimits"];
+            /** Presets */
+            presets: {
+                [key: string]: components["schemas"]["DifficultyTargets"];
+            };
+        };
+        /** DifficultyTargets */
+        DifficultyTargets: {
+            /** Length */
+            length: number;
+            /** Own Words */
+            own_words: number;
+            /** Uncommon Pct */
+            uncommon_pct: number;
+        };
         /** EmailChange */
         EmailChange: {
             /** Email */
@@ -1416,6 +1445,7 @@ export interface components {
         };
         /** StoryOptionsOut */
         StoryOptionsOut: {
+            difficulty: components["schemas"]["DifficultyOptions"];
             /** Topics */
             topics: string[];
             /** Types */

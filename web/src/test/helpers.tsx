@@ -39,6 +39,11 @@ export const LANGS = [
   { code: "en", name: "English", native: "English", tier: 1, stories_enabled: true },
   { code: "es", name: "Spanish", native: "Español", tier: 1, stories_enabled: true },
 ];
+/** What GET /stories/options sends for difficulty: the three presets and the limits. */
+export const DIFFICULTY = {
+  presets: { easy: { length: 60, own_words: 3, uncommon_pct: 5 }, medium: { length: 110, own_words: 5, uncommon_pct: 10 }, hard: { length: 200, own_words: 8, uncommon_pct: 20 } },
+  limits: { length: [20, 400], own_words: [1, 30], uncommon_pct: [0, 50] },
+};
 export const ALICE = { id: 1, email: "alice@example.com", display_name: "Alice", native_language: "en", languages: ["en"] };
 export const BOB = { id: 2, email: "bob@example.com", display_name: "Bob", native_language: "en", languages: ["en"] };
 export const err = (status: number, code: string, message: string) => () => ({ status, json: { error: { code, message } } });

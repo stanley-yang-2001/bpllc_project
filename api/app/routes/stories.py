@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from tutor_core import prompts
+from tutor_core import difficulty, prompts
 
 from ..db import connection
 from ..deps import current_user, require_language
@@ -15,7 +15,9 @@ router = APIRouter(prefix="/stories", tags=["stories"])
 
 @router.get("/options", response_model=StoryOptionsOut)
 def options(_: dict = Depends(current_user)):
-    return {"types": list(prompts.ALL_STORY_TYPES), "topics": list(prompts.TOPICS)}
+    return {"types": list(prompts.ALL_STORY_TYPES), "topics": list(prompts.TOPICS),
+            "difficulty": {"presets": {name: dict(targets) for name, targets in difficulty.TIERS.items()},
+                           "limits": {key: list(bounds) for key, bounds in difficulty.LIMITS.items()}}}
 
 
 @router.post("/generate", response_model=GeneratedStoryOut)

@@ -63,7 +63,17 @@ def test_generate_needs_login_and_the_csrf_header(app, llm):
 def test_options_need_login_and_match_the_core_lists(make_user, app):
     assert TestClient(app, headers=HEADERS).get("/api/stories/options").status_code == 401
     r = make_user("alice").get("/api/stories/options")
-    assert r.status_code == 200 and r.json() == {"types": list(prompts.ALL_STORY_TYPES), "topics": list(prompts.TOPICS)}
+    body = r.json()
+    assert r.status_code == 200 and body["types"] == list(prompts.ALL_STORY_TYPES) and body["topics"] == list(prompts.TOPICS)
+
+
+def test_options_serve_the_difficulty_sizes_the_core_uses(make_user):
+    """The Easy, Medium and Hard numbers and the limits are written once, in tutor_core, and the page reads them here."""
+    from tutor_core import difficulty
+    d = make_user("alice").get("/api/stories/options").json()["difficulty"]
+    assert d["presets"] == {name: dict(t) for name, t in difficulty.TIERS.items()}
+    assert d["limits"] == {k: list(v) for k, v in difficulty.LIMITS.items()}
+    assert set(d["presets"]) == {"easy", "medium", "hard"} and d["limits"]["length"] == [20, 400]
 
 
 # --- the happy path ----------------------------------------------------------------------------------------

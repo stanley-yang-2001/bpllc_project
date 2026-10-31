@@ -1,13 +1,13 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
+import { ALICE, DIFFICULTY, err, LANGS, mockApi, renderApp } from "../test/helpers";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
 const W = (id: number, word: string, meaning: string | null = null) => ({ id, language: "en", word, meaning, set_id: null, created_at: "2026-01-01T00:00:00Z" });
 const page = (items: ReturnType<typeof W>[]) => ({ items, total: items.length, limit: 50, offset: 0 });
-const OPTIONS = { types: ["narration", "dialogue"], topics: [] };
+const OPTIONS = { types: ["narration", "dialogue"], topics: [], difficulty: DIFFICULTY };
 const REPORT = { rules_version: 4, status: "pass", language: { requested: "en", ok: true, verdict: "english" }, structure: { ok: true, leaked_plan: false, units: 4 }, vocabulary: { mode: "strict", ok: true, outside: [], outside_count: 0, limit: 5 }, read_seconds: 6 };
 const STORY = { story: "Ana: Hello.\nBen: Hi.", language: "en", story_type: "dialogue", topic: null, report: REPORT, words_total: 3, words_used: 3 };
 const base = { "GET /me": ALICE, "GET /languages": LANGS, "GET /sets": { items: [], general_count: 2, total_count: 2 } };

@@ -7,9 +7,28 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from tutor_core import difficulty, prompts
 
 
+class DifficultyTargets(BaseModel):
+    length: int
+    own_words: int
+    uncommon_pct: int
+
+
+class DifficultyLimits(BaseModel):
+    """Each limit is [smallest, largest], both allowed."""
+    length: list[int]
+    own_words: list[int]
+    uncommon_pct: list[int]
+
+
+class DifficultyOptions(BaseModel):
+    presets: dict[str, DifficultyTargets]        # easy, medium, hard: the numbers a preset asks for
+    limits: DifficultyLimits                     # what a learner's own numbers may be
+
+
 class StoryOptionsOut(BaseModel):
     types: list[str]
     topics: list[str]
+    difficulty: DifficultyOptions
 
 
 class GeneratedStoryOut(BaseModel):

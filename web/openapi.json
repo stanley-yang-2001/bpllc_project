@@ -465,6 +465,82 @@
         "title": "DictationSet",
         "type": "object"
       },
+      "DifficultyLimits": {
+        "description": "Each limit is [smallest, largest], both allowed.",
+        "properties": {
+          "length": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Length",
+            "type": "array"
+          },
+          "own_words": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Own Words",
+            "type": "array"
+          },
+          "uncommon_pct": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Uncommon Pct",
+            "type": "array"
+          }
+        },
+        "required": [
+          "length",
+          "own_words",
+          "uncommon_pct"
+        ],
+        "title": "DifficultyLimits",
+        "type": "object"
+      },
+      "DifficultyOptions": {
+        "properties": {
+          "limits": {
+            "$ref": "#/components/schemas/DifficultyLimits"
+          },
+          "presets": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DifficultyTargets"
+            },
+            "title": "Presets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "presets",
+          "limits"
+        ],
+        "title": "DifficultyOptions",
+        "type": "object"
+      },
+      "DifficultyTargets": {
+        "properties": {
+          "length": {
+            "title": "Length",
+            "type": "integer"
+          },
+          "own_words": {
+            "title": "Own Words",
+            "type": "integer"
+          },
+          "uncommon_pct": {
+            "title": "Uncommon Pct",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "length",
+          "own_words",
+          "uncommon_pct"
+        ],
+        "title": "DifficultyTargets",
+        "type": "object"
+      },
       "EmailChange": {
         "properties": {
           "email": {
@@ -1858,6 +1934,9 @@
       },
       "StoryOptionsOut": {
         "properties": {
+          "difficulty": {
+            "$ref": "#/components/schemas/DifficultyOptions"
+          },
           "topics": {
             "items": {
               "type": "string"
@@ -1875,7 +1954,8 @@
         },
         "required": [
           "types",
-          "topics"
+          "topics",
+          "difficulty"
         ],
         "title": "StoryOptionsOut",
         "type": "object"
