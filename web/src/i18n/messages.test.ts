@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../api/client";
 import { errorMessage, htmlLang, translate, translateCount } from "./I18nProvider";
-import { LOCALES, MESSAGES } from "./messages";
+import { AREAS, LOCALES, MESSAGES } from "./messages";
 
 const rows = Object.entries(MESSAGES) as [string, readonly string[]][];
 const holes = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
 
 describe("message catalog", () => {
+  it("keeps every key in exactly one area file, and every area in the table", () => {
+    const perArea = Object.values(AREAS).reduce((n, area) => n + Object.keys(area).length, 0);
+    expect(Object.keys(MESSAGES).length).toBe(perArea);        // a key repeated in two areas would be silently overwritten
+    expect(Object.keys(MESSAGES).length).toBeGreaterThan(500);
+    for (const [name, area] of Object.entries(AREAS)) {
+      const prefixes = new Set(Object.keys(area).map((k) => k.split(".")[0]));
+      expect(prefixes.size, name).toBeGreaterThan(0);
+    }
+  });
   it("has nine non-empty entries per message, in the fixed locale order", () => {
     expect(LOCALES).toEqual(["en", "es", "fr", "de", "it", "pt", "ja", "zh", "ko"]);
     for (const [key, row] of rows) {
