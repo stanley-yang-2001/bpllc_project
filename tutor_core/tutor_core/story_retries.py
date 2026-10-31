@@ -71,7 +71,7 @@ class RetryPolicy:
     def _fewer_strays(self, passage: str) -> str:
         if self.language != "en":
             return passage
-        everyday = _d._everyday("en")
+        everyday = _d.everyday_words("en")
         vocab = ", ".join(self.words)
 
         def strays(text):

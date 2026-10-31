@@ -121,7 +121,7 @@ def test_verb_forms_count_as_everyday_when_a_lemmatizer_is_installed(monkeypatch
     pytest.importorskip("simplemma")
     text = "Caminé y respiré. Lavé el coche."
     with_lemmas = d.measure(text, "es", [])["uncommon_pct"]
-    monkeypatch.setattr(d, "_lemma", lambda word, code: word)
+    monkeypatch.setattr("tutor_core.difficulty.measuring._lemma", lambda word, code: word)
     assert with_lemmas < d.measure(text, "es", [])["uncommon_pct"]
 
 

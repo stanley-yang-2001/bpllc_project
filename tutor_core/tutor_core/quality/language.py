@@ -51,7 +51,7 @@ def _short_text_verdict(tokens, language_name):
     code = next((c for c, lang in LANGUAGES.items() if lang.name.lower() == language_name), None)
     if code is None or code == "en" or not _d.has_everyday_list(code) or not _d.has_everyday_list("en"):
         return None
-    en, target = _d._everyday("en"), _d._everyday(code)
+    en, target = _d.everyday_words("en"), _d.everyday_words(code)
     english_only = sum(1 for t in tokens if t in en and t not in target)
     target_only = sum(1 for t in tokens if t in target and t not in en)
     if english_only <= target_only or english_only < 3:
