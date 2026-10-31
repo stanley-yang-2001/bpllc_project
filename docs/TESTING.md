@@ -36,6 +36,7 @@ run-checks.bat --list               # every check and what its failure means
 | `m3-live` | live | a learner's tools fail closed: the Agent cannot reach another learner's words |
 | `routing-live` | live | the chat routing matrix: the right tool and arguments for each request |
 | `difficulty-live` | live | stories at Easy, Medium and Hard in all nine languages hit their targets (`--quick`: English and Chinese at Medium) |
+| `rich-kinds-live` | live | diary, letter, place, routine, anecdote and story texts stay near your words (`rich_kinds_check`); run it before setting `TUTOR_RICH_RANDOM=1` |
 | `pos-live` | live | the tutor labels words with the right part of speech in English, Spanish, German, Japanese, Chinese and Korean, and only with that language's own categories |
 | `meanings-live` | live | the tutor writes meanings in the language chosen: your own, the studied one, both, or one picked for a click |
 | `text-tools-live` | live | pinyin, romaji, Korean romanization, English IPA, and translation |
@@ -80,3 +81,5 @@ docker compose exec -T api python scripts/text_tools_check.py
 
 * A new test file that imports Langflow (directly or through `custom_components`) goes in `LANGFLOW_ONLY_TESTS` in `scripts/run_all_checks.py`; `tests/test_run_all_checks.py` fails if you forget.
 * A new live check is one function and one `Stage(...)` line in the same file.
+
+The container test `tests/test_langflow_extras.py` runs inside the Langflow container and checks the splitter and lemma packages are installed there.

@@ -162,7 +162,7 @@ def test_round_is_unit_and_stack_plus_only_its_live_checks_with_the_stack_starte
     assert got[0] == "stack-up"
     assert {"api", "web-unit", "e2e", "flow-sync"} <= set(got)
     assert [i for i in got if i.endswith("-live")] == sorted(rc.ROUND_LIVE, key=[s.id for s in rc.STAGES].index)
-    assert "m3-live" not in got and "routing-live" not in got and "difficulty-live" not in got
+    assert "m3-live" not in got and "difficulty-live" not in got
 
 
 def test_round_can_still_be_trimmed_and_live_adds_the_rest():

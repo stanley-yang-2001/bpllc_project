@@ -603,14 +603,15 @@
  },
  {
   "title": "Saved story remembers which model wrote it",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
+  "date": "2026-10-31",
   "summary": "Store the model name with a saved story and show it in the Library.",
-  "done": [],
+  "done": [
+   "Already built in an earlier patch; found while going through the backlog"
+  ],
   "todo": [
-   "Migration",
-   "Library row"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backlog",
@@ -619,14 +620,15 @@
  },
  {
   "title": "Difficulty option for the chat story tool",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
+  "date": "2026-10-31",
   "summary": "Let the chat tool pass a tier so a chat story can be Easy, Medium or Hard.",
-  "done": [],
+  "done": [
+   "Already built in an earlier patch; found while going through the backlog"
+  ],
   "todo": [
-   "Tool input",
-   "Routing cases"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backlog",
@@ -636,14 +638,15 @@
  },
  {
   "title": "Language check: very short English text can pass as a Latin-script language",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
+  "date": "2026-10-31",
   "summary": "With few words no English marker fires. Needs a positive check (accents, function words) and tests.",
-  "done": [],
+  "done": [
+   "Already built in an earlier patch; found while going through the backlog"
+  ],
   "todo": [
-   "Design a rule",
-   "Tests"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backlog",
@@ -685,14 +688,15 @@
  },
  {
   "title": "Install splitter and lemma packages in the Langflow image",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
+  "date": "2026-10-31",
   "summary": "Only the API image has the [cjk] and [lemmas] extras.",
-  "done": [],
+  "done": [
+   "Langflow Dockerfile installs the extras; tests/test_langflow_extras.py runs in the Langflow container"
+  ],
   "todo": [
-   "Update the Langflow image",
-   "Container tests"
+   "Rebuild Langflow and run the container tests (run-checks.bat does this)"
   ],
   "labels": [
    "backlog",
@@ -701,14 +705,15 @@
  },
  {
   "title": "Richer English kinds back into random picks",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
+  "date": "2026-10-31",
   "summary": "Regenerate once when the check fails so diary, letter and place stories can return to random choice.",
-  "done": [],
+  "done": [
+   "Stray-word retry and TUTOR_RICH_RANDOM switch; rich-kinds-live check added"
+  ],
   "todo": [
-   "Retry rule",
-   "Batch measurement"
+   "Run rich-kinds-live; if it passes, set TUTOR_RICH_RANDOM=1 in docker-compose.yml and rebuild"
   ],
   "labels": [
    "backlog",
@@ -717,13 +722,15 @@
  },
  {
   "title": "Merge the duplicated add-word INSERT",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
+  "date": "2026-10-31",
   "summary": "The same INSERT exists in two places.",
-  "done": [],
+  "done": [
+   "Both paths call tutor_core.vocab.insert_word"
+  ],
   "todo": [
-   "Refactor with tests"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backlog",
@@ -972,15 +979,16 @@
  },
  {
   "title": "B3: Move the chat turn out of the chat route; give the chat client an interface",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "routes/chat.py holds the gate slot, session record, preference read and reply language, and reads calls_ai and stores_chat with getattr.",
-  "done": [],
+  "done": [
+   "services/chat_turn.py holds the chat turn; ChatClient protocol with real attributes",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Add services/chat_turn.py",
-   "Add a ChatClient Protocol with calls_ai and stores_chat as real attributes",
-   "Make NoStoredChat, LangflowClient, StubChat and NotReadyChat satisfy it"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -990,15 +998,16 @@
  },
  {
   "title": "B4: Move the own-model settings logic out of the model route",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "routes/model.py does the test, save and remove steps with encryption and the address check inline.",
-  "done": [],
+  "done": [
+   "services/model_settings.py holds the test, save and remove steps",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Add services/model_settings.py",
-   "Keep the route to validation and the answer",
-   "Route the Test call through AiRunner's limiter rules if it fits"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -1008,15 +1017,16 @@
  },
  {
   "title": "B5: Split user_model.py into address guard, pinned HTTP, client and rate limit",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "services/user_model.py (160 lines) has four jobs: the SSRF address check, the pinned connections, the chat-completions call and the request limiter.",
-  "done": [],
+  "done": [
+   "user_model.py is a facade over model_address, pinned_http, model_client and rate_limit",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Create model_address.py, pinned_http.py, model_client.py, rate_limit.py",
-   "Keep user_model.py as a facade so imports and tests still work",
-   "Keep the security tests (private addresses, redirects) unchanged"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -1027,15 +1037,16 @@
  },
  {
   "title": "B6: Split vocab.py: CSV import and meaning helpers",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "services/vocab.py (172 lines) mixes word CRUD, meaning filling, CSV parsing and bulk insert.",
-  "done": [],
+  "done": [
+   "vocab helpers moved to tutor_core.vocab (insert_word, note_language) and services/csv_import.py, word_fill.py",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Move parse_csv and bulk_add to csv_import.py",
-   "Move words_without_meaning and fill_meanings to meanings.py",
-   "Keep a facade for old imports"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -1045,14 +1056,16 @@
  },
  {
   "title": "B7: Turn practice.py into a practice package",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "services/practice.py (192 lines) holds flashcards, multiple choice and fill-in-the-blank. Each mode gets its own module so a new mode is a new file.",
-  "done": [],
+  "done": [
+   "services/practice/ is a package, one module per mode",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Create practice/flashcards.py, choices.py, cloze.py and a shared set clause",
-   "Re-export from practice/__init__.py"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -1062,15 +1075,16 @@
  },
  {
   "title": "B8: Split schemas.py by area",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "schemas.py (204 lines, 29 models) is one file for every response model.",
-  "done": [],
+  "done": [
+   "schemas/ is a package split by area; same names exported",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Create schemas/user.py, words.py, stories.py, practice.py, system.py",
-   "Re-export from schemas/__init__.py",
-   "Regenerate web/openapi.json and schema.d.ts and check the diff is empty (npm run gen:api)"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -1080,16 +1094,16 @@
  },
  {
   "title": "B9: Break up generate_story in tutor_core",
-  "status": "Backlog",
+  "status": "In review",
   "area": "tutor-core",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "generate_story has 12 parameters and 82 lines: gate, cache, load, prompt, model call and two retry policies. _better_try reads the private difficulty._UNSPACED.",
-  "done": [],
+  "done": [
+   "generate_story takes a StoryRequest; cache and retry policies are their own modules",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Extract a StoryCache class",
-   "Extract the language and length retries into a RetryPolicy",
-   "Add a StoryRequest dataclass for the parameters",
-   "Make the unspaced-language fact public in difficulty"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "tutor-core",
@@ -1099,14 +1113,16 @@
  },
  {
   "title": "B10: Turn check_passage into a list of small rules",
-  "status": "Backlog",
+  "status": "In review",
   "area": "tutor-core",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "quality/passage.check_passage is the longest function in the repo (118 lines, 12 parameters). Each rule becomes a function; a runner combines them.",
-  "done": [],
+  "done": [
+   "check_passage runs a list of small rules",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Extract structure, format, length and vocabulary rules",
-   "Keep the report's output shape identical (the rescore tests compare it)"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "tutor-core",
@@ -1116,16 +1132,17 @@
  },
  {
   "title": "B11: One parser for Langflow tool output",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "custom_components/tool_result_relay.py and api/app/services/langflow/reply.py each parse a tool's recorded output with their own copy of output_to_text and the block walker.",
-  "done": [],
+  "done": [
+   "one parser for tool output (tutor_core.quality.tool_output) used by the relay and the API",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Create tutor_core/tool_output.py",
-   "Use it in both places",
-   "Run sync_flow_nodes.py to update the flow and rebuild the langflow image",
-   "Re-run the routing matrix on your machine"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass",
+   "Rebuild Langflow (docker compose up -d --build) and re-run the routing matrix (routing-live) because the relay code changed"
   ],
   "labels": [
    "backend",
@@ -1136,15 +1153,16 @@
  },
  {
   "title": "B12: Split security.py and difficulty.py into packages",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "security.py mixes password hashing, tokens and the login guard; difficulty.py mixes presets, the prompt note and measuring.",
-  "done": [],
+  "done": [
+   "security/ and difficulty/ are packages with facade re-exports",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "security/: passwords.py, tokens.py, login_guard.py",
-   "difficulty/: presets.py, measure.py, evaluate.py",
-   "Facades keep old imports working"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "backend",
@@ -1155,15 +1173,16 @@
  },
  {
   "title": "F1: Split the API client by area",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "web/src/api/client.ts is one object with 43 calls, so every page depends on all of them.",
-  "done": [],
+  "done": [
+   "api/ has one file per area; client.ts composes the same api object",
+   "Tests green here (API 947, core 365, web 328)"
+  ],
   "todo": [
-   "Create api/words.ts, stories.ts, account.ts, practice.ts, text.ts, chat.ts, model.ts",
-   "Keep exporting the same api object",
-   "Keep the 269 web tests green"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1173,15 +1192,16 @@
  },
  {
   "title": "F2: Split Story Studio",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "Studio.tsx (232 lines) has 10 states, 5 queries and mutations, the difficulty presets and the custom-kind logic.",
-  "done": [],
+  "done": [
+   "Studio.tsx split into studio/ (OptionsForm, GeneratedStory, DifficultyPicker, two hooks)",
+   "Web tests green"
+  ],
   "todo": [
-   "studio/OptionsForm, DifficultyPicker, GeneratedStory",
-   "useStoryGeneration hook",
-   "Studio.test.tsx must pass unchanged"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1208,15 +1228,17 @@
  },
  {
   "title": "F4: Serve the difficulty sizes from the API",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "The Easy, Medium and Hard numbers and limits are written in Studio.tsx and again in tutor_core/difficulty.py.",
-  "done": [],
+  "done": [
+   "GET /stories/options sends presets and limits from tutor_core.difficulty; Studio reads them",
+   "API and web tests cover it"
+  ],
   "todo": [
-   "Add presets and limits to GET /api/stories/options",
-   "Read them in Studio",
-   "Add an API test and a web test"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass",
+   "Open Story Studio, choose Hard and Custom: the numbers match the difficulty guide"
   ],
   "labels": [
    "frontend",

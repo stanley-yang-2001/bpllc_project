@@ -352,9 +352,9 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 and 0034) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0037) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
-ROUND_LIVE = ("pos-live", "rich-kinds-live", "meanings-live", "text-tools-live")
+ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live")
 ROUND_MANUAL = [
     "Vocabulary: the Part of speech column. Pick a label for one word by hand; press 'Label parts of speech' and see the rest get labels; switch to Japanese and check the choices include i-adjective and na-adjective (not plain adjective).",
     "Practice > Parts of speech: answer a round in English, then in a language with its own categories (Japanese or Chinese); check a wrong answer shows the right category.",
@@ -365,6 +365,9 @@ ROUND_MANUAL = [
     "Practice: the progress card shows Due now / New / Learning / Known. Answer a round, come back: those words rest and 'Review due words' only offers the rest.",
     "Practice > Dictation: press Listen (and the slow one), type the word with a missing accent, then a wrong word. Check the three messages. In a browser with no voice for the language the card should say so instead of offering Start.",
     "Download my data (Settings): the file lists word_progress and practice_days.",
+    "Story Studio > Difficulty: pick Easy, Medium, Hard and Custom. The sizes shown under the list and the limits for your own numbers come from the API; check they match the difficulty guide (Hard: about 200 words, 8 of your words, 20% unusual).",
+    "Chat: ask the tutor for a story, then for one with your sets ticked differently the second time. Check the story, its Read aloud and Save buttons still work after the Langflow rebuild (the relay code changed).",
+    "If rich-kinds-live passes: set TUTOR_RICH_RANDOM=1 in docker-compose.yml, rebuild, and make several stories with 'Surprise me' to see diaries, letters and place stories mixed in.",
     "Privacy policy: the approved wording says practice results are not stored; they now are (per word: box, due date, counts). Decide the wording and bump policy.POLICY_VERSION when you approve it.",
 ]
 STACK_UP_STAGE = Stage("stack-up", "stack", "start the stack", "docker compose up failed", stage_stack_up, ("docker",))

@@ -3,42 +3,29 @@
 Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uploads). Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.
 
 
-## Backlog (29)
+## Backlog (10)
 
 - **Chat on your own model (phase 2)** (no date) — Needs a spike on the author's machine first (how the Agent calls a user-supplied model).
-- **Saved story remembers which model wrote it** (no date) — Store the model name with a saved story and show it in the Library.
-- **Difficulty option for the chat story tool** (no date) — Let the chat tool pass a tier so a chat story can be Easy, Medium or Hard.
-- **Language check: very short English text can pass as a Latin-script language** (no date) — With few words no English marker fires. Needs a positive check (accents, function words) and tests.
 - **Vocabulary adherence for non-English lists** (no date) — Strays are listed but not scored outside English. The everyday lists now make a scored rule possible.
 - **Native review of the nine-language site text and policy copies** (no date) — Translations are machine-written and not reviewed by native speakers; policy copies are shown only when approved.
-- **Install splitter and lemma packages in the Langflow image** (no date) — Only the API image has the [cjk] and [lemmas] extras.
-- **Richer English kinds back into random picks** (no date) — Regenerate once when the check fails so diary, letter and place stories can return to random choice.
-- **Merge the duplicated add-word INSERT** (no date) — The same INSERT exists in two places.
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
-- **B3: Move the chat turn out of the chat route; give the chat client an interface** (2026-10-27) — routes/chat.py holds the gate slot, session record, preference read and reply language, and reads calls_ai and stores_chat with getattr.
-- **B4: Move the own-model settings logic out of the model route** (2026-10-27) — routes/model.py does the test, save and remove steps with encryption and the address check inline.
-- **B5: Split user_model.py into address guard, pinned HTTP, client and rate limit** (2026-10-27) — services/user_model.py (160 lines) has four jobs: the SSRF address check, the pinned connections, the chat-completions call and the request limiter.
-- **B6: Split vocab.py: CSV import and meaning helpers** (2026-10-27) — services/vocab.py (172 lines) mixes word CRUD, meaning filling, CSV parsing and bulk insert.
-- **B7: Turn practice.py into a practice package** (2026-10-27) — services/practice.py (192 lines) holds flashcards, multiple choice and fill-in-the-blank. Each mode gets its own module so a new mode is a new file.
-- **B8: Split schemas.py by area** (2026-10-27) — schemas.py (204 lines, 29 models) is one file for every response model.
-- **B9: Break up generate_story in tutor_core** (2026-10-27) — generate_story has 12 parameters and 82 lines: gate, cache, load, prompt, model call and two retry policies. _better_try reads the private difficulty._UNSPACED.
-- **B10: Turn check_passage into a list of small rules** (2026-10-27) — quality/passage.check_passage is the longest function in the repo (118 lines, 12 parameters). Each rule becomes a function; a runner combines them.
-- **B11: One parser for Langflow tool output** (2026-10-27) — custom_components/tool_result_relay.py and api/app/services/langflow/reply.py each parse a tool's recorded output with their own copy of output_to_text and the block walker.
-- **B12: Split security.py and difficulty.py into packages** (2026-10-27) — security.py mixes password hashing, tokens and the login guard; difficulty.py mixes presets, the prompt note and measuring.
-- **F1: Split the API client by area** (2026-10-27) — web/src/api/client.ts is one object with 43 calls, so every page depends on all of them.
-- **F2: Split Story Studio** (2026-10-27) — Studio.tsx (232 lines) has 10 states, 5 queries and mutations, the difficulty presets and the custom-kind logic.
 - **F3: Split the Login page into LoginForm and RegisterForm** (2026-10-27) — Login.tsx (187 lines) holds two forms and their field helpers.
-- **F4: Serve the difficulty sizes from the API** (2026-10-27) — The Easy, Medium and Hard numbers and limits are written in Studio.tsx and again in tutor_core/difficulty.py.
 - **F5: Split the Chat page** (2026-10-27) — Chat.tsx (153 lines) holds the message list, the composer, the retry and the story-save button.
 - **F6: One StoryMeta component for kind, topic and difficulty** (2026-10-27) — Studio and Library both render a story's kind, topic and difficulty with the same three label helpers.
 - **F7: Split the message table by area** (2026-10-27) — i18n/messages.ts is one 471-line table for the whole site.
 - **F8: Separate saving from holding in PreferencesProvider** (2026-10-27) — PreferencesProvider.tsx (162 lines) holds the value, debounces saves, retries and writes the device copy.
 - **F9: Split Library and Privacy into parts** (2026-10-27) — Library.tsx (129 lines) holds the list, row, opened story and delete flow; Privacy.tsx (131 lines) holds a block renderer.
 
-## In review (20)
+## In review (39)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
+- **Saved story remembers which model wrote it** (2026-10-31) — Store the model name with a saved story and show it in the Library.
+- **Difficulty option for the chat story tool** (2026-10-31) — Let the chat tool pass a tier so a chat story can be Easy, Medium or Hard.
+- **Language check: very short English text can pass as a Latin-script language** (2026-10-31) — With few words no English marker fires. Needs a positive check (accents, function words) and tests.
+- **Install splitter and lemma packages in the Langflow image** (2026-10-31) — Only the API image has the [cjk] and [lemmas] extras.
+- **Richer English kinds back into random picks** (2026-10-31) — Regenerate once when the check fails so diary, letter and place stories can return to random choice.
+- **Merge the duplicated add-word INSERT** (2026-10-31) — The same INSERT exists in two places.
 - **Vocabulary sets (general plus your own)** (2026-10-26) — Learners group words into named sets; the original list is the General set.
 - **Choose sets for stories in Studio and Chat** (2026-10-26) — Tick which sets feed a story; General is always available.
 - **Multiple choice practice** (2026-10-26) — Four options per question from the learner's own words with meanings.
@@ -48,10 +35,23 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Read aloud (text to speech)** (2026-10-26) — A button to hear a word or a story in the study language.
 - **SOLID refactor of the new and existing code** (2026-10-27) — Apply single-responsibility, open/closed and dependency-inversion where there was a real reason, without changing behaviour.
 - **Update the docs diagrams and add class diagrams** (2026-10-27) — Rewrite the architecture, use-case, concept, workflow and state diagrams for the current site; add back-end and front-end class diagrams and a database diagram.
-- **One command that runs every test (run-checks.bat)** (2026-10-28) — scripts/run_all_checks.py runs the unit, stack and live checks and prints one table; Python suites run in a throwaway container with their own Postgres.
-- **Read-aloud voices and meanings in the learner's chosen language** (2026-10-29) — A voice is chosen per language (never a wrong-language one) with a clear message when none is installed, and tutor-written meanings can be in the learner's language, the study language, or both.
 - **B1: Move the story-making use case out of the stories route** (2026-10-29) — routes/stories.py holds the whole generate flow and the request models. Move the flow to services/story_generation.py and the models to schemas so the route only calls it.
 - **B2: One set-filter clause instead of three copies** (2026-10-29) — The same all/general/set-id SQL clause is written in vocab.list_words, vocab.words_without_meaning and practice._set_clause.
+- **B3: Move the chat turn out of the chat route; give the chat client an interface** (2026-10-31) — routes/chat.py holds the gate slot, session record, preference read and reply language, and reads calls_ai and stores_chat with getattr.
+- **B4: Move the own-model settings logic out of the model route** (2026-10-31) — routes/model.py does the test, save and remove steps with encryption and the address check inline.
+- **B5: Split user_model.py into address guard, pinned HTTP, client and rate limit** (2026-10-31) — services/user_model.py (160 lines) has four jobs: the SSRF address check, the pinned connections, the chat-completions call and the request limiter.
+- **B6: Split vocab.py: CSV import and meaning helpers** (2026-10-31) — services/vocab.py (172 lines) mixes word CRUD, meaning filling, CSV parsing and bulk insert.
+- **B7: Turn practice.py into a practice package** (2026-10-31) — services/practice.py (192 lines) holds flashcards, multiple choice and fill-in-the-blank. Each mode gets its own module so a new mode is a new file.
+- **B8: Split schemas.py by area** (2026-10-31) — schemas.py (204 lines, 29 models) is one file for every response model.
+- **B9: Break up generate_story in tutor_core** (2026-10-31) — generate_story has 12 parameters and 82 lines: gate, cache, load, prompt, model call and two retry policies. _better_try reads the private difficulty._UNSPACED.
+- **B10: Turn check_passage into a list of small rules** (2026-10-31) — quality/passage.check_passage is the longest function in the repo (118 lines, 12 parameters). Each rule becomes a function; a runner combines them.
+- **B11: One parser for Langflow tool output** (2026-10-31) — custom_components/tool_result_relay.py and api/app/services/langflow/reply.py each parse a tool's recorded output with their own copy of output_to_text and the block walker.
+- **B12: Split security.py and difficulty.py into packages** (2026-10-31) — security.py mixes password hashing, tokens and the login guard; difficulty.py mixes presets, the prompt note and measuring.
+- **F1: Split the API client by area** (2026-10-31) — web/src/api/client.ts is one object with 43 calls, so every page depends on all of them.
+- **F2: Split Story Studio** (2026-10-31) — Studio.tsx (232 lines) has 10 states, 5 queries and mutations, the difficulty presets and the custom-kind logic.
+- **F4: Serve the difficulty sizes from the API** (2026-10-31) — The Easy, Medium and Hard numbers and limits are written in Studio.tsx and again in tutor_core/difficulty.py.
+- **One command that runs every test (run-checks.bat)** (2026-10-28) — scripts/run_all_checks.py runs the unit, stack and live checks and prints one table; Python suites run in a throwaway container with their own Postgres.
+- **Read-aloud voices and meanings in the learner's chosen language** (2026-10-29) — A voice is chosen per language (never a wrong-language one) with a clear message when none is installed, and tutor-written meanings can be in the learner's language, the study language, or both.
 - **Remembered practice with spaced review** (2026-10-29) — Practice remembers right and wrong answers per word (Leitner boxes), brings words back when due, and shows a progress card with a streak.
 - **Starter word packs and first-run guide** (2026-10-29) — One click adds 12 everyday words from four packs in any of the nine languages; Home guides a new learner through three steps.
 - **Dictation practice** (2026-10-29) — Hear a word read aloud and type it; tells right, missing accent and wrong; says plainly when the device has no voice.
