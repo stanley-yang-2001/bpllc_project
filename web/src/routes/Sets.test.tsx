@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ALICE, DIFFICULTY, LANGS, mockApi, renderApp } from "../test/helpers";
+import { ALICE, DIFFICULTY, err, LANGS, mockApi, renderApp } from "../test/helpers";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
@@ -147,6 +147,25 @@ describe("choosing sets for stories and chat", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     await screen.findByText("ok");
     expect(calls.find((c) => c.path === "/chat")!.body.set_ids).toEqual([0, 7]);
+  });
+
+  it("Chat's Try again uses the sets ticked now, not the sets of the first send", async () => {
+    let n = 0;
+    const { calls } = mockApi({
+      ...base, "GET /words": page([]),
+      "POST /chat": ({ body }: { body: { session_id: string } }) =>
+        ++n === 1 ? err(429, "tutor_busy", "The tutor is busy. Try again in a moment.")() : { json: { reply: "ok", tool_calls: [], session_id: body.session_id } },
+    });
+    renderApp("/chat");
+    await userEvent.type(await screen.findByLabelText("Message"), "tell me a story");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("The tutor is busy. Try again in a moment.");
+    await userEvent.click(screen.getByLabelText(/^Travel/));                       // changed after the first send
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByText("ok");
+    const sent = calls.filter((c) => c.path === "/chat");
+    expect(sent[0].body.set_ids).toBeUndefined();
+    expect(sent[1].body.set_ids).toEqual([0, 7]);
   });
 
   it("shows no picker for a learner who has made no sets", async () => {
