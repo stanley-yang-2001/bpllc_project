@@ -28,6 +28,7 @@ FLOW = os.path.join(ROOT, "flows", "language-tutor.json")
 COMPONENTS = os.path.join(ROOT, "custom_components")
 
 NODES = {"AddWord-WhP5g": "add_word.py", "StoryGeneratorTool-RQpvc": "story_tool.py", "WordLoader-2zTeQ": "word_loader.py"}
+CODE_ONLY = {"ToolResultRelay-G5PjB": "tool_result_relay.py"}      # no hidden learner inputs: only its code, hash and dependencies are kept in step
 LANGFLOW_VERSION = "1.12.2"
 _SECRET = re.compile(r"gsk_\w{20,}|AIza[\w\-]{20,}|sk-[\w\-]{20,}")
 
@@ -118,31 +119,40 @@ def code_hash(code):
     return hashlib.sha256(code.encode("utf-8")).hexdigest()[:12]
 
 
+def _sync_code(node_id, node, filename, problems, write):
+    code = code_of(filename)
+    if node["template"]["code"]["value"] != code:
+        problems.append(f"{node_id}: the code on the canvas differs from custom_components/{filename}")
+        if write:
+            node["template"]["code"]["value"] = code
+    wanted = code_hash(code)
+    if node.get("metadata", {}).get("code_hash") != wanted:
+        problems.append(f"{node_id}: code_hash is {node.get('metadata', {}).get('code_hash')}, should be {wanted}")
+        if write:
+            node.setdefault("metadata", {})["code_hash"] = wanted
+    deps = {"dependencies": [{"name": "tutor_core", "version": tutor_core_version()}, {"name": "langflow", "version": LANGFLOW_VERSION}],
+            "total_dependencies": 2}
+    if node.get("metadata", {}).get("dependencies") != deps:
+        problems.append(f"{node_id}: dependency metadata is out of date")
+        if write:
+            node.setdefault("metadata", {})["dependencies"] = deps
+
+
 def sync(flow, write=True):
     """Returns the list of differences found (and fixes them in `flow` when write=True)."""
     problems = []
     nodes = {n["id"]: n["data"]["node"] for n in flow["data"]["nodes"]}
+    for node_id, filename in CODE_ONLY.items():
+        if node_id not in nodes:
+            problems.append(f"{node_id}: node is missing from the flow")
+        else:
+            _sync_code(node_id, nodes[node_id], filename, problems, write)
     for node_id, filename in NODES.items():
         if node_id not in nodes:
             problems.append(f"{node_id}: node is missing from the flow")
             continue
         node = nodes[node_id]
-        code = code_of(filename)
-        if node["template"]["code"]["value"] != code:
-            problems.append(f"{node_id}: the code on the canvas differs from custom_components/{filename}")
-            if write:
-                node["template"]["code"]["value"] = code
-        wanted = code_hash(code)
-        if node.get("metadata", {}).get("code_hash") != wanted:
-            problems.append(f"{node_id}: code_hash is {node.get('metadata', {}).get('code_hash')}, should be {wanted}")
-            if write:
-                node.setdefault("metadata", {})["code_hash"] = wanted
-        deps = {"dependencies": [{"name": "tutor_core", "version": tutor_core_version()}, {"name": "langflow", "version": LANGFLOW_VERSION}],
-                "total_dependencies": 2}
-        if node.get("metadata", {}).get("dependencies") != deps:
-            problems.append(f"{node_id}: dependency metadata is out of date")
-            if write:
-                node["metadata"]["dependencies"] = deps
+        _sync_code(node_id, node, filename, problems, write)
         previous = "language"
         for name, (display, info) in VISIBLE.get(node_id, {}).items():
             if node["template"].get(name) != visible_field(name, display, info):

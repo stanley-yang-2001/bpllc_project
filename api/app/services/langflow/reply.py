@@ -4,14 +4,13 @@ custom_components/tool_result_relay.py, which Step 10 verified against the real 
 yields an empty result, never an exception."""
 from __future__ import annotations
 
-import ast
 import json
 import re
 from dataclasses import dataclass, field
 
+from tutor_core.tool_output import output_to_text      # noqa: F401  (one parser, shared with the Langflow relay)
+
 _TOOL_BLOCK_TYPE = "tool_use"
-_TEXT_KEYS = ("text", "result", "content", "message", "output", "data")
-_MAX_DEPTH = 6
 # The tools return these as ordinary text when they fail, so the reply is passed through unchanged and
 # the matching tool call is flagged for the trace. (They move to tutor_core in M3.)
 _FAILURE_MARKERS = ("Couldn't add word", "Add word failed", "I'm having trouble generating a story", "I can't write a story",
@@ -36,44 +35,6 @@ class ChatResult:
     reply: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     tokens: int | None = None            # what Langflow says the turn used (total tokens), if it said
-
-
-def _parse_structured_string(value: str):
-    stripped = value.strip()
-    if stripped[:1] not in ("{", "["):
-        return None
-    try:
-        return json.loads(stripped)
-    except ValueError:
-        pass
-    try:
-        parsed = ast.literal_eval(stripped)
-    except (ValueError, SyntaxError):
-        return None
-    return parsed if isinstance(parsed, (dict, list)) else None
-
-
-def output_to_text(output, _depth: int = 0) -> str:
-    """A tool call's recorded output as plain text. Unusable shapes become ''."""
-    if output is None or _depth > _MAX_DEPTH:
-        return ""
-    if isinstance(output, str):
-        parsed = _parse_structured_string(output)
-        if parsed is not None:
-            inner = output_to_text(parsed, _depth + 1)
-            if inner.strip():
-                return inner
-        return output                                   # a plain story is returned exactly as it is
-    if isinstance(output, dict):
-        for key in _TEXT_KEYS:
-            if key in output:
-                inner = output_to_text(output[key], _depth + 1)
-                if inner.strip():
-                    return inner
-        return ""
-    if isinstance(output, (list, tuple)):
-        return "\n".join(p for p in (output_to_text(i, _depth + 1) for i in output) if p.strip())
-    return str(output)
 
 
 def walk_tool_blocks(obj, _depth: int = 0):

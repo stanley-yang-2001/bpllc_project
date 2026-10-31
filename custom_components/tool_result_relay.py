@@ -16,59 +16,12 @@ The pure functions are kept separate from the Langflow class so they can be test
 (see tests/test_tool_result_relay.py).
 """
 
-import ast
-import json
-
 from langflow.custom import Component
 from langflow.io import MessageInput, Output
 from langflow.schema.message import Message
+from tutor_core.tool_output import MAX_DEPTH as _MAX_DEPTH, output_to_text      # noqa: F401  (one parser, shared with the API)
 
 _TOOL_BLOCK_TYPE = "tool_use"
-_TEXT_KEYS = ("text", "result", "content", "message", "output", "data")
-_MAX_DEPTH = 6
-
-
-def _parse_structured_string(value):
-    """If a string holds a JSON or Python-repr dict/list, return it parsed; otherwise None."""
-    stripped = value.strip()
-    if stripped[:1] not in ("{", "["):
-        return None
-    try:
-        return json.loads(stripped)
-    except ValueError:
-        pass
-    try:
-        parsed = ast.literal_eval(stripped)
-    except (ValueError, SyntaxError):
-        return None
-    return parsed if isinstance(parsed, (dict, list)) else None
-
-
-def output_to_text(output, _depth=0):
-    """Turn a tool call's recorded output into plain text. Unusable shapes become ''."""
-    if output is None or _depth > _MAX_DEPTH:
-        return ""
-    if isinstance(output, str):
-        parsed = _parse_structured_string(output)
-        if parsed is not None:
-            inner = output_to_text(parsed, _depth + 1)
-            if inner.strip():
-                return inner
-        return output  # a plain story is returned exactly as it is
-    if isinstance(output, dict):
-        for key in _TEXT_KEYS:
-            if key in output:
-                inner = output_to_text(output[key], _depth + 1)
-                if inner.strip():
-                    return inner
-        return ""
-    if isinstance(output, (list, tuple)):
-        parts = [output_to_text(item, _depth + 1) for item in output]
-        return "\n".join(p for p in parts if p.strip())
-    text = getattr(output, "text", None)  # Message / Data and similar objects
-    if isinstance(text, str):
-        return text
-    return str(output)
 
 
 def _walk_content(blocks, _depth=0):
