@@ -1,12 +1,12 @@
 # Class Diagrams — Back End (API, `tutor_core`, Langflow components)
 
-*Updated 27 October 2026, after the SOLID refactor (patch 0030). The diagrams follow the code in `api/app/`,
+*Updated 31 October 2026, after the SOLID refactor (patch 0030) and the back-end splits B1 to B12 (patches 0030, 0034 and 0037). The diagrams follow the code in `api/app/`,
 `tutor_core/tutor_core/` and `custom_components/`. Python has many module-level functions, so a module that is
 only functions is drawn as a class with the stereotype `<<module>>`.*
 
 Reading order: 1 layers, 2 model choice (the main design pattern), 3 the chat client, 4 the AI limits and
-security, 5 `tutor_core`, 6 who calls what, 7 database. Section 8 records what the diagrams show about where to
-split further; each item there is a card in `docs/kanban/cards.json`.
+security, 5 `tutor_core`, 6 who calls what, 7 database. Section 8 records the splits the first version of these
+diagrams proposed (cards B1 to B12 in `docs/kanban/cards.json`), which are now built.
 
 ## 1. Layers and the rule between them
 
@@ -19,17 +19,17 @@ flowchart TB
     end
     subgraph S["services/ (use cases and data access; no FastAPI imports)"]
         direction LR
-        s1[users, sessions, reauth] --- s2[vocab, word_sets, meanings] --- s3[stories, practice]
-        s4[text_tools, ai_runner, ai_gate] --- s5[langflow/, chat, chat_stub] --- s6[user_model, user_models, model_secrets]
-        s7[preferences, export, chat_sessions]
+        s1[users, sessions, reauth] --- s2[vocab, csv_import, word_fill, word_sets, meanings] --- s3[stories, story_generation, practice/]
+        s4[text_tools, ai_runner, ai_gate] --- s5[langflow/, chat, chat_stub, chat_turn] --- s6[model_settings, user_models, model_secrets]
+        s7[model_address, pinned_http, model_client, rate_limit] --- s8[preferences, export, chat_sessions, progress]
     end
     subgraph C["tutor_core (pure Python, shared with Langflow)"]
         direction LR
-        c1[words, vocab, languages] --- c2[story, prompts/, quality/, difficulty] --- c3[pronunciation, translation, definitions, numbered] --- c4[groq, tools, splitter]
+        c1[words, vocab, languages] --- c2[story, story_cache, story_retries, prompts/, quality/, difficulty/] --- c3[pronunciation, translation, definitions, numbered, pos] --- c4[groq, tools, splitter, tool_output]
     end
     subgraph F["cross-cutting (app/)"]
         direction LR
-        f1[deps: current_user, require_language] --- f2[security, errors, config] --- f3[db: pool, connection, cursor]
+        f1[deps: current_user, require_language] --- f2[security/, errors, config] --- f3[db: pool, connection, cursor]
     end
     R --> S
     S --> C
@@ -101,13 +101,29 @@ classDiagram
         +settle(actual)
     }
     class RequestLimiter {
+        <<module rate_limit>>
         +allow(user_id) bool
     }
-    class UserModelClient {
-        <<module user_model>>
+    class ModelAddress {
+        <<module model_address>>
         +check_base_url(url, allow_private) tuple
+        +ModelError
+    }
+    class PinnedHttp {
+        <<module pinned_http>>
+        connections pinned to the checked address
+    }
+    class ModelClient {
+        <<module model_client>>
         +call_model(model, base_url, key, prompt) str
         +make_call_fn(model, base_url, key) Callable
+    }
+    class ModelSettings {
+        <<module model_settings>>
+        +view(conn, settings, user_id) dict
+        +test_connection(...)
+        +save(...) dict
+        +remove(conn, user_id)
     }
     class ModelSecrets {
         <<module>>
@@ -127,20 +143,28 @@ classDiagram
     TokenBudget ..> Ticket : issues
     OwnModelSource --> OwnModels : finds the learner's model
     OwnModelSource --> RequestLimiter : 10 a minute
-    OwnModelSource ..> UserModelClient : builds the call
+    OwnModelSource ..> ModelClient : builds the call
+    ModelClient ..> ModelAddress : checks the address
+    ModelClient ..> PinnedHttp : connects to it
+    ModelSettings ..> ModelClient : test the connection
+    ModelSettings ..> OwnModels : save, remove
+    ModelSettings ..> RequestLimiter : tests are limited
     OwnModels ..> ModelSecrets : decrypts the key
 ```
 
 The order built by `ai_runner_for` is `StubSource`, `OwnModelSource`, `SharedSource(state.story_llm)`. A new
-source (for example a second shared provider) is a new class in that list. The stories route, `meanings.write_missing`
-and `text_tools` all go through `AiRunner`; **`routes/chat.py` and `routes/model.py` do not** (see section 8, items B3 and B4).
+source (for example a second shared provider) is a new class in that list. The stories route (through
+`story_generation`), `meanings.write_missing` and `text_tools` all go through `AiRunner`. Chat is the other path:
+Langflow, not the API, calls the model, so `chat_turn.run_turn` takes its own slot in the `AiGate`. `routes/model.py`
+only checks the request body and calls `ModelSettings`. `services/user_model.py` remains as a facade that re-exports
+the four modules above, so old imports keep working.
 
 ## 3. The chat path (Agent in Langflow, or a stand-in)
 
 ```mermaid
 classDiagram
     class ChatClient {
-        <<duck type, no interface yet>>
+        <<Protocol, services/chat_turn>>
         +calls_ai: bool
         +stores_chat: bool
         +run(user_id, language, message, session_id, reply_language, set_ids) ChatResult
@@ -191,12 +215,25 @@ classDiagram
         +with_reply_language(message, reply_language) str
         +build_run_payload(message, session_id, tweaks) dict
     }
+    class ChatTurn {
+        <<module chat_turn>>
+        +run_turn(state, user_id, language, message, browser_session_id, set_ids)
+        +estimate_tokens(message) int
+    }
     class Reply {
         <<module langflow/reply>>
         +parse_run_response(body) ChatResult
         +find_tool_calls(obj) list~ToolCall~
         +walk_tool_blocks(obj)
+    }
+    class ToolOutput {
+        <<module tutor_core/tool_output>>
         +output_to_text(output) str
+        +parse_structured_string(value)
+    }
+    class ToolResultRelay {
+        <<Langflow component>>
+        shows the tool's text to the Agent
     }
     class Transport {
         <<module langflow/transport>>
@@ -216,6 +253,10 @@ classDiagram
     LangflowClient --> Transport : sends it
     LangflowClient --> Reply : reads the answer
     Reply ..> ChatResult
+    Reply ..> ToolOutput : tool text
+    ToolResultRelay ..> ToolOutput : tool text
+    ChatTurn ..> ChatClient : state.chat
+    ChatTurn ..> LangflowClient : session id from the user
     ChatResult o-- ToolCall
     MakeChatClient ..> LangflowClient : AI_MODE live
     MakeChatClient ..> StubChat : AI_MODE stub
@@ -223,8 +264,10 @@ classDiagram
 ```
 
 `services/langflow_client.py` is a facade that re-exports the names of the `langflow/` package, so old imports
-keep working. The learner's id is never read from the request body: `routes/chat.py` builds the Langflow session
-id from the session cookie's user.
+keep working. The learner's id is never read from the request body: `chat_turn.run_turn` builds the Langflow session
+id from the session cookie's user. `routes/chat.py` (46 lines) only checks the request and shapes the answer. The
+tool-output parser lives once in `tutor_core.tool_output`: the API reads the Agent's recorded tool calls with it and the
+relay component reads the live ones with it, so the two cannot drift apart.
 
 ## 4. Security, errors and settings
 
@@ -242,16 +285,20 @@ classDiagram
         +validate()
     }
     class LoginGuard {
+        <<security/login_guard>>
         +check(key)
         +failure(key)
         +success(key)
     }
-    class Security {
-        <<module>>
+    class Passwords {
+        <<module security/passwords>>
         +hash_password(password, salt, rounds) str
         +verify_password(password, hash, salt) bool
         +new_salt() str
         +check_password_rules(pw) str
+    }
+    class Tokens {
+        <<module security/tokens>>
         +create_token(user_id, session_id, secret, hours) str
         +decode_token(token, secret) tuple
         +new_session_id() str
@@ -290,16 +337,17 @@ classDiagram
     }
 
     Deps ..> Sessions : cookie to user
-    Deps ..> Security : decode_token
-    Reauth ..> Security : verify_password
+    Deps ..> Tokens : decode_token
+    Reauth ..> Passwords : verify_password
     Reauth ..> LoginGuard : state.login_guard counts wrong guesses
-    Sessions ..> Security
+    Sessions ..> Tokens : new_session_id
     Users ..> AppError : raises
     Deps ..> AppError : raises
     Settings <.. Deps : app.state.settings
 ```
 
-Only the guard middleware in `main.py` (CSRF header, origin check, no-store headers) and `install_error_handlers`
+`security/` is a package (`passwords`, `tokens`, `login_guard`) whose `__init__` re-exports the old names, so
+`from app.security import ...` still works. Only the guard middleware in `main.py` (CSRF header, origin check, no-store headers) and `install_error_handlers`
 (`AppError` to the `{error: {code, message}}` shape) are applied to every route.
 
 ## 5. `tutor_core` (shared by the API and the Langflow tools)
@@ -331,14 +379,33 @@ classDiagram
         +language: str
         +added: bool
     }
+    class StoryRequest {
+        <<frozen dataclass>>
+        +learner_id +language +story_type +topic
+        +max_words +difficulty +set_ids
+        +cache_key() tuple
+    }
     class Story {
         <<module story>>
         +generate_story(conn, learner_id, language, call_groq_fn, story_type, topic, difficulty, set_ids) StoryResult
-        -better_try(...) str
+        -make_story(conn, request, call, rng) StoryResult
+    }
+    class StoryCache {
+        <<module story_cache>>
+        +fresh(key, now) StoryResult
+        +remember(key, now, result) StoryResult
+    }
+    class RetryPolicy {
+        <<frozen dataclass, module story_retries>>
+        +language +prompt +words +difficulty +call
+        +improve(passage) str
+        -right_language() complete_and_sized() fewer_strays()
     }
     class Vocab {
         <<module vocab>>
         +add_word(conn, ...) AddResult
+        +insert_word(cur, learner_id, language, text, note) bool
+        +note_language(cur, learner_id, language)
         +load_words(conn, learner_id, language, set_ids) list
         +sample_words(words, cap) list
         +clean_set_ids(set_ids) list
@@ -360,18 +427,26 @@ classDiagram
     class Quality {
         <<package quality>>
         +report(text, language, words, targets) dict
-        +check_passage(...) dict
+        +check_passage(...) dict  runs the rules below
         +language_check(text, name, ...) dict
         +ends_complete(text) bool
         +has_dangling_sentence(text, language) bool
     }
-    class Difficulty {
-        <<module>>
-        +resolve(name, length, own_words, pct) dict
-        +prompt_note(targets, language) str
-        +measure(text, language, words) dict
-        +evaluate(targets, measured) dict
+    class PassageRules {
+        <<module quality/passage>>
+        +Shape: style, units, format_ok, leaked
+        -read_shape(text) Shape
+        -length_rule(shape, range) dict
+        -vocabulary_rule(shape, vocab, ...) dict
     }
+    class Difficulty {
+        <<package difficulty>>
+        presets: resolve, TIERS, LIMITS, ask_size
+        note: prompt_note(language, targets) str
+        measuring: measure(text, language, words) dict
+        judging: evaluate(targets, measured, ...) dict
+    }
+
     class TextTools {
         <<modules>>
         pronunciation: romanize, build_prompt, parse
@@ -397,10 +472,14 @@ classDiagram
 
     Story --> Vocab : load_words, sample_words
     Story --> Prompts : build prompt
-    Story --> Quality : language check, ends
-    Story --> Difficulty : length gap
+    Story *-- StoryCache : _STORY_CACHE
+    Story ..> StoryRequest
+    Story --> RetryPolicy : improve the passage
+    RetryPolicy --> Quality : language check, ends
+    RetryPolicy --> Difficulty : length gap
     Story --> Groq : default model call
     Story ..> StoryResult
+    Quality *-- PassageRules
     Vocab --> Words
     Vocab --> Language
     Vocab ..> AddResult
@@ -421,14 +500,14 @@ classDiagram
 | `me` | users, preferences |
 | `account` | users, sessions, reauth, export, chat_sessions, security, emails |
 | `public` | policy, languages |
-| `words` | vocab, word_sets |
+| `words` | vocab, csv_import, word_fill, word_sets |
 | `sets` | word_sets |
 | `definitions` | meanings, `AiRunner` |
 | `text_tools` | text_tools, `AiRunner` |
-| `stories` | stories, `AiRunner`, `OwnModels`; `tutor_core` story and quality (**inside the route**) |
-| `practice` | practice, stories |
-| `chat` | chat client, chat_sessions, preferences, `AiGate` (**inside the route**) |
-| `model` | user_models, model_secrets, user_model (**inside the route**) |
+| `stories` | story_generation, stories, `AiRunner`, `OwnModels`; `tutor_core` difficulty and prompts (only for the options list) |
+| `practice` | practice/ (flashcards, choices, cloze), progress, stories |
+| `chat` | chat_turn (which uses the chat client, chat_sessions, preferences and `AiGate`) |
+| `model` | model_settings (which uses user_models, model_secrets and model_client) |
 | `health` | db, `app.state` health objects |
 
 ## 7. Database (schema `tutor`)
@@ -513,25 +592,26 @@ Deleting a user cascades to every table above; deleting a set sets `words.set_id
 General). The Langflow tools connect as the limited role `tutor_tools`: SELECT and INSERT on `words`, INSERT on
 `user_languages`, nothing else.
 
-## 8. What these diagrams show about further splits
+## 8. The splits the first version of these diagrams proposed
 
-Findings are ranked by value for easier maintenance. Each has a kanban card (cards "B1" to "B12" in
-`docs/kanban/cards.json`). None is built yet; each keeps behaviour unchanged and starts with the existing tests.
+The first version of this document (27 October) ranked twelve splits, each a kanban card "B1" to "B12" in
+`docs/kanban/cards.json`. All twelve are built, each keeping behaviour unchanged and starting from the existing tests
+(API 869 then, 950 now; `tutor_core` 334 then, 365 now).
 
-| # | Where | What the diagram shows | Proposed split | Principle |
+| # | Where | What the diagram showed | What was done | Principle |
 |---|---|---|---|---|
-| B1 | `routes/stories.py` (174 lines) | The route holds the whole "make a story" use case (load words, check the minimum, choose the model, generate, report) and also the request models with validators | `services/story_generation.py` for the use case; request models to `schemas`; the route only calls it | S, D |
-| B2 | Set filter SQL | The same "all, general or a set id" clause is written three times: `vocab.list_words`, `vocab.words_without_meaning`, `practice._set_clause` | One `word_sets.filter_clause(set_filter)` used by all three | DRY, S |
-| B3 | `routes/chat.py` | Holds the chat turn: gate slot, session record, preferences, reply language. The chat client is a duck type read with `getattr(state.chat, "calls_ai")` | `services/chat_turn.py` plus a `ChatClient` Protocol with `calls_ai` and `stores_chat` as real attributes | S, D, L |
-| B4 | `routes/model.py` | Holds test, save and remove for the learner's own model, with encryption and the address check inline | `services/model_settings.py`; the route validates the body only | S |
-| B5 | `services/user_model.py` (160 lines) | Four jobs in one file: the address guard (SSRF), the pinned connections, the HTTP call, the request limiter | Split into `model_address.py`, `pinned_http.py`, `model_client.py`, `rate_limit.py` | S |
-| B6 | `services/vocab.py` (172 lines) | Word CRUD, meaning filling and CSV parsing and bulk insert in one module | `vocab.py` (CRUD), `csv_import.py`; `fill_meanings` and `words_without_meaning` move into `meanings.py` | S, cohesion |
-| B7 | `services/practice.py` (192 lines) | Three practice modes in one module | A `practice/` package: `flashcards.py`, `choices.py`, `cloze.py` | S, O |
-| B8 | `schemas.py` (204 lines, 29 models) | One file for every response model | A `schemas/` package by area (`user`, `words`, `stories`, `practice`, `system`) with a re-exporting `__init__` | S, I |
-| B9 | `tutor_core/story.py` `generate_story` (82 lines, 12 parameters) | Gate, cache, load, prompt, model call, two retry policies in one function; `_better_try` reads the private `difficulty._UNSPACED` | A `StoryCache` class, a `RetryPolicy` for the language and length retries, a `StoryRequest` dataclass for the parameters; make the unspaced-language fact public | S, O, encapsulation |
-| B10 | `tutor_core/quality/passage.py` `check_passage` (118 lines, 12 parameters) | The longest function in the repo; one function runs every rule | A list of small rule functions (structure, format, length, vocabulary) combined by a runner | O, S |
-| B11 | `custom_components/tool_result_relay.py` and `services/langflow/reply.py` | Both parse a Langflow tool output (`output_to_text`, walking the content blocks), with two slightly different copies | One `tutor_core/tool_output.py` used by both (the other three Langflow components already import `tutor_core`, so the image has it); re-sync the flow | DRY |
-| B12 | `security.py` (110 lines) and `difficulty.py` (252 lines) | `security` mixes password hashing, tokens and the login guard; `difficulty` mixes presets, prompt note and measuring | `security/` package (`passwords`, `tokens`, `login_guard`); `difficulty/` package (`presets`, `measure`, `evaluate`) | S |
+| B1 | `routes/stories.py` | The route held the whole "make a story" use case and the request models | `services/story_generation.py` (generate, save); request models in `schemas`; the route is 60 lines (patch 0034) | S, D |
+| B2 | Set filter SQL | The same "all, general or a set id" clause was written three times | One `word_sets.filter_clause(set_filter)` (patch 0034) | DRY, S |
+| B3 | `routes/chat.py` | Held the chat turn; the chat client was a duck type read with `getattr` | `services/chat_turn.py` and a `ChatClient` Protocol with `calls_ai` and `stores_chat` as real attributes; the route is 46 lines (patch 0037) | S, D, L |
+| B4 | `routes/model.py` | Test, save and remove with encryption and the address check inline | `services/model_settings.py`; the route validates the body only (patch 0037) | S |
+| B5 | `services/user_model.py` | Four jobs in one file | `model_address.py`, `pinned_http.py`, `model_client.py`, `rate_limit.py`; `user_model.py` is a facade (patch 0037) | S |
+| B6 | `services/vocab.py` | CRUD, meaning filling, CSV parsing and bulk insert in one module | `csv_import.py`, `word_fill.py`; the add-word INSERT is `tutor_core.vocab.insert_word`, used by both add paths (patch 0037) | S, DRY |
+| B7 | `services/practice.py` | Three practice modes in one module | `practice/` package: `flashcards.py`, `choices.py`, `cloze.py`, `limits.py` (patch 0037) | S, O |
+| B8 | `schemas.py` | One file for every response model | `schemas/` package: `user`, `words`, `stories`, `practice`, `system`; `__init__` re-exports (patch 0037) | S, I |
+| B9 | `tutor_core/story.py` `generate_story` | Gate, cache, load, prompt, model call and two retry policies in one function | `StoryRequest`, `StoryCache` (`story_cache.py`), `RetryPolicy` (`story_retries.py`); the unspaced-language fact is public (patch 0037) | S, O |
+| B10 | `quality/passage.py` `check_passage` | The longest function in the repo | Small rules (`_read_shape`, `_length_rule`, `_vocabulary_rule`) joined by `check_passage` (patch 0037) | O, S |
+| B11 | `tool_result_relay.py` and `langflow/reply.py` | Two copies of the tool-output parser | One `tutor_core/tool_output.py` used by both; the flow was re-synced (patch 0037) | DRY |
+| B12 | `security.py` and `difficulty.py` | Each mixed several jobs | `security/` (`passwords`, `tokens`, `login_guard`) and `difficulty/` (`presets`, `note`, `measuring`, `judging`) packages with re-exporting `__init__` (patch 0037) | S |
 
 Not worth splitting (checked): `ai_gate.py` (three small classes that share one lock, one concern),
 `main.py` (a composition root should know every part), `policy/` and `emails.py`.

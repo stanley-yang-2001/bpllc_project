@@ -122,7 +122,7 @@ Planned for the AI features: `tutor_busy` (429, the shared Groq limit or too man
 
 ### 3.5 Inside the React app
 
-- **API client** (`src/api/client.ts`): one small function wraps `fetch`, adds the headers above, and turns any error body into an `ApiError` with a code, a message and an optional retry time.
+- **API client** (`src/api/`): one small function (`http.ts`) wraps `fetch`, adds the headers above, and turns any error body into an `ApiError` with a code, a message and an optional retry time. The calls are one file per area (`account.ts`, `words.ts`, `stories.ts`, `practice.ts`, `chat.ts`, `text.ts`, `model.ts`) and `client.ts` puts them into the one `api` object the pages use.
 - **Providers**, outermost first: theme, query cache, auth, router. Inside the logged-in area, and re-created for each user: active language, toasts, confirm dialogs.
 - **Server data** lives in TanStack Query. Every per-learner key includes the user id, for example `["words", userId, language, search, offset]`.
 - **Auth** (`AuthContext`) holds the profile, handles logout, “log out everywhere” and account deletion, and reacts to a 401 from anywhere by emptying the cache and asking the server who is really logged in.
@@ -446,7 +446,7 @@ M0 must come first because Chat depends on its answer. M5 and M6 can then procee
 |---|---|
 | `web/src` | The React app: `api/` client and generated types, `auth/`, `theme/`, `components/`, `routes/` |
 | `web/e2e` | Real-browser tests (isolation, accounts, dark mode, accessibility) |
-| `api/app` | The FastAPI app: `routes/`, `services/`, `security.py`, `migrations/` |
+| `api/app` | The FastAPI app: `routes/`, `services/`, `security/`, `migrations/` |
 | `tutor_core` | Shared logic; languages and the word rule so far |
 | `custom_components` | The Langflow components (to become thin wrappers) |
 | `scripts` | The Step 10 routing tests and helpers; `check_api_types.sh` |
