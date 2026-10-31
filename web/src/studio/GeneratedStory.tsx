@@ -1,9 +1,9 @@
 import { BookmarkPlus, GraduationCap, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { StoryReport } from "../components/StoryReport";
-import { Badge, Button, Card, ErrorText } from "../components/ui";
+import { StoryMeta } from "../components/StoryMeta";
+import { Button, Card, ErrorText } from "../components/ui";
 import { useI18n } from "../i18n/I18nProvider";
-import { diffLabel, topicLabel, typeLabel } from "../i18n/labels";
 import { StoryTools } from "../text/StoryTools";
 import { ownModelName, requestedOf } from "./labels";
 import type { StoryGeneration } from "./useStoryGeneration";
@@ -17,9 +17,7 @@ export function GeneratedStory({ g, languageName, onAnother }: { g: StoryGenerat
   return (
     <Card className="mt-4 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{typeLabel(t, story.story_type ?? "story")}</Badge>
-        {story.topic && <Badge>{topicLabel(t, story.topic)}</Badge>}
-        {requested.difficulty && <Badge>{diffLabel(t, requested.difficulty)}</Badge>}
+        <StoryMeta kind={story.story_type ?? "story"} topic={story.topic} difficulty={requested.difficulty} />
         <span className="text-xs text-slate-600">{t("studio.builtFrom", { used: story.words_used, total: story.words_total })}</span>
       </div>
       <p lang={story.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.story}</p>
