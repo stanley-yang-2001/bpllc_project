@@ -3,6 +3,7 @@
 Groq is replaced by a recorder, so these tests check everything the API owns: who the story is made for, which words
 reach the prompt, the language gate, the 5-word minimum, the gate and token budget, error shapes, and privacy.
 """
+from tutor_core import quality
 import re
 
 import pytest
@@ -84,7 +85,7 @@ def test_a_story_comes_back_with_type_topic_and_a_report(make_user, llm):
     body = r.json()
     assert body["story"] == DIALOGUE and body["language"] == "en"
     assert (body["story_type"], body["topic"]) == ("story", "a market day")
-    assert body["report"]["vocabulary"]["mode"] == "strict" and body["report"]["rules_version"] == 4
+    assert body["report"]["vocabulary"]["mode"] == "strict" and body["report"]["rules_version"] == quality.RULES_VERSION
     assert body["report"]["status"] == "pass" and body["words_total"] == len(WORDS) and body["words_used"] == len(WORDS)
     assert len(llm.prompts) == 1 and "a market day" in llm.prompts[0]
 

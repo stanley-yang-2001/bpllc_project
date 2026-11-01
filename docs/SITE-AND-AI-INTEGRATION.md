@@ -354,9 +354,9 @@ What can be checked depends on the language, and the report says which mode it u
 |---|---|---|---|
 | Written in the requested language | Yes | Yes | Yes (by script) |
 | Length 4 to 10 sentences or lines, dialogue format (conversations only), no leaked plan | Yes | Yes | Yes |
-| Words outside your list | **Strict**: at most 5 strays to pass | **Informational**: listed, not scored (no grammar-word list exists yet, so articles would count as strays) | Not available |
+| Words outside your list | **Strict**: at most 5 strays to pass | **Scored** (rules version 4): words outside your list and the everyday-word list are counted, about one in ten allowed (never fewer than 5). **Informational** (listed, not scored) when a difficulty is asked for | **Scored** (rules version 5) with the splitter cutting the words; **not available** if the splitter is not installed or a difficulty is asked for |
 
-Shape: `{ rules_version, status, language, structure, vocabulary: { mode, outside, limit }, read_seconds }`. A story passes when the language is right, the structure is right, no plan leaked and, for English only, there are at most 5 strays. Studio shows the report honestly, including when the newer story types fail the stray-word rule (see the tuning note in section 4.2).
+Shape: `{ rules_version, status, language, structure, vocabulary: { mode, outside, limit }, read_seconds }`. A story passes when the language is right, the structure is right, no plan leaked and the strays are within the limit (English: 5; scored languages: about one word in ten). Studio shows the report honestly, including when the newer story types fail the stray-word rule (see the tuning note in section 4.2).
 
 ### 8.5 When other languages open up
 

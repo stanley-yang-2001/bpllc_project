@@ -100,19 +100,44 @@ def _covered(piece: str, everyday: frozenset) -> bool:
     return ok[n]
 
 
-def _uncommon_split(text: str, code: str, own: set) -> Optional[float]:
+def _split_scan(text: str, code: str, own: set) -> Optional[tuple[list[str], int, int]]:
+    """For Chinese, Japanese and Korean: (the unusual words as written, how many words were checked, how many content words the
+    text has). A word is checked when it is a content word and not one of the learner's own; it is unusual when neither it nor its
+    dictionary form is an everyday word and it cannot be cut into everyday words. None when no splitter is installed."""
     tokens = splitter.split(_LABEL.sub("", text), code)
     if tokens is None:
         return None
     everyday = _everyday(code)
-    checked = uncommon = 0
+    unusual: list[str] = []
+    checked = content = 0
     for t in tokens:
-        if not t.content or t.surface.casefold() in own or t.base.casefold() in own:
+        if not t.content:
+            continue
+        content += 1
+        if t.surface.casefold() in own or t.base.casefold() in own:
             continue
         checked += 1
         if t.surface not in everyday and t.base not in everyday and not _covered(t.surface, everyday):
-            uncommon += 1
-    return round(100.0 * uncommon / checked, 1) if checked else 0.0
+            unusual.append(t.surface)
+    return unusual, checked, content
+
+
+def _uncommon_split(text: str, code: str, own: set) -> Optional[float]:
+    scan = _split_scan(text, code, own)
+    if scan is None:
+        return None
+    unusual, checked, _ = scan
+    return round(100.0 * len(unusual) / checked, 1) if checked else 0.0
+
+
+def unusual_words(text: str, code: str, vocab_words) -> Optional[tuple[list[str], int]]:
+    """The words of a Chinese, Japanese or Korean story that are neither the learner's own nor everyday, with the number of content
+    words in the story: (["车厢", "窗外"], 41). None for other languages, or when the everyday list or the splitter is missing.
+    The story report counts these as strays, as it counts the words outside the list in a space-delimited language."""
+    if code not in splitter.SPLIT_LANGUAGES or not has_everyday_list(code):
+        return None
+    scan = _split_scan(text, code, _own_set(vocab_words, code))
+    return None if scan is None else (scan[0], scan[2])
 
 
 def _uncommon_share(text: str, code: str, vocab_words) -> Optional[float]:

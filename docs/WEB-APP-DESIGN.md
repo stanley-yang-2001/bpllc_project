@@ -576,9 +576,9 @@ The report is computed by `tutor_core.quality`, moved out of `scripts/vocab_adhe
 |---|---|---|---|
 | Written in the requested language | yes (`language_check`) | yes (share of English words must be low) | yes (script share) |
 | Structure: length 4 to 10 sentences or lines, dialogue format (conversations only), no leaked plan, not empty | yes | yes | yes |
-| Words outside the vocabulary | **strict**: pass/fail, at most 5 strays (the owner raised it from 2 in tuning change #2) | **informational**: listed, not scored | not available |
+| Words outside the vocabulary | **strict**: pass/fail, at most 5 strays (the owner raised it from 2 in tuning change #2) | **informational** at first; since rules versions 4 and 5 **scored** (words outside your list and the everyday list, about one in ten allowed) | scored with a splitter (version 5), else not available |
 
-Why informational for other languages: the strict English rule works because the checker has an English list of allowed grammar words. No such list exists for Spanish or French yet, so articles and prepositions would be flagged as strays and every story would fail. The learner still sees the list ("Words not in your list"), which is what U4 asks for.
+Why informational at first for other languages (before the everyday-word lists existed): the strict English rule works because the checker has an English list of allowed grammar words. No such list exists for Spanish or French yet, so articles and prepositions would be flagged as strays and every story would fail. The learner still sees the list ("Words not in your list"), which is what U4 asks for.
 
 **Pass** = language ok **and** structure ok **and** no leaked plan **and** (English only) at most 5 strays. Lemmas come from `simplemma` when available, so inflections count as the same word. **Read time** = `ceil(word_count / 2)` seconds, a slow beginner pace.
 

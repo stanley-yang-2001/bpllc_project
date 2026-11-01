@@ -10,8 +10,9 @@ import math
 
 # --- the report Story Studio shows (M6, commit 2 of 2) -----------------------------------------------------
 
-RULES_VERSION = 4            # bump when the pass rule changes, so a saved report stays interpretable
+RULES_VERSION = 5            # bump when the pass rule changes, so a saved report stays interpretable
 MAX_STRAYS_ENGLISH = 5       # tuning change #2: raised from 2
+STRAY_ONE_IN = 10            # scored mode: about one word in ten may be outside the list (never fewer than MAX_STRAYS_ENGLISH)
 READ_WORDS_PER_SECOND = 2    # a slow beginner pace
 _OUTSIDE_LIST_CAP = 30       # informational mode lists at most this many words
 
@@ -30,9 +31,11 @@ def report(text, language, vocab_words, difficulty=None):
 
     `language` is an ISO code from tutor_core.languages; `vocab_words` is the learner's FULL list in that language (the
     prompt only sees a sample, but the learner knows all of it). Which checks run depends on the language, and the
-    report says which: strict (English: at most MAX_STRAYS_ENGLISH words outside the list), informational (other
-    space-delimited languages: listed, never scored, because no grammar-word list exists for them yet) or unavailable
-    (Tier 2). Pass = language ok and structure ok and no leaked plan and, in strict mode only, few enough strays.
+    report says which: strict (English: at most MAX_STRAYS_ENGLISH words outside the list), scored (any other language with an
+    everyday-word list, and for Chinese, Japanese and Korean a splitter: words outside both the learner's list and the everyday
+    words are counted, about one in ten allowed), informational (listed, never scored; used when a difficulty tier is asked for)
+    or unavailable (Chinese, Japanese or Korean with no splitter installed). Pass = language ok and structure ok and no leaked
+    plan and, in strict and scored mode, few enough strays.
 
     The language check is run WITHOUT the learner's list: language_check treats that list as English marker words, which
     is right for an English vocabulary and wrong for a Spanish learner's Spanish words (design 17A item 6)."""
@@ -45,6 +48,9 @@ def report(text, language, vocab_words, difficulty=None):
     mode = "strict" if language == "en" else ("informational" if lang.tier == 1 else "unavailable")
     if mode == "informational" and not difficulty and _d.has_everyday_list(language):
         mode = "scored"           # rules version 4: with the everyday list, words outside the learner's list can be counted fairly
+    unspaced = lang.tier == 2
+    if unspaced and not difficulty and _d.can_measure_uncommon(language):
+        mode = "scored"           # rules version 5: the same count for Chinese, Japanese and Korean, with the splitter cutting the words
     if difficulty and mode == "strict":
         # A tier asks for everyday words beyond the learner's list, so the strict stray-word count would fail every such story
         # (24 Oct: "friend", "work", "thanks" counted). The tier's own unusual-word share replaces it; strays are listed only.
@@ -55,7 +61,7 @@ def report(text, language, vocab_words, difficulty=None):
     # check_passage's own `passed` is not used: the pass rule is applied below, per mode.
     # With a difficulty tier the length is the tier's business (reported below), so the sentence-count rule is not applied.
     everyday = (lambda w: _d.is_everyday(w, language)) if _d.has_everyday_list(language) and lang.tier == 1 else None
-    scored = check_passage(text, vocab, check_vocab=(mode != "unavailable"), max_oov=10 ** 9, everyday=everyday,
+    scored = check_passage(text, vocab, check_vocab=(mode != "unavailable" and not unspaced), max_oov=10 ** 9, everyday=everyday,
                            **({"length_range": (1, 10 ** 6)} if difficulty else {}))
     failure = scored["failure"]
     scored["format_ok"] = scored["format_ok"] and not has_dangling_sentence(text, language)       # rules version 4
@@ -69,9 +75,14 @@ def report(text, language, vocab_words, difficulty=None):
 
     outside = None
     count = 0
+    words_in_story = scored["word_count"]
     if mode != "unavailable" and not failure:
-        outside = scored["oov_words"] if mode in ("strict", "scored") else scored["oov_words"][:_OUTSIDE_LIST_CAP]
-        count = scored["oov_count"]
+        if unspaced:
+            outside, words_in_story = _d.unusual_words(text, language, vocab_words) or ([], words_in_story)
+            count = len(outside)
+        else:
+            outside = scored["oov_words"] if mode in ("strict", "scored") else scored["oov_words"][:_OUTSIDE_LIST_CAP]
+            count = scored["oov_count"]
     limit = None
     vocab_ok = None
     if mode == "strict":
@@ -79,7 +90,7 @@ def report(text, language, vocab_words, difficulty=None):
         vocab_ok = (not failure) and count <= limit
     elif mode == "scored":
         # about one unusual word in ten, never fewer than the English limit (English: 5 in a 50-word story)
-        limit = None if failure else max(MAX_STRAYS_ENGLISH, -(-scored["word_count"] // 10))
+        limit = None if failure else max(MAX_STRAYS_ENGLISH, -(-words_in_story // STRAY_ONE_IN))
         vocab_ok = (not failure) and count <= limit
 
     section = None

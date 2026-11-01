@@ -2,13 +2,15 @@
 
 {rules_version, status, language, structure, vocabulary: {mode, outside, limit}, read_seconds}. What can be checked
 depends on the language, so the report says which mode ran: strict (English: at most 5 words outside the list),
-informational (other space-delimited languages: listed, not scored) or unavailable (Japanese, Chinese, Korean).
+scored (other languages with an everyday list, and Japanese, Chinese and Korean with a splitter: words outside the list and the
+everyday words are counted, about one in ten allowed), informational (listed, not scored: a difficulty tier was asked for) or
+unavailable (Japanese, Chinese or Korean with no splitter installed).
 """
 import json
 
 import pytest
 
-from tutor_core import quality
+from tutor_core import quality, splitter
 
 VOCAB = ["hello", "goodbye", "please", "thank you", "water", "friend", "house", "today"]
 DIALOGUE = "Ana: Hello, friend.\nBen: Hello, water please.\nAna: Thank you.\nBen: Goodbye, friend."
@@ -102,12 +104,41 @@ def test_an_english_story_requested_in_spanish_fails_on_language():
     assert r["status"] == "fail" and r["language"]["ok"] is False and r["language"]["verdict"] in ("english", "mixed")
 
 
-# --- Tier 2: unavailable ---------------------------------------------------------------------------------
+# --- Chinese, Japanese, Korean: scored with the splitter, unavailable without one ------------------------------
 
 JA = "アナ: こんにちは、ともだち。\nベン: こんにちは、みずをください。\nアナ: どうぞ。\nベン: ありがとう。"
+needs_splitter = pytest.mark.skipif(not (splitter.available("ja") and splitter.available("zh") and splitter.available("ko")), reason="the [cjk] extras are not installed")
 
 
-def test_japanese_checks_script_and_structure_but_not_vocabulary():
+@needs_splitter
+def test_japanese_is_scored_like_the_spaced_languages_with_the_splitter():
+    r = rep(JA, "ja", ["みず", "ともだち"])
+    v = r["vocabulary"]
+    assert (v["mode"], v["ok"], v["outside"], v["outside_count"], v["limit"]) == ("scored", True, [], 0, quality.MAX_STRAYS_ENGLISH)
+    assert r["status"] == "pass" and r["language"]["ok"] is True and r["rules_version"] == quality.RULES_VERSION == 5
+
+
+@needs_splitter
+def test_chinese_and_korean_list_their_unusual_words_and_a_story_full_of_them_fails():
+    zh = rep("今天我在家里。我喝水，吃面包。朋友来了，我们一起看书。窗外下雨了。", "zh", ["水", "面包"])["vocabulary"]
+    assert zh["mode"] == "scored" and zh["outside"] == ["窗外"] and zh["outside_count"] == 1 and zh["ok"] is True
+    rare = "壁虎爬上穹顶。蝾螈潜入沼泽。獬豸踏过苔藓。貔貅守着祠堂。鲲鹏掠过峡谷。饕餮吞下琥珀。"
+    r = rep(rare, "zh", ["水"])
+    assert r["vocabulary"]["mode"] == "scored" and r["vocabulary"]["ok"] is False and r["status"] == "fail" and r["vocabulary"]["outside_count"] > r["vocabulary"]["limit"]
+    ko = rep("우리 집 앞에 새로운 친구가 있어요.\n친구는 큰 정원에 꽃을 많이 키워요.", "ko", ["집", "친구", "정원", "꽃"])["vocabulary"]
+    assert ko["mode"] == "scored" and ko["ok"] is True and ko["outside_count"] <= ko["limit"]
+
+
+@needs_splitter
+def test_a_tier_keeps_chinese_japanese_and_korean_without_the_stray_count():
+    from tutor_core import difficulty
+    r = quality.report(JA, "ja", ["みず"], difficulty.TIERS["easy"])
+    assert r["vocabulary"]["mode"] == "unavailable" and r["vocabulary"]["outside"] is None
+
+
+def test_without_a_splitter_japanese_checks_script_and_structure_but_not_vocabulary(monkeypatch):
+    monkeypatch.setattr(splitter, "split", lambda text, code: None)
+    monkeypatch.setattr(splitter, "available", lambda code: False)
     r = rep(JA, "ja", ["みず", "ともだち"])
     v = r["vocabulary"]
     assert (v["mode"], v["ok"], v["outside"], v["outside_count"], v["limit"]) == ("unavailable", None, None, 0, None)
@@ -163,7 +194,6 @@ def test_spanish_with_many_rare_words_fails_in_scored_mode_but_a_tier_keeps_it_i
     assert r["vocabulary"]["mode"] == "scored" and r["vocabulary"]["ok"] is False and r["status"] == "fail"
     from tutor_core import difficulty
     assert quality.report(rare, "es", ES_VOCAB, difficulty.TIERS["easy"])["vocabulary"]["mode"] == "informational"
-    assert rep(JA, "ja", ["みず"])["vocabulary"]["mode"] == "unavailable"            # no scored mode without a splitter-based rule
 
 
 def test_very_short_english_does_not_pass_as_a_latin_script_language():

@@ -45,6 +45,21 @@ def test_chinese_is_split_into_words_when_a_splitter_is_installed():
     assert rare["uncommon_pct"] > 20
 
 
+def test_unusual_words_lists_the_rare_words_and_counts_the_content_words():
+    pytest.importorskip("rjieba")
+    words, content = d.unusual_words("我在蜃景里看见一只貔貅。", "zh", [])
+    assert "貔貅" in words and content >= len(words) > 0
+    own, _ = d.unusual_words("我喝水。", "zh", ["水"])
+    assert own == []                                         # the learner's own word and everyday words are not unusual
+    assert d.unusual_words("Hello there", "en", []) is None  # only for Chinese, Japanese and Korean
+
+
+def test_unusual_words_is_none_without_a_splitter(monkeypatch):
+    monkeypatch.setattr(d.splitter, "split", lambda text, code: None)
+    monkeypatch.setattr(d.splitter, "available", lambda code: False)
+    assert d.unusual_words("我在家。", "zh", []) is None
+
+
 def test_a_one_character_own_word_is_not_found_inside_a_longer_word():
     pytest.importorskip("rjieba")
     assert d.measure("我喜欢面包。", "zh", ["面"])["own_words"] == 0         # 面 is only part of 面包

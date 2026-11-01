@@ -19,7 +19,7 @@ The work is in four files; this one keeps `tutor_core.difficulty` importing as i
 from .. import splitter                                       # noqa: F401  (tests reach it as difficulty.splitter)
 from .judging import evaluate, section
 from .measuring import (_covered, _everyday, _lemma, _own_found, _own_set, _tokens, _uncommon_share, _uncommon_split, can_measure_uncommon,  # noqa: F401
-                      has_everyday_list, is_everyday, measure)
+                      has_everyday_list, is_everyday, measure, unusual_words)
 from .note import prompt_note
 from .presets import (CHARS_PER_WORD, LENGTH_TOLERANCE, LIMITS, TIER_NAMES, TIERS, UNCOMMON_SLACK, UNSPACED, _unit, ask_size,  # noqa: F401
                       is_unspaced, resolve)

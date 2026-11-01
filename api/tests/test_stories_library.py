@@ -1,4 +1,5 @@
 """The library API (M6): save, list, open, delete. The report is recomputed by the server, never taken from the page."""
+from tutor_core import quality
 import pytest
 from fastapi.testclient import TestClient
 
@@ -36,7 +37,7 @@ def test_a_saved_story_comes_back_with_a_report_the_server_made(make_user):
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["body"] == DIALOGUE and body["language"] == "en" and body["story_type"] == "dialogue"
-    assert body["report"]["rules_version"] == 4 and body["report"]["vocabulary"]["mode"] == "strict"
+    assert body["report"]["rules_version"] == quality.RULES_VERSION and body["report"]["vocabulary"]["mode"] == "strict"
     assert body["passed"] is (body["report"]["status"] == "pass") and body["passed"] is True
 
 
