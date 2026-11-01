@@ -596,7 +596,7 @@ General). The Langflow tools connect as the limited role `tutor_tools`: SELECT a
 
 The first version of this document (27 October) ranked twelve splits, each a kanban card "B1" to "B12" in
 `docs/kanban/cards.json`. All twelve are built, each keeping behaviour unchanged and starting from the existing tests
-(API 869 then, 950 now; `tutor_core` 334 then, 365 now).
+(API 869 then, 948 now; `tutor_core` 334 then, 370 now).
 
 | # | Where | What the diagram showed | What was done | Principle |
 |---|---|---|---|---|

@@ -656,7 +656,7 @@ classDiagram
 
 The first version of this document (27 October) ranked nine splits, each a kanban card "F1" to "F9" in
 `docs/kanban/cards.json`. All nine are built and tested: each kept screens and labels unchanged, and the web tests
-(269 then, 330 now) were the safety net.
+(269 then, 333 now) were the safety net.
 
 | # | Where | What the diagram showed | What was done | Principle |
 |---|---|---|---|---|

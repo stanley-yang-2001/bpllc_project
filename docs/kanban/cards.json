@@ -655,14 +655,19 @@
  },
  {
   "title": "Vocabulary adherence for non-English lists",
-  "status": "Backlog",
+  "status": "In review",
   "area": "backlog",
-  "date": "",
-  "summary": "Strays are listed but not scored outside English. The everyday lists now make a scored rule possible.",
-  "done": [],
+  "date": "2026-10-31",
+  "summary": "Words outside the learner's list are now scored in every language that has an everyday-word list: about one in ten allowed, never fewer than five (rules version 5 adds Chinese, Japanese and Korean through the splitter).",
+  "done": [
+   "Rule version 4 scored the space-delimited languages; version 5 scores Chinese, Japanese and Korean (difficulty.unusual_words)",
+   "Measured on your saved batches: German, Italian, Portuguese 48 stories, Chinese 15, Korean 18; none over the limit (strays 0 to 6 against limits of 5 or more)",
+   "Tests for the three modes and for no splitter"
+  ],
   "todo": [
-   "Choose limits per language",
-   "Measure on batches"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass",
+   "Japanese has no saved batch yet: run run-checks.bat --live (difficulty-live) and look at a few Japanese reports for strays",
+   "Tell me if a language looks too strict or too loose and I will change STRAY_ONE_IN"
   ],
   "labels": [
    "backlog",
@@ -1211,14 +1216,16 @@
  },
  {
   "title": "F3: Split the Login page into LoginForm and RegisterForm",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "Login.tsx (187 lines) holds two forms and their field helpers.",
-  "done": [],
+  "done": [
+   "login/ holds the schemas, field helpers, both forms, the brand panel and the request hook; form state stays in the page (new test)",
+   "Web tests green here"
+  ],
   "todo": [
-   "auth/LoginForm, RegisterForm, fields.tsx",
-   "The page only picks the tab"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1248,14 +1255,16 @@
  },
  {
   "title": "F5: Split the Chat page",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "Chat.tsx (153 lines) holds the message list, the composer, the retry and the story-save button.",
-  "done": [],
+  "done": [
+   "chat/ holds the conversation, bubbles, composer, waiting line, save button and storyCalls; Try again uses the sets ticked now (new test)",
+   "Web tests green here"
+  ],
   "todo": [
-   "chat/MessageList, Composer, SaveStory",
-   "Fix: retry should use the sets ticked now, not the sets of the first send"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1265,14 +1274,16 @@
  },
  {
   "title": "F6: One StoryMeta component for kind, topic and difficulty",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "Studio and Library both render a story's kind, topic and difficulty with the same three label helpers.",
-  "done": [],
+  "done": [
+   "components/StoryMeta used by Studio and Library; Pager, PracticeLink and useSaveStory are shared too",
+   "Web tests green here"
+  ],
   "todo": [
-   "components/StoryMeta",
-   "Use it in Studio and Library"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1282,14 +1293,16 @@
  },
  {
   "title": "F7: Split the message table by area",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "i18n/messages.ts is one 471-line table for the whole site.",
-  "done": [],
+  "done": [
+   "i18n/catalog/ has 15 area files; all 508 messages unchanged; a test checks each key is in one area",
+   "Web tests green here"
+  ],
   "todo": [
-   "i18n/messages/ with common, vocab, studio, practice, settings, chat and auth",
-   "Merge in an index; keep the compile-time check for a missing translation"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1299,14 +1312,16 @@
  },
  {
   "title": "F8: Separate saving from holding in PreferencesProvider",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "PreferencesProvider.tsx (162 lines) holds the value, debounces saves, retries and writes the device copy.",
-  "done": [],
+  "done": [
+   "useSavedPreferences, deviceSync and legacyAdoption hooks; the provider only merges",
+   "Web tests green here"
+  ],
   "todo": [
-   "useSavedPreferences hook for debounce, retry and device copy",
-   "The provider only holds and shares the value"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
@@ -1316,14 +1331,16 @@
  },
  {
   "title": "F9: Split Library and Privacy into parts",
-  "status": "Backlog",
+  "status": "In review",
   "area": "frontend",
-  "date": "2026-10-27",
+  "date": "2026-10-31",
   "summary": "Library.tsx (129 lines) holds the list, row, opened story and delete flow; Privacy.tsx (131 lines) holds a block renderer.",
-  "done": [],
+  "done": [
+   "library/ (StoryRow, OpenedStory, useLibrary) and privacy/ (document, blocks, picker, top bar, usePolicy)",
+   "Web tests green here"
+  ],
   "todo": [
-   "library/StoryRow, OpenedStory",
-   "privacy/PolicyBlocks"
+   "Run run-checks.bat --round and confirm the unit and stack stages pass"
   ],
   "labels": [
    "frontend",
