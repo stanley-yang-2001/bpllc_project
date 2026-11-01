@@ -47,7 +47,7 @@ def install_stubs():
     module("langchain_openai", ChatOpenAI=ChatOpenAI)
 
 
-def build(field_value):
+def build(field_value, **extra):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "custom_components")
     sys.path.insert(0, path)
     sys.modules.pop("groq_language_model", None)
@@ -55,6 +55,8 @@ def build(field_value):
 
     component = g.GroqLanguageModel()
     component.api_key, component.model_name = field_value, "openai/gpt-oss-120b"
+    for name, value in extra.items():
+        setattr(component, name, value)
     return component.build_model().kwargs
 
 
@@ -72,6 +74,11 @@ def main():
         kwargs = build("k")
         check("base url and model are unchanged",
               kwargs["base_url"] == "https://api.groq.com/openai/v1" and kwargs["model"] == "openai/gpt-oss-120b")
+        groq = "https://api.groq.com/openai/v1"
+        check("no base url field (a node with old code) means Groq", build("k")["base_url"] == groq)
+        check("an empty or blank base url means Groq", build("k", base_url="")["base_url"] == groq and build("k", base_url="  ")["base_url"] == groq
+              and build("k", base_url=None)["base_url"] == groq)
+        check("a base url tweaked for one request is used, trimmed", build("k", base_url=" https://api.example.com/v1 ")["base_url"] == "https://api.example.com/v1")
     finally:
         if saved is not None:
             os.environ["GROQ_API_KEY"] = saved

@@ -589,11 +589,16 @@
   "status": "Backlog",
   "area": "backlog",
   "date": "",
-  "summary": "Needs a spike on the author's machine first (how the Agent calls a user-supplied model).",
-  "done": [],
+  "summary": "The spike is written and tested against fakes (patch 0040); it waits for you to run it on your machine. It decides between tweaks and an API-side model proxy.",
+  "done": [
+   "Read Langflow 1.12.2's tweak handling (design section 9.1)",
+   "Spike script: override, parallel, control, no leak, stored key, optional real provider",
+   "Groq component takes an optional Base URL (empty means Groq)"
+  ],
   "todo": [
-   "Spike",
-   "Design the key handling for chat",
+   "Run the spike on your machine (design section 9.4) and send the report",
+   "Choose option A (tweaks) or B (API-side proxy) from the report",
+   "Give the chat story tool the learner's endpoint too",
    "Build and test"
   ],
   "labels": [

@@ -8,7 +8,7 @@ It speaks just enough of the API that scripts/spike_tweaks.py and scripts/captur
   GET  /api/v1/monitor/messages/sessions       -> the stored session ids
   DELETE /api/v1/monitor/messages/session/<id> -> forgets that session
 
-A run behaves like the Who Am I spike flow when the message mentions "Who Am I" (the tool reports the
+With `model_key` it also behaves like the model node of scripts/spike_model_tweaks.py. A run behaves like the Who Am I spike flow when the message mentions "Who Am I" (the tool reports the
 `learner_id` and `language` of the tweaks for the key it is given, holding 0.3 s so parallel calls overlap), and
 like the real tutor otherwise (a story request returns a tool call). `legacy=True` prints the ORIGINAL spike code's field name (user_id). `shadow=True` reproduces the first live run's
 bug: the tool reports a fixed "Langflow account" id instead of the learner. Like Langflow's parameter handler, a
@@ -26,8 +26,9 @@ ACCOUNT = "784d78de-8532-42c1-990e-d6b50f77beb0"
 
 
 class FakeLangflow:
-    def __init__(self, key="K", shadow=False, legacy=False):
+    def __init__(self, key="K", shadow=False, legacy=False, model_key=None):
         self.key, self.shadow, self.legacy = key, shadow, legacy
+        self.model_key = model_key      # the model node's tweaks key; when set, a run whose tweaks carry a base_url calls that model
         self.sessions: dict[str, list] = {}
         self.requests: list[tuple] = []
         outer = self
@@ -88,6 +89,19 @@ class FakeLangflow:
         self.server.shutdown()
         self.server.server_close()
 
+    @staticmethod
+    def ask_model(fields):
+        """What the model node does with its (tweaked) fields: one streamed /chat/completions request."""
+        import urllib.request
+        req = urllib.request.Request(
+            f"{fields['base_url']}/chat/completions", method="POST",
+            data=json.dumps({"model": fields.get("model_name", ""), "stream": True, "messages": []}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {fields.get('api_key', '')}"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = resp.read().decode()
+        return "".join(json.loads(line[6:])["choices"][0]["delta"].get("content", "")
+                       for line in body.splitlines() if line.startswith("data: {"))
+
     def run(self, body):
         message, session = body.get("input_value", ""), body.get("session_id", "")
         if "who am i" in message.lower():
@@ -99,6 +113,8 @@ class FakeLangflow:
             text = (f"WHOAMI {field}={learner} language={cfg.get('language', 'NONE')} langflow_user={ACCOUNT} "
                     f"session=NONE graph_session={session} t0={t0:.3f} t1={time.time():.3f} thread=1")
             calls = [{"type": "tool_use", "name": "spike_who_am_i", "tool_input": {"note": "x"}, "output": text}]
+        elif self.model_key and (body.get("tweaks") or {}).get(self.model_key, {}).get("base_url"):
+            text, calls = self.ask_model((body["tweaks"])[self.model_key]), []
         elif "story" in message.lower():
             text = "Ana: Hola.\nBen: Hola, Ana."
             calls = [{"type": "tool_use", "name": "story_generator_tool", "tool_input": {"language": "Spanish"}, "output": text}]

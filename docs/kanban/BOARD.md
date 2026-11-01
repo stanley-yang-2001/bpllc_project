@@ -5,7 +5,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 
 ## Backlog (3)
 
-- **Chat on your own model (phase 2)** (no date) — Needs a spike on the author's machine first (how the Agent calls a user-supplied model).
+- **Chat on your own model (phase 2)** (no date) — The spike is written and tested against fakes (patch 0040); it waits for you to run it on your machine. It decides between tweaks and an API-side model proxy.
 - **Native review of the nine-language site text and policy copies** (no date) — Translations are machine-written and not reviewed by native speakers; policy copies are shown only when approved.
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 

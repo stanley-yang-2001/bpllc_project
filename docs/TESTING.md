@@ -75,6 +75,7 @@ docker compose exec -T langflow python /app/scripts/m3_check.py --flow-id langua
 docker compose exec -T langflow python /app/scripts/run_routing_tests.py --flow-id language-tutor --delay 20
 docker compose exec -T api python scripts/difficulty_check.py --show
 docker compose exec -T api python scripts/text_tools_check.py
+docker compose exec langflow python /app/scripts/spike_model_tweaks.py --flow language-tutor-spike --key GroqLanguageModel-h5DsK   # phase 2 spike, docs/CUSTOM-MODEL-DESIGN.md section 9.4
 ```
 
 ## When you add a test

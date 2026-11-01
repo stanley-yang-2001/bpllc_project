@@ -1,6 +1,6 @@
 # Use the model the learner chooses (design, 22 October 2026)
 
-**Status (24 October 2026): phase 1 (stories) is built and tested here, not yet run on your machine; decisions are in section 6. Phase 2 (chat) is not built and waits for the spike. Not done: the privacy-policy sentence (it needs your wording and a version bump, which makes every learner accept the policy again).**
+**Status (1 November 2026): phase 1 (stories) is built and tested here, not yet run on your machine; decisions are in section 6. Phase 2 (chat) is not built: the spike that decides how is written and tested against fakes (section 9), and waits for you to run it. Not done: the privacy-policy sentence (it needs your wording and a version bump, which makes every learner accept the policy again).**
 
 ## 1. The request
 A learner can enter **a model name, an API key and the model's address** (base URL), and the site then uses that model instead of the shared Groq one.
@@ -27,7 +27,7 @@ A provider that is not OpenAI-compatible (Anthropic's own API, Gemini's own API)
 
 **Stories (phase 1):** when the learner has a saved model, `POST /api/stories/generate` builds a `call_fn` for their endpoint and passes it as `call_groq_fn`. Everything after the call is unchanged, including the stray-word check and quality report, and the report says which model wrote the story. Request differences: no `reasoning_effort` unless the model is known to take it (other providers reject unknown fields), and `max_tokens` is sent as `max_tokens`.
 
-**Chat (phase 2):** the Agent's model is a node in the shared flow. Langflow takes per-request overrides ("tweaks"), which the project already uses for the learner id. Phase 2 passes the learner's model, key and address as tweaks on a chat request. This must be **proved on your machine first** with a spike like M0 (does the Agent node accept an OpenAI-compatible override per request, and does the key stay out of Langflow's logs and stored chat?). The chat story tool would call back through the same endpoint. I will not promise phase 2 until the spike passes.
+**Chat (phase 2):** the Agent's model is a node in the shared flow. Langflow takes per-request overrides ("tweaks"), which the project already uses for the learner id. Phase 2 passes the learner's model, key and address as tweaks on a chat request. This must be **proved on your machine first** with a spike like M0 (section 9 has it and what Langflow's own source says) (does the Agent node accept an OpenAI-compatible override per request, and does the key stay out of Langflow's logs and stored chat?). The chat story tool would call back through the same endpoint. I will not promise phase 2 until the spike passes.
 
 ## 5. Risks and how the design handles them
 1. **The server calls an address the learner typed (SSRF).** Without a guard, someone could point it at the database, Langflow, or the host's cloud metadata address. Rule: https only; resolve the name and refuse loopback, private, link-local and metadata addresses; no redirects; 30 second timeout; response size cap. Local models (Ollama on the learner's own PC) are refused by default because the server cannot reach that PC anyway; an `ALLOW_PRIVATE_MODEL_URLS=1` switch exists for a single-user setup like yours.
@@ -70,3 +70,50 @@ A provider that is not OpenAI-compatible (Anthropic's own API, Gemini's own API)
 - Routes: `GET/PUT/DELETE /api/me/model` and `POST /api/me/model/test` (5 tests a minute). Story Studio uses the model when it is saved: no shared token budget, 10 stories a minute, a failure shows the provider's reason and says to remove the model to go back to the shared one; no silent fallback. The report names the model.
 - Settings has a My model card (only on switched-on accounts), in nine languages.
 - Not built: chat on your own model (phase 2), a saved story remembering which model wrote it, other providers than OpenAI-compatible.
+
+## 9. Phase 2 (chat): the spike, and what Langflow's source says (1 November 2026)
+**Status: `scripts/spike_model_tweaks.py` is written and tested against fakes (including a real Postgres for the storage search). It has not been run on your machine. Nothing in the real flow changed: the Groq component gained an optional "Base URL" field (empty means Groq, so the repo's flow behaves exactly as before) and `flows/language-tutor.json` is untouched until the spike passes.**
+
+### 9.1 What Langflow 1.12.2 does (read from the `langflow-base` and `lfx` 1.12.2 packages, the version the Dockerfile pins; not yet confirmed on a run)
+1. A tweak sets a field of a node, found by node id or display name. A **string** is stored as the field's value and the field's "load from database" flag is turned off, so a key sent as a tweak is used as typed and is not looked up as the name of a stored variable.
+2. A tweak for a field the node does not have is **skipped without any error**. That is why the model node needs the new Base URL field, and why old node code shows up as "the fake model was never called".
+3. Only code fields (and two SQL fields) are protected. A deployment setting, `LANGFLOW_TWEAKS_POLICY` (`permissive` by default; `declared` and `off` refuse tweaks), can answer 422 "does not accept tweaks". Only the account that owns the flow may send tweaks; anyone else gets 404. The spike explains both when it meets them.
+4. Langflow records each run: chat messages, one "transaction" per component and one "vertex build" per component. The transaction log masks values of keys called `api_key`, `password` and the like to their **first four and last four characters**. Whether the whole key also lands in another table is what the spike's `stored_key` check measures; the source cannot answer it.
+5. The warm graph cache (`LANGFLOW_WARM_REGISTRY_ENABLED`, off by default) is skipped when a request carries tweaks.
+
+### 9.2 What the spike checks (inside the Langflow container; it starts a tiny OpenAI-compatible server of its own, so it needs no second provider and costs nothing)
+| Check | Passes when |
+|---|---|
+| `override` | the model call reaches the fake server with the tweaked model name, the tweaked key as `Authorization: Bearer ...`, at `/chat/completions`, and the Agent's reply is the fake model's sentence |
+| `parallel`, `overlap` | several learners at the same moment each reach the server with their own pair, never another's; calls that did not overlap in time are INCONCLUSIVE, not PASS |
+| `control` | a request with no tweaks, sent after the overrides, goes to the shared Groq model and not to the fake one (an override must not stick; this is the one case where Langflow's source mentions a cached graph) |
+| `no_leak` | no throwaway key appears in anything Langflow returned |
+| `stored_key` | reported next to the verdict: FAIL if the whole key is found in Langflow's database or message store, PASS if only the masked form or nothing is, INCONCLUSIVE if it could not look |
+| `real_provider` (optional) | your real provider's model, set through the same tweaks, drives the Agent's calculator tool (a model without tool-call support shows as INCONCLUSIVE or ERROR) |
+
+The throwaway keys are invented by the script (`spike-key-...`). Your real key is only ever sent by `--real-model`, is read from the environment variable `SPIKE_REAL_API_KEY`, is never printed or saved, and is not searched for in the database (use a key you can revoke afterwards).
+
+### 9.3 Two ways to build phase 2
+- **Option A, tweaks carry model, key and address.** Simple, and the spike decides whether it works. Two costs even when it works. (1) Langflow keeps at least the masked key (eight characters) in its transaction log, and maybe more. (2) The address guard of phase 1 resolves the name and calls the address it checked; with tweaks, Langflow resolves the name again itself, so the guard can only check, not pin, and a name that changes its answer between the check and the call defeats it.
+- **Option B, the API is the model (recommended if `stored_key` FAILs, and a good idea even if not).** The API gets an internal OpenAI-compatible route that only the Langflow container can reach. For a chat request the API issues a random one-time token that stands for this learner and this request (minutes to live) and sends Langflow tweaks of: the learner's model name, the API's internal address as Base URL, and the token as the key. The API receives Langflow's model request, looks up the learner's stored encrypted key, runs the **same address guard with the address pinned**, forwards the request (streamed) and counts the per-learner request limit. The real key never leaves the API, Langflow stores only a throwaway token, the guard is the code phase 1 already has, and the provider's error reaches the learner in the same words as in Story Studio. Cost: one internal route with streaming pass-through, a token store, and tests; the route must not be published outside the Docker network.
+- **Either way, one gap remains:** the Story Generator Tool inside the chat flow calls Groq itself with the shared key (`tutor_core.tools.story_for_agent`), so a story made in chat would still be written by the shared model while the Agent's own sentences come from the learner's. Phase 2 must also give that tool the learner's endpoint (with option B: the same token and internal address as two more hidden inputs).
+
+### 9.4 Run it on your machine (Windows, in the project folder)
+1. In Langflow, duplicate "language tutor", name the copy "language tutor spike" with the endpoint name `language-tutor-spike` (reuse the copy from the M0 spike if you still have it).
+2. Open the Groq node in the copy, press the code button, replace the code with the whole of `custom_components/groq_language_model.py`, Check & Save. An advanced field "Base URL" appears.
+3. Run the free checks. `--key` takes the node id (`GroqLanguageModel-h5DsK` in the repo flow) or the display name (`--key "Groq (via OpenAI-compatible)"`), whichever your copy answers to:
+```
+docker compose exec langflow python /app/scripts/spike_model_tweaks.py --flow language-tutor-spike --key GroqLanguageModel-h5DsK
+```
+It takes about a minute and one Groq turn (the `control` check; add `--skip-control` to avoid it, and wait a minute and re-run if it says rate limit).
+4. Look for the key in Langflow's log, a second source the script cannot read:
+```
+docker compose logs langflow | findstr /C:"spike-key-"
+```
+No line should come out. If one does, paste it (it is a throwaway key).
+5. Optional, your real provider (use a key you can revoke afterwards). Put the key in the environment of your command window, not in the command (the `-e` below copies it from there):
+```
+set SPIKE_REAL_API_KEY=your-key
+docker compose exec -e SPIKE_REAL_API_KEY langflow python /app/scripts/spike_model_tweaks.py --flow language-tutor-spike --key GroqLanguageModel-h5DsK --skip-control --real-model gpt-4o-mini --real-base-url https://api.openai.com/v1
+```
+Paste the printed report back. The script saves `scripts/spike_model_tweaks_<time>.json` (git-ignored; keys cut to their last four characters).

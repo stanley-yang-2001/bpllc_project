@@ -20,6 +20,7 @@ from fake_langflow import ACCOUNT, FakeLangflow  # noqa: E402
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SPIKE = os.path.join(ROOT, "scripts", "spike_tweaks.py")
 CAPTURE = os.path.join(ROOT, "scripts", "capture_fixtures.py")
+MODEL_SPIKE = os.path.join(ROOT, "scripts", "spike_model_tweaks.py")
 failures = []
 
 
@@ -32,7 +33,7 @@ def check(name, condition, detail=""):
 
 
 def run(script, *args):
-    env = {k: v for k, v in os.environ.items() if k != "LANGFLOW_API_KEY"}
+    env = {k: v for k, v in os.environ.items() if k not in ("LANGFLOW_API_KEY", "LANGFLOW_DATABASE_URL")}
     return subprocess.run([sys.executable, script, *args], capture_output=True, text=True, timeout=120, env=env)
 
 
@@ -102,6 +103,84 @@ def test_spike_argument_errors():
     check("--help lists --pause and --out-dir", "--pause" in r.stdout and "--out-dir" in r.stdout)
 
 
+def test_model_spike_end_to_end():
+    print("spike_model_tweaks.py against a fake Langflow whose model node honours the tweaks")
+    with FakeLangflow(model_key="ModelNode-1") as lf, tempfile.TemporaryDirectory() as out:
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--flow", "f", "--key", "ModelNode-1", "--users", "2", "--hold", "0.5",
+                "--out-dir", out)
+        check("it runs (exit 0)", r.returncode == 0, r.stdout[-500:] + r.stderr[-500:])
+        check("it reports the override working", "THE OVERRIDE WORKS" in r.stdout, r.stdout)
+        check("every free check passed", all(f"PASS         {n}" in r.stdout for n in ("override", "parallel", "overlap", "control", "no_leak")), r.stdout)
+        check("it suggests the real-provider run", "--real-model" in r.stdout)
+        check("the storage check says it could not search the database (none was given)",
+              "INCONCLUSIVE stored_key" in r.stdout and "database: not configured" in r.stdout and "not fully checked" in r.stdout, r.stdout)
+        check("it names the log search to run by hand", "findstr" in r.stdout)
+        check("the messages store was searched through the Langflow API",
+              any(q[0] == "GET" and q[1] == "/api/v1/monitor/messages" for q in lf.requests), lf.requests)
+        saved = glob.glob(os.path.join(out, "spike_model_tweaks_*.json"))
+        check("raw responses were saved, with no whole key in them",
+              len(saved) == 1 and "spike-key-" not in open(saved[0]).read())
+
+
+def test_model_spike_searches_the_database_it_is_given():
+    print("spike_model_tweaks.py --db-url (a real Postgres, when TEST_DATABASE_URL is set)")
+    url = os.environ.get("TEST_DATABASE_URL", "")
+    try:
+        import psycopg2  # noqa: F401
+    except ImportError:
+        url = ""
+    if not url:
+        print("  (skipped: TEST_DATABASE_URL is not set or psycopg2 is missing)")
+        return
+    with FakeLangflow(model_key="ModelNode-1") as lf, tempfile.TemporaryDirectory() as out:
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--flow", "f", "--key", "ModelNode-1", "--users", "2", "--hold", "0.3",
+                "--db-url", url, "--out-dir", out)
+        check("the database search ran and found no key", "PASS         stored_key" in r.stdout and "found nowhere" in r.stdout, r.stdout[-700:])
+        check("it did not print the database address", url not in r.stdout + r.stderr)
+    with FakeLangflow(model_key="ModelNode-1") as lf, tempfile.TemporaryDirectory() as out:
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--flow", "f", "--key", "ModelNode-1", "--users", "2", "--hold", "0.3",
+                "--db-url", "postgresql://nobody:x@127.0.0.1:1/none", "--out-dir", out)
+        check("an unreachable database makes the storage check INCONCLUSIVE, not the run a crash",
+              r.returncode == 0 and "INCONCLUSIVE stored_key" in r.stdout and "database: " in r.stdout, r.stdout[-700:] + r.stderr[-300:])
+
+
+def test_model_spike_with_the_wrong_node_key_is_not_a_pass():
+    print("spike_model_tweaks.py with a tweaks key that matches no node")
+    with FakeLangflow(model_key="ModelNode-1") as lf, tempfile.TemporaryDirectory() as out:
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--flow", "f", "--key", "WrongNode", "--users", "2", "--hold", "0.2", "--out-dir", out)
+        check("it fails and names the likely causes", r.returncode == 1 and "never called" in r.stdout and "OLD code" in r.stdout, r.stdout[-500:])
+        check("it does not claim the override works", "THE OVERRIDE WORKS" not in r.stdout)
+
+
+def test_model_spike_with_a_real_provider_never_prints_its_key():
+    print("spike_model_tweaks.py --real-model (the key comes from the environment)")
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    import spike_model_tweaks as sm
+    secret = "sk-REAL-SECRET-4242"
+    with sm.FakeModelServer() as provider, FakeLangflow(model_key="ModelNode-1") as lf, tempfile.TemporaryDirectory() as out:
+        env = {**os.environ, "SPIKE_REAL_API_KEY": secret}
+        env.pop("LANGFLOW_API_KEY", None)
+        r = subprocess.run([sys.executable, MODEL_SPIKE, "--base-url", lf.url, "--flow", "f", "--key", "ModelNode-1", "--users", "2",
+                            "--hold", "0.3", "--skip-control", "--real-model", "provider-model",
+                            "--real-base-url", f"http://127.0.0.1:{provider.port}/v1", "--out-dir", out],
+                           capture_output=True, text=True, timeout=120, env=env)
+        saved = "".join(open(f).read() for f in glob.glob(os.path.join(out, "*.json")))
+        check("the real provider was called with the key from the environment",
+              any(c.authorization == f"Bearer {secret}" and c.model == "provider-model" for c in provider.snapshot()))
+        check("a provider that does not do the sum is INCONCLUSIVE, not a pass of that check", "INCONCLUSIVE real_provider" in r.stdout, r.stdout)
+        check("the key is in neither the printed report nor the saved file", secret not in r.stdout + r.stderr + saved)
+
+
+def test_model_spike_argument_errors():
+    print("spike_model_tweaks.py argument handling")
+    r = run(MODEL_SPIKE, "--flow", "f", "--key", "K", "--users", "1")
+    check("one learner is refused", r.returncode == 2 and "at least 2" in r.stderr, r.stderr)
+    r = run(MODEL_SPIKE, "--flow", "f", "--key", "K", "--real-model", "m")
+    check("--real-model alone is refused", r.returncode == 2 and "go together" in r.stderr, r.stderr)
+    r = run(MODEL_SPIKE, "--flow", "f", "--key", "K", "--real-model", "m", "--real-base-url", "https://x/v1")
+    check("the real key is not taken from the command line", r.returncode == 2 and "SPIKE_REAL_API_KEY" in r.stderr, r.stderr)
+
+
 def test_capture_end_to_end():
     print("capture_fixtures.py with --probe-delete")
     with FakeLangflow() as lf, tempfile.TemporaryDirectory() as out:
@@ -140,6 +219,11 @@ def main():
     test_spike_reports_the_shadowed_field_bug_as_a_failure()
     test_spike_with_the_wrong_key_is_not_a_pass()
     test_spike_argument_errors()
+    test_model_spike_end_to_end()
+    test_model_spike_searches_the_database_it_is_given()
+    test_model_spike_with_the_wrong_node_key_is_not_a_pass()
+    test_model_spike_with_a_real_provider_never_prints_its_key()
+    test_model_spike_argument_errors()
     test_capture_end_to_end()
     test_capture_case_option()
     print()

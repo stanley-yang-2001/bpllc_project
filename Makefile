@@ -17,13 +17,14 @@ test-core:
 # The command-line scripts (spike, capture) and their end-to-end tests against a fake Langflow. Standard library only.
 test-scripts:
 	$(PYTHON) tests/test_spike_tweaks.py
+	$(PYTHON) tests/test_spike_model_tweaks.py
 	$(PYTHON) tests/test_capture_fixtures.py
 	$(PYTHON) tests/test_groq_language_model.py
 	$(PYTHON) tests/test_cli_end_to_end.py
 
 # Everything that needs the langflow container (Langflow, tutor_core, Postgres with the api's migrations applied).
 test-langflow:
-	docker compose exec -T langflow sh -c 'rc=0; for t in /app/tests/test_*.py; do case "$$t" in */test_spike_tweaks.py|*/test_capture_fixtures.py|*/test_cli_end_to_end.py|*/test_groq_language_model.py) continue;; esac; echo "== $$t"; python "$$t" || rc=1; done; exit $$rc'
+	docker compose exec -T langflow sh -c 'rc=0; for t in /app/tests/test_*.py; do case "$$t" in */test_spike_tweaks.py|*/test_spike_model_tweaks.py|*/test_capture_fixtures.py|*/test_cli_end_to_end.py|*/test_groq_language_model.py) continue;; esac; echo "== $$t"; python "$$t" || rc=1; done; exit $$rc'
 
 test-api:
 	cd api && $(PYTHON) -m pytest -q
