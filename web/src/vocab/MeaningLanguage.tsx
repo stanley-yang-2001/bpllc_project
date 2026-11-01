@@ -16,9 +16,9 @@ export function MeaningLanguage() {
   const same = nativeCode === active;                  // studying your own language: "both" would just repeat it
   const value = same && prefs.meaning_mode === "both" ? "native" : prefs.meaning_mode;
   return (
-    <label className="flex items-center gap-2 text-sm text-slate-700">
+    <label className="flex w-full flex-col items-start gap-1 text-sm text-slate-700 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
       <span className="whitespace-nowrap">{t("vocab.meaningIn")}</span>
-      <select className={`${inputCls} w-auto`} value={value} onChange={(e) => void update({ meaning_mode: e.target.value as "native" | "study" | "both" })}>
+      <select className={`${inputCls} min-w-0 sm:w-64`} value={value} onChange={(e) => void update({ meaning_mode: e.target.value as "native" | "study" | "both" })}>
         <option value="native">{t("vocab.meaningNative", { language: native })}</option>
         <option value="study">{t("vocab.meaningStudy", { language: study })}</option>
         {!same && <option value="both">{t("vocab.meaningBoth", { native, study })}</option>}

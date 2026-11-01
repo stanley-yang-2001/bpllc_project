@@ -115,7 +115,7 @@ def test_japanese_is_scored_like_the_spaced_languages_with_the_splitter():
     r = rep(JA, "ja", ["みず", "ともだち"])
     v = r["vocabulary"]
     assert (v["mode"], v["ok"], v["outside"], v["outside_count"], v["limit"]) == ("scored", True, [], 0, quality.MAX_STRAYS_ENGLISH)
-    assert r["status"] == "pass" and r["language"]["ok"] is True and r["rules_version"] == quality.RULES_VERSION == 5
+    assert r["status"] == "pass" and r["language"]["ok"] is True and r["rules_version"] == quality.RULES_VERSION == 6
 
 
 @needs_splitter
@@ -206,6 +206,21 @@ def test_very_short_english_does_not_pass_as_a_latin_script_language():
     assert quality.language_check("Ciao amico mio, voglio acqua, grazie mille.", "Italian")["ok"] is True
     assert quality.language_check("Olá meu amigo, eu quero água, muito obrigado.", "Portuguese")["ok"] is True
     assert quality.language_check("Hello, friend.", "English")["verdict"] == "not_checked"
+
+
+def test_a_letters_signature_on_its_own_line_is_not_an_unfinished_sentence():
+    for letter in ("你好！\n我很好。\n再见，李华", "你好！\n我很好。\n李华", "Dear Ann,\nI am fine.\nCheers, Pierre", "I am fine.\nPierre",
+                   "Todo bien.\nCon cariño, Ana", "元気です。\nさようなら、たろう"):
+        assert quality.ends_complete(letter), letter
+    for cut in ("우리는 집에 갔어요.\n따뜻하게 잠", "Todo bien.\nLuego fuimos al mer", "Ana: Hola.\nBen: Adi", "我很好。\n我们一起去学校读", "Luego fuimos al mer\nPierre", "따뜻하게 잠"):
+        assert not quality.ends_complete(cut), cut
+
+
+def test_a_chinese_letter_with_a_signature_passes_the_shape_check():
+    letter = ("亲爱的朋友小明，你好！\n我在房子里修水管，水漏了。\n妈妈帮我拿工具，爸爸在厨房喝咖啡。\n我把桌子搬到花园，椅子在旁边。\n"
+              "修好后我们一起吃面包和苹果。\n明天一起去学校读书吧。\n祝你工作顺利，天气有太阳。\n再见，李华")
+    r = rep(letter, "zh", ["房子", "水", "面包", "朋友", "妈妈", "爸爸", "桌子", "椅子", "苹果", "咖啡", "花园", "太阳", "工作", "学校", "书"])
+    assert r["structure"]["format_ok"] is True and r["structure"]["ok"] is True
 
 
 def test_a_sentence_that_stops_after_an_article_or_conjunction_is_caught():

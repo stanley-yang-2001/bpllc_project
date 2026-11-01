@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Plus, Search, SearchX, Sparkles, Tags, Type, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { BookOpen, Plus, SearchX } from "lucide-react";
+import { useEffect, useState } from "react";
 import { setsKey, wordsKey } from "../api/keys";
 import { api, type SetFilter, type UploadResult } from "../api/client";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
@@ -20,7 +20,7 @@ import { useDebounced } from "../vocab/useDebounced";
 import { WordTable } from "../vocab/WordTable";
 import { useToast } from "../components/Toast";
 import { usePreferences } from "../prefs/PreferencesProvider";
-import { MeaningLanguage } from "../vocab/MeaningLanguage";
+import { Toolbar } from "../vocab/Toolbar";
 import { StarterPacks } from "../vocab/StarterPacks";
 
 const LIMIT = 50;
@@ -43,7 +43,6 @@ export default function Vocabulary() {
   const [showReading, setShowReading] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [progress, setProgress] = useState<{ done: number; left: number } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setSetFilter("all"); }, [active]);
   useEffect(() => { setOffset(0); setSelected(new Set()); setUpload(null); }, [active, q, setFilter]);
@@ -64,7 +63,6 @@ export default function Vocabulary() {
   const csv = useMutation({
     mutationFn: (file: File) => api.uploadWords(active, file),
     onSuccess: (r) => { setUpload(r); refreshSets(); void qc.invalidateQueries({ queryKey: wordsKey(user!.id, active) }); },
-    onSettled: () => { if (fileRef.current) fileRef.current.value = ""; },
   });
 
   const define = useMutation({
@@ -122,20 +120,10 @@ export default function Vocabulary() {
 
       <Card className="p-0">
         <SetBar language={active} filter={setFilter} onFilter={setSetFilter} />
-        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 p-4">
-          <div className="relative min-w-52 max-w-xs flex-1">
-            <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-            <input aria-label={t("vocab.searchAria")} placeholder={t("vocab.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} pl-9`} />
-          </div>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <Button variant="secondary" aria-pressed={showReading} loading={reading.isFetching && showReading} icon={<Type aria-hidden className="size-4" />} onClick={() => setShowReading(!showReading)}>{showReading ? t("reading.hide") : t("reading.show")}</Button>
-            <MeaningLanguage />
-            <Button variant="secondary" loading={define.isPending} icon={<Sparkles aria-hidden className="size-4" />} onClick={() => define.mutate()}>{t("vocab.defineMissing")}</Button>
-            <Button variant="secondary" loading={label.isPending} icon={<Tags aria-hidden className="size-4" />} onClick={() => label.mutate()}>{t("vocab.labelMissing")}</Button>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" hidden aria-label={t("vocab.csvFile")} onChange={(e) => { const f = e.target.files?.[0]; if (f) csv.mutate(f); }} />
-            <Button variant="secondary" loading={csv.isPending} icon={<Upload aria-hidden className="size-4" />} onClick={() => fileRef.current?.click()}>{t("vocab.uploadCsv")}</Button>
-          </div>
-        </div>
+        <Toolbar search={search} onSearch={setSearch}
+          showReading={showReading} readingLoading={reading.isFetching && showReading} onToggleReading={() => setShowReading(!showReading)}
+          defining={define.isPending} onDefine={() => define.mutate()} labelling={label.isPending} onLabel={() => label.mutate()}
+          uploading={csv.isPending} onCsv={(f) => csv.mutate(f)} />
 
         {(progress || define.error || label.error || move.error) && (
           <div className="space-y-1 border-b border-slate-200 px-4 py-2">

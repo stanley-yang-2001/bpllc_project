@@ -352,7 +352,7 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0038) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0039) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
 ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live")
 ROUND_MANUAL = [
@@ -369,6 +369,7 @@ ROUND_MANUAL = [
     "Chat: ask the tutor for a story, then for one with your sets ticked differently the second time. Check the story, its Read aloud and Save buttons still work after the Langflow rebuild (the relay code changed).",
     "If rich-kinds-live passes: set TUTOR_RICH_RANDOM=1 in docker-compose.yml, rebuild, and make several stories with 'Surprise me' to see diaries, letters and place stories mixed in.",
     "Story Studio, Japanese: make a Japanese story with Difficulty 'Any' and look at its report: it should say how many words are outside your list (or that all are from it) and Looks good. Do the same for Chinese and Korean. Tell me if a good story shows Needs a look because of strays.",
+    "Vocabulary: the buttons above the word table sit in two tidy rows with equal-size buttons (try a narrow browser window too). Then make a Chinese letter with a sign-off such as 再见，李华 and check its report no longer says the length or format is wrong.",
     "Click through the pages that were split (Log in and Create account tabs, Chat with Try again, Library open/delete/next page, Privacy in another language, Settings appearance): they should look and behave as before.",
     "Privacy policy: the approved wording says practice results are not stored; they now are (per word: box, due date, counts). Decide the wording and bump policy.POLICY_VERSION when you approve it.",
 ]

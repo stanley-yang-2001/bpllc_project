@@ -10,6 +10,7 @@ import { PreferencesProvider } from "../prefs/PreferencesProvider";
 import { ALICE, mockApi } from "../test/helpers";
 import { defineLoop } from "./defineLoop";
 import { Pager } from "../components/Pager";
+import { Toolbar } from "./Toolbar";
 import { UploadNotice } from "./UploadNotice";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
@@ -69,5 +70,30 @@ describe("UploadNotice", () => {
   it("lists each rejected row with its reason", () => {
     wrap(<UploadNotice result={{ added: 2, duplicates: 1, invalid_count: 1, invalid: [{ row: 4, reason: "empty word" }] }} />);
     expect(screen.getByRole("status")).toHaveTextContent("empty word");
+  });
+});
+
+describe("Toolbar", () => {
+  const props = { search: "", onSearch: () => undefined, showReading: false, readingLoading: false, onToggleReading: () => undefined,
+    defining: false, onDefine: () => undefined, labelling: false, onLabel: () => undefined, uploading: false, onCsv: () => undefined };
+
+  it("has every tool, and the five buttons share one size", async () => {
+    wrap(<Toolbar {...props} />);
+    const names = ["Show pronunciation", "Upload CSV", "Write missing meanings", "Label parts of speech"];
+    for (const name of names) expect(screen.getByRole("button", { name })).toHaveClass("sm:w-56");
+    expect(screen.getByLabelText("Search words")).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Write meanings in/)).toBeInTheDocument();
+  });
+
+  it("hands a chosen CSV file up and runs the tutor's tools", async () => {
+    const onCsv = vi.fn(), onDefine = vi.fn(), onLabel = vi.fn();
+    wrap(<Toolbar {...props} onCsv={onCsv} onDefine={onDefine} onLabel={onLabel} />);
+    await userEvent.click(screen.getByRole("button", { name: "Write missing meanings" }));
+    await userEvent.click(screen.getByRole("button", { name: "Label parts of speech" }));
+    const file = new File(["word,meaning\nhi,hello"], "words.csv", { type: "text/csv" });
+    await userEvent.upload(screen.getByLabelText(/CSV file/i), file);
+    expect(onDefine).toHaveBeenCalledOnce();
+    expect(onLabel).toHaveBeenCalledOnce();
+    expect(onCsv).toHaveBeenCalledWith(file);
   });
 });

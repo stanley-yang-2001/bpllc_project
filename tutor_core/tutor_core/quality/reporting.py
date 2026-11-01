@@ -10,7 +10,7 @@ import math
 
 # --- the report Story Studio shows (M6, commit 2 of 2) -----------------------------------------------------
 
-RULES_VERSION = 5            # bump when the pass rule changes, so a saved report stays interpretable
+RULES_VERSION = 6            # bump when the pass rule changes, so a saved report stays interpretable
 MAX_STRAYS_ENGLISH = 5       # tuning change #2: raised from 2
 STRAY_ONE_IN = 10            # scored mode: about one word in ten may be outside the list (never fewer than MAX_STRAYS_ENGLISH)
 READ_WORDS_PER_SECOND = 2    # a slow beginner pace
@@ -50,7 +50,7 @@ def report(text, language, vocab_words, difficulty=None):
         mode = "scored"           # rules version 4: with the everyday list, words outside the learner's list can be counted fairly
     unspaced = lang.tier == 2
     if unspaced and not difficulty and _d.can_measure_uncommon(language):
-        mode = "scored"           # rules version 5: the same count for Chinese, Japanese and Korean, with the splitter cutting the words
+        mode = "scored"           # rules version 5 (6: a letter's signature line is allowed): the same count for Chinese, Japanese and Korean, with the splitter cutting the words
     if difficulty and mode == "strict":
         # A tier asks for everyday words beyond the learner's list, so the strict stray-word count would fail every such story
         # (24 Oct: "friend", "work", "thanks" counted). The tier's own unusual-word share replaces it; strays are listed only.
