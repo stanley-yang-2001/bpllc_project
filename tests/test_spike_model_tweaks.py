@@ -482,6 +482,73 @@ def test_scan_database_against_a_real_postgres():
         connection.close()
 
 
+# --- the spike's own copy of the flow, and "nothing was tested" -------------------------------------------------------------
+
+
+def repo_flow():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "flows", "language-tutor.json")
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def groq_node(flow):
+    return next(n for n in flow["data"]["nodes"] if n["id"] == s.MODEL_NODE_ID)
+
+
+def test_the_spike_flow_is_the_repo_flow_with_the_current_model_node():
+    flow = repo_flow()
+    before = json.dumps(flow, sort_keys=True)
+    body = s.build_spike_flow(flow, "CODE", "abc123abc123", s.GROQ_URL)
+    assert json.dumps(flow, sort_keys=True) == before, "the original flow must not be changed"
+    inner = groq_node(body)["data"]["node"]
+    assert inner["template"]["code"]["value"] == "CODE" and inner["metadata"]["code_hash"] == "abc123abc123"
+    field = inner["template"]["base_url"]
+    assert field["name"] == "base_url" and field["value"] == s.GROQ_URL and field["advanced"] is True
+    assert field["_input_type"] == "StrInput" and field["type"] == "str" and field["display_name"] == "Base URL"
+    assert inner["field_order"] == ["api_key", "model_name", "base_url"]
+    assert inner["template"]["model_name"]["name"] == "model_name", "the field it was cloned from is untouched"
+    assert body["endpoint_name"] == s.SPIKE_ENDPOINT and body["name"] == s.SPIKE_NAME and "id" not in body
+    others = lambda f: {n["id"]: n for n in f["data"]["nodes"] if n["id"] != s.MODEL_NODE_ID}      # noqa: E731
+    assert others(body) == others(flow), "no other node is touched"
+    assert body["data"]["edges"] == flow["data"]["edges"]
+    assert "id" in flow and flow["endpoint_name"] == "language-tutor"
+
+
+def test_the_spike_flow_field_order_is_not_doubled_and_a_missing_node_is_refused():
+    once = s.build_spike_flow(repo_flow(), "C", "h", s.GROQ_URL)
+    twice = s.build_spike_flow(once, "C", "h", s.GROQ_URL)
+    assert groq_node(twice)["data"]["node"]["field_order"].count("base_url") == 1
+    try:
+        s.build_spike_flow(repo_flow(), "C", "h", s.GROQ_URL, node_id="NoSuchNode")
+    except ValueError as e:
+        assert "NoSuchNode" in str(e) and "--key" in str(e)
+    else:
+        raise AssertionError("a missing model node must be refused")
+
+
+def test_the_spike_flow_matches_the_component_file():
+    """The code the spike pastes in is the component file, and it declares the field that the flow copy gets."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "custom_components", "groq_language_model.py")
+    source = open(path, encoding="utf-8").read()
+    assert 'name="base_url"' in source and s.GROQ_URL in source
+
+
+def test_nothing_sent_means_nothing_was_tested():
+    """When no request carrying a key reached Langflow (a 404, say), 'the key was found nowhere' is not a finding."""
+    def missing(message, session_id, tweaks):
+        raise RuntimeError("HTTP 404 from POST /run: Flow identifier language-tutor-spike not found")
+    result = suite(missing, inspectors=CLEAN)
+    assert result["checks"]["stored_key"][0] == s.INCONCLUSIVE and "nothing was tested" in result["checks"]["stored_key"][1]
+    assert result["checks"]["no_leak"][0] == s.INCONCLUSIVE
+    assert result["verdict"] == s.FAIL
+
+
+def test_a_missing_flow_points_at_create_flow():
+    hint = s.explain_error("HTTP 404 from POST http://x/api/v1/run/language-tutor-spike: Flow identifier language-tutor-spike not found")
+    assert "--create-flow" in hint
+    assert "owns the flow" in s.explain_error("HTTP 404 from POST /run: Flow not found"), "the other 404 keeps its own hint"
+
+
 def test_report_text():
     good, bad = suite(FakeFlow()), suite(FakeFlow(base_url_dropped=True))
     report = s.format_report([good])

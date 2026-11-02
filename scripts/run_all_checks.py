@@ -205,6 +205,15 @@ def npx(r: Runner, *args: str) -> int:
     return r.sh([exe or "npx", *args], cwd=ROOT / "web")
 
 
+def openapi_typescript(r: Runner, source: Path, target: Path) -> int:
+    """Run the generator with node itself: on some Windows set-ups the npx shim cannot be executed ("The system cannot execute
+    the specified program"). The npx route stays as the fallback when the package's own script is not where it is expected."""
+    cli, node = ROOT / "web" / "node_modules" / "openapi-typescript" / "bin" / "cli.js", shutil.which("node")
+    if cli.is_file() and node:
+        return r.sh([node, str(cli), str(source), "-o", str(target)], cwd=ROOT / "web")
+    return npx(r, "--no-install", "openapi-typescript", str(source), "-o", str(target))
+
+
 def web_deps(r: Runner) -> int:
     """`npm ci` once per run, and only when node_modules is missing or older than package-lock.json."""
     mods, lock = ROOT / "web" / "node_modules", ROOT / "web" / "package-lock.json"
@@ -234,7 +243,7 @@ def stage_api_types(r: Runner) -> Result:
         code = r.in_tests(".", ["api/scripts/dump_openapi.py", f"{rel}/openapi.json"])
         if code:
             return Result(FAIL, r.tail())
-        code = web_deps(r) or npx(r, "--no-install", "openapi-typescript", str(tmp / "openapi.json"), "-o", str(tmp / "schema.d.ts"))
+        code = web_deps(r) or openapi_typescript(r, tmp / "openapi.json", tmp / "schema.d.ts")
         if code:
             return Result(FAIL, r.tail())
         stale = [name for name, mine, theirs in (("web/openapi.json", tmp / "openapi.json", ROOT / "web" / "openapi.json"),
@@ -352,7 +361,7 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0040) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0041) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
 ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live")
 ROUND_MANUAL = [
@@ -371,7 +380,7 @@ ROUND_MANUAL = [
     "Story Studio, Japanese: make a Japanese story with Difficulty 'Any' and look at its report: it should say how many words are outside your list (or that all are from it) and Looks good. Do the same for Chinese and Korean. Tell me if a good story shows Needs a look because of strays.",
     "Vocabulary: the buttons above the word table sit in two tidy rows with equal-size buttons (try a narrow browser window too). Then make a Chinese letter with a sign-off such as 再见，李华 and check its report no longer says the length or format is wrong.",
     "Click through the pages that were split (Log in and Create account tabs, Chat with Try again, Library open/delete/next page, Privacy in another language, Settings appearance): they should look and behave as before.",
-    "Phase 2 spike (optional; the site itself does not change): follow docs/CUSTOM-MODEL-DESIGN.md section 9.4 (paste the new Groq component code into a copy of the flow, then one docker compose exec command) and send me the printed report and the findstr line count.",
+    "Phase 2 spike (optional; the site itself does not change): follow docs/CUSTOM-MODEL-DESIGN.md section 9.4 (one command: docker compose exec langflow python /app/scripts/spike_model_tweaks.py --create-flow) and send me the printed report and the findstr line count.",
     "Privacy policy: the approved wording says practice results are not stored; they now are (per word: box, due date, counts). Decide the wording and bump policy.POLICY_VERSION when you approve it.",
 ]
 STACK_UP_STAGE = Stage("stack-up", "stack", "start the stack", "docker compose up failed", stage_stack_up, ("docker",))

@@ -10,5 +10,5 @@ export default defineConfig({
     // Same paths as production (nginx): /api is forwarded unchanged, no rewriting.
     proxy: { "/api": "http://localhost:8000" },
   },
-  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], globals: false, include: ["src/**/*.test.{ts,tsx}"] },
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], globals: false, testTimeout: 20000, hookTimeout: 20000, include: ["src/**/*.test.{ts,tsx}"] },
 });

@@ -7,6 +7,11 @@ It speaks just enough of the API that scripts/spike_tweaks.py and scripts/captur
   GET  /api/v1/monitor/messages?session_id=    -> the stored messages of that session
   GET  /api/v1/monitor/messages/sessions       -> the stored session ids
   DELETE /api/v1/monitor/messages/session/<id> -> forgets that session
+  POST /api/v1/flows/                          -> creates a flow (only when `flows` is given, see below)
+
+With `flows` (a set of endpoint names) a run of any other flow answers 404 "Flow identifier X not found", as Langflow does, and
+POST /api/v1/flows/ adds the body's endpoint_name (409 "Endpoint name must be unique" when it is already there); the created
+bodies are kept in `created`. Without it every flow name is accepted.
 
 With `model_key` it also behaves like the model node of scripts/spike_model_tweaks.py. A run behaves like the Who Am I spike flow when the message mentions "Who Am I" (the tool reports the
 `learner_id` and `language` of the tweaks for the key it is given, holding 0.3 s so parallel calls overlap), and
@@ -26,9 +31,11 @@ ACCOUNT = "784d78de-8532-42c1-990e-d6b50f77beb0"
 
 
 class FakeLangflow:
-    def __init__(self, key="K", shadow=False, legacy=False, model_key=None):
+    def __init__(self, key="K", shadow=False, legacy=False, model_key=None, flows=None):
         self.key, self.shadow, self.legacy = key, shadow, legacy
         self.model_key = model_key      # the model node's tweaks key; when set, a run whose tweaks carry a base_url calls that model
+        self.flows = None if flows is None else set(flows)
+        self.created: list[dict] = []
         self.sessions: dict[str, list] = {}
         self.requests: list[tuple] = []
         outer = self
@@ -71,9 +78,20 @@ class FakeLangflow:
                 outer.requests.append(("POST", url.path, self.headers.get("x-api-key")))
                 if url.path == "/api/v1/api_key/":
                     return self._send(200, {"api_key": "fake-api-key"})
+                if url.path == "/api/v1/flows/" and outer.flows is not None:
+                    if self.headers.get("x-api-key") != "fake-api-key":
+                        return self._send(403, {"detail": "bad key"})
+                    if body.get("endpoint_name") in outer.flows:
+                        return self._send(409, {"detail": "Endpoint name must be unique"})
+                    outer.flows.add(body.get("endpoint_name"))
+                    outer.created.append(body)
+                    return self._send(201, {"id": "new-flow", "name": body.get("name")})
                 if url.path.startswith("/api/v1/run/"):
                     if self.headers.get("x-api-key") != "fake-api-key":
                         return self._send(403, {"detail": "bad key"})
+                    flow = url.path.rsplit("/", 1)[-1]
+                    if outer.flows is not None and flow not in outer.flows:
+                        return self._send(404, {"detail": f"Flow identifier {flow} not found"})
                     return self._send(200, outer.run(body))
                 self._send(404, {"detail": "not found"})
 

@@ -171,6 +171,42 @@ def test_model_spike_with_a_real_provider_never_prints_its_key():
         check("the key is in neither the printed report nor the saved file", secret not in r.stdout + r.stderr + saved)
 
 
+def test_model_spike_without_the_flow_says_how_to_create_it_and_proves_nothing():
+    print("spike_model_tweaks.py when the spike flow does not exist (your first real run)")
+    with FakeLangflow(model_key="GroqLanguageModel-h5DsK", flows={"language-tutor"}) as lf, tempfile.TemporaryDirectory() as out:
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--users", "2", "--hold", "0.2", "--out-dir", out)
+        check("it fails", r.returncode == 1, r.stdout[-500:])
+        check("it says which flow is missing and offers --create-flow", "language-tutor-spike" in r.stdout and "--create-flow" in r.stdout, r.stdout)
+        check("a run that tested nothing does not say the key was found nowhere",
+              "INCONCLUSIVE no_leak" in r.stdout and "INCONCLUSIVE stored_key" in r.stdout and "found nowhere" not in r.stdout, r.stdout)
+
+
+def test_model_spike_create_flow_makes_the_copy_and_passes_with_the_defaults():
+    print("spike_model_tweaks.py --create-flow, with no other option")
+    with FakeLangflow(model_key="GroqLanguageModel-h5DsK", flows={"language-tutor"}) as lf, tempfile.TemporaryDirectory() as out:
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--create-flow", "--users", "2", "--hold", "0.4", "--out-dir", out)
+        check("it runs (exit 0)", r.returncode == 0, r.stdout[-600:] + r.stderr[-600:])
+        check("it says it created the flow", "created the flow 'language-tutor-spike'" in r.stdout, r.stdout[:300])
+        check("one flow was created, with the spike's endpoint and the Base URL field",
+              len(lf.created) == 1 and lf.created[0]["endpoint_name"] == "language-tutor-spike"
+              and any("base_url" in n["data"]["node"]["template"] for n in lf.created[0]["data"]["nodes"]
+                      if n["id"] == "GroqLanguageModel-h5DsK"))
+        check("the override works", "THE OVERRIDE WORKS" in r.stdout, r.stdout)
+        r = run(MODEL_SPIKE, "--base-url", lf.url, "--create-flow", "--users", "2", "--hold", "0.4", "--out-dir", out)
+        check("a second run reuses the copy", r.returncode == 0 and "already exists" in r.stdout and len(lf.created) == 1, r.stdout[:400])
+
+
+def test_model_spike_create_flow_refuses_another_flow_name():
+    print("spike_model_tweaks.py --create-flow with a different --flow")
+    r = run(MODEL_SPIKE, "--create-flow", "--flow", "other")
+    check("it is refused", r.returncode == 2 and "language-tutor-spike" in r.stderr, r.stderr)
+    with tempfile.TemporaryDirectory() as out:
+        with FakeLangflow(flows=set()) as lf:
+            r = run(MODEL_SPIKE, "--base-url", lf.url, "--create-flow", "--flow-file", os.path.join(out, "nope.json"), "--out-dir", out)
+        check("a flow file that is not there stops the run with a message, not a traceback",
+              r.returncode == 2 and "Could not create the spike flow" in r.stderr and "Traceback" not in r.stderr, r.stderr)
+
+
 def test_model_spike_argument_errors():
     print("spike_model_tweaks.py argument handling")
     r = run(MODEL_SPIKE, "--flow", "f", "--key", "K", "--users", "1")
@@ -223,6 +259,9 @@ def main():
     test_model_spike_searches_the_database_it_is_given()
     test_model_spike_with_the_wrong_node_key_is_not_a_pass()
     test_model_spike_with_a_real_provider_never_prints_its_key()
+    test_model_spike_without_the_flow_says_how_to_create_it_and_proves_nothing()
+    test_model_spike_create_flow_makes_the_copy_and_passes_with_the_defaults()
+    test_model_spike_create_flow_refuses_another_flow_name()
     test_model_spike_argument_errors()
     test_capture_end_to_end()
     test_capture_case_option()

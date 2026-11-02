@@ -99,21 +99,19 @@ The throwaway keys are invented by the script (`spike-key-...`). Your real key i
 - **Either way, one gap remains:** the Story Generator Tool inside the chat flow calls Groq itself with the shared key (`tutor_core.tools.story_for_agent`), so a story made in chat would still be written by the shared model while the Agent's own sentences come from the learner's. Phase 2 must also give that tool the learner's endpoint (with option B: the same token and internal address as two more hidden inputs).
 
 ### 9.4 Run it on your machine (Windows, in the project folder)
-1. In Langflow, duplicate "language tutor", name the copy "language tutor spike" with the endpoint name `language-tutor-spike` (reuse the copy from the M0 spike if you still have it).
-2. Open the Groq node in the copy, press the code button, replace the code with the whole of `custom_components/groq_language_model.py`, Check & Save. An advanced field "Base URL" appears.
-3. Run the free checks. `--key` takes the node id (`GroqLanguageModel-h5DsK` in the repo flow) or the display name (`--key "Groq (via OpenAI-compatible)"`), whichever your copy answers to:
+1. Run the free checks. One command: `--create-flow` makes the spike's own copy of the flow by itself ("language tutor spike", endpoint `language-tutor-spike`: the repo flow with the Groq node brought up to the current `custom_components/groq_language_model.py`, so it has the advanced "Base URL" field; the real "language tutor" flow is not touched). A copy that already exists is reused, so the same command works every time; if you made a copy by hand earlier, delete it in Langflow first. The key defaults to the node id `GroqLanguageModel-h5DsK`.
 ```
-docker compose exec langflow python /app/scripts/spike_model_tweaks.py --flow language-tutor-spike --key GroqLanguageModel-h5DsK
+docker compose exec langflow python /app/scripts/spike_model_tweaks.py --create-flow
 ```
-It takes about a minute and one Groq turn (the `control` check; add `--skip-control` to avoid it, and wait a minute and re-run if it says rate limit).
-4. Look for the key in Langflow's log, a second source the script cannot read:
+It takes about a minute and one Groq turn (the `control` check; add `--skip-control` to avoid it, and wait a minute and re-run if it says rate limit). A line `ERROR ... Flow identifier ... not found` means the copy does not exist: add `--create-flow`. A report where `no_leak` and `stored_key` say INCONCLUSIVE "nothing was tested" means no request carrying a key got through; read the ERROR lines above them.
+2. Look for the key in Langflow's log, a second source the script cannot read:
 ```
 docker compose logs langflow | findstr /C:"spike-key-"
 ```
 No line should come out. If one does, paste it (it is a throwaway key).
-5. Optional, your real provider (use a key you can revoke afterwards). Put the key in the environment of your command window, not in the command (the `-e` below copies it from there):
+3. Optional, your real provider (use a key you can revoke afterwards). Put the key in the environment of your command window, not in the command (the `-e` below copies it from there):
 ```
 set SPIKE_REAL_API_KEY=your-key
-docker compose exec -e SPIKE_REAL_API_KEY langflow python /app/scripts/spike_model_tweaks.py --flow language-tutor-spike --key GroqLanguageModel-h5DsK --skip-control --real-model gpt-4o-mini --real-base-url https://api.openai.com/v1
+docker compose exec -e SPIKE_REAL_API_KEY langflow python /app/scripts/spike_model_tweaks.py --skip-control --real-model gpt-4o-mini --real-base-url https://api.openai.com/v1
 ```
 Paste the printed report back. The script saves `scripts/spike_model_tweaks_<time>.json` (git-ignored; keys cut to their last four characters).

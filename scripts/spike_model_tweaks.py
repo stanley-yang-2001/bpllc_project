@@ -17,21 +17,19 @@ The Agent's model is a node inside the shared flow. Before any Chat code is writ
 Checks 1 to 5 cost nothing and need no second provider: the script starts a tiny OpenAI-compatible server of its own and points
 the model node at it, using throwaway keys it invents. Check 3 sends one ordinary chat turn to the shared Groq model.
 
-Setup (once, on the canvas)
-  1. Duplicate the "language tutor" flow; name the copy "language tutor spike" and give it the endpoint name
-     language-tutor-spike (flow settings). (If you already have that copy from the M0 spike, reuse it.)
-  2. Open the Groq node in the copy -> </> Code -> paste the whole of custom_components/groq_language_model.py -> Check &
-     Save. The node now has an advanced field "Base URL" (this is the only code change; the real flow is not touched).
-  3. The node id is in the exported JSON (in the repo flow it is GroqLanguageModel-h5DsK); the display name
-     "Groq (via OpenAI-compatible)" works as the tweaks key too:
-       python -c "import json,sys; [print(n['id'], n['data']['node']['display_name']) for n in json.load(open(sys.argv[1]))['data']['nodes']]" spike.json
+Setup: none. --create-flow makes the spike's own copy of the flow by itself: "language tutor spike", endpoint name
+language-tutor-spike, the repo flow with only the Groq node brought up to the current custom_components/groq_language_model.py (it
+gains the advanced "Base URL" field). The real "language tutor" flow is not touched. (A copy made by hand on the canvas works as well:
+paste the component file into the Groq node's </> Code, then Check & Save.)
 
 Run (inside the Langflow container, so that the fake model server is reachable at 127.0.0.1; standard library only, plus
 psycopg2, which the container has, for the storage search):
 
-    docker compose exec langflow python /app/scripts/spike_model_tweaks.py --flow language-tutor-spike --key GroqLanguageModel-h5DsK
+    docker compose exec langflow python /app/scripts/spike_model_tweaks.py --create-flow
 
-  --key X              node id and/or display name to use as the tweaks key (repeat to compare; the node id is the safe one)
+  --create-flow        create the spike's copy of the flow first (a copy that exists is reused)
+  --flow F             the flow to run against (default language-tutor-spike)
+  --key X              node id and/or display name to use as the tweaks key (repeat to compare; default GroqLanguageModel-h5DsK, the node id, which is the safe one)
   --users 3            how many learners run at once in check 2 (at least 2)
   --hold 2.0           seconds each fake model call lasts, so that parallel calls overlap
   --skip-control       do not send the no-tweaks request (it uses Groq tokens: about 2000)
@@ -50,6 +48,7 @@ their last four characters). Paste the printed report back.
 """
 
 import argparse
+import copy
 import json
 import os
 import sys
@@ -64,6 +63,11 @@ import spike_stored_key as stored  # where Langflow keeps a key it was sent
 import spike_tweaks as m0  # the Langflow HTTP helpers and the PASS/FAIL words of the M0 spike
 
 PASS, FAIL, INCONCLUSIVE, ERROR = m0.PASS, m0.FAIL, m0.INCONCLUSIVE, m0.ERROR
+
+SPIKE_ENDPOINT = "language-tutor-spike"
+SPIKE_NAME = "language tutor spike"
+GROQ_URL = "https://api.groq.com/openai/v1"      # the default of the Base URL field (custom_components/groq_language_model.py)
+MODEL_NODE_ID = "GroqLanguageModel-h5DsK"     # the model node of flows/language-tutor.json
 
 MARKER = "MODELSPIKE"
 MODEL_FIELD, KEY_FIELD, URL_FIELD = "model_name", "api_key", "base_url"       # input names on the model node
@@ -322,6 +326,55 @@ def key_verdict(checks: dict) -> str:
     return INCONCLUSIVE
 
 
+# --- the spike's own copy of the flow ---------------------------------------------------------------------------------------
+
+
+def build_spike_flow(flow: dict, component_code: str, code_hash: str, default_url: str, node_id: str = MODEL_NODE_ID) -> dict:
+    """The body of a POST /api/v1/flows/ that creates the spike's copy: the repo flow with the model node brought up to the
+    current custom_components/groq_language_model.py (new code, new hash, and the advanced "Base URL" field). Pure: `flow` is
+    not changed, and no other node is touched. Raises ValueError when the model node is not in the flow."""
+    body = copy.deepcopy(flow)
+    node = next((n for n in body["data"]["nodes"] if n["id"] == node_id), None)
+    if node is None:
+        raise ValueError(f"the flow has no node {node_id!r}; pass --key with the id of your model node")
+    inner = node["data"]["node"]
+    template = inner["template"]
+    template["code"]["value"] = component_code
+    inner.setdefault("metadata", {})["code_hash"] = code_hash
+    field = copy.deepcopy(template["model_name"])        # a StrInput of the same shape, made into the new field
+    field.update(name="base_url", display_name="Base URL", value=default_url, advanced=True,
+                 info="OpenAI-compatible address. Empty means Groq.")
+    template["base_url"] = field
+    order = inner.setdefault("field_order", [])
+    if "base_url" not in order:
+        order.append("base_url")
+    for name in ("id", "folder_id", "user_id"):
+        body.pop(name, None)
+    body.update(name=SPIKE_NAME, endpoint_name=SPIKE_ENDPOINT, is_component=False,
+                description="Copy of the language tutor for scripts/spike_model_tweaks.py. Safe to delete.")
+    return body
+
+
+def create_spike_flow(base: str, langflow_key: str, flow_file: str = "") -> str:
+    """Create the copy in Langflow; returns what happened, in words. A copy that already exists is reused as it is."""
+    import sync_flow_nodes as sync
+    flow_file = flow_file or sync.FLOW
+    if not os.path.exists(flow_file):
+        raise m0.ApiError(f"{flow_file} not found: run this inside the Langflow container, where /app/flows is mounted")
+    with open(flow_file, encoding="utf-8") as f:
+        flow = json.load(f)
+    code = sync.code_of("groq_language_model.py")
+    body = build_spike_flow(flow, code, sync.code_hash(code), GROQ_URL)
+    try:
+        m0._request("POST", f"{base}/api/v1/flows/", payload=body, headers={"x-api-key": langflow_key})
+    except m0.ApiError as e:
+        if "endpoint name must be unique" in str(e).lower():
+            return (f"the flow {SPIKE_ENDPOINT!r} already exists and is reused as it is (if it was made by hand or by an older "
+                    "version of this script, delete it in Langflow and run again to get the current copy)")
+        raise
+    return f"created the flow {SPIKE_ENDPOINT!r}: a copy of language-tutor with the Base URL field"
+
+
 # --- the suite (Langflow and the fake model are injected, so it can be tested with fakes) ---------------------------------
 
 
@@ -385,12 +438,20 @@ def run_suite(run, server_calls, base_url, node_key, users=3, skip_control=False
         except Exception as e:  # noqa: BLE001
             checks["control"] = check_control([], None, error=explain_error(str(e)))
 
-    # 4. the keys must not be in any response
-    checks["no_leak"] = check_no_key_in_responses(secrets, [r["response"] for r in raw])
+    # 4. the keys must not be in any response (and no request that carried a key means nothing was tested)
+    sent = [r for r in raw if r["tweaks"]]
+    nothing_sent = "no request carrying a key reached Langflow, so nothing was tested"
+    if sent:
+        checks["no_leak"] = check_no_key_in_responses(secrets, [r["response"] for r in raw])
+    else:
+        checks["no_leak"] = (INCONCLUSIVE, nothing_sent)
 
     # 4b. where Langflow keeps the keys (a design finding, not part of the verdict)
-    findings, inspect_errors = stored.run_inspectors(inspectors or {}, secrets, [r["session_id"] for r in raw])
-    checks["stored_key"] = stored.check_stored_key(findings, inspect_errors)
+    if sent:
+        findings, inspect_errors = stored.run_inspectors(inspectors or {}, secrets, [r["session_id"] for r in raw])
+        checks["stored_key"] = stored.check_stored_key(findings, inspect_errors)
+    else:
+        checks["stored_key"] = (INCONCLUSIVE, nothing_sent)
 
     # 5. your real provider (optional)
     if real:
@@ -423,6 +484,9 @@ def explain_error(message: str) -> str:
     if "does not accept tweaks" in low or "declares which fields" in low or "field is protected" in low:
         return (message + " || Langflow refused the tweak: LANGFLOW_TWEAKS_POLICY is not 'permissive' (the default), "
                 "or a field of the flow is marked api_editable, or the field is protected")
+    if "404" in message and "flow identifier" in low and "not found" in low:
+        return (message + " || There is no such flow in Langflow. Add --create-flow and the script makes the spike's copy of "
+                "language-tutor for you (or pass the flow you made by hand)")
     if "404" in message and "flow not found" in low:
         return (message + " || Langflow accepts tweaks only from the account that owns the flow (it answers 404 to anyone "
                 "else): use an API key of the owner (--api-key)")
@@ -472,8 +536,13 @@ def database_connect(db_url: str):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Phase 2 spike: per-request model override (see the module docstring).")
     parser.add_argument("--base-url", default="http://localhost:7860", help="Langflow's address")
-    parser.add_argument("--flow", required=True, help="flow id or endpoint name, e.g. language-tutor-spike")
-    parser.add_argument("--key", action="append", required=True, help="tweaks key: the model node's id and/or display name")
+    parser.add_argument("--flow", default=SPIKE_ENDPOINT, help=f"flow id or endpoint name (default {SPIKE_ENDPOINT})")
+    parser.add_argument("--key", action="append",
+                        help=f"tweaks key: the model node's id and/or display name (repeat to compare; default {MODEL_NODE_ID})")
+    parser.add_argument("--create-flow", action="store_true",
+                        help=f"first create the spike's own copy of flows/language-tutor.json in Langflow (endpoint {SPIKE_ENDPOINT}) "
+                             "with the current model component code; a copy that exists is reused. Run inside the Langflow container")
+    parser.add_argument("--flow-file", default="", help="the flow file --create-flow copies (default: the repo's flows/language-tutor.json)")
     parser.add_argument("--users", type=int, default=3)
     parser.add_argument("--hold", type=float, default=2.0)
     parser.add_argument("--skip-control", action="store_true")
@@ -499,8 +568,18 @@ def main(argv=None):
             parser.error("set the environment variable SPIKE_REAL_API_KEY to your provider's key (it is not taken from the command line)")
         real = (args.real_model, args.real_base_url.rstrip("/"), real_key)
 
+    args.key = args.key or [MODEL_NODE_ID]
+    if args.create_flow and args.flow != SPIKE_ENDPOINT:
+        parser.error(f"--create-flow makes the flow {SPIKE_ENDPOINT!r}; drop --flow or use that name")
+
     base = args.base_url.rstrip("/")
     langflow_key = m0.get_api_key(base, args.api_key)
+    if args.create_flow:
+        try:
+            print(create_spike_flow(base, langflow_key, args.flow_file), flush=True)
+        except (m0.ApiError, ValueError, OSError) as e:
+            print(f"Could not create the spike flow: {e}", file=sys.stderr)
+            return 2
     url = f"{base}/api/v1/run/{args.flow}?stream=false"
 
     def run(message, session_id, tweaks):
