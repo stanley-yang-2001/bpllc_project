@@ -32,6 +32,7 @@ psycopg2, which the container has, for the storage search):
   --key X              node id and/or display name to use as the tweaks key (repeat to compare; default GroqLanguageModel-h5DsK, the node id, which is the safe one)
   --users 3            how many learners run at once in check 2 (at least 2)
   --hold 2.0           seconds each fake model call lasts, so that parallel calls overlap
+  --settle 8           seconds to wait before searching Langflow's database (it writes its records just after answering)
   --skip-control       do not send the no-tweaks request (it uses Groq tokens: about 2000)
   --db-url URL         Langflow's own database, searched for the throwaway keys (default $LANGFLOW_DATABASE_URL, which the
                        Langflow container has; without it the storage check can only look at the message store)
@@ -378,7 +379,7 @@ def create_spike_flow(base: str, langflow_key: str, flow_file: str = "") -> str:
 # --- the suite (Langflow and the fake model are injected, so it can be tested with fakes) ---------------------------------
 
 
-def run_suite(run, server_calls, base_url, node_key, users=3, skip_control=False, real=None, inspectors=None) -> dict:
+def run_suite(run, server_calls, base_url, node_key, users=3, skip_control=False, real=None, inspectors=None, settle=0.0) -> dict:
     """`run(message, session_id, tweaks)` -> parsed JSON response (or raises). `server_calls()` -> the fake model's calls so
     far. `real` is None or (model, base_url, api_key). `inspectors` is {name: (keys, session_ids) -> [Finding]}, see
     spike_stored_key.py; none means the storage check says it could not look."""
@@ -448,6 +449,7 @@ def run_suite(run, server_calls, base_url, node_key, users=3, skip_control=False
 
     # 4b. where Langflow keeps the keys (a design finding, not part of the verdict)
     if sent:
+        time.sleep(settle)      # Langflow writes its run records a moment after it answers; searching at once could miss them
         findings, inspect_errors = stored.run_inspectors(inspectors or {}, secrets, [r["session_id"] for r in raw])
         checks["stored_key"] = stored.check_stored_key(findings, inspect_errors)
     else:
@@ -546,6 +548,8 @@ def main(argv=None):
     parser.add_argument("--users", type=int, default=3)
     parser.add_argument("--hold", type=float, default=2.0)
     parser.add_argument("--skip-control", action="store_true")
+    parser.add_argument("--settle", type=float, default=8.0,
+                        help="seconds to wait before searching Langflow's database, which writes its run records a moment after answering (default 8)")
     parser.add_argument("--listen-host", default="127.0.0.1")
     parser.add_argument("--advertise-host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=0, help="port of the fake model (0 = any free port)")
@@ -597,7 +601,7 @@ def main(argv=None):
         print(f"Fake model listening on {args.listen_host}:{fake.port}; Langflow will be told {model_url}", flush=True)
         for node_key in args.key:
             print(f"Running the suite for key {node_key!r} ...", flush=True)
-            results.append(run_suite(run, fake.snapshot, model_url, node_key, args.users, args.skip_control, real, inspectors))
+            results.append(run_suite(run, fake.snapshot, model_url, node_key, args.users, args.skip_control, real, inspectors, args.settle))
     print(format_report(results, real_requested=bool(real)))
 
     out = os.path.join(args.out_dir, f"spike_model_tweaks_{time.strftime('%Y%m%d_%H%M%S')}.json")

@@ -115,3 +115,10 @@ set SPIKE_REAL_API_KEY=your-key
 docker compose exec -e SPIKE_REAL_API_KEY langflow python /app/scripts/spike_model_tweaks.py --skip-control --real-model gpt-4o-mini --real-base-url https://api.openai.com/v1
 ```
 Paste the printed report back. The script saves `scripts/spike_model_tweaks_<time>.json` (git-ignored; keys cut to their last four characters).
+
+### 9.5 Result of the spike on your machine (2 November 2026)
+Run with `--create-flow` against Langflow 1.12.2 and the repo's flow: `override` PASS (the call arrived with the tweaked model name, key and address, and the Agent answered with that model's reply), `parallel` PASS (three learners at once, each with their own pair; `overlap` PASS, so the calls really ran at the same time), `control` PASS (a request without tweaks went to the shared Groq model, so an override does not stick), `no_leak` PASS, `stored_key` PASS (neither the whole key nor its masked "abcd...wxyz" form was found in Langflow's database or message store).
+So **option A (tweaks carry model, key and address) works** on this Langflow version. Not yet shown, in order of importance:
+1. The database search ran immediately after the answers, and Langflow writes some records a moment later; the script now waits 8 seconds (`--settle`) first. Re-run once and check that `stored_key` still passes, and that `docker compose logs langflow | findstr /C:"spike-key-"` prints nothing.
+2. That your real provider's model can drive the Agent's tools (`--real-model`, step 3 above).
+3. The two costs of option A in section 9.3 stay: the address guard can check but not pin the address, and the Story Generator Tool inside the chat flow still calls the shared model. Option B removes both and is still the safer build; the choice is yours once 1 and 2 are done.

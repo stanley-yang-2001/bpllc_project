@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { nav, register, unique } from "./helpers";
 
-// Runs against the stub tutor (AI_MODE=stub): "Write missing meanings" fills "(stub) meaning of <word>".
+// Runs against the stub tutor or the live one: "Write missing meanings" fills every word's meaning ("(stub) meaning of <word>" in stub
+// mode, the model's own words in live mode), so the test asks the API whether every word has one instead of looking for fixed text.
 test.describe("Starter packs, remembered practice and dictation", () => {
   test("a new learner adds a pack from Home, gets meanings, reviews due words and sees progress", async ({ page }) => {
     await register(page, `round_${unique()}`);
@@ -12,7 +13,11 @@ test.describe("Starter packs, remembered practice and dictation", () => {
     await nav(page, "Vocabulary").click();
     await expect(page.getByRole("heading", { name: /\(12\)/ })).toBeVisible();
     await page.getByRole("button", { name: "Write missing meanings" }).click();
-    await expect(page.getByText("(stub) meaning of hello").first()).toBeVisible();
+    await expect.poll(async () => {
+      const r = await page.request.get("/api/words?language=en&limit=200");
+      const items: { meaning?: string | null }[] = (await r.json()).items ?? [];
+      return items.filter((w) => (w.meaning ?? "").trim() !== "").length;
+    }, { timeout: 90_000, message: "every word should get a meaning" }).toBe(12);
 
     await nav(page, "Practice").click();
     await expect(page.getByText("Your progress")).toBeVisible();

@@ -283,6 +283,8 @@ def evaluate_turn(spec, resp, vocab, error=None, max_oov=5):
             detail = (f"{result['style']}, {result['units']} units"
                       + (f", stray words {result['oov_words']}" if result["oov_words"] else "")
                       + (", leaked plan" if result["leaked_plan"] else "")
+                      + (", length outside the allowed range" if not result["length_ok"] else "")
+                      + (", format wrong" if not result["format_ok"] else "")
                       + (f", language: written in {lc['verdict']} (English share {lc['english_ratio']:.0%})"
                          if lc and not lc["ok"] and lc["english_ratio"] is not None else "")
                       + (f", language: {lc['verdict']}" if lc and not lc["ok"] and lc["english_ratio"] is None else ""))

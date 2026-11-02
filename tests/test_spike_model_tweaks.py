@@ -549,6 +549,20 @@ def test_a_missing_flow_points_at_create_flow():
     assert "owns the flow" in s.explain_error("HTTP 404 from POST /run: Flow not found"), "the other 404 keeps its own hint"
 
 
+def test_the_storage_search_waits_for_langflow_to_write_its_records():
+    slept, seen = [], []
+    real = s.time.sleep
+    s.time.sleep = slept.append
+    try:
+        suite_inspectors = {"database": lambda keys, sessions: seen.append(list(slept)) or [], "messages": lambda keys, sessions: []}
+        with s.FakeModelServer(hold=0.0) as fake:
+            base = f"http://127.0.0.1:{fake.port}/v1"
+            s.run_suite(lambda m, sid, tw: shared_reply(m), fake.snapshot, base, NODE, 2, True, None, suite_inspectors, settle=7.0)
+    finally:
+        s.time.sleep = real
+    assert 7.0 in slept and seen and 7.0 in seen[0], "the wait comes before the search"
+
+
 def test_report_text():
     good, bad = suite(FakeFlow()), suite(FakeFlow(base_url_dropped=True))
     report = s.format_report([good])
