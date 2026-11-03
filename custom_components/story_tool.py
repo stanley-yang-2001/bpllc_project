@@ -99,6 +99,30 @@ class StoryGeneratorTool(Component):
             advanced=True,
             tool_mode=False,
         ),
+        StrInput(
+            name="own_model_name",
+            display_name="Own model name (hidden)",
+            info="Set per request by the API through tweaks, only for a learner on their own model: the model's name.",
+            value="",
+            advanced=True,
+            tool_mode=False,
+        ),
+        StrInput(
+            name="own_model_url",
+            display_name="Own model address (hidden)",
+            info="Set per request by the API through tweaks, only for a learner on their own model: the API's internal model address.",
+            value="",
+            advanced=True,
+            tool_mode=False,
+        ),
+        StrInput(
+            name="own_model_token",
+            display_name="Own model token (hidden)",
+            info="Set per request by the API through tweaks, only for a learner on their own model: a throwaway token for this turn, never the learner's key.",
+            value="",
+            advanced=True,
+            tool_mode=False,
+        ),
     ]
 
     outputs = [
@@ -107,6 +131,7 @@ class StoryGeneratorTool(Component):
 
     def run(self) -> Message:
         message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,
-                                               self.story_type, self.topic, self.difficulty, set_ids=self.set_ids))
+                                               self.story_type, self.topic, self.difficulty, set_ids=self.set_ids,
+                                               own_model=(self.own_model_name, self.own_model_url, self.own_model_token)))
         self.status = message
         return message

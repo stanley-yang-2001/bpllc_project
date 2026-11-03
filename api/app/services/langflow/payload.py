@@ -19,13 +19,33 @@ def build_session_id(user_id: int, client_part) -> str:
     return f"u{int(user_id)}-{client_part}"
 
 
-def build_tweaks(keys, user_id: int, language: str, set_ids=None) -> dict | None:
+# Hidden inputs of the story tool that carry the learner's own model for the tool's own model call (phase 2, design section 10).
+OWN_MODEL_TOOL_FIELDS = ("own_model_name", "own_model_url", "own_model_token")
+
+
+def build_tweaks(keys, user_id: int, language: str, set_ids=None, own_model: dict | None = None) -> dict | None:
     """The hidden tool inputs are named `learner_id` and `active_language` (not `language`: the story tool already has a visible
     `language` argument that the Agent fills in, and the two must not be confused). NOT `user_id`: Langflow reserves that name on every
     component (it returns the Langflow account's UUID) and a tool input called user_id is silently shadowed by it.
     The id is sent as a STRING: Langflow's text-field handling accepts only strings, lists and Data objects and silently
     drops anything else, so an integer never reaches the tool (the tool then sees no learner and, by design, refuses).
     Both found by the M0 spike. The tool turns the string back into an integer and rejects anything else."""
+    tweaks = _learner_tweaks(keys, user_id, language, set_ids)
+    if own_model:
+        tweaks = _with_own_model(tweaks or {}, own_model)
+    return tweaks or None
+
+
+def _with_own_model(tweaks: dict, own: dict) -> dict:
+    """`own` = {node, model, url, token}: the chat's model node and the story tool are told to call the API's internal address with
+    a throwaway token instead of Groq. The learner's real key is not here and never reaches Langflow (design section 10)."""
+    tweaks[own["node"]] = {"model_name": own["model"], "base_url": own["url"], "api_key": own["token"]}
+    for key in [k for k in tweaks if k.startswith(STORY_TOOL_KEYS)]:
+        tweaks[key].update(own_model_name=own["model"], own_model_url=own["url"], own_model_token=own["token"])
+    return tweaks
+
+
+def _learner_tweaks(keys, user_id: int, language: str, set_ids=None) -> dict | None:
     if not keys:
         return None
     tweaks = {key: {"learner_id": str(int(user_id)), "active_language": language} for key in keys}

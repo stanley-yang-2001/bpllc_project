@@ -9,7 +9,8 @@ from typing import Protocol
 from tutor_core.languages import LANGUAGES
 
 from ..db import connection
-from . import chat_sessions, preferences
+from ..errors import AppError
+from . import chat_model, chat_sessions, preferences
 from .langflow_client import ChatResult, build_session_id
 
 # Reserved from the token budget before a turn runs, then replaced by the count Langflow reports. The base is above
@@ -27,7 +28,8 @@ class ChatClient(Protocol):
     stores_chat: bool       # the tutor keeps the conversation somewhere (so the session is noted and can be deleted later)
     calls_ai: bool          # a turn reaches the model, so it is charged to the token budget
 
-    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None) -> ChatResult: ...
+    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None,
+            own_model: dict | None = None) -> ChatResult: ...
 
     def health(self) -> dict: ...
 
@@ -38,17 +40,29 @@ def run_turn(state, user_id: int, language: str, message: str, browser_session_i
     """Runs one turn as this learner and nobody else. Returns the result and the browser's own session id."""
     chat: ChatClient = state.chat
     session_id = build_session_id(user_id, browser_session_id)
-    with state.ai_gate.slot(user_id, tokens=estimate_tokens(message) if chat.calls_ai else 0) as ticket:
-        if chat.stores_chat:
-            # noted BEFORE the run, so even a failed turn (Langflow may already hold the question) can be deleted later
+    with connection(state.pool) as conn:
+        own = chat_model.plan(state, conn, user_id)      # the learner's own model, when switched on and saved (design section 10)
+    try:
+        # a learner on their own model skips the shared token budget (they pay their own provider) but still takes a place in the gate
+        with state.ai_gate.slot(user_id, tokens=0 if own else (estimate_tokens(message) if chat.calls_ai else 0)) as ticket:
+            if chat.stores_chat:
+                # noted BEFORE the run, so even a failed turn (Langflow may already hold the question) can be deleted later
+                with connection(state.pool) as conn:
+                    chat_sessions.record(conn, user_id, session_id)
+            reply_language = None
             with connection(state.pool) as conn:
-                chat_sessions.record(conn, user_id, session_id)
-        reply_language = None
-        with connection(state.pool) as conn:
-            prefs = preferences.get(conn, user_id)
-        if prefs and prefs["chat_in_study_language"]:
-            reply_language = LANGUAGES[language].name           # the model's own sentences only; tool messages stay as the tool wrote them
-        result = chat.run(user_id=user_id, language=language, message=message, session_id=session_id,
-                          reply_language=reply_language, set_ids=set_ids)
-        ticket.settle(result.tokens)
+                prefs = preferences.get(conn, user_id)
+            if prefs and prefs["chat_in_study_language"]:
+                reply_language = LANGUAGES[language].name           # the model's own sentences only; tool messages stay as the tool wrote them
+            extra = {"own_model": own} if own else {}
+            try:
+                result = chat.run(user_id=user_id, language=language, message=message, session_id=session_id,
+                                  reply_language=reply_language, set_ids=set_ids, **extra)
+            except AppError as e:
+                raise chat_model.failure(state, own, e) if own else e
+            if not own:
+                ticket.settle(result.tokens)
+    finally:
+        if own:
+            state.turn_tokens.revoke(own["token"])      # the throwaway token ends with the turn
     return result, browser_session_id

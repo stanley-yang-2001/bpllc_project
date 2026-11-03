@@ -73,3 +73,24 @@ def call_groq(prompt: str) -> str:
             raise RuntimeError(f"Groq API error {e.code}: {detail}") from e
 
     raise last_error
+
+
+def make_endpoint_call(base_url: str, api_key: str, model: str, *, timeout: int = 60, opener=None):
+    """A story function `prompt -> text` that calls ONE OpenAI-compatible address with ONE bearer token (phase 2, design section 10).
+
+    In chat on a learner's own model the address is the API's internal model route and the token is a throwaway one: the learner's
+    real key is not here. No reasoning_effort is sent (a model that does not know it may refuse the request)."""
+    url = base_url.rstrip("/") + "/chat/completions"
+    opener = opener or urllib.request.urlopen
+
+    def call(prompt: str) -> str:
+        payload = json.dumps({"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 1500}).encode("utf-8")
+        req = urllib.request.Request(url, data=payload, method="POST", headers={
+            "Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "language-tutor-story-tool/1.0"})
+        try:
+            with opener(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8"))["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"Own model error {e.code}: {e.read().decode('utf-8', errors='replace')[:300]}") from e
+
+    return call

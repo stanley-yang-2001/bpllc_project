@@ -346,3 +346,51 @@ def test_story_for_agent_reads_the_sets_the_api_chose_and_ignores_anything_else(
     from tutor_core.tools import _set_ids
     assert _set_ids("0,3") == [0, 3] and _set_ids(" 5 ") == [5] and _set_ids("") is None and _set_ids(None) is None
     assert _set_ids("a,1") is None and _set_ids("1;2") is None and _set_ids("-1") is None and _set_ids(",".join(["1"] * 101)) is None
+
+
+# --- the learner's own model (phase 2, design section 10) -------------------------------------------------------------
+
+class _Resp:
+    def __init__(self, body):
+        self.body = body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        import json
+        return json.dumps(self.body).encode()
+
+
+def test_the_endpoint_call_sends_the_token_and_the_model_and_no_reasoning_effort():
+    import json
+    from tutor_core.groq import make_endpoint_call
+    seen = {}
+
+    def opener(req, timeout):
+        seen.update(url=req.full_url, auth=req.get_header("Authorization"), body=json.loads(req.data), timeout=timeout)
+        return _Resp({"choices": [{"message": {"content": "text"}}]})
+    assert make_endpoint_call("http://api:8000/internal/v1/", "tt-abc", "gpt-x", opener=opener)("hello") == "text"
+    assert seen["url"] == "http://api:8000/internal/v1/chat/completions" and seen["auth"] == "Bearer tt-abc"
+    assert seen["body"]["model"] == "gpt-x" and "reasoning_effort" not in seen["body"]
+
+
+def test_own_model_inputs_choose_the_call_and_a_partial_set_fails_closed():
+    assert tools._own_model_call(None) is None and tools._own_model_call(("", " ", None)) is None      # nothing set: the shared model
+    assert callable(tools._own_model_call(("gpt-x", "http://api:8000/internal/v1", "tt-abc")))
+    refuse = tools._own_model_call(("gpt-x", "", "tt-abc"))
+    with pytest.raises(RuntimeError, match="partly set up"):
+        refuse("hi")
+
+
+def test_a_story_for_a_learner_on_their_own_model_never_calls_groq(conn, make_learner, monkeypatch):
+    make_learner()
+    seed(conn, 1, "es", ["pan"])
+    own = Groq(text="Ana: Hola, pan.")
+    monkeypatch.setattr("tutor_core.groq.make_endpoint_call", lambda url, token, name, **kw: own)
+    monkeypatch.setattr("tutor_core.groq.call_groq", lambda prompt: pytest.fail("the shared Groq key was used"))
+    out = tools.story_for_agent("", "1", "es", connect=connect, env={}, own_model=("gpt-x", "http://api:8000/internal/v1", "tt-abc"))
+    assert out == "Ana: Hola, pan." and len(own.prompts) == 1

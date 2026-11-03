@@ -59,8 +59,9 @@ class LangflowClient:
         except TransportError:
             return None                                 # best effort: the run response is the main source
 
-    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None) -> ChatResult:
-        payload = build_run_payload(with_reply_language(message, reply_language), session_id, build_tweaks(self.tweak_keys, user_id, language, set_ids))
+    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None, own_model: dict | None = None) -> ChatResult:
+        payload = build_run_payload(with_reply_language(message, reply_language), session_id,
+                                    build_tweaks(self.tweak_keys, user_id, language, set_ids, own_model))
         url = f"{self.base_url}/api/v1/run/{urllib.parse.quote(self.flow, safe='')}?stream=false"
         try:
             response = self._transport("POST", url, payload, self._headers(), self.timeout)

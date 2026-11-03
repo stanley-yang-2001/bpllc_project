@@ -10,11 +10,13 @@ from .config import Settings, load_settings
 from .db import make_pool
 from .errors import install_error_handlers
 from .migrate import run_migrations, set_tools_password
-from .routes import account, auth, chat, definitions, health, me, model, practice, public, sets, stories, text_tools, words
+from .routes import account, auth, chat, definitions, health, internal_model, me, model, practice, public, sets, stories, text_tools, words
+from .routes.internal_model import INTERNAL_PREFIX
 from .security import LoginGuard, make_dummy_credentials
 from .services.ai_gate import AiGate
 from .services.chat import make_chat_client
 from .services.user_model import RequestLimiter
+from .services.turn_tokens import TurnTokens
 from .services.story_llm import GroqHealth, make_story_llm
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -51,6 +53,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.story_llm = make_story_llm(settings)
     app.state.model_limiter = RequestLimiter(limit=10, window=60.0)           # a learner's own model: stories per minute
     app.state.model_test_limiter = RequestLimiter(limit=5, window=60.0)
+    app.state.chat_model_limiter = RequestLimiter(limit=settings.chat_model_requests_per_minute, window=60.0)     # chat on a learner's own model: calls per minute
+    app.state.turn_tokens = TurnTokens()
     app.state.groq_health = GroqHealth(stub=settings.ai_mode == "stub")
     install_error_handlers(app)
 
@@ -60,7 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         Every response (errors included) is marked uncacheable: a shared browser or proxy must never be able
         to replay one person's JSON to another."""
         blocked = False
-        if request.method not in SAFE_METHODS:
+        if request.method not in SAFE_METHODS and not request.url.path.startswith(INTERNAL_PREFIX):      # the internal model route has its own token check
             origin = request.headers.get("origin")
             blocked = request.headers.get(CSRF_HEADER) != CSRF_VALUE or bool(origin and origin not in settings.allowed_origins)
         if blocked:
@@ -73,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     for module in (auth, public, me, account, model, words, definitions, text_tools, sets, chat, stories, practice, health):
         app.include_router(module.router, prefix="/api")
+    app.include_router(internal_model.router)       # /internal/v1: not under /api, so nginx does not publish it
     return app
 
 

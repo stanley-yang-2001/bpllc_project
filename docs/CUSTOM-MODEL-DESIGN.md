@@ -122,3 +122,29 @@ So **option A (tweaks carry model, key and address) works** on this Langflow ver
 1. The database search ran immediately after the answers, and Langflow writes some records a moment later; the script now waits 8 seconds (`--settle`) first. Re-run once and check that `stored_key` still passes, and that `docker compose logs langflow | findstr /C:"spike-key-"` prints nothing.
 2. That your real provider's model can drive the Agent's tools (`--real-model`, step 3 above).
 3. The two costs of option A in section 9.3 stay: the address guard can check but not pin the address, and the Story Generator Tool inside the chat flow still calls the shared model. Option B removes both and is still the safer build; the choice is yours once 1 and 2 are done.
+
+## 10. Phase 2 built: chat on your own model, option B (3 November 2026)
+
+**Decision (owner, 3 November 2026): option B.** The API is the model: Langflow never holds a learner's real key. Built and tested here against fakes; not yet run on your machine.
+
+### 10.1 How a chat turn runs
+1. The API checks the turn: `CHAT_OWN_MODEL=1`, `MODEL_KEY_SECRET` set, the account switched on, and a model saved. If any is missing the turn runs on the shared model exactly as before (an account that is switched on but has saved nothing is not an error).
+2. It issues a random throwaway token for this learner and this turn (`services/turn_tokens.py`: in memory, five minutes plus the Langflow timeout, 40 uses because the Agent may call the model several times, revoked when the turn ends).
+3. It sends Langflow tweaks (`services/chat_model.py`, `langflow/payload.py`): on the model node (`LANGFLOW_MODEL_NODE`, default `GroqLanguageModel-h5DsK`) `model_name` = the learner's model, `base_url` = `INTERNAL_API_URL` (default `http://api:8000/internal/v1`), `api_key` = the token; on the Story Generator Tool the same three as hidden inputs `own_model_name`, `own_model_url`, `own_model_token`. The real key is not in any of it.
+4. Langflow calls `POST /internal/v1/chat/completions` with the token (`routes/internal_model.py`). The API looks up the learner, decrypts the stored key, runs the phase 1 address guard with the address pinned, forces the saved model name, forwards the request and streams the answer back (`services/model_proxy.py`: no redirects, 60 s timeout, 1 MB request and 8 MB answer caps).
+5. The story tool does the same through `tutor_core.groq.make_endpoint_call` (no `reasoning_effort`, which a non-reasoning model may refuse). Its three inputs must all be set or the tool refuses; it never falls back to the shared key.
+
+### 10.2 Why it is safe
+- **Not published:** the route is at `/internal/v1`, not under `/api`, so the web container's nginx (which forwards `/api/` only) never serves it, and the API port is `expose`d, not published. A request carrying proxy headers (`X-Forwarded-For`, `X-Real-IP`, `X-Forwarded-Proto`, `Forwarded`) is refused anyway. The route skips the browser's CSRF header check because Langflow cannot send it; the token is its check.
+- **One learner, one turn:** a token never names another learner, expires, runs out of uses and is revoked after the turn. A token that Langflow logs is worthless a moment later.
+- **Limits:** a learner on their own model skips the shared token budget (and the AI gate's token count) but not the gate slot, and has `CHAT_MODEL_REQUESTS_PER_MINUTE` (60) model calls a minute counted at the route. A learner who is switched off, or has removed the model, gets a plain 409 from the route.
+- **Errors:** the proxy turns a provider failure into a short message with the key removed ("The model server answered 401. Check the key."). It is remembered against the token, and a failed turn shows it as `own_model_failed` (502) instead of the generic "the tutor couldn't answer"; there is no fallback to the shared model. A failure inside the story tool is shown by the Agent in its own words (the tool returns its usual "couldn't write a story" message).
+
+### 10.3 Switching it on (in this order)
+1. Apply patch 0044 and run `docker compose up -d --build` (the API and Langflow both changed; the flow file now carries the model node's Base URL field and the tool's three hidden inputs, `python scripts/sync_flow_nodes.py --check` is in step).
+2. Set `CHAT_OWN_MODEL=1` in `.env`, run `docker compose up -d api`. Leave it at 0 and nothing changes for anyone.
+3. Switch your account on, save a model in Settings > My model, and chat. Ask for a story: both the Agent's sentences and the story come from your model.
+
+### 10.4 Not built
+Streaming to the browser (the chat page still waits for the whole reply), a per-learner model for the other Langflow tools (Add Word calls no model), the privacy-policy sentence for chat on your own model (your decision, see the checklist).
+

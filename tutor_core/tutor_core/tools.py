@@ -118,7 +118,7 @@ def _set_ids(value):
 
 
 def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, difficulty=None, *, set_ids=None, connect=None, env=None,
-                    call_groq_fn=None) -> str:
+                    call_groq_fn=None, own_model=None) -> str:
     """`language` is what the Agent passed (the learner may say "a story in French" while Spanish is active); blank means the
     hidden active language. `story_type` and `topic` are what the learner asked for in chat ("a dialogue", "a letter about my
     trip"); both are optional, and blank means "choose for me". generate_story cleans them and refuses a type it cannot use.
@@ -126,6 +126,7 @@ def story_for_agent(language, learner_id, active_language, story_type=None, topi
     learner = resolve_learner(learner_id, env)
     if learner is None:
         return NO_LEARNER_STORY
+    call_groq_fn = call_groq_fn or _own_model_call(own_model)
     named = " ".join(str(language or "").split())
     if named:
         code = normalize_language(named)
@@ -145,6 +146,21 @@ def story_for_agent(language, learner_id, active_language, story_type=None, topi
     except Exception:  # noqa: BLE001
         log.exception("story failed")
         return FAILURE_FALLBACK_MESSAGE
+
+
+def _own_model_call(own_model):
+    """`own_model` = (name, address, token) from the tool's hidden inputs, set only by the API for a learner on their own model.
+    All three present: the story is written through that address. Only some present: fail closed (None would mean the shared Groq key)."""
+    parts = [str(p or "").strip() for p in (own_model or ())]
+    if not any(parts):
+        return None
+    if not all(parts):
+        def refuse(_prompt):
+            raise RuntimeError("Your own model is only partly set up for this tool.")
+        return refuse
+    from .groq import make_endpoint_call
+    name, url, token = parts
+    return make_endpoint_call(url, token, name)
 
 
 def vocabulary_for_agent(learner_id, active_language, *, connect=None, env=None) -> str:

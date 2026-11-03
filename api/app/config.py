@@ -47,6 +47,12 @@ class Settings:
     model_key_secret: str = ""
     # Single-user setups only: let a learner's model address be on the host's own network (a local Ollama, say). Off by default.
     allow_private_model_urls: bool = False
+    # Phase 2 (docs/CUSTOM-MODEL-DESIGN.md section 10): chat on the learner's own model. Off until the flow in Langflow has been synced
+    # and rebuilt (scripts/sync_flow_nodes.py). The learner's key never leaves the API: Langflow gets a throwaway token and this address.
+    chat_own_model: bool = False
+    internal_api_url: str = "http://api:8000/internal/v1"       # what the Langflow container calls; not published outside the Docker network
+    langflow_model_node: str = "GroqLanguageModel-h5DsK"        # the model node in flows/language-tutor.json whose model, key and address are tweaked
+    chat_model_requests_per_minute: int = 60                    # a chat turn makes several model calls (the Agent may loop through its tools)
 
     def validate(self) -> "Settings":
         if not self.database_url:
@@ -93,6 +99,10 @@ def load_settings(env=None) -> Settings:
         tools_db_password=env.get("TOOLS_DB_PASSWORD", ""),
         model_key_secret=env.get("MODEL_KEY_SECRET", "").strip(),
         allow_private_model_urls=env.get("ALLOW_PRIVATE_MODEL_URLS", "0") == "1",
+        chat_own_model=env.get("CHAT_OWN_MODEL", "0") == "1",
+        internal_api_url=(env.get("INTERNAL_API_URL") or "http://api:8000/internal/v1").strip().rstrip("/"),
+        langflow_model_node=(env.get("LANGFLOW_MODEL_NODE") or "GroqLanguageModel-h5DsK").strip(),
+        chat_model_requests_per_minute=int(env.get("CHAT_MODEL_REQUESTS_PER_MINUTE", "60")),
     )
     if "LANGFLOW_TWEAK_KEYS" in env:
         s.langflow_tweak_keys = tuple(k.strip() for k in env["LANGFLOW_TWEAK_KEYS"].split(",") if k.strip())

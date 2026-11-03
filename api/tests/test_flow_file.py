@@ -78,7 +78,8 @@ def test_the_story_tools_argument_list_names_the_same_three_arguments(flow):
 
 
 def test_the_visible_fields_follow_language_in_field_order(flow):
-    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language", "set_ids"]
+    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language", "set_ids",
+                                                                         "own_model_name", "own_model_url", "own_model_token"]
 
 
 def _component_inputs(filename):
@@ -187,7 +188,7 @@ def test_a_visible_field_out_of_place_in_field_order_is_reported_and_moved(flow)
     order.append("story_type")
     assert any("story_type is not right after language" in p for p in sync.sync(stale, write=False))
     sync.sync(stale, write=True)
-    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language", "set_ids"]
+    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"][:4] == ["language", "story_type", "topic", "difficulty"]
 
 
 def test_the_other_tool_nodes_get_no_visible_extras(flow):
@@ -260,3 +261,11 @@ def test_a_missing_tutor_core_is_explained_not_a_traceback(tmp_path, monkeypatch
     with pytest.raises(SystemExit) as e:
         sync.tutor_core_version(str(tmp_path))
     assert "tutor_core" in str(e.value) and "pyproject.toml" in str(e.value)
+
+
+def test_the_model_node_has_the_base_url_field_the_apis_tweak_lands_on(flow):
+    """Without the field a tweak for `base_url` is dropped silently by Langflow and chat would go on calling Groq (design section 10)."""
+    model = node(flow, sync.MODEL_NODE)
+    assert model["template"]["base_url"] == sync.model_base_url_field() and "base_url" in model["field_order"]
+    assert model["template"]["api_key"]["value"] == ""                  # the repo flow never holds a key
+    assert model["template"]["code"]["value"] == open(os.path.join(ROOT, "custom_components", "groq_language_model.py"), encoding="utf-8").read().rstrip("\n")

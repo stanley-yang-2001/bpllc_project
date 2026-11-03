@@ -48,7 +48,29 @@ STORY_ONLY_HIDDEN = {
     "set_ids": ("Word sets (hidden)",
                 "Set per request by the API through tweaks: the ids of the learner's word sets to use for a story, separated by commas "
                 "(0 is the General set). Blank means all of the learner's words."),
+    "own_model_name": ("Own model name (hidden)",
+                       "Set per request by the API through tweaks, only for a learner on their own model: the model's name."),
+    "own_model_url": ("Own model address (hidden)",
+                      "Set per request by the API through tweaks, only for a learner on their own model: the API's internal model address."),
+    "own_model_token": ("Own model token (hidden)",
+                        "Set per request by the API through tweaks, only for a learner on their own model: a throwaway token for this turn, never the learner's key."),
 }
+
+
+# The chat's model node (phase 2, docs/CUSTOM-MODEL-DESIGN.md section 10): its code, and the advanced "Base URL" field the API's tweak lands on.
+# Without the field a tweak for it is dropped silently and the node would go on calling Groq.
+MODEL_NODE = "GroqLanguageModel-h5DsK"
+MODEL_FILE = "groq_language_model.py"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+
+
+def model_base_url_field():
+    return {
+        "_input_type": "StrInput", "advanced": True, "api_editable": False, "display_name": "Base URL", "dynamic": False,
+        "info": "OpenAI-compatible address. Empty means Groq.", "list": False, "list_add_label": "Add More", "load_from_db": False,
+        "name": "base_url", "override_skip": False, "placeholder": "", "required": False, "show": True, "title_case": False,
+        "tool_mode": False, "trace_as_metadata": True, "track_in_telemetry": False, "type": "str", "value": GROQ_BASE_URL,
+    }
 
 
 # (display name, info) of the extra VISIBLE inputs of a node, in the order they follow `language`; they must match the
@@ -181,7 +203,33 @@ def sync(flow, write=True):
                 problems.append(f"{node_id}: {name} is not in field_order")
                 if write:
                     node.setdefault("field_order", []).append(name)
+    _sync_model_node(nodes, problems, write)
     return problems
+
+
+def _sync_model_node(nodes, problems, write):
+    node = nodes.get(MODEL_NODE)
+    if node is None:
+        problems.append(f"{MODEL_NODE}: node is missing from the flow")
+        return
+    code = code_of(MODEL_FILE)
+    if node["template"]["code"]["value"] != code:
+        problems.append(f"{MODEL_NODE}: the code on the canvas differs from custom_components/{MODEL_FILE}")
+        if write:
+            node["template"]["code"]["value"] = code
+    wanted = code_hash(code)
+    if node.get("metadata", {}).get("code_hash") != wanted:
+        problems.append(f"{MODEL_NODE}: code_hash is {node.get('metadata', {}).get('code_hash')}, should be {wanted}")
+        if write:
+            node.setdefault("metadata", {})["code_hash"] = wanted
+    if node["template"].get("base_url") != model_base_url_field():
+        problems.append(f"{MODEL_NODE}: the Base URL field is missing or differs")
+        if write:
+            node["template"]["base_url"] = model_base_url_field()
+    if "base_url" not in node.get("field_order", []):
+        problems.append(f"{MODEL_NODE}: base_url is not in field_order")
+        if write:
+            node.setdefault("field_order", []).append("base_url")
 
 
 def main(argv=None):
