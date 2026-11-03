@@ -12,7 +12,7 @@ import { useI18n } from "../i18n/I18nProvider";
 export default function Chat() {
   const { active, info } = useActiveLanguage();
   const { t } = useI18n();
-  const { messages, sending, send, retry, newChat } = useChat();
+  const { messages, sending, draft, send, retry, newChat } = useChat();
   const [sets, setSets] = useState<SetChoice>(null);       // null = every set (General always among them)
   const name = info(active)?.native ?? active;
   useEffect(() => { setSets(null); }, [active]);
@@ -32,7 +32,7 @@ export default function Chat() {
         }
       />
       <Card className="flex flex-col gap-4">
-        <Conversation messages={messages} sending={sending} languageName={name} onRetry={(id) => retry(id, active, setIdsToSend(sets))} />
+        <Conversation messages={messages} sending={sending} draft={draft} languageName={name} onRetry={(id) => retry(id, active, setIdsToSend(sets))} />
         <Composer language={active} sets={sets} onSets={setSets} sending={sending} onSend={(text) => send(text, active, setIdsToSend(sets))} />
       </Card>
       <div className="mt-4"><Notice>{t("chat.notice")}</Notice></div>

@@ -145,6 +145,20 @@ So **option A (tweaks carry model, key and address) works** on this Langflow ver
 2. Set `CHAT_OWN_MODEL=1` in `.env`, run `docker compose up -d api`. Leave it at 0 and nothing changes for anyone.
 3. Switch your account on, save a model in Settings > My model, and chat. Ask for a story: both the Agent's sentences and the story come from your model.
 
-### 10.4 Not built
-Streaming to the browser (the chat page still waits for the whole reply), a per-learner model for the other Langflow tools (Add Word calls no model), the privacy-policy sentence for chat on your own model (your decision, see the checklist).
+### 10.4 Added in patch 0045
+- **The reason is no longer lost.** If the story tool's call to your model fails but the Agent still answers, the answer now carries a `notice` (the provider's reason, key removed) and the chat page shows it under the reply. A later call that works clears it.
+- **Streaming** (section 11).
+- **Checked, nothing to build:** meanings, parts of speech, pronunciation and translation already go through your own model (the shared `AiRunner` picks it first); Add Word calls no model; the German, Italian and Portuguese everyday-word lists exist.
+
+### 10.5 Not built
+A per-learner model for any other Langflow tool (there is none that calls a model), and the privacy wording for chat on your own model if you want it to differ from the Story Studio sentence you approved on 24 October.
+
+## 11. Streaming the chat reply (3 November 2026, patch 0045)
+
+Off by default: `CHAT_STREAM=1` in `.env`, then `docker compose up -d api`.
+
+- **Langflow side (`?stream=true`, read from the langflow-base 1.12.2 source, not yet run here):** the response is one JSON object per line, `{"event": "token" | "add_message" | "end" | "error", "data": ...}`. A `token` event carries `data.chunk`; `end` carries `data.result`, the same result the non-streaming call returns; `error` ends the turn. The client passes each non-empty chunk on and takes the answer from `end` only, so a stream with no token events still ends with the full answer, and an unrecognised event is ignored.
+- **API side:** `POST /api/chat` streams only when the page sends `Accept: application/x-ndjson`, `CHAT_STREAM=1`, and the tutor can stream (the stub cannot). Otherwise it answers with one JSON body exactly as before. The turn is the ordinary `run_turn` (login, session note, AI gate, token budget) in its own thread; the response is lines of JSON: `{"event":"delta","text"}`, then `{"event":"final", ...the usual answer...}` or `{"event":"error","status","error":{code,message,retry_after}}`. Checks that happen before the turn (login, validation, language) still answer with ordinary HTTP errors.
+- **Page:** the words so far appear in a tutor bubble in place of "The tutor is thinking…", and the finished answer replaces them (so text the tool relay changes, such as a story, ends up as the relayed version). If the answer is not a stream the page behaves as before.
+- **Limits, honestly:** the Agent may not emit token events at all (then only the finished answer shows, as before); the words of an answer that calls a tool may include text that the relay later replaces; the stream has no cancel button yet.
 

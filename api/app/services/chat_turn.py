@@ -29,14 +29,14 @@ class ChatClient(Protocol):
     calls_ai: bool          # a turn reaches the model, so it is charged to the token budget
 
     def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None,
-            own_model: dict | None = None) -> ChatResult: ...
+            own_model: dict | None = None, on_delta=None) -> ChatResult: ...
 
     def health(self) -> dict: ...
 
     def delete_sessions(self, session_ids) -> None: ...
 
 
-def run_turn(state, user_id: int, language: str, message: str, browser_session_id: str, set_ids) -> tuple[ChatResult, str]:
+def run_turn(state, user_id: int, language: str, message: str, browser_session_id: str, set_ids, on_delta=None) -> tuple[ChatResult, str]:
     """Runs one turn as this learner and nobody else. Returns the result and the browser's own session id."""
     chat: ChatClient = state.chat
     session_id = build_session_id(user_id, browser_session_id)
@@ -55,12 +55,16 @@ def run_turn(state, user_id: int, language: str, message: str, browser_session_i
             if prefs and prefs["chat_in_study_language"]:
                 reply_language = LANGUAGES[language].name           # the model's own sentences only; tool messages stay as the tool wrote them
             extra = {"own_model": own} if own else {}
+            if on_delta is not None and getattr(chat, "streams", False):
+                extra["on_delta"] = on_delta
             try:
                 result = chat.run(user_id=user_id, language=language, message=message, session_id=session_id,
                                   reply_language=reply_language, set_ids=set_ids, **extra)
             except AppError as e:
                 raise chat_model.failure(state, own, e) if own else e
-            if not own:
+            if own:
+                result.notice = chat_model.notice(state, own)         # a failed call to their model during an answered turn, with the reason
+            else:
                 ticket.settle(result.tokens)
     finally:
         if own:

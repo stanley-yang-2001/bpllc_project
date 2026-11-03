@@ -53,6 +53,11 @@ class TurnTokens:
             if token in self._grants:
                 self._grants[token].last_error = message
 
+    def clear_error(self, token: str) -> None:
+        with self._lock:
+            if token in self._grants:
+                self._grants[token].last_error = ""
+
     def last_error(self, token: str) -> str:
         with self._lock:
             grant = self._grants.get(token)

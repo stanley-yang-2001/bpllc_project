@@ -325,3 +325,15 @@ def test_a_failed_turn_without_a_noted_reason_keeps_the_usual_error(on, make_use
     c = learner(make_user)
     tutor.error = AppError("ai_failed", "The tutor couldn't answer just now.", 502)
     assert say(c).json()["error"]["code"] == "ai_failed"
+
+
+def test_a_failure_the_agent_covered_for_still_reaches_the_page_as_a_notice(on, make_user, tutor):
+    """The story tool's call to the learner's model fails; the Agent still answers (with its own apology). The reason must not be lost."""
+    c = learner(make_user)
+    tutor.note = "The model server answered 401. Check the key."
+    r = say(c)
+    assert r.status_code == 200 and r.json()["notice"] == tutor.note and KEY not in r.text
+
+
+def test_no_failure_means_no_notice(on, make_user, tutor):
+    assert say(learner(make_user)).json()["notice"] is None

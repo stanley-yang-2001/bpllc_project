@@ -853,6 +853,8 @@ export interface components {
         };
         /** ChatOut */
         ChatOut: {
+            /** Notice */
+            notice?: string | null;
             /** Reply */
             reply: string;
             /** Session Id */

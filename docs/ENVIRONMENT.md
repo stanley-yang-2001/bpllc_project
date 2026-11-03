@@ -40,6 +40,8 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # --- a learner's own model (docs/CUSTOM-MODEL-DESIGN.md) ---------------------------------------------
 # MODEL_KEY_SECRET=                # a long random value (16+ characters) that encrypts learners' own API keys in the database. EMPTY = the feature is off for everyone. Changing it makes saved keys unreadable (learners enter them again).
 # ALLOW_PRIVATE_MODEL_URLS=0       # 1 = a model address may be on your own network or http:// (a local Ollama). Single-user setups only: it lets the server call any address a learner types.
+# CHAT_OWN_MODEL=0              # 1 = chat uses the learner's own model when the account is switched on and a model is saved (docs/CUSTOM-MODEL-DESIGN.md section 10). Needs the flow synced and Langflow rebuilt first.
+# CHAT_STREAM=0                  # 1 = the chat page shows the tutor's words as they are written (design section 11). With 0 the answer arrives whole, as before.
 # Switch an account on (off by default), from the project folder:
 #   docker compose exec api python -m app.custom_model_admin on you@example.com      (also: off, list)
 

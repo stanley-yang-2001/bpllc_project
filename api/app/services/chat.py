@@ -30,4 +30,4 @@ def make_chat_client(settings: Settings, get_pool):
                     "confirmed per-user). Set AI_MODE=stub to develop, or finish M0/M3 and set the flag.")
         return NotReadyChat()
     return LangflowClient(settings.langflow_url, settings.langflow_flow, settings.langflow_api_key,
-                          settings.langflow_timeout, settings.langflow_tweak_keys)
+                          settings.langflow_timeout, settings.langflow_tweak_keys, stream=settings.chat_stream)

@@ -55,3 +55,4 @@ class ChatOut(BaseModel):
     reply: str
     tool_calls: list[ToolCallOut]
     session_id: str
+    notice: str | None = None       # on a learner's own model: why a call to it failed although the tutor still answered (the key is never in it)

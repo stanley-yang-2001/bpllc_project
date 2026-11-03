@@ -3,16 +3,16 @@
 Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uploads). Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.
 
 
-## Backlog (3)
+## Backlog (2)
 
-- **Chat on your own model (phase 2)** (no date) — The spike is written and tested against fakes (patch 0040); it waits for you to run it on your machine. It decides between tweaks and an API-side model proxy.
 - **Native review of the nine-language site text and policy copies** (no date) — Translations are machine-written and not reviewed by native speakers; policy copies are shown only when approved.
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 
-## In review (46)
+## In review (50)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
+- **Chat on your own model (phase 2)** (2026-11-03) — Option B (your choice): the API is the model for Langflow. A turn gets the learner's model name, the API's internal address and a throwaway token; the real key never leaves the API. Off until CHAT_OWN_MODEL=1. Built and tested here (patch 0044); not run on your machine.
 - **Saved story remembers which model wrote it** (2026-10-31) — Store the model name with a saved story and show it in the Library.
 - **Difficulty option for the chat story tool** (2026-10-31) — Let the chat tool pass a tier so a chat story can be Easy, Medium or Hard.
 - **Language check: very short English text can pass as a Latin-script language** (2026-10-31) — With few words no English marker fires. Needs a positive check (accents, function words) and tests.
@@ -57,6 +57,9 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Dictation practice** (2026-10-29) — Hear a word read aloud and type it; tells right, missing accent and wrong; says plainly when the device has no voice.
 - **Checks on GitHub and a --round flag** (2026-10-29) — A GitHub Actions workflow runs the checks on every push; run-checks.bat --round runs everything the current round needs and prints a checklist for manual tries.
 - **Parts of speech for words, tutor labelling and practice** (2026-10-30) — Each word can carry a part of speech from its language's own list; the tutor can label the unlabelled ones; Practice has a parts-of-speech round.
+- **Own-model failure reason shown in chat** (2026-11-03) — When the story tool's call to your own model fails but the Agent still answers, the chat now shows the provider's reason under the reply (key removed) instead of losing it.
+- **Streaming chat reply in the browser** (2026-11-03) — With CHAT_STREAM=1 the chat page shows the tutor's words as they are written. The API reads Langflow's event stream (token, end, error) and sends lines of JSON; the last line is the same full answer as before. Off by default; with it off nothing changes.
+- **Own model for meanings, parts of speech and text tools** (2026-11-03) — Checked in the code: the shared AiRunner already sends tutor-written meanings, parts-of-speech labels, pronunciation and translation through a learner's own model when the account is switched on (a request limit instead of the shared token budget). Nothing new to build; card added so it is on the board.
 
 ## Done (33)
 

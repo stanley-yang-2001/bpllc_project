@@ -586,24 +586,29 @@
  },
  {
   "title": "Chat on your own model (phase 2)",
-  "status": "Backlog",
-  "area": "backlog",
-  "date": "",
-  "summary": "The spike is written and tested against fakes (patch 0040); it waits for you to run it on your machine. It decides between tweaks and an API-side model proxy.",
+  "status": "In review",
+  "area": "feature",
+  "date": "2026-11-03",
+  "summary": "Option B (your choice): the API is the model for Langflow. A turn gets the learner's model name, the API's internal address and a throwaway token; the real key never leaves the API. Off until CHAT_OWN_MODEL=1. Built and tested here (patch 0044); not run on your machine.",
   "done": [
-   "Read Langflow 1.12.2's tweak handling (design section 9.1)",
-   "Spike script: override, parallel, control, no leak, stored key, optional real provider",
-   "Groq component takes an optional Base URL (empty means Groq)"
+   "Spike on your machine: tweaks work (patch 0040 to 0043)",
+   "Internal /internal/v1/chat/completions route, not published by nginx",
+   "Throwaway per-turn token store",
+   "Address guard pinned, streamed pass-through, 60 calls a minute",
+   "Story Generator Tool takes the learner's endpoint (three hidden inputs)",
+   "Flow file synced (model node Base URL field)",
+   "28 API tests"
   ],
   "todo": [
-   "Run the spike on your machine (design section 9.4) and send the report",
-   "Choose option A (tweaks) or B (API-side proxy) from the report",
-   "Give the chat story tool the learner's endpoint too",
-   "Build and test"
+   "Apply 0044, rebuild, run run-checks.bat --round and send REPORT.txt",
+   "Set CHAT_OWN_MODEL=1, save a model, chat and ask for a story (design section 10.3)",
+   "Save a wrong key and check the chat says to check the key"
   ],
   "labels": [
-   "backlog",
-   "chat"
+   "feature",
+   "chat",
+   "privacy",
+   "security"
   ]
  },
  {
@@ -1498,6 +1503,67 @@
   "labels": [
    "vocabulary",
    "practice"
+  ]
+ },
+ {
+  "title": "Own-model failure reason shown in chat",
+  "status": "In review",
+  "area": "chat",
+  "date": "2026-11-03",
+  "summary": "When the story tool's call to your own model fails but the Agent still answers, the chat now shows the provider's reason under the reply (key removed) instead of losing it.",
+  "done": [
+   "notice field on the chat answer",
+   "Cleared when a later call works",
+   "Nine-language line",
+   "Tests (API and web)"
+  ],
+  "todo": [
+   "Save a wrong key, chat, ask for a story: the reply is followed by 'A call to your own model failed: ... Check the key.'"
+  ],
+  "labels": [
+   "chat",
+   "privacy"
+  ]
+ },
+ {
+  "title": "Streaming chat reply in the browser",
+  "status": "In review",
+  "area": "chat",
+  "date": "2026-11-03",
+  "summary": "With CHAT_STREAM=1 the chat page shows the tutor's words as they are written. The API reads Langflow's event stream (token, end, error) and sends lines of JSON; the last line is the same full answer as before. Off by default; with it off nothing changes.",
+  "done": [
+   "Langflow stream reader (format read from langflow-base 1.12.2 source)",
+   "POST /api/chat streams when the page asks and CHAT_STREAM=1",
+   "Web reader, live draft bubble",
+   "Falls back to the one JSON answer",
+   "Tests (API 16, web 5)"
+  ],
+  "todo": [
+   "Set CHAT_STREAM=1 in .env, run docker compose up -d api, chat and watch the words arrive",
+   "Tell me if no words arrive before the whole answer (then Langflow's Agent is not emitting token events and only the finished answer shows)"
+  ],
+  "labels": [
+   "chat",
+   "feature"
+  ]
+ },
+ {
+  "title": "Own model for meanings, parts of speech and text tools",
+  "status": "In review",
+  "area": "feature",
+  "date": "2026-11-03",
+  "summary": "Checked in the code: the shared AiRunner already sends tutor-written meanings, parts-of-speech labels, pronunciation and translation through a learner's own model when the account is switched on (a request limit instead of the shared token budget). Nothing new to build; card added so it is on the board.",
+  "done": [
+   "AiRunner picks the learner's model first",
+   "Used by meanings, pos_labels, text_tools, stories",
+   "Errors name the model and give the provider's reason"
+  ],
+  "todo": [
+   "With a model saved, press 'Write missing meanings' and 'Label parts of speech' and check they still work"
+  ],
+  "labels": [
+   "feature",
+   "privacy"
   ]
  }
 ]

@@ -45,6 +45,7 @@ async def chat_completions(request: Request):
         upstream = await run_in_threadpool(_open, state, user_id, raw)      # database and network work: off the event loop
     except ProxyError as e:
         return _error(e.status, e.message, token, state.turn_tokens)
+    state.turn_tokens.clear_error(token)          # a later call that works means the earlier failure is not what the learner needs to hear
     return StreamingResponse(upstream.chunks(), media_type=upstream.content_type)
 
 

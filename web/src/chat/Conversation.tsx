@@ -7,10 +7,10 @@ import type { ChatMessage } from "./ChatContext";
 import { Waiting } from "./Waiting";
 
 /** The scrolling log: an empty state, the messages in order, and the waiting line while the tutor works. */
-export function Conversation({ messages, sending, languageName, onRetry }: { messages: ChatMessage[]; sending: boolean; languageName: string; onRetry: (id: number) => void }) {
+export function Conversation({ messages, sending, draft = "", languageName, onRetry }: { messages: ChatMessage[]; sending: boolean; draft?: string; languageName: string; onRetry: (id: number) => void }) {
   const { t } = useI18n();
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [messages, sending]);
+  useEffect(() => { end.current?.scrollIntoView?.({ block: "end" }); }, [messages, sending, draft]);
   return (
     <div role="log" aria-label={t("chat.conversation")} aria-live="polite" className="min-h-64 space-y-4">
       {messages.length === 0 && !sending && (
@@ -21,7 +21,8 @@ export function Conversation({ messages, sending, languageName, onRetry }: { mes
       {messages.map((m) => m.role === "user"
         ? <UserBubble key={m.id} m={m} onRetry={() => onRetry(m.id)} disabled={sending} />
         : <TutorBubble key={m.id} m={m} />)}
-      {sending && <Waiting />}
+      {sending && draft && <TutorBubble m={{ id: -1, role: "tutor", text: draft, toolCalls: [] }} />}
+      {sending && !draft && <Waiting />}
       <div ref={end} />
     </div>
   );

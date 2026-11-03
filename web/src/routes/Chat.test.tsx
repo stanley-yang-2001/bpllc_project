@@ -19,6 +19,29 @@ async function say(text: string) {
 }
 
 describe("chat page", () => {
+  it("shows the tutor's words as they arrive, then the finished answer, and a notice about the learner's own model", async () => {
+    mockApi(base);
+    const inner = globalThis.fetch;
+    let finish: () => void = () => undefined;
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      if (!String(url).endsWith("/chat")) return inner(url, init);
+      const enc = new TextEncoder();
+      return Promise.resolve(new Response(new ReadableStream({
+        start(c) {
+          c.enqueue(enc.encode('{"event":"delta","text":"Hola, "}\n'));
+          finish = () => { c.enqueue(enc.encode('{"event":"final","reply":"Hola, amigo","tool_calls":[],"session_id":"s","notice":"The model server answered 401. Check the key."}\n')); c.close(); };
+        },
+      }), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+    });
+    renderApp("/chat");
+    await say("hi");
+    expect(await screen.findByText("Hola,")).toBeInTheDocument();           // the draft, before the answer is finished
+    expect(screen.queryByText("The tutor is thinking…")).not.toBeInTheDocument();
+    await act(async () => { finish(); });
+    expect(await screen.findByText("Hola, amigo")).toBeInTheDocument();
+    expect(screen.getByText(/A call to your own model failed: The model server answered 401/)).toBeInTheDocument();
+  });
+
   it("starts with an empty state that says what the tutor can do", async () => {
     mockApi(base);
     renderApp("/chat");

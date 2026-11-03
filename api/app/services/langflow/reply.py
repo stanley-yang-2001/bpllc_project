@@ -35,6 +35,7 @@ class ChatResult:
     reply: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     tokens: int | None = None            # what Langflow says the turn used (total tokens), if it said
+    notice: str = ""                     # set by the API: why a call to the learner's own model failed during an otherwise answered turn
 
 
 def walk_tool_blocks(obj, _depth: int = 0):

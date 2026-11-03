@@ -27,9 +27,11 @@ export function UserBubble({ m, onRetry, disabled }: { m: ChatMessage; onRetry: 
 
 /** The tutor's reply, what it did behind the scenes, and for each story it wrote: the text tools and Save. */
 export function TutorBubble({ m }: { m: ChatMessage }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col items-start">
       <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-bl-md border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-900 dark:bg-slate-100/40">{m.text}</p>
+      {m.notice && <p role="note" className="mt-1.5 max-w-[85%] text-xs text-amber-800 dark:text-amber-300">{t("chat.ownModelNotice", { reason: m.notice })}</p>}
       <div className="max-w-[85%] self-stretch">
         <ToolTrace calls={m.toolCalls} />
         {m.language && storyCalls(m.toolCalls).map((c, i) => (

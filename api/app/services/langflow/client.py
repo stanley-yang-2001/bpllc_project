@@ -7,7 +7,7 @@ import urllib.parse
 from ...errors import AppError
 from .payload import build_run_payload, build_tweaks, with_reply_language
 from .reply import ChatResult, find_tool_calls, parse_run_response
-from .transport import Transport, TransportError, map_transport_error, urllib_transport
+from .transport import Transport, TransportError, map_transport_error, urllib_stream_transport, urllib_transport
 
 log = logging.getLogger("tutor.langflow")
 
@@ -40,7 +40,8 @@ class LangflowClient:
     HEALTH_TIMEOUT = 3
 
     def __init__(self, base_url: str, flow: str, api_key: str, timeout: float = 100.0,
-                 tweak_keys=(), transport: Transport | None = None, fallback_timeout: float = 10.0):
+                 tweak_keys=(), transport: Transport | None = None, fallback_timeout: float = 10.0, stream: bool = False,
+                 stream_transport=None):
         self.base_url = base_url.rstrip("/")
         self.flow = flow
         self.api_key = api_key
@@ -48,6 +49,8 @@ class LangflowClient:
         self.tweak_keys = tuple(tweak_keys)
         self.fallback_timeout = fallback_timeout
         self._transport = transport or urllib_transport
+        self.streams = bool(stream)                      # CHAT_STREAM=1: the words of the answer may be passed on as they arrive
+        self._stream_transport = stream_transport or urllib_stream_transport
 
     def _headers(self) -> dict:
         return {"x-api-key": self.api_key}
@@ -59,20 +62,46 @@ class LangflowClient:
         except TransportError:
             return None                                 # best effort: the run response is the main source
 
-    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None, own_model: dict | None = None) -> ChatResult:
+    def run(self, *, user_id: int, language: str, message: str, session_id: str, reply_language: str | None = None, set_ids=None,
+            own_model: dict | None = None, on_delta=None) -> ChatResult:
         payload = build_run_payload(with_reply_language(message, reply_language), session_id,
                                     build_tweaks(self.tweak_keys, user_id, language, set_ids, own_model))
-        url = f"{self.base_url}/api/v1/run/{urllib.parse.quote(self.flow, safe='')}?stream=false"
-        try:
-            response = self._transport("POST", url, payload, self._headers(), self.timeout)
-        except TransportError as e:
-            raise map_transport_error(e)
+        flow = urllib.parse.quote(self.flow, safe="")
+        if on_delta is not None and self.streams:
+            response = self._run_streaming(f"{self.base_url}/api/v1/run/{flow}?stream=true", payload, on_delta)
+        else:
+            url = f"{self.base_url}/api/v1/run/{flow}?stream=false"
+            try:
+                response = self._transport("POST", url, payload, self._headers(), self.timeout)
+            except TransportError as e:
+                raise map_transport_error(e)
         stored = None if find_tool_calls(response) else self._stored_messages(session_id)
         result = parse_run_response(response, stored)
         if not result.reply.strip() and not result.tool_calls:
             log.warning("langflow returned no reply and no tool calls")
             raise AppError("ai_failed", "The tutor couldn't answer just now. Please try again.", 502)
         return result
+
+    def _run_streaming(self, url: str, payload: dict, on_delta) -> dict:
+        """Langflow's event stream: `token` events carry words (passed to on_delta), `end` carries the same result the non-streaming call
+        returns, `error` ends the turn. Anything unrecognised is ignored, so a stream with no token events still ends with the full answer."""
+        final = None
+        try:
+            for event in self._stream_transport("POST", url, payload, self._headers(), self.timeout):
+                kind, data = event.get("event"), event.get("data")
+                if kind == "token" and isinstance(data, dict) and isinstance(data.get("chunk"), str) and data["chunk"]:
+                    on_delta(data["chunk"])
+                elif kind == "end" and isinstance(data, dict) and isinstance(data.get("result"), dict):
+                    final = data["result"]
+                elif kind == "error":
+                    log.warning("langflow stream error: %s", str((data or {}).get("error", ""))[:200] if isinstance(data, dict) else "")
+                    raise AppError("ai_failed", "The tutor couldn't answer just now. Please try again.", 502)
+        except TransportError as e:
+            raise map_transport_error(e)
+        if final is None:
+            log.warning("langflow stream ended without a result")
+            raise AppError("ai_failed", "The tutor couldn't answer just now. Please try again.", 502)
+        return final
 
     def health(self) -> dict:
         """Is Langflow answering? Only the kind of failure is reported, never its address or our key."""

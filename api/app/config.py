@@ -52,6 +52,7 @@ class Settings:
     chat_own_model: bool = False
     internal_api_url: str = "http://api:8000/internal/v1"       # what the Langflow container calls; not published outside the Docker network
     langflow_model_node: str = "GroqLanguageModel-h5DsK"        # the model node in flows/language-tutor.json whose model, key and address are tweaked
+    chat_stream: bool = False                                  # CHAT_STREAM=1: the chat page may receive the tutor's words as they are written (design section 11)
     chat_model_requests_per_minute: int = 60                    # a chat turn makes several model calls (the Agent may loop through its tools)
 
     def validate(self) -> "Settings":
@@ -99,6 +100,7 @@ def load_settings(env=None) -> Settings:
         tools_db_password=env.get("TOOLS_DB_PASSWORD", ""),
         model_key_secret=env.get("MODEL_KEY_SECRET", "").strip(),
         allow_private_model_urls=env.get("ALLOW_PRIVATE_MODEL_URLS", "0") == "1",
+        chat_stream=env.get("CHAT_STREAM", "0") == "1",
         chat_own_model=env.get("CHAT_OWN_MODEL", "0") == "1",
         internal_api_url=(env.get("INTERNAL_API_URL") or "http://api:8000/internal/v1").strip().rstrip("/"),
         langflow_model_node=(env.get("LANGFLOW_MODEL_NODE") or "GroqLanguageModel-h5DsK").strip(),

@@ -12,6 +12,7 @@ export interface ChatMessage {
   text: string;
   toolCalls: ToolCall[];
   language?: string;                  // on a tutor message: the language the learner was in when it was asked
+  notice?: string;                    // on a tutor message: why a call to the learner's own model failed although the tutor answered
   error?: string;                     // the server's message (English)
   errorCode?: string;                 // its code: the screen translates by code when it can
 }
@@ -19,6 +20,7 @@ export interface ChatMessage {
 interface Value {
   messages: ChatMessage[];
   sending: boolean;
+  draft: string;                      // the tutor's words so far, while a streamed answer is being written
   send: (text: string, language: string, setIds?: number[]) => void;
   retry: (id: number, language: string, setIds?: number[]) => void;
   newChat: () => void;
@@ -40,13 +42,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const { user, setUser } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [draft, setDraft] = useState("");
   const busy = useRef(false);                        // the synchronous guard: state updates arrive a render too late
   const nextId = useRef(1);
   const session = useRef(newSessionId());
   const userId = user?.id;
   // Through a mutation, not a bare fetch: AuthProvider watches the mutation cache for a 401 (session ended, or another
   // tab logged in as someone else) and then drops this learner's data and adopts whoever is signed in now.
-  const chatCall = useMutation({ mutationFn: api.chat });
+  const chatCall = useMutation({ mutationFn: (v: { body: Parameters<typeof api.chat>[0]; onDelta: (text: string) => void }) => api.chat(v.body, v.onDelta) });
   const chatRef = useRef(chatCall.mutateAsync);
   chatRef.current = chatCall.mutateAsync;
 
@@ -54,11 +57,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     async (id: number, text: string, language: string, setIds?: number[]) => {
       busy.current = true;
       setSending(true);
+      setDraft("");
       try {
-        const r = await chatRef.current({ message: text, language, session_id: session.current, ...(setIds ? { set_ids: setIds } : {}) });
+        const r = await chatRef.current({
+          body: { message: text, language, session_id: session.current, ...(setIds ? { set_ids: setIds } : {}) },
+          onDelta: (piece) => setDraft((d) => d + piece),
+        });
         setMessages((m) => [
           ...m.map((x) => (x.id === id ? { ...x, error: undefined, errorCode: undefined } : x)),
-          { id: nextId.current++, role: "tutor", text: r.reply, toolCalls: r.tool_calls, language },
+          { id: nextId.current++, role: "tutor", text: r.reply, toolCalls: r.tool_calls, language, ...(r.notice ? { notice: r.notice } : {}) },
         ]);
         if (r.tool_calls.some((c) => c.name === "Add Word" && !c.failed) && userId !== undefined) {
           void qc.invalidateQueries({ queryKey: ["words", userId] });       // the Vocabulary page and Home's word count
@@ -71,6 +78,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       } finally {
         busy.current = false;
         setSending(false);
+        setDraft("");
       }
     },
     [qc, setUser, userId],
@@ -104,7 +112,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMessages([]);
   }, []);
 
-  const value = useMemo(() => ({ messages, sending, send, retry, newChat }), [messages, sending, send, retry, newChat]);
+  const value = useMemo(() => ({ messages, sending, draft, send, retry, newChat }), [messages, sending, draft, send, retry, newChat]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

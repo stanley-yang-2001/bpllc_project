@@ -26,3 +26,9 @@ def failure(state, own: dict, error: AppError) -> AppError:
     """A failed turn on the learner's own model says why (as Story Studio does), with the key already removed by the proxy."""
     message = state.turn_tokens.last_error(own["token"])
     return AppError("own_model_failed", message, 502) if message else error
+
+
+def notice(state, own: dict) -> str:
+    """The reason a call to the learner's own model failed during a turn that still ended with an answer (for example the story tool's
+    call: the Agent then tells the learner it could not write a story). Empty when nothing failed or a later call succeeded."""
+    return state.turn_tokens.last_error(own["token"])

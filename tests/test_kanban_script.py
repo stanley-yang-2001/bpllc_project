@@ -29,3 +29,14 @@ def test_set_status_uses_the_matching_column_and_reports_a_missing_one(monkeypat
     assert k.set_status(1, "o", setup, "https://github.com/o/r/issues/1", "Backlog") == "status set" and "O1" in calls[-1]
     assert "not on the board" in k.set_status(1, "o", setup, "https://github.com/o/r/issues/99", "Done")
     assert "no matching column" in k.set_status(1, "o", ("P", "F", {"x": "1"}), "https://github.com/o/r/issues/1", "Done")
+
+
+def test_the_board_file_is_what_make_board_writes():
+    """docs/kanban/BOARD.md is generated from cards.json; this fails when someone edits one and not the other."""
+    import importlib.util
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    spec = importlib.util.spec_from_file_location("make_board", root / "scripts" / "make_board.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.main(["--check"]) == 0, "run: python scripts/make_board.py"

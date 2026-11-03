@@ -14,10 +14,10 @@ from .langflow.client import CLEANUP_FAILED, LangflowClient, NoStoredChat, clean
 from .langflow.payload import build_run_payload, build_session_id, build_tweaks, with_reply_language
 from .langflow.reply import (ChatResult, ToolCall, walk_tool_blocks, canonical_tool_name, find_tokens, find_tool_calls, output_to_text,
                              parse_run_response, reply_text)
-from .langflow.transport import Transport, TransportError, map_transport_error, urllib_transport
+from .langflow.transport import Transport, TransportError, map_transport_error, urllib_stream_transport, urllib_transport
 
 __all__ = [
     "CLEANUP_FAILED", "ChatResult", "LangflowClient", "NoStoredChat", "ToolCall", "Transport", "TransportError", "build_run_payload",
     "build_session_id", "build_tweaks", "canonical_tool_name", "cleanup_failed", "find_tokens", "find_tool_calls", "map_transport_error",
-    "output_to_text", "parse_run_response", "reply_text", "urllib_transport", "walk_tool_blocks", "with_reply_language",
+    "output_to_text", "parse_run_response", "reply_text", "urllib_stream_transport", "urllib_transport", "walk_tool_blocks", "with_reply_language",
 ]

@@ -95,6 +95,17 @@
       },
       "ChatOut": {
         "properties": {
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
+          },
           "reply": {
             "title": "Reply",
             "type": "string"

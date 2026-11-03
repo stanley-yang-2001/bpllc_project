@@ -87,6 +87,7 @@ services:
       - ALLOW_PRIVATE_MODEL_URLS=${ALLOW_PRIVATE_MODEL_URLS:-0}
       # Chat on a learner's own model (phase 2, design section 10). Leave at 0 until the flow is synced and Langflow rebuilt.
       - CHAT_OWN_MODEL=${CHAT_OWN_MODEL:-0}
+      - CHAT_STREAM=${CHAT_STREAM:-0}              # 1: the chat page shows the tutor's words as they are written
     depends_on:
       postgres:
         condition: service_healthy

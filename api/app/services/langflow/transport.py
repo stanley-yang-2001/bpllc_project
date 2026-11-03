@@ -46,6 +46,38 @@ def urllib_transport(method: str, url: str, payload, headers: dict, timeout: flo
         raise TransportError("badjson", 200, body[:100])
 
 
+def urllib_stream_transport(method: str, url: str, payload, headers: dict, timeout: float):
+    """Like urllib_transport, but for Langflow's `?stream=true`: yields one dict per event (a JSON line, `{"event": ..., "data": ...}`).
+    `timeout` is the longest silence allowed between two events. A line that is not JSON is skipped. Failures are TransportErrors."""
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    hdrs = dict(headers)
+    if data is not None:
+        hdrs["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=hdrs, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            for raw in response:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(event, dict):
+                    yield event
+    except urllib.error.HTTPError as e:
+        raise TransportError("http", e.code, e.read().decode("utf-8", "replace")[:200])
+    except (socket.timeout, TimeoutError):
+        raise TransportError("timeout")
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, (socket.timeout, TimeoutError)):
+            raise TransportError("timeout")
+        raise TransportError("unreachable", None, str(e.reason))
+    except OSError as e:
+        raise TransportError("unreachable", None, str(e))
+
+
 def map_transport_error(error: TransportError) -> AppError:
     """Learner-facing messages never mention Langflow, Groq or HTTP; the detail goes to the log."""
     log.warning("langflow call failed: %s", error)
