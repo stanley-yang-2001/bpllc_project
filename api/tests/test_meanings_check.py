@@ -60,8 +60,11 @@ def test_a_busy_model_is_waited_for_as_long_as_the_api_says():
             waits.clear()
             queue = list(answers)
             assert module.with_retry(lambda: queue.pop(0), 10) == (200, {"ok": True})
-            assert waits == [23, 15], waits       # retry_after + 3, never under 15 seconds
-        queue = [(429, {"retry_after": 1})] * 5
-        assert tt.with_retry(lambda: queue.pop(0), 10)[0] == 429 and len(queue) == 2, "it gives up after two retries"
+            assert waits == [25, 20], waits       # retry_after + 5, never under 20 seconds
+        queue = [(429, {"retry_after": 1})] * 7
+        assert tt.with_retry(lambda: queue.pop(0), 10)[0] == 429 and len(queue) == 2, "it gives up after four retries"
+        queue = [(429, {"error": {"retry_after": 30}}), (200, {})]
+        waits.clear()
+        assert tt.with_retry(lambda: queue.pop(0), 10)[0] == 200 and waits == [35], waits
     finally:
         mc.time.sleep, tt.time.sleep = real_sleep["m"], real_sleep["t"]

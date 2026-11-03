@@ -115,6 +115,31 @@ def test_table_and_exit_code(tmp_path=None):
     assert "core" in out and "FAIL" in out and "1 failed" in out and "stack not running" in out
 
 
+def test_report_is_one_file_with_the_table_and_only_the_failing_logs(tmp_path):
+    (tmp_path / "api.log").write_text("api is fine\n" * 5, encoding="utf-8")
+    (tmp_path / "e2e.log").write_text("".join(f"line {i}\n" for i in range(200)) + "\x1b[31mFAIL the real reason\x1b[0m\n\n\n\nlast\n", encoding="utf-8")
+    rows = [("api", rc.PASS, 3.0, ""), ("e2e", rc.FAIL, 9.0, "2 failed"), ("web-unit", rc.SKIP, 0.0, "not asked")]
+    path = rc.write_report(tmp_path, rows, "To try by hand:\n  [ ] 1. something", tail=10)
+    text = path.read_text(encoding="utf-8")
+    assert path.name == "REPORT.txt" and path.parent == tmp_path
+    assert "api" in text and "PASS" in text and "e2e" in text and "web-unit" in text, "every check is in the table"
+    assert "api is fine" not in text, "a passing check's log is not quoted"
+    assert "FAIL the real reason" in text and "\x1b" not in text, "the failure is quoted, without colour codes"
+    assert "line 0\n" not in text and "(the last 10 of" in text, "only the end of a long log"
+    assert "\n\n\n" not in text.split("=== e2e")[1], "runs of blank lines are squeezed"
+    assert "To try by hand" in text
+
+
+def test_report_stays_small_when_many_checks_fail(tmp_path):
+    rows = []
+    for i in range(30):
+        (tmp_path / f"c{i}.log").write_text("x\n" * 500, encoding="utf-8")
+        rows.append((f"c{i}", rc.FAIL, 1.0, "bad"))
+    text = rc.write_report(tmp_path, rows).read_text(encoding="utf-8")
+    assert text.count("=== c") == rc.REPORT_MAX_LOGS and "more failing checks" in text
+    assert len(text) < 60_000
+
+
 def test_main_exit_codes_with_fake_stages():
     import tempfile
     saved_stages, saved_by_id, saved_root = list(rc.STAGES), dict(rc.BY_ID), rc.ROOT

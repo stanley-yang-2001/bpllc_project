@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { addWord, nav, register, unique } from "./helpers";
 
-// Runs against the stub tutor (AI_MODE=stub). Covers the newer controls: the kind-of-story picker with a kind of your own,
+// Runs against the stub tutor or the live one (a story is on screen when its Save button is; its words are not fixed). Covers the newer controls: the kind-of-story picker with a kind of your own,
 // the topic picker, and the User ID row in Settings.
 const WORDS: [string, string][] = [["hello", "a greeting"], ["friend", "someone you like"], ["water", "a drink"], ["please", "a polite word"], ["goodbye", "parting words"]];
 
@@ -25,7 +25,7 @@ test.describe("Story Studio options and Settings", () => {
 
     await make.click();
     await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
-    await expect(page.getByText(/Hello, friend/).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save to library" })).toBeVisible();
   });
 
   test("the topic hint shows for the classic styles and goes away for a newer kind", async ({ page }) => {

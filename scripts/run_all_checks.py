@@ -31,6 +31,7 @@ import argparse
 import json
 import os
 import queue
+import re
 import shlex
 import shutil
 import subprocess
@@ -361,7 +362,7 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0042) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0043) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
 ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live")
 ROUND_MANUAL = [
@@ -467,6 +468,41 @@ def table(rows: list[tuple[str, str, float, str]]) -> str:
     fmt = lambda r: "  ".join(r[k].ljust(widths[k]) for k in range(3)) + "  " + r[3]
     return "\n".join([fmt(head), "  ".join("-" * w for w in widths)] + [fmt(r) for r in body])
 
+REPORT_TAIL_LINES = 70          # lines of a failing check's log that go into REPORT.txt
+REPORT_MAX_LOGS = 12            # failing logs quoted at most (the table still lists every check)
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
+def clean_log_lines(text: str) -> list[str]:
+    """A log without terminal colour codes and without runs of blank lines."""
+    out: list[str] = []
+    for line in _ANSI.sub("", text).splitlines():
+        line = line.rstrip()
+        if line or (out and out[-1]):
+            out.append(line)
+    return out
+
+
+def write_report(report_dir: Path, rows: list[tuple[str, str, float, str]], checklist: str = "", tail: int = REPORT_TAIL_LINES) -> Path:
+    """One file with everything a person needs to send back: the table, then, for each check that did NOT pass, the end of its log
+    (with the lines that say what went wrong), then the checklist for the hand checks. A passing check is one line of the table, so the
+    file stays small however many checks ran. (Uploading is limited to 20 files at once; the whole round is now one.)"""
+    parts = [f"Round report {report_dir.name}", "", table(rows)]
+    bad = [r for r in rows if r[1] in (FAIL,)]
+    for name, status, _, detail in bad[:REPORT_MAX_LOGS]:
+        log = report_dir / f"{name}.log"
+        lines = clean_log_lines(log.read_text(encoding="utf-8", errors="replace")) if log.exists() else ["(no log)"]
+        cut = len(lines) - tail
+        parts += ["", f"=== {name}: {status} " + "=" * 40, (f"(the last {tail} of {len(lines)} lines)" if cut > 0 else f"({len(lines)} lines)")]
+        parts += lines[max(cut, 0):]
+    if len(bad) > REPORT_MAX_LOGS:
+        parts += ["", f"({len(bad) - REPORT_MAX_LOGS} more failing checks: their logs are in {report_dir})"]
+    if checklist:
+        parts += ["", checklist]
+    path = report_dir / "REPORT.txt"
+    path.write_text("\n".join(parts) + "\n", encoding="utf-8")
+    return path
+
 
 def print_list() -> None:
     print("group  check             what a failure means")
@@ -558,10 +594,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"\n{passed} passed, {len(failed)} failed, {len(skipped)} skipped.  Logs and summary.json: {report_dir}")
     if skipped:
         print("A skipped check did not run; the table says why. It is not a failure.")
+    checklist = ""
     if args.round:
         checklist = "To try by hand (the automatic checks cannot hear or see these):\n" + "\n".join(f"  [ ] {i}. {line}" for i, line in enumerate(ROUND_MANUAL, 1))
         print("\n" + checklist)
         (report_dir / "manual-checklist.txt").write_text(checklist + "\n", encoding="utf-8")
+    report = write_report(report_dir, rows, checklist)
+    print(f"\nSend me ONE file: {report}")
     (report_dir / "summary.json").write_text(json.dumps([{"check": n, "result": st, "seconds": round(t, 1), "detail": d} for n, st, t, d in rows], indent=1), encoding="utf-8")
     return 1 if failed else 0
 

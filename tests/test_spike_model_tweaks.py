@@ -563,6 +563,16 @@ def test_the_storage_search_waits_for_langflow_to_write_its_records():
     assert 7.0 in slept and seen and 7.0 in seen[0], "the wait comes before the search"
 
 
+def test_the_saved_file_keeps_the_verdict_and_the_replies_but_not_the_response_bodies():
+    result = suite(lambda m, sid, tw: shared_reply(m), skip_control=True)
+    slim = s.compact_results([result])[0]
+    assert slim["verdict"] == result["verdict"] and slim["checks"] == result["checks"]
+    assert slim["raw"] and all(set(r) == {"label", "session_id", "tweaks", "reply"} for r in slim["raw"])
+    assert slim["raw"][0]["reply"] == ["Hello from the shared model."]
+    assert len(json.dumps(slim)) < len(json.dumps(result)), "smaller than the full results"
+    assert "raw" in result, "the original is not changed"
+
+
 def test_report_text():
     good, bad = suite(FakeFlow()), suite(FakeFlow(base_url_dropped=True))
     report = s.format_report([good])

@@ -61,6 +61,7 @@ The Python suites do not run against your database. The API tests drop and rebui
 
 * A **SKIP** means the check could not run (no Docker, stack not up, `AI_MODE` is `stub`): the note says why. It is not a failure.
 * Each check's full output is in `test-reports/<date-time>/<check>.log`, with `summary.json` beside them. The folder is ignored by git.
+* **To send me the result, send ONE file: `test-reports/<date-time>/REPORT.txt`** (the run prints its path on the last line). It holds the table, the end of the log of every check that failed (colour codes removed) and, for `--round`, the checklist for the hand checks; a passing check is one table line. Uploads are limited to 20 files, and a round used to produce more than that. The spike (`spike_model_tweaks.py`) now saves a compact JSON too (replies only; `--full-responses` keeps Langflow's whole answers).
 * The exit code is 0 only if nothing failed, so it can sit in a script or CI job.
 * Useful options: `--only core,api`, `--skip e2e`, `--fail-fast`, `--verbose` (show the output live), `--pause 30` (longer pauses between Groq calls), `--keep-test-db`, `--npm-ci`.
 

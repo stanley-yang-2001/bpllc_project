@@ -33,6 +33,7 @@ psycopg2, which the container has, for the storage search):
   --users 3            how many learners run at once in check 2 (at least 2)
   --hold 2.0           seconds each fake model call lasts, so that parallel calls overlap
   --settle 8           seconds to wait before searching Langflow's database (it writes its records just after answering)
+  --full-responses     save Langflow's whole response for every call (default: only the reply text, a page instead of a hundred)
   --skip-control       do not send the no-tweaks request (it uses Groq tokens: about 2000)
   --db-url URL         Langflow's own database, searched for the throwaway keys (default $LANGFLOW_DATABASE_URL, which the
                        Langflow container has; without it the storage check can only look at the message store)
@@ -469,6 +470,18 @@ def run_suite(run, server_calls, base_url, node_key, users=3, skip_control=False
     return {"key": node_key, "checks": checks, "verdict": key_verdict(checks), "raw": raw}
 
 
+def compact_results(results: list) -> list:
+    """The saved file without Langflow's full response bodies (about 150 lines each): per call only what the verdict was judged on,
+    so the file is a page, not a hundred pages, to send back."""
+    out = []
+    for result in results:
+        slim = {k: v for k, v in result.items() if k != "raw"}
+        slim["raw"] = [{"label": r["label"], "session_id": r["session_id"], "tweaks": r["tweaks"],
+                        "reply": [t for t in reply_texts(r["response"]) if t.strip()][:3]} for r in result.get("raw", [])]
+        out.append(slim)
+    return out
+
+
 def redact_tweaks(tweaks):
     if not tweaks:
         return tweaks
@@ -559,6 +572,7 @@ def main(argv=None):
     parser.add_argument("--db-url", default=os.environ.get("LANGFLOW_DATABASE_URL", ""),
                         help="Langflow's own database, searched for the throwaway keys (default $LANGFLOW_DATABASE_URL, which the "
                              "Langflow container has; search skipped when empty)")
+    parser.add_argument("--full-responses", action="store_true", help="save Langflow's whole response for every call (the default keeps only the reply text)")
     parser.add_argument("--out-dir", default=os.path.dirname(os.path.abspath(__file__)))
     args = parser.parse_args(argv)
     if args.users < 2:
@@ -606,7 +620,7 @@ def main(argv=None):
 
     out = os.path.join(args.out_dir, f"spike_model_tweaks_{time.strftime('%Y%m%d_%H%M%S')}.json")
     with open(out, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, default=str)
+        json.dump(results if args.full_responses else compact_results(results), f, indent=2, default=str)
     print(f"\nRaw responses saved to {out}")
     return 0 if any(r["verdict"] == PASS for r in results) else 1
 

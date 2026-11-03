@@ -111,11 +111,13 @@ class Report:
 
 
 def with_retry(call, delay):
+    """Up to four retries after a pause when the shared model is busy (HTTP 429): as long as the API says plus a margin, at least 20 seconds."""
     status, body = call()
-    for _ in range(2):         # the model's limit is per minute: wait as long as the API says, then ask again
+    for _ in range(4):
         if status != 429:
             break
-        time.sleep(max(delay, 15, (body.get("retry_after") or 0) + 3 if isinstance(body, dict) else 0))
+        said = body.get("retry_after") or (body.get("error") or {}).get("retry_after") if isinstance(body, dict) else 0
+        time.sleep(max(delay, 20, (said or 0) + 5))
         status, body = call()
     return status, body
 

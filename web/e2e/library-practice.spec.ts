@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { addWord, nav, register, unique } from "./helpers";
 
-// Runs against the stub tutor (AI_MODE=stub): the story is the fixed dialogue "Hello, friend. Hello, water please. ...".
+// Runs against the stub tutor (a fixed dialogue) or the live one (a story the model writes), so it never looks for fixed words: a story is on
+// screen when its Save button is, and the Library shows a verdict whichever it is.
 const WORDS: [string, string][] = [["hello", "a greeting"], ["friend", "someone you like"], ["water", "a drink"], ["please", "a polite word"], ["goodbye", "parting words"]];
 
 async function learnerWithWords(page: import("@playwright/test").Page, local: string) {
@@ -16,12 +17,12 @@ test.describe("Story Studio, Library and Practice", () => {
     await nav(page, "Studio").click();
     await page.getByRole("button", { name: "Make a story" }).click();
     await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
-    await expect(page.getByText(/Hello, friend/).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save to library" })).toBeVisible();
     await page.getByRole("button", { name: "Save to library" }).click();
     await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();
 
     await nav(page, "Library").click();
-    await expect(page.getByText("Looks good")).toBeVisible();
+    await expect(page.getByText(/Looks good|Needs a look/)).toBeVisible();
     await page.getByRole("button", { name: "Open" }).click();
     await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
 

@@ -39,10 +39,11 @@ describe("settings: appearance", () => {
   it("the editor is hidden until Custom is chosen", async () => {
     open("ocean");
     renderApp("/settings");
-    await screen.findByRole("radio", { name: "Ocean" });
+    const ocean = await screen.findByRole("radio", { name: "Ocean" });
+    await waitFor(() => expect(ocean).toBeChecked());           // the saved choice has arrived, so it cannot overwrite the click below
     expect(screen.queryByText("Customize colors")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("radio", { name: "Custom" }));
-    expect(await screen.findByText("Customize colors")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Customize colors")).toBeInTheDocument());
   });
 
   it("typing a hex colour changes the part, saves the five colours, and ignores a bad value", async () => {
