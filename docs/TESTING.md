@@ -77,6 +77,7 @@ docker compose exec -T langflow python /app/scripts/run_routing_tests.py --flow-
 docker compose exec -T api python scripts/difficulty_check.py --show
 docker compose exec -T api python scripts/text_tools_check.py
 docker compose exec langflow python /app/scripts/spike_model_tweaks.py --create-flow   # phase 2 spike, docs/CUSTOM-MODEL-DESIGN.md section 9.4
+docker compose exec langflow python /app/scripts/stream_probe.py   # does Langflow send the Agent's words as they are written? (design section 11)
 ```
 
 ## When you add a test

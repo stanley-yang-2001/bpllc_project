@@ -362,7 +362,7 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0046) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0047) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
 ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live")
 ROUND_MANUAL = [
