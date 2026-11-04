@@ -1527,10 +1527,10 @@
  },
  {
   "title": "Streaming chat reply in the browser",
-  "status": "In review",
-  "area": "chat",
+  "status": "Backlog",
+  "area": "backlog",
   "date": "2026-11-03",
-  "summary": "With CHAT_STREAM=1 the chat page shows the tutor's words as they are written. The API reads Langflow's event stream (token, end, error) and sends lines of JSON; the last line is the same full answer as before. Off by default; with it off nothing changes.",
+  "summary": "Parked. Built behind CHAT_STREAM=1 (API reads Langflow's stream, the page shows a live draft), but your probe of 4 Nov showed Langflow's Agent sends no word events and a plain answer finishes in about 1.5 s, so nothing visible changes. Code stays, off by default.",
   "done": [
    "Langflow stream reader (format read from langflow-base 1.12.2 source)",
    "POST /api/chat streams when the page asks and CHAT_STREAM=1",
@@ -1539,12 +1539,11 @@
    "Tests (API 16, web 5)"
   ],
   "todo": [
-   "Set CHAT_STREAM=1 in .env, run docker compose up -d api, chat and watch the words arrive",
-   "Tell me if no words arrive before the whole answer (then Langflow's Agent is not emitting token events and only the finished answer shows)"
+   "Re-run scripts/stream_probe.py after a Langflow upgrade or a flow change; resume only if it shows token events"
   ],
   "labels": [
-   "chat",
-   "feature"
+   "backlog",
+   "chat"
   ]
  },
  {
