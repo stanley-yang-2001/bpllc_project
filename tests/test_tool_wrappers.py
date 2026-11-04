@@ -68,7 +68,13 @@ def test_the_wrappers_hand_over_the_right_values():
     out = story_tool.StoryGeneratorTool(language="French", story_type="dialogue", topic="a market", difficulty="easy", learner_id="17",
                                         active_language="es", set_ids="0,4").run()
     check("Story tool passes (language, learner_id, active_language, story_type, topic, difficulty) and set_ids, and returns the story as a message",
-          seen["story"] == ("French", "17", "es", "dialogue", "a market", "easy") and seen["story_kw"] == {"set_ids": "0,4"} and out.text == "a story", str(seen))
+          seen["story"] == ("French", "17", "es", "dialogue", "a market", "easy") and seen["story_kw"]["set_ids"] == "0,4" and out.text == "a story", str(seen))
+    check("with no own-model inputs the Story tool passes nothing (so it uses the shared model)", not any(seen["story_kw"]["own_model"]), str(seen))
+    seen.clear()
+    story_tool.StoryGeneratorTool(language="French", learner_id="17", active_language="es", own_model_name="gpt-x",
+                                  own_model_url="http://api:8000/internal/v1", own_model_token="tt-abc").run()
+    check("the Story tool passes the learner's own model name, address and throwaway token on",
+          seen["story_kw"]["own_model"] == ("gpt-x", "http://api:8000/internal/v1", "tt-abc"), str(seen))
     seen.clear()
     story_tool.StoryGeneratorTool(language="French", learner_id="17", active_language="es").run()
     check("with no type or topic the Story tool passes them on blank (None or an empty string), and the tool then chooses",

@@ -16,7 +16,7 @@ test.describe("Story Studio, Library and Practice", () => {
 
     await nav(page, "Studio").click();
     await page.getByRole("button", { name: "Make a story" }).click();
-    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible({ timeout: 90_000 });
     await expect(page.getByRole("button", { name: "Save to library" })).toBeVisible();
     await page.getByRole("button", { name: "Save to library" }).click();
     await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();

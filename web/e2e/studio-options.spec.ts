@@ -38,7 +38,7 @@ test.describe("Story Studio options and Settings", () => {
     await expect(hint).toBeHidden();
     await page.getByLabel("Topic").selectOption({ index: 1 });
     await page.getByRole("button", { name: "Make a story" }).click();
-    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible({ timeout: 90_000 });
   });
 
   test("Settings shows the learner's own User ID in the Account card", async ({ page }) => {

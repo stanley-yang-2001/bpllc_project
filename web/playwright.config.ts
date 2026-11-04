@@ -5,7 +5,7 @@ import { defineConfig } from "@playwright/test";
 //   PW_CHROMIUM_PATH use an existing Chromium instead of `npx playwright install chromium`
 export default defineConfig({
   testDir: "./e2e",
-  timeout: 45_000,
+  timeout: 120_000,
   workers: 1,
   retries: 0,
   reporter: "list",

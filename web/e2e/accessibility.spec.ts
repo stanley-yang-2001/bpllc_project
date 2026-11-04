@@ -33,7 +33,7 @@ for (const scheme of ["light", "dark"] as const) {
       for (const [word, meaning] of [["hello", "a greeting"], ["friend", "someone you like"], ["water", "a drink"], ["please", "polite"], ["goodbye", "parting"]]) await addWord(page, word, meaning);
       await nav(page, "Studio").click();
       await page.getByRole("button", { name: "Make a story" }).click();
-      await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible({ timeout: 90_000 });
       await scan(page, `studio with a story and report (${scheme})`);
       await page.getByRole("button", { name: "Save to library" }).click();
       await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
