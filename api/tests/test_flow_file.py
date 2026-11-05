@@ -66,19 +66,19 @@ def test_the_agent_sees_only_the_documented_arguments(flow):
     visible = {nid: sorted(k for k, v in node(flow, nid)["template"].items()
                            if isinstance(v, dict) and v.get("tool_mode") is True and k != "tools_metadata")
                for nid in ("AddWord-WhP5g", "StoryGeneratorTool-RQpvc")}
-    assert visible == {"AddWord-WhP5g": ["word"], "StoryGeneratorTool-RQpvc": ["difficulty", "language", "story_type", "topic"]}
+    assert visible == {"AddWord-WhP5g": ["word"], "StoryGeneratorTool-RQpvc": ["difficulty", "language", "length", "story_type", "topic"]}
 
 
 def test_the_story_tools_argument_list_names_the_same_three_arguments(flow):
     """The tool's `args` in tools_metadata is what the Agent is actually shown; it must list the type and the topic too."""
     tool = node(flow, "StoryGeneratorTool-RQpvc")["template"]["tools_metadata"]["value"][0]
-    assert sorted(tool["args"]) == ["difficulty", "language", "story_type", "topic"]
+    assert sorted(tool["args"]) == ["difficulty", "language", "length", "story_type", "topic"]
     for name, (display, info) in sync.VISIBLE["StoryGeneratorTool-RQpvc"].items():
         assert tool["args"][name] == {"default": "", "description": info, "title": display, "type": "string"}
 
 
 def test_the_visible_fields_follow_language_in_field_order(flow):
-    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "learner_id", "active_language", "set_ids",
+    assert node(flow, "StoryGeneratorTool-RQpvc")["field_order"] == ["language", "story_type", "topic", "difficulty", "length", "learner_id", "active_language", "set_ids",
                                                                          "own_model_name", "own_model_url", "own_model_token"]
 
 
@@ -188,7 +188,7 @@ def test_a_visible_field_out_of_place_in_field_order_is_reported_and_moved(flow)
     order.append("story_type")
     assert any("story_type is not right after language" in p for p in sync.sync(stale, write=False))
     sync.sync(stale, write=True)
-    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"][:4] == ["language", "story_type", "topic", "difficulty"]
+    assert node(stale, "StoryGeneratorTool-RQpvc")["field_order"][:5] == ["language", "story_type", "topic", "difficulty", "length"]
 
 
 def test_the_other_tool_nodes_get_no_visible_extras(flow):

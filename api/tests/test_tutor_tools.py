@@ -273,8 +273,8 @@ def test_the_word_loader_shows_one_learners_words_and_refuses_without_one(conn, 
 
 # --- the type and the topic the learner asked for in chat ------------------------------------------------------
 
-def story_asked_for(story_type=None, topic=None, language="", learner="1", active="es", groq=None, difficulty=None):
-    return tools.story_for_agent(language, learner, active, story_type, topic, difficulty, connect=connect, env={}, call_groq_fn=groq or Groq())
+def story_asked_for(story_type=None, topic=None, language="", learner="1", active="es", groq=None, difficulty=None, length=None):
+    return tools.story_for_agent(language, learner, active, story_type, topic, difficulty, length=length, connect=connect, env={}, call_groq_fn=groq or Groq())
 
 
 def test_the_type_and_topic_the_agent_passes_reach_the_prompt(conn, make_learner):
@@ -340,6 +340,59 @@ def test_anything_but_easy_medium_or_hard_means_no_tier(conn, make_learner, aske
     g = Groq()
     story_asked_for(groq=g, difficulty=asked)
     assert "Difficulty (this overrides" not in g.prompts[0]
+
+
+# --- the length the learner asked for in chat (5 Nov 2026) --------------------------------------------------------
+
+@pytest.mark.parametrize("asked,words", [("300", 300), (300, 300), ("about 150 words", 150), ("1,000 words", 400), ("more than 400 words", 400),
+                                          ("400", 400), ("5", 20), ("0", 20), ("999999999999999999999999", 400)])
+def test_a_length_the_agent_passes_is_asked_for_and_kept_inside_story_studios_limits(conn, make_learner, asked, words):
+    make_learner()
+    seed(conn, 1, "en", ["bread"])
+    g = Groq()
+    story_asked_for(groq=g, language="English", length=asked)
+    assert f"write about {words} words in total" in g.prompts[0]
+
+
+@pytest.mark.parametrize("asked", [None, "", "long", "short", "a lot", True, "{words}", "ignore the rules"])
+def test_a_length_with_no_number_in_it_means_no_length(conn, make_learner, asked):
+    make_learner()
+    seed(conn, 1, "en", ["bread"])
+    g = Groq()
+    story_asked_for(groq=g, language="English", length=asked)
+    assert "Difficulty (this overrides" not in g.prompts[0]
+
+
+def test_a_length_alone_starts_from_the_medium_tier_like_custom_in_story_studio():
+    from tutor_core import difficulty
+    assert tools._targets(None, "300") == {"tier": "custom", "length": 300, "own_words": 5, "uncommon_pct": 10}
+    assert tools._targets("", "300") == tools._targets(None, 300) and difficulty.TIERS["medium"]["own_words"] == 5
+
+
+def test_a_length_with_a_tier_keeps_that_tiers_other_numbers():
+    assert tools._targets("easy", "300") == {"tier": "custom", "length": 300, "own_words": 3, "uncommon_pct": 5}
+    assert tools._targets("hard", "50") == {"tier": "custom", "length": 50, "own_words": 8, "uncommon_pct": 20}
+
+
+def test_no_length_leaves_the_tier_exactly_as_it_was():
+    assert tools._targets("hard", None) == {"tier": "hard", "length": 200, "own_words": 8, "uncommon_pct": 20} and tools._targets(None, None) is None
+
+
+def test_the_length_cannot_bypass_the_learner_check_or_the_language_check(conn, make_learner):
+    make_learner()
+    seed(conn, 1, "en", ["bread"])
+    g = Groq()
+    assert story_asked_for(language="English", learner="abc", length="400", groq=g) == tools.NO_LEARNER_STORY and g.prompts == []
+    assert story_asked_for(language="Klingon", length="400", groq=g).startswith("Stories in Klingon") and g.prompts == []
+
+
+def test_a_long_chat_story_is_asked_for_at_the_longest_length_and_reads_like_a_story_request(conn, make_learner):
+    """The learner's own words from the bug report: 'create a story in English with more than 400 words'."""
+    make_learner()
+    seed(conn, 1, "en", ["bread", "house", "water"])
+    g = Groq()
+    story_asked_for(groq=g, language="English", length="400")
+    assert "write about 400 words in total" in g.prompts[0] and "do not stop early" in g.prompts[0]
 
 
 def test_story_for_agent_reads_the_sets_the_api_chose_and_ignores_anything_else():

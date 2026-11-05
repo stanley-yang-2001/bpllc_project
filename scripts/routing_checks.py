@@ -88,6 +88,9 @@ CASES = [
     {"id": "D1", "name": "A requested difficulty reaches the tool (an easy story)", "turns": [
         _typed("Tell me an easy story in French", ["french", "français", "francais"],
                [{"key": "difficulty", "any_of": ["easy"]}])]},
+    {"id": "L1", "name": "A requested length reaches the tool and the story is long (400 words)", "turns": [
+        dict(_typed("Create a story in English with more than 400 words", ["english"], [{"key": "length", "contains": ["400"]}], quality=False),
+             min_words=250)]},       # not judged by the story-shape check: its length range is for the short chat stories
     {"id": "N1", "name": "A greeting needs no tool", "turns": [{"say": "hi", "tool": None}]},
     {"id": "N2", "name": "An unrelated question needs no tool", "turns": [
         {"say": "What's the weather like today?", "tool": None}]},
@@ -270,6 +273,11 @@ def evaluate_turn(spec, resp, vocab, error=None, max_oov=5):
     if spec.get("expect_guard"):
         is_guard = GUARD_MARKER in text.lower().replace("\u2019", "'")
         checks.append(_c("empty-vocabulary guard", is_guard, text[:80] if text else "no reply", info))
+
+    # a long story was asked for: the reply must really be long (counted in words; English and the other spaced languages only)
+    if spec.get("min_words"):
+        count = len(text.split())
+        checks.append(_c("reply length", count >= spec["min_words"], f"{count} words; at least {spec['min_words']} expected", info))
 
     # story quality
     kind = spec.get("story")

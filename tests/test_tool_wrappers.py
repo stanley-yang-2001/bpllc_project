@@ -37,7 +37,7 @@ def inputs_of(cls):
 
 def test_what_the_agent_can_see():
     print("what the Agent can see")
-    for cls, visible in ((add_word.AddWord, ["word"]), (story_tool.StoryGeneratorTool, ["difficulty", "language", "story_type", "topic"]),
+    for cls, visible in ((add_word.AddWord, ["word"]), (story_tool.StoryGeneratorTool, ["difficulty", "language", "length", "story_type", "topic"]),
                          (word_loader.WordLoader, [])):
         tool_inputs = sorted(n for n, i in inputs_of(cls).items() if getattr(i, "tool_mode", False))
         check(f"{cls.__name__}: the Agent can fill in only {visible}", tool_inputs == visible, str(tool_inputs))
@@ -66,9 +66,10 @@ def test_the_wrappers_hand_over_the_right_values():
     out = add_word.AddWord(word="bread", learner_id="17", active_language="es").run()
     check("Add Word passes (word, learner_id, active_language) and returns the text", seen["add"] == ("bread", "17", "es") and out == "added", str(seen))
     out = story_tool.StoryGeneratorTool(language="French", story_type="dialogue", topic="a market", difficulty="easy", learner_id="17",
-                                        active_language="es", set_ids="0,4").run()
+                                        active_language="es", set_ids="0,4", length="300").run()
     check("Story tool passes (language, learner_id, active_language, story_type, topic, difficulty) and set_ids, and returns the story as a message",
           seen["story"] == ("French", "17", "es", "dialogue", "a market", "easy") and seen["story_kw"]["set_ids"] == "0,4" and out.text == "a story", str(seen))
+    check("the Story tool passes the length the Agent gave on as it is (the tool cleans it)", seen["story_kw"]["length"] == "300", str(seen))
     check("with no own-model inputs the Story tool passes nothing (so it uses the shared model)", not any(seen["story_kw"]["own_model"]), str(seen))
     seen.clear()
     story_tool.StoryGeneratorTool(language="French", learner_id="17", active_language="es", own_model_name="gpt-x",
@@ -77,6 +78,7 @@ def test_the_wrappers_hand_over_the_right_values():
           seen["story_kw"]["own_model"] == ("gpt-x", "http://api:8000/internal/v1", "tt-abc"), str(seen))
     seen.clear()
     story_tool.StoryGeneratorTool(language="French", learner_id="17", active_language="es").run()
+    check("with no length the Story tool passes it on blank", not seen["story_kw"]["length"], str(seen))
     check("with no type or topic the Story tool passes them on blank (None or an empty string), and the tool then chooses",
           seen["story"][:3] == ("French", "17", "es") and all(not v for v in seen["story"][3:]) and len(seen["story"]) == 6, str(seen))
     out = word_loader.WordLoader(learner_id="17", active_language="es").run()

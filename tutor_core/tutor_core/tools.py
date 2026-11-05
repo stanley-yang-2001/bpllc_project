@@ -105,6 +105,27 @@ def _tier(value):
     return resolve(name) if name in TIERS else None
 
 
+def _length(value):
+    """The number of words the Agent passed ("300", 300, "about 300 words", "1,000"), kept inside what Story Studio allows (20 to 400, so a
+    longer ask is written at 400); None for blank or anything with no digits in it (never trusted as typed)."""
+    match = re.search(r"\d{1,9}", str(value if value is not None else "").replace(",", ""))
+    if match is None:
+        return None
+    from .difficulty import LIMITS
+    low, high = LIMITS["length"]
+    return max(low, min(high, int(match.group())))
+
+
+def _targets(difficulty, length):
+    """What the story is asked to meet: the tier the Agent named (or none), with the length the learner asked for put in. A length alone
+    starts from the medium tier, as Custom does in Story Studio; a length with a tier keeps that tier's other numbers."""
+    tier, words = _tier(difficulty), _length(length)
+    if words is None:
+        return tier
+    from .difficulty import resolve
+    return {**(tier or resolve("medium")), "tier": "custom", "length": words}
+
+
 def _set_ids(value):
     """The sets the API chose for this chat ("0,3" = General and set 3), or None (all words) for blank or anything not a clean list.
     It is a hidden input set by the API, never by the Agent; an id that is not the learner's matches no words."""
@@ -117,12 +138,13 @@ def _set_ids(value):
     return [int(p) for p in parts]
 
 
-def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, difficulty=None, *, set_ids=None, connect=None, env=None,
-                    call_groq_fn=None, own_model=None) -> str:
+def story_for_agent(language, learner_id, active_language, story_type=None, topic=None, difficulty=None, *, set_ids=None, length=None, connect=None,
+                    env=None, call_groq_fn=None, own_model=None) -> str:
     """`language` is what the Agent passed (the learner may say "a story in French" while Spanish is active); blank means the
     hidden active language. `story_type` and `topic` are what the learner asked for in chat ("a dialogue", "a letter about my
     trip"); both are optional, and blank means "choose for me". generate_story cleans them and refuses a type it cannot use.
-    `difficulty` is "easy", "medium" or "hard" when the learner asked for that; anything else (or blank) means no tier."""
+    `difficulty` is "easy", "medium" or "hard" when the learner asked for that; anything else (or blank) means no tier.
+    `length` is a number of words when the learner asked for one ("a 300-word story"); it is kept inside Story Studio's limits (20 to 400)."""
     learner = resolve_learner(learner_id, env)
     if learner is None:
         return NO_LEARNER_STORY
@@ -140,7 +162,7 @@ def story_for_agent(language, learner_id, active_language, story_type=None, topi
         conn = _open(connect, env)
         try:
             return generate_story(conn, learner, code, call_groq_fn=call_groq_fn, story_type=story_type, topic=topic,
-                              difficulty=_tier(difficulty), set_ids=_set_ids(set_ids)).text
+                              difficulty=_targets(difficulty, length), set_ids=_set_ids(set_ids)).text
         finally:
             conn.close()
     except Exception:  # noqa: BLE001

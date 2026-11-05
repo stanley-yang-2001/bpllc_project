@@ -264,6 +264,23 @@ def test_requested_difficulty_is_checked():
           not all(c["ok"] for c in evaluate_turn(d1, dropped, VOCAB) if c["check"] == "tool argument"))
 
 
+def test_requested_length_is_checked():
+    l1 = {c["id"]: c["turns"][0] for c in CASES}["L1"]
+    long_story = " ".join(["Ana walks to the market and buys bread."] * 40)
+    good = response(long_story, tool_block("story_generator_tool", {"language": "English", "story_type": "", "topic": "", "difficulty": "", "length": "400"}, long_story))
+    check("a 400-word request that reaches the tool as 400 passes every check", all(c["ok"] for c in evaluate_turn(l1, good, VOCAB)))
+    as_words = response(long_story, tool_block("story_generator_tool", {"language": "English", "length": "400 words"}, long_story))
+    check("the number given as '400 words' is accepted too", all(c["ok"] for c in evaluate_turn(l1, as_words, VOCAB)))
+    dropped = response(long_story, tool_block("story_generator_tool", {"language": "English", "story_type": "", "topic": "", "length": ""}, long_story))
+    check("a length that was dropped fails the argument check",
+          not all(c["ok"] for c in evaluate_turn(l1, dropped, VOCAB) if c["check"] == "tool argument"))
+    short = "Ana: Hello.\nBen: Hello.\nAna: Bread, please.\nBen: Here.\nAna: Thank you."
+    five_lines = response(short, tool_block("story_generator_tool", {"language": "English", "length": "400"}, short))
+    check("the five-line dialogue from the bug report fails the length check even when the argument was passed",
+          [c["ok"] for c in evaluate_turn(l1, five_lines, VOCAB) if c["check"] == "reply length"] == [False])
+    check("the length case does not apply the story-shape check", "story quality" not in results_by_name(evaluate_turn(l1, good, VOCAB)))
+
+
 def test_case_catalogue():
     ids = [c["id"] for c in CASES]
     check("case ids are unique", len(ids) == len(set(ids)))
@@ -290,6 +307,7 @@ def main():
     test_reply_that_differs_from_the_tool_output_is_caught()
     test_english_story_quality_uses_the_vocabulary_rules()
     test_requested_difficulty_is_checked()
+    test_requested_length_is_checked()
     test_no_tool_expected()
     test_add_word_turns()
     test_empty_vocabulary_guard()
@@ -299,6 +317,7 @@ def main():
     test_request_error()
     test_requested_kind_and_topic_are_checked()
     test_requested_difficulty_is_checked()
+    test_requested_length_is_checked()
     test_case_catalogue()
     print()
     if failures:

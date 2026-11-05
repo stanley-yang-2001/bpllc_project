@@ -1586,5 +1586,27 @@
    "privacy",
    "testing"
   ]
+ },
+ {
+  "title": "Length for chat stories",
+  "status": "In review",
+  "area": "chat",
+  "date": "2026-11-05",
+  "summary": "'Create a story in English with more than 400 words' gave a five-line dialogue because the chat story tool knew only easy, medium and hard. The tool now takes a length in words (20 to 400, Story Studio's Custom limits; more than 400 is written at 400). Built and tested here; routing case L1 checks it on your stack.",
+  "done": [
+   "length input on the Story Generator Tool and in the flow",
+   "_length and _targets in tutor_core.tools (digits only, clamped)",
+   "Agent instructions pass digits, 400 for 'more than 400'",
+   "Routing case L1 (argument reaches the tool, reply at least 250 words)",
+   "Tests (core/API, flow file, wrappers, routing)"
+  ],
+  "todo": [
+   "Apply patch 0050, rebuild, run run-checks.bat --round and send REPORT.txt",
+   "Decide whether the chat should say when 400 was the cap (needs a notice from the API)"
+  ],
+  "labels": [
+   "chat",
+   "stories"
+  ]
  }
 ]

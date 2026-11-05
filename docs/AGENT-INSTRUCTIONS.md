@@ -19,6 +19,10 @@ You are a language tutor with two tools: Add Word and Story Generator Tool.
   "tell me a story" or "create a story in Spanish" leaves story_type empty.
 - If the user asks for an easy, medium or hard story, pass that word as
   difficulty. Leave it out otherwise; never invent it.
+- If the user asks for a length in words (for example "a 300-word story" or
+  "more than 400 words"), pass the number as digits as length: 300, or 400 for
+  more than 400, which is the longest possible. "Long" or "short" is not a
+  number: leave length out. Never invent it.
 
 RULES FOR YOUR REPLY AFTER A TOOL CALL:
 - The tool's output is the complete, final answer. Reply with that text exactly,
@@ -43,6 +47,7 @@ If the message needs no tool, reply briefly.
   trip" on, so every chat story was the tool's random choice. They are optional, short and plain: the tool cleans them and
   refuses a type it cannot use (tutor_core.prompts), so the Agent is told what to pass, not what is allowed. "Never invent
   them" keeps a plain "tell me a story" random. Found in the 19 Oct routing run (case M1, turn 1): the tool text listed "story" as a kind, so "Create a story in English" came through as story_type="story", which is one fixed kind (a looser vocabulary rule) and failed the stray-word check. Both texts now say the plain word "story" is not a kind.
+- **length (added with the chat length option, 5 Nov 2026)**: "create a story in English with more than 400 words" came back as a five-line dialogue because the tool only knew easy, medium and hard. `length` is a number of words; the tool keeps it between 20 and 400 (Story Studio's Custom limits), so a longer ask is written at 400. The Agent is told what to pass ("400 for more than 400"), not what is allowed, and that "long" is not a number so a plain "a long story" stays at the tutor's own length. The reply is the tool's output exactly (the relay), so the cap is not announced in the chat.
 - **No "call a tool at most once" rule**: an earlier version had one, and the Agent's leaked
   reasoning showed it confusing that rule with earlier turns. The story cache already absorbs
   repeated calls.

@@ -19,8 +19,8 @@ request with an HTTP 1010).
 M3: the pipeline is tutor_core.story and the tool logic is tutor_core.tools.story_for_agent (tested in
 api/tests/test_tutor_core_story.py and test_tutor_tools.py). The story is built from the CALLING LEARNER's words in the
 chosen language only; `learner_id` and `active_language` are hidden inputs set by the API, and without a usable
-learner the tool refuses (fail closed). The visible `language`, `story_type`, `topic` and `difficulty` arguments are what the Agent
-fills in; the last three are optional and carry what the learner asked for in chat ("a dialogue", "a letter about my trip", "an easy story").
+learner the tool refuses (fail closed). The visible `language`, `story_type`, `topic`, `difficulty` and `length` arguments are what the Agent
+fills in; the last four are optional and carry what the learner asked for in chat ("a dialogue", "a letter about my trip", "an easy story", "300 words").
 A type or topic the tool cannot use is cleaned or refused inside tutor_core.prompts, never passed into the prompt as it came.
 """
 
@@ -70,6 +70,13 @@ class StoryGeneratorTool(Component):
             display_name="Difficulty",
             info="Optional. Only if the learner asked for an easy, medium or hard story: pass easy, medium or hard. "
                  "Leave blank otherwise.",
+            value="",
+            tool_mode=True,
+        ),
+        MessageTextInput(
+            name="length",
+            display_name="Length (words)",
+            info="Optional. Only if the learner asked for a length in words (for example '400 words' or 'about 150 words'): pass the number as digits, such as 300. A story of at most 400 words is possible; for more than 400 pass 400. Words like 'long' or 'short' are not a number: leave this blank. Leave blank otherwise.",
             value="",
             tool_mode=True,
         ),
@@ -131,7 +138,7 @@ class StoryGeneratorTool(Component):
 
     def run(self) -> Message:
         message = Message(text=story_for_agent(self.language, self.learner_id, self.active_language,
-                                               self.story_type, self.topic, self.difficulty, set_ids=self.set_ids,
+                                               self.story_type, self.topic, self.difficulty, set_ids=self.set_ids, length=self.length,
                                                own_model=(self.own_model_name, self.own_model_url, self.own_model_token)))
         self.status = message
         return message
