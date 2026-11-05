@@ -34,7 +34,7 @@ run-checks.bat --list               # every check and what its failure means
 | `container-tests` | stack | every test file inside the Langflow container, where the tools really run |
 | `e2e` | stack | Playwright in a real browser: sign-up to saved story and practice |
 | `m3-live` | live | a learner's tools fail closed: the Agent cannot reach another learner's words |
-| `routing-live` | live | the chat routing matrix: the right tool and arguments for each request |
+| `routing-live` | live | the chat routing matrix: the right tool and arguments for each request. The kind cases are run more than once (T1 three times, T4 twice) and the pass rate of each is printed, for example `T1 2/3`; a plain story request must leave `story_type` blank |
 | `difficulty-live` | live | stories at Easy, Medium and Hard in all nine languages hit their targets (`--quick`: English and Chinese at Medium) |
 | `rich-kinds-live` | live | diary, letter, place, routine, anecdote and story texts stay near your words (`rich_kinds_check`); run it before setting `TUTOR_RICH_RANDOM=1` |
 | `pos-live` | live | the tutor labels words with the right part of speech in English, Spanish, German, Japanese, Chinese and Korean, and only with that language's own categories |

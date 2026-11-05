@@ -1610,5 +1610,28 @@
    "chat",
    "stories"
   ]
+ },
+ {
+  "title": "More reliable story kinds in chat",
+  "status": "In review",
+  "area": "chat",
+  "date": "2026-11-05",
+  "summary": "'Tell me a dialogue in Spanish' now and then reached the story tool with no kind. The Agent instructions list every kind of text as a reason to call the tool, say a named kind is passed and 'story' alone is not a kind, and give five examples worded differently from the tests. New routing cases T4, T5, T6 and D2; every plain story case must leave the kind blank; T1 and T4 run several times and the runner prints pass rates like T1 2/3.",
+  "done": [
+   "Agent instructions and tool hint rewritten, flow synced",
+   "New routing cases T4, T5, T6, D2",
+   "Plain story cases fail on story_type 'story'",
+   "Per-case repeats with printed pass rates",
+   "Tests with a fake flow that drops the kind every third time"
+  ],
+  "todo": [
+   "Run the round and send REPORT.txt: look at the T1 and T4 pass rates",
+   "If a kind still fails: look at the Agent's own words in the saved routing results before changing the text again"
+  ],
+  "labels": [
+   "chat",
+   "routing",
+   "testing"
+  ]
  }
 ]

@@ -51,9 +51,7 @@ class StoryGeneratorTool(Component):
         MessageTextInput(
             name="story_type",
             display_name="Story type",
-            info="Optional. Only a kind of text the learner NAMED: dialogue, diary, letter, place, routine, anecdote, "
-                 "or a short kind in plain words (for example 'poem'). A plain request for 'a story' names no kind: "
-                 "leave this blank so the tutor chooses.",
+            info="Optional. The kind of text the learner asked for, when they named one: dialogue (also for a conversation or a chat between people), diary, letter, place, routine, anecdote, or a short kind in plain words (for example 'poem'). 'A dialogue', 'a conversation' or 'a letter' NAMES a kind: pass it. The plain word 'story', 'text' or 'passage' names no kind: leave this blank so the tutor chooses.",
             value="",
             tool_mode=True,
         ),

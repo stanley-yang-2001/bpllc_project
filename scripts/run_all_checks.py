@@ -379,7 +379,7 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0051) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0052) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
 ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live", "own-model-chat-live")
 ROUND_MANUAL = [
@@ -393,6 +393,7 @@ ROUND_MANUAL = [
     "Practice > Dictation: press Listen (and the slow one), type the word with a missing accent, then a wrong word. Check the three messages. In a browser with no voice for the language the card should say so instead of offering Start.",
     "Download my data (Settings): the file lists word_progress and practice_days.",
     "Story Studio > Difficulty: pick Easy, Medium, Hard and Custom. The sizes shown under the list and the limits for your own numbers come from the API; check they match the difficulty guide (Hard: about 200 words, 8 of your words, 20% unusual).",
+    "Chat kinds: ask the tutor 'Write a postcard in German about my holiday', 'Make a chat in Italian at a train station' and 'I\'d like an easy poem in Portuguese'. Each should come back as that kind of text (a postcard, a dialogue, a short poem) in that language. routing-live checks other wordings of the same requests; these three are the ones the Agent instructions use as examples.",
     "Chat length: ask the tutor 'Create a story in English with more than 400 words' and then 'Write an easy story in English of about 150 words'. The first should come back at about 400 words (the longest possible; the chat does not say so), the second at about 150 and easy. A plain 'Create a story in English' should still be short.",
     "Phase 2 (chat on your own model; docs/CUSTOM-MODEL-DESIGN.md section 10.3): own-model-chat-live above checks the plumbing with a fake provider. By hand, with your real provider: set CHAT_OWN_MODEL=1, switch your account on, save a model in Settings > My model, chat and ask for a story; both should come from your model (check your provider's usage page). Then save a wrong key and chat again: the error should say to check the key, and nothing should come from the shared model.",
     "Chat: ask the tutor for a story, then for one with your sets ticked differently the second time. Check the story, its Read aloud and Save buttons still work after the Langflow rebuild (the relay code changed).",

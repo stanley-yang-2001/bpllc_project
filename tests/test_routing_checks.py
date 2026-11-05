@@ -24,9 +24,11 @@ sys.path.insert(0, "/app/scripts")
 
 from routing_checks import (  # noqa: E402
     CASES,
+    NO_KIND,
     evaluate_turn,
     final_text,
     find_tool_calls,
+    repeat_summary,
     with_tool_blocks,
 )
 
@@ -281,6 +283,55 @@ def test_requested_length_is_checked():
     check("the length case does not apply the story-shape check", "story quality" not in results_by_name(evaluate_turn(l1, good, VOCAB)))
 
 
+def test_a_plain_story_request_must_not_pass_the_word_story_as_a_kind():
+    s2 = {c["id"]: c["turns"][0] for c in CASES}["S2"]
+    def args_ok(args):
+        r = response(SPANISH_STORY, tool_block("story_generator_tool", args, SPANISH_STORY))
+        return all(c["ok"] for c in evaluate_turn(s2, r, VOCAB) if c["check"] == "tool argument")
+    check("a plain story request with no kind passes", args_ok({"language": "Spanish"}))
+    check("a blank kind passes", args_ok({"language": "Spanish", "story_type": "", "topic": ""}))
+    check("'random' (the tool treats it as no kind) passes", args_ok({"language": "Spanish", "story_type": "random"}))
+    check("the word 'story' passed as the kind fails (a fixed kind with a looser vocabulary rule)", not args_ok({"language": "Spanish", "story_type": "story"}))
+    check("a made-up kind for a plain request fails", not args_ok({"language": "Spanish", "story_type": "fairy tale"}))
+    check("every plain story turn carries the check", all(NO_KIND in t.get("args", []) for c in CASES for t in c["turns"] if c["id"] in ("S1", "S2", "S3", "S4", "M1")))
+
+
+def test_kinds_named_in_other_wordings_are_checked():
+    by_id = {c["id"]: c["turns"][0] for c in CASES}
+    def args_pass(case, args, text):
+        r = response(text, tool_block("story_generator_tool", args, text))
+        return all(c["ok"] for c in evaluate_turn(by_id[case], r, VOCAB) if c["check"] == "tool argument")
+    es = "Ana: Hola.\nLuis: Hola, amigo.\nAna: Gracias.\nLuis: Adiós.\nAna: Vamos.\nLuis: Sí."
+    check("T4: a conversation at a cafe passes as a dialogue with the setting as the topic",
+          args_pass("T4", {"language": "Spanish", "story_type": "dialogue", "topic": "two friends at a cafe"}, es))
+    check("T4: the setting dropped fails", not args_pass("T4", {"language": "Spanish", "story_type": "dialogue", "topic": ""}, es))
+    check("T4: the kind dropped fails", not args_pass("T4", {"language": "Spanish", "story_type": "", "topic": "a cafe"}, es))
+    en = "Dear diary,\nToday I walked home.\nI saw a dog.\nBye."
+    check("T5: a diary entry about my day passes", args_pass("T5", {"language": "English", "story_type": "diary", "topic": "my day"}, en))
+    check("T5: a letter instead of a diary fails", not args_pass("T5", {"language": "English", "story_type": "letter", "topic": "my day"}, en))
+    fr = "Hier, j'ai perdu mon parapluie.\nIl pleuvait.\nJe suis rentré mouillé."
+    check("T6: an anecdote about a lost umbrella passes", args_pass("T6", {"language": "French", "story_type": "anecdote", "topic": "a lost umbrella"}, fr))
+    check("T6: the subject dropped fails", not args_pass("T6", {"language": "French", "story_type": "anecdote", "topic": ""}, fr))
+    check("D2: an easy dialogue passes with both arguments", args_pass("D2", {"language": "Spanish", "story_type": "dialogue", "difficulty": "easy"}, es))
+    check("D2: the difficulty dropped fails", not args_pass("D2", {"language": "Spanish", "story_type": "dialogue", "difficulty": ""}, es))
+    check("D2: the kind dropped fails", not args_pass("D2", {"language": "Spanish", "story_type": "", "difficulty": "easy"}, es))
+
+
+def test_cases_that_run_more_than_once_and_their_pass_rates():
+    times = {c["id"]: c.get("times", 1) for c in CASES}
+    check("every 'times' is a whole number from 1 to 5", all(isinstance(n, int) and 1 <= n <= 5 for n in times.values()))
+    check("T1 (the dialogue that once lost its kind) runs three times and T4 twice", times["T1"] == 3 and times["T4"] == 2)
+    check("only the kind cases are repeated: the rest cost no extra Groq calls", {k for k, n in times.items() if n > 1} == {"T1", "T4"})
+    ok = {"checks": [{"ok": True}]}
+    bad = {"checks": [{"ok": False}]}
+    info = {"checks": [{"ok": False, "info": True}]}
+    results = [{"case": "T1", "repeat": 1, "turns": [ok]}, {"case": "T1", "repeat": 2, "turns": [bad]}, {"case": "T1", "repeat": 3, "turns": [info]},
+               {"case": "A1", "repeat": 1, "turns": [bad]}, {"case": "M1", "repeat": 1, "turns": [ok, bad]}, {"case": "M1", "repeat": 2, "turns": [ok, ok]}]
+    check("a run passes when none of its checks failed (info lines do not count); single runs are not summarised",
+          repeat_summary(results) == {"T1": (2, 3), "M1": (1, 2)})
+    check("no repeated cases, nothing to summarise", repeat_summary([{"case": "A1", "repeat": 1, "turns": [ok]}]) == {})
+
+
 def test_case_catalogue():
     ids = [c["id"] for c in CASES]
     check("case ids are unique", len(ids) == len(set(ids)))
@@ -318,6 +369,9 @@ def main():
     test_requested_kind_and_topic_are_checked()
     test_requested_difficulty_is_checked()
     test_requested_length_is_checked()
+    test_a_plain_story_request_must_not_pass_the_word_story_as_a_kind()
+    test_kinds_named_in_other_wordings_are_checked()
+    test_cases_that_run_more_than_once_and_their_pass_rates()
     test_case_catalogue()
     print()
     if failures:

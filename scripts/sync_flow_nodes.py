@@ -78,9 +78,7 @@ def model_base_url_field():
 VISIBLE = {
     "StoryGeneratorTool-RQpvc": {
         "story_type": ("Story type",
-                       "Optional. Only a kind of text the learner NAMED: dialogue, diary, letter, place, routine, anecdote, "
-                       "or a short kind in plain words (for example 'poem'). A plain request for 'a story' names no kind: "
-                       "leave this blank so the tutor chooses."),
+                       "Optional. The kind of text the learner asked for, when they named one: dialogue (also for a conversation or a chat between people), diary, letter, place, routine, anecdote, or a short kind in plain words (for example 'poem'). 'A dialogue', 'a conversation' or 'a letter' NAMES a kind: pass it. The plain word 'story', 'text' or 'passage' names no kind: leave this blank so the tutor chooses."),
         "topic": ("Topic",
                   "Optional. What the text should be about, in a few plain words (for example 'my trip to the market'). "
                   "Leave blank to let the tutor choose."),

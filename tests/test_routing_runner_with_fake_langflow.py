@@ -51,7 +51,7 @@ STORIES = {
 GUARD = "You don't have any vocabulary yet! Add some words first."
 NAMES = {"en": "English", "es": "Spanish", "fr": "French", "ja": "Japanese"}
 CODES = {name.lower(): code for code, name in NAMES.items()}
-STATE = {"words": {}, "seeded": {}, "bug": None, "last_language": {}, "key_created": False, "tweaks_seen": [],
+STATE = {"words": {}, "seeded": {}, "bug": None, "last_language": {}, "key_created": False, "tweaks_seen": [], "typed_calls": 0,
          "next_id": 100, "created": set(), "created_ever": False, "leftover": set()}
 
 
@@ -121,13 +121,19 @@ def reply_for(message, session, learner, language):
             out = f"'{word}' is already in your {name} vocabulary." if word in have else f"Added '{word}' to your {name} vocabulary."
             have.add(word)
         return build_response(out, [tool("add_word", {"word": m.group(1)}, out)])
-    typed = re.match(r"(?:tell me|write) (?:a|an) (dialogue|letter|poem) in (\w+)(?: about (.*))?$", low)
-    if typed:                                          # a request that names a kind of text (and maybe a subject)
-        kind, lang, about = typed.group(1), typed.group(2).capitalize(), typed.group(3)
+    typed = re.match(r"(?:tell me|write|make) (?:me )?(?:a|an) (?:(easy|medium|hard) )?(?:short )?(dialogue|conversation|letter|poem|diary entry|anecdote)"
+                     r" in (\w+)(?: (?:about|between|at) (.*))?$", low)
+    if typed:                                          # a request that names a kind of text (and maybe a tier and a subject)
+        tier, kind, lang, about = typed.group(1), typed.group(2), typed.group(3).capitalize(), typed.group(4)
         words = STATE["words"].get(learner, {}).get(CODES.get(lang.lower(), "en"), set()) if learner is not None else None
         out = ("I can't write a story right now: I don't know whose vocabulary to use." if learner is None
                else GUARD if not words else STORIES.get(lang.lower(), STORIES["english"]))
         args = {"language": lang, "story_type": kind, "topic": about or ""}
+        if tier:
+            args["difficulty"] = tier
+        STATE["typed_calls"] += 1
+        if STATE["bug"] == "drop_kind_third" and STATE["typed_calls"] % 3 == 0:
+            args["story_type"] = ""                    # the flake seen live: the kind named by the learner does not reach the tool
         return build_response(out, [tool("story_generator_tool", args, out)])
     if "story" in low and ("in " in low):
         lang = "japanese" if "\u65e5\u672c\u8a9e" in message else re.search(r"in (\w+)", low).group(1)
@@ -151,6 +157,8 @@ def reply_for(message, session, learner, language):
         if STATE["bug"] == "rewrite_reply":
             text = out.splitlines()[0] + " ... (Note: intentionally short)"
         args = {"language": shown_arg}
+        if STATE["bug"] == "story_as_kind":
+            args["story_type"] = "story"               # the word "story" passed on as a kind (case M1 of 19 Oct)
         tier = re.search(r"\b(easy|medium|hard)\b", low)
         if tier:                                       # the tool's optional difficulty, passed only when the learner named one
             args["difficulty"] = tier.group(1)
@@ -221,7 +229,7 @@ def run(argv):
 
 
 def reset(bug=None):
-    STATE.update(words={}, seeded={}, bug=bug, last_language={}, key_created=False, tweaks_seen=[], created=set(),
+    STATE.update(words={}, seeded={}, bug=bug, last_language={}, key_created=False, tweaks_seen=[], typed_calls=0, created=set(),
                  created_ever=False, leftover=set())
 
 
@@ -337,6 +345,22 @@ def main():
         reset("english_in_spanish")
         code, out = run(common + ["--only", "S2"])
         check("an English story for a Spanish request fails the run", code == 1 and "story quality" in out and "english" in out.lower())
+
+        # the kind cases are run more than once and each pass rate is printed (0052)
+        reset()
+        code, out = run(common + ["--only", "T1,T4", "--skip-empty-vocab"])
+        check("a case with its own \"times\" runs that many times and the pass rates are printed", code == 0 and "T1 3/3" in out and "T4 2/2" in out, out[-400:])
+        check("the kinds named in other wordings (conversation, diary entry, anecdote, an easy dialogue) pass on a healthy flow",
+              run(common + ["--only", "T4,T5,T6,D2", "--skip-empty-vocab"])[0] == 0)
+        reset("drop_kind_third")
+        code, out = run(common + ["--only", "T1", "--skip-empty-vocab"])
+        check("a kind that reaches the tool only 2 times in 3 fails the run and says 2/3", code == 1 and "T1 2/3" in out and "story_type" in out, out[-500:])
+        reset("story_as_kind")
+        code, out = run(common + ["--only", "S2", "--skip-empty-vocab"])
+        check("the word 'story' passed on as a kind is caught", code == 1 and "story_type" in out and "[FAIL]" in out, out[-400:])
+        reset()
+        code, out = run(["--list"])
+        check("--list says which cases run more than once", "run 3 times" in out and "run 2 times" in out)
 
         # the response listed every tool call twice
         reset("duplicate_blocks")

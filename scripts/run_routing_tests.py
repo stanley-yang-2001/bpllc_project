@@ -22,6 +22,7 @@ First time, check that the response is parsed correctly:
     docker compose exec langflow python /app/scripts/run_routing_tests.py --flow-id <flow-id> --only N1,S1 --debug
 
 Useful options: --only A1,S2   --list   --repeat 3   --delay 20   --skip-empty-vocab   --cleanup-leftover
+(a case with "times" in routing_checks.py, such as T1, is run that many times whatever --repeat says; the pass rate of each is printed)
 --tweak-keys  the tweak keys of the Add Word and Story Generator Tool nodes (default $LANGFLOW_TWEAK_KEYS, else the
               node ids in flows/language-tutor.json)
 Authentication: --api-key / $LANGFLOW_API_KEY, otherwise it logs in with $LANGFLOW_SUPERUSER /
@@ -44,6 +45,7 @@ sys.path.insert(0, "/app/scripts")
 from routing_checks import (  # noqa: E402
     CASES,
     TEST_WORD,
+    repeat_summary,
     evaluate_turn,
     final_text,
     find_tool_calls,
@@ -262,6 +264,12 @@ def report_turn(case, turn_no, n_turns, spec, checks):
             print(f"         {mark} {c['check']}: {c['detail']}")
 
 
+def times_of(case, args):
+    """How many times a case runs: the --repeat given, or the case's own "times" when that is more (the kind cases are run again because
+    the Agent is a language model: a kind that reaches the tool 2 times in 3 is a finding)."""
+    return max(args.repeat, case.get("times", 1))
+
+
 def selected_cases(only):
     if not only:
         return list(CASES)
@@ -295,7 +303,8 @@ def main(argv=None, db_factory=LearnerDb):
 
     if args.list:
         for c in CASES:
-            print(f"{c['id']:4} {c['name']}  ({len(c['turns'])} turn{'s' if len(c['turns']) > 1 else ''})")
+            print(f"{c['id']:4} {c['name']}  ({len(c['turns'])} turn{'s' if len(c['turns']) > 1 else ''}"
+                  + (f", run {c['times']} times" if c.get("times", 1) > 1 else "") + ")")
         return 0
     if not args.flow_id and not args.cleanup_leftover:
         parser.error("--flow-id is required (the id in the browser URL: localhost:7860/flow/<flow-id>)")
@@ -334,15 +343,17 @@ def main(argv=None, db_factory=LearnerDb):
               + (f", learner {empty_learner} has none" if empty_learner else "") + f"; tweak keys: {', '.join(keys)}.\n")
         full_tweaks = build_tweaks(keys, full, "en")
 
-        for repeat in range(1, args.repeat + 1):
+        for repeat in range(1, max([args.repeat] + [times_of(c, args) for c in normal]) + 1):
             db.remove_test_word(full)       # every repeat starts clean, so A1 can add the word again
             for case in normal:
+                if repeat > times_of(case, args):
+                    continue
                 results.append({"case": case["id"], "name": case["name"], "repeat": repeat,
                                 "turns": run_case(case, args, api_key, vocab, repeat, debug_state, full_tweaks)})
         if empty:
             empty_tweaks = build_tweaks(keys, empty_learner, "en")
             for case in empty:
-                for repeat in range(1, args.repeat + 1):
+                for repeat in range(1, times_of(case, args) + 1):
                     results.append({"case": case["id"], "name": case["name"], "repeat": repeat,
                                     "turns": run_case(case, args, api_key, "", repeat, debug_state, empty_tweaks)})
     except KeyboardInterrupt:
@@ -355,6 +366,9 @@ def main(argv=None, db_factory=LearnerDb):
     failed_turns = sum(1 for r in results for t in r["turns"] if any(not c["ok"] and not c.get("info") for c in t["checks"]))
     failed_cases = sorted({r["case"] for r in results for t in r["turns"] if any(not c["ok"] and not c.get("info") for c in t["checks"])})
     print(f"\nTurns: {total_turns - failed_turns}/{total_turns} passed" + (f"   Failing cases: {', '.join(failed_cases)}" if failed_cases else ""))
+    rates = repeat_summary(results)
+    if rates:
+        print("Repeated cases (runs that passed every check): " + ", ".join(f"{case} {passed}/{runs}" for case, (passed, runs) in sorted(rates.items())))
     lat = sorted(t["latency"] for r in results for t in r["turns"] if t.get("latency") is not None)
     if lat:
         print(f"Turn latency (Agent + tool + relay), {len(lat)} turns: p50 {lat[len(lat) // 2]:.1f}s, "

@@ -34,6 +34,10 @@ GUARD_MARKER = "don't have any vocabulary yet"
 
 TEST_WORD = "autotestapple"  # removed from the vocabulary again after the run
 
+SPANISH = ["spanish", "español", "espanol"]
+FRENCH = ["french", "français", "francais"]
+DIALOGUE_WORDS = ["dialogue", "dialogo", "diálogo", "conversation", "conversación", "conversacion"]
+
 
 def _typed(say, languages, extra, quality=True):
     """A story request that also names a kind of text and/or a subject. `extra` is a list of argument checks on the story
@@ -45,8 +49,13 @@ def _typed(say, languages, extra, quality=True):
     return turn
 
 
+NO_KIND = {"key": "story_type", "any_of": ["", "random"]}      # "a story" names no kind: the word must not reach the tool as one
+
+
 def _story(say, languages, kind):
-    turn = {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "story": kind}
+    """A plain story request: the right language, and no kind (the word "story" once reached the tool as story_type, a fixed kind
+    with a looser vocabulary rule, case M1 of 19 Oct)."""
+    turn = {"say": say, "tool": "story", "arg": {"key": "language", "any_of": languages}, "args": [NO_KIND], "story": kind}
     if kind == "other":
         turn["language"] = languages[0].capitalize()  # the story must really be written in it
     return turn
@@ -75,9 +84,10 @@ CASES = [
         _story("Create a story in Spanish", ["spanish", "español", "espanol"], "other"),
         _story("Create a story in English", ["english"], "english"),
         _story("Create a story in French", ["french", "français", "francais"], "other")]},
-    {"id": "T1", "name": "A requested kind of text reaches the tool (a dialogue)", "turns": [
-        _typed("Tell me a dialogue in Spanish", ["spanish", "español", "espanol"],
-               [{"key": "story_type", "any_of": ["dialogue", "dialogo", "diálogo", "conversation", "conversación", "conversacion"]}])]},
+    # "times": the case is run that many times in one run (fresh sessions), because the Agent is a language model and a kind that
+    # reaches the tool 2 times in 3 is a finding, not a pass. The runner prints each repeated case's pass rate.
+    {"id": "T1", "name": "A requested kind of text reaches the tool (a dialogue)", "times": 3, "turns": [
+        _typed("Tell me a dialogue in Spanish", SPANISH, [{"key": "story_type", "any_of": DIALOGUE_WORDS}])]},
     {"id": "T2", "name": "A requested kind and subject reach the tool (a letter about a market)", "turns": [
         _typed("Write a letter in French about a trip to the market", ["french", "français", "francais"],
                [{"key": "story_type", "any_of": ["letter", "lettre"]}, {"key": "topic", "contains": ["market", "marché", "marche"]}],
@@ -85,6 +95,20 @@ CASES = [
     {"id": "T3", "name": "A kind of the learner's own reaches the tool (a poem)", "turns": [
         _typed("Write a poem in Spanish", ["spanish", "español", "espanol"],
                [{"key": "story_type", "any_of": ["poem", "poema", "a poem"]}], quality=False)]},
+    # Other wordings of the same requests (the Agent's own examples use different ones, so these measure more than recall of the prompt).
+    {"id": "T4", "name": "A conversation with a setting reaches the tool as a dialogue", "times": 2, "turns": [
+        _typed("Make a short conversation in Spanish between two friends at a cafe", SPANISH,
+               [{"key": "story_type", "any_of": DIALOGUE_WORDS}, {"key": "topic", "contains": ["cafe", "café", "friends", "amigos"]}])]},
+    {"id": "T5", "name": "A diary entry about the learner's day reaches the tool", "turns": [
+        _typed("Write me a diary entry in English about my day", ["english"],
+               [{"key": "story_type", "any_of": ["diary", "diary entry", "journal"]}, {"key": "topic", "contains": ["day"]}], quality=False)]},
+    {"id": "T6", "name": "An anecdote about something specific reaches the tool", "turns": [
+        _typed("Write a short anecdote in French about a lost umbrella", FRENCH,
+               [{"key": "story_type", "any_of": ["anecdote", "anecdote courte", "short anecdote"]}, {"key": "topic", "contains": ["umbrella", "parapluie"]}],
+               quality=False)]},
+    {"id": "D2", "name": "A kind and a difficulty together reach the tool (an easy dialogue)", "turns": [
+        _typed("Write an easy dialogue in Spanish", SPANISH,
+               [{"key": "story_type", "any_of": DIALOGUE_WORDS}, {"key": "difficulty", "any_of": ["easy"]}])]},
     {"id": "D1", "name": "A requested difficulty reaches the tool (an easy story)", "turns": [
         _typed("Tell me an easy story in French", ["french", "français", "francais"],
                [{"key": "difficulty", "any_of": ["easy"]}])]},
@@ -299,3 +323,14 @@ def evaluate_turn(spec, resp, vocab, error=None, max_oov=5):
         checks.append(_c("story quality", result["passed"], detail, info))
 
     return checks
+
+
+def repeat_summary(results):
+    """{case id: (runs that passed every check, runs)} for the cases that ran more than once in a run. `results` is the runner's list of
+    {"case", "repeat", "turns": [{"checks": [...]}]}; a run fails when any non-info check of any of its turns failed."""
+    runs = {}
+    for r in results:
+        failed = any(not c["ok"] and not c.get("info") for t in r["turns"] for c in t["checks"])
+        passed, total = runs.get(r["case"], (0, 0))
+        runs[r["case"]] = (passed + (0 if failed else 1), total + 1)
+    return {case: counts for case, counts in runs.items() if counts[1] > 1}
