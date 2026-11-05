@@ -1,0 +1,10 @@
+# Used only by run-checks.bat for the own-model-chat-live check (api/scripts/own_model_chat_check.py): it switches on, for the API only,
+# what that check needs. Put the stack back afterwards with `docker compose up -d api`.
+#   docker compose -f docker-compose.yml -f docker-compose.own-model-check.yml up -d api
+# ALLOW_PRIVATE_MODEL_URLS lets the check's fake provider (on the API container's own loopback) be saved as a model; a real stack leaves it 0.
+services:
+  api:
+    environment:
+      - CHAT_OWN_MODEL=1
+      - ALLOW_PRIVATE_MODEL_URLS=1
+      - MODEL_KEY_SECRET=${MODEL_KEY_SECRET:-own-model-check-secret-0000-not-for-real-keys}

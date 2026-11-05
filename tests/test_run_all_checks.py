@@ -167,6 +167,75 @@ def test_main_exit_codes_with_fake_stages():
         rc.ROOT = saved_root
 
 
+# --- the own-model chat stage: the API is always put back ------------------------------------------------------------------
+
+class FakeRunner:
+    """Just enough of Runner for stage_own_model_chat: records each command and answers with the exit code chosen for it."""
+    def __init__(self, code_for):
+        import types
+        self.calls, self.code_for = [], code_for
+        self.args = types.SimpleNamespace(pause=20)
+
+    def compose(self, *args):
+        return ["docker", "compose", *args]
+
+    def sh(self, cmd, **_kw):
+        self.calls.append(cmd)
+        return self.code_for(cmd)
+
+    def tail(self, lines=12):
+        return "tail"
+
+
+def _own_model_stage(code_for):
+    r = FakeRunner(code_for)
+    return rc.stage_own_model_chat(r), r.calls
+
+
+def _is_override_up(cmd):
+    return "docker-compose.own-model-check.yml" in cmd and "up" in cmd
+
+
+def _is_check(cmd):
+    return any("own_model_chat_check.py" in part for part in cmd)
+
+
+def _is_restore(cmd):
+    return cmd[:3] == ["docker", "compose", "up"] and "-f" not in cmd
+
+
+def test_own_model_stage_runs_the_check_on_the_override_and_then_restores_the_api():
+    result, calls = _own_model_stage(lambda cmd: 0)
+    assert result.status == rc.PASS
+    assert [_is_override_up(c) for c in calls] == [True, False, False] and _is_check(calls[1]) and _is_restore(calls[2])
+
+
+def test_own_model_stage_restores_the_api_even_when_the_check_fails_or_crashes():
+    result, calls = _own_model_stage(lambda cmd: 1 if _is_check(cmd) else 0)
+    assert result.status == rc.FAIL and _is_restore(calls[-1])
+
+    def crash(cmd):
+        if _is_check(cmd):
+            raise RuntimeError("boom")
+        return 0
+    r = FakeRunner(crash)
+    try:
+        rc.stage_own_model_chat(r)
+    except RuntimeError:
+        pass
+    assert _is_restore(r.calls[-1])
+
+
+def test_own_model_stage_skips_the_check_when_the_api_cannot_start_with_the_override_and_still_restores():
+    result, calls = _own_model_stage(lambda cmd: 1 if _is_override_up(cmd) else 0)
+    assert result.status == rc.FAIL and not any(_is_check(c) for c in calls) and _is_restore(calls[-1])
+
+
+def test_own_model_stage_fails_loudly_when_the_api_cannot_be_put_back():
+    result, _ = _own_model_stage(lambda cmd: 1 if _is_restore(cmd) else 0)
+    assert result.status == rc.FAIL and "docker compose up -d api" in result.detail
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in list(globals().items()):

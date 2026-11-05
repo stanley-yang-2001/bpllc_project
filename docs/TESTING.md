@@ -40,10 +40,11 @@ run-checks.bat --list               # every check and what its failure means
 | `pos-live` | live | the tutor labels words with the right part of speech in English, Spanish, German, Japanese, Chinese and Korean, and only with that language's own categories |
 | `meanings-live` | live | the tutor writes meanings in the language chosen: your own, the studied one, both, or one picked for a click |
 | `text-tools-live` | live | pinyin, romaji, Korean romanization, English IPA, and translation |
+| `own-model-chat-live` | live | chat on a learner's own model: a scripted fake provider stands in for the learner's model; the real key reaches it only from the API (never Langflow), the story tool's call goes the same way, a refused key does not fall back to the shared model, and the key is in no table (`own_model_chat_check`; the stage recreates the API with `docker-compose.own-model-check.yml` and always puts it back; needs live chat on: `LANGFLOW_API_KEY` and `LANGFLOW_PER_USER_TOOLS=1`) |
 
 ## `--round`: the checks for the current round
 
-`run-checks.bat --round` is one flag for "everything I need to test after applying the latest patches". It rebuilds the stack (`--up` is implied: the round adds migrations 0014 and 0015 and new screens), runs the unit and stack checks, runs only the live checks that touch what changed (`pos-live`, `meanings-live`, `text-tools-live`; the others passed earlier, add `--live` to repeat them), and ends with a checklist of what to try by hand (hearing Japanese read aloud, the voice chooser, each meaning language, the first-run guide and starter packs, Due practice, dictation, parts of speech, the data download, the privacy wording). The checklist is also saved as `manual-checklist.txt` in the report folder. `--skip` and `--pause` still work with it. The list of live checks and the checklist are `ROUND_LIVE` and `ROUND_MANUAL` in `scripts/run_all_checks.py`; they are rewritten at the start of each round.
+`run-checks.bat --round` is one flag for "everything I need to test after applying the latest patches". It rebuilds the stack (`--up` is implied: the round adds migrations 0014 and 0015 and new screens), runs the unit and stack checks, runs only the live checks that touch what changed (`pos-live`, `meanings-live`, `text-tools-live`, `own-model-chat-live`; the others passed earlier, add `--live` to repeat them), and ends with a checklist of what to try by hand (hearing Japanese read aloud, the voice chooser, each meaning language, the first-run guide and starter packs, Due practice, dictation, parts of speech, the data download, the privacy wording). The checklist is also saved as `manual-checklist.txt` in the report folder. `--skip` and `--pause` still work with it. The list of live checks and the checklist are `ROUND_LIVE` and `ROUND_MANUAL` in `scripts/run_all_checks.py`; they are rewritten at the start of each round.
 
 ## Your data is not touched
 
@@ -76,6 +77,10 @@ docker compose exec -T langflow python /app/scripts/m3_check.py --flow-id langua
 docker compose exec -T langflow python /app/scripts/run_routing_tests.py --flow-id language-tutor --delay 20
 docker compose exec -T api python scripts/difficulty_check.py --show
 docker compose exec -T api python scripts/text_tools_check.py
+# chat on your own model (the stage does these three for you; by hand, in this order):
+docker compose -f docker-compose.yml -f docker-compose.own-model-check.yml up -d --no-deps --wait api
+docker compose exec -T api python scripts/own_model_chat_check.py
+docker compose up -d --no-deps --wait api   # back to normal settings
 docker compose exec langflow python /app/scripts/spike_model_tweaks.py --create-flow   # phase 2 spike, docs/CUSTOM-MODEL-DESIGN.md section 9.4
 docker compose exec langflow python /app/scripts/stream_probe.py   # does Langflow send the Agent's words as they are written? (design section 11)
 ```

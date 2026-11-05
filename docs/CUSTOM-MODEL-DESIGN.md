@@ -153,6 +153,16 @@ So **option A (tweaks carry model, key and address) works** on this Langflow ver
 ### 10.5 Not built
 A per-learner model for any other Langflow tool (there is none that calls a model), and the privacy wording for chat on your own model if you want it to differ from the Story Studio sentence you approved on 24 October.
 
+### 10.6 An automatic check on your stack (patch 0049)
+`run-checks.bat --round` now has a stage, `own-model-chat-live` (`api/scripts/own_model_chat_check.py`), so chat on your own model no longer depends on someone trying it by hand. It needs no real provider key. The script starts a small scripted OpenAI-style server inside the API container, signs up two throwaway learners, saves that server as the first learner's model (a made-up key), and then chats through the real API and the real Langflow flow:
+- **Greeting:** the reply comes from the scripted provider, and every call it received carried the learner's key and the saved model name, never a `tt-` throwaway token.
+- **Story:** "tell me a story" makes the Agent call the Story Generator Tool, and the tool's own call also reached the provider with the real key.
+- **Control:** a learner who is not switched on is answered by the shared model, and the provider hears nothing.
+- **Wrong key:** the provider refuses the key; the chat says to check the key (502 `own_model_failed`, or the answer with a notice) and the shared model does not answer instead.
+- **At rest:** the key is searched for in every text and JSON column of every table (Langflow's messages, transactions and builds included) and must be nowhere.
+
+To let the stack accept a provider on the API container's own loopback, the stage recreates only the API with `docker-compose.own-model-check.yml` (`CHAT_OWN_MODEL=1`, `ALLOW_PRIVATE_MODEL_URLS=1`, and a `MODEL_KEY_SECRET` if `.env` has none) and, in a `finally`, runs `docker compose up -d` for the API again, so a failed check cannot leave those settings on. It needs live chat itself to be on (`LANGFLOW_API_KEY`, `LANGFLOW_PER_USER_TOOLS=1`); if it is not, the check stops with one line saying so. The throwaway learners are deleted at the end. Tested here against the real API with a stand-in for Langflow (`api/tests/test_own_model_chat_check.py`) and the stage's restore behaviour (`tests/test_run_all_checks.py`); the first run against real Langflow is yours.
+
 ## 11. Streaming the chat reply (3 November 2026, patch 0045)
 
 Off by default: `CHAT_STREAM=1` in `.env`, then `docker compose up -d api`.

@@ -339,6 +339,22 @@ def stage_text_tools(r: Runner) -> Result:
     return finish(r, r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/text_tools_check.py", "--base", "http://localhost:8000", "--delay", str(max(5, r.args.pause // 2))), timeout=3600))
 
 
+def stage_own_model_chat(r: Runner) -> Result:
+    """Chat on a learner's own model, end to end. The API is recreated with docker-compose.own-model-check.yml (the feature on, private
+    addresses allowed for the check's fake provider), the check runs inside it, and the API is put back as it was, whatever happened."""
+    override = ["-f", "docker-compose.yml", "-f", "docker-compose.own-model-check.yml"]
+    code = r.sh(r.compose(*override, "up", "-d", "--no-deps", "--wait", "api"), timeout=600)
+    try:
+        if code == 0:
+            code = r.sh(r.compose("exec", "-T", "-e", "PYTHONUNBUFFERED=1", "api", "python", "scripts/own_model_chat_check.py", "--base", "http://localhost:8000",
+                                  "--delay", str(max(5, r.args.pause // 2))), timeout=1800)
+    finally:
+        restored = r.sh(r.compose("up", "-d", "--no-deps", "--wait", "api"), timeout=600)
+    if restored != 0:
+        return Result(FAIL, "the API could not be put back to its normal settings: run `docker compose up -d api`. " + r.tail())
+    return finish(r, code)
+
+
 STAGES: list[Stage] = [
     Stage("core", "unit", "tutor_core tests", "a shared rule is wrong (word cleaning, story prompts, quality report, readings)", stage_core, ("docker",)),
     Stage("api", "unit", "API tests (own Postgres)", "the server misbehaves or one learner can see another's data", stage_api, ("docker",)),
@@ -359,12 +375,13 @@ STAGES: list[Stage] = [
     Stage("pos-live", "live", "parts of speech per language (pos_check)", "the tutor labels words with the wrong category, or one outside the language's own list", stage_pos, ("stack", "live-ai")),
     Stage("rich-kinds-live", "live", "richer English kinds stay near your words (rich_kinds_check)", "diary, letter, place, routine, anecdote or story texts use too many words outside the list", stage_rich_kinds, ("stack", "live-ai")),
     Stage("text-tools-live", "live", "pronunciation and translation (text_tools_check)", "pinyin, romaji, Korean, IPA or translations come back wrong", stage_text_tools, ("stack", "live-ai")),
+    Stage("own-model-chat-live", "live", "chat on your own model keeps the key in the API (own_model_chat_check)", "the learner's key reaches Langflow, chat or its story tool bypasses the learner's model, or a refused key falls back to the shared model", stage_own_model_chat, ("stack", "live-ai")),
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0048) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0049) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
-ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live")
+ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live", "own-model-chat-live")
 ROUND_MANUAL = [
     "Vocabulary: the Part of speech column. Pick a label for one word by hand; press 'Label parts of speech' and see the rest get labels; switch to Japanese and check the choices include i-adjective and na-adjective (not plain adjective).",
     "Practice > Parts of speech: answer a round in English, then in a language with its own categories (Japanese or Chinese); check a wrong answer shows the right category.",
@@ -376,7 +393,7 @@ ROUND_MANUAL = [
     "Practice > Dictation: press Listen (and the slow one), type the word with a missing accent, then a wrong word. Check the three messages. In a browser with no voice for the language the card should say so instead of offering Start.",
     "Download my data (Settings): the file lists word_progress and practice_days.",
     "Story Studio > Difficulty: pick Easy, Medium, Hard and Custom. The sizes shown under the list and the limits for your own numbers come from the API; check they match the difficulty guide (Hard: about 200 words, 8 of your words, 20% unusual).",
-    "Phase 2 (chat on your own model; docs/CUSTOM-MODEL-DESIGN.md section 10.3): with CHAT_OWN_MODEL=1, your account switched on and a model saved in Settings > My model, chat with the tutor and ask for a story; both should come from your model (check your provider's usage page). Then save a wrong key and chat again: the error should say to check the key, and nothing should come from the shared model.",
+    "Phase 2 (chat on your own model; docs/CUSTOM-MODEL-DESIGN.md section 10.3): own-model-chat-live above checks the plumbing with a fake provider. By hand, with your real provider: set CHAT_OWN_MODEL=1, switch your account on, save a model in Settings > My model, chat and ask for a story; both should come from your model (check your provider's usage page). Then save a wrong key and chat again: the error should say to check the key, and nothing should come from the shared model.",
     "Chat: ask the tutor for a story, then for one with your sets ticked differently the second time. Check the story, its Read aloud and Save buttons still work after the Langflow rebuild (the relay code changed).",
     "If rich-kinds-live passes: set TUTOR_RICH_RANDOM=1 in docker-compose.yml, rebuild, and make several stories with 'Surprise me' to see diaries, letters and place stories mixed in.",
     "Story Studio, Japanese: make a Japanese story with Difficulty 'Any' and look at its report: it should say how many words are outside your list (or that all are from it) and Looks good. Do the same for Chinese and Korean. Tell me if a good story shows Needs a look because of strays.",

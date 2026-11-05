@@ -1564,5 +1564,27 @@
    "feature",
    "privacy"
   ]
+ },
+ {
+  "title": "Automatic check for chat on your own model",
+  "status": "In review",
+  "area": "testing",
+  "date": "2026-11-05",
+  "summary": "run-checks.bat --round now runs own_model_chat_check: a scripted fake provider plays the learner's model (no real key) and the check proves the key reaches it only from the API, the story tool's call goes the same way, a refused key does not fall back to the shared model, and the key is in no table. Built and tested here against the real API with a stand-in for Langflow; the first run on real Langflow is yours.",
+  "done": [
+   "Check script (api/scripts/own_model_chat_check.py)",
+   "Compose override for the check only, always restored",
+   "Stage own-model-chat-live in the round",
+   "Tests (8 for the check, 4 for the stage)",
+   "Design section 10.6"
+  ],
+  "todo": [
+   "Apply patch 0049, run run-checks.bat --round and send REPORT.txt (needs LANGFLOW_API_KEY and LANGFLOW_PER_USER_TOOLS=1 in .env)"
+  ],
+  "labels": [
+   "chat",
+   "privacy",
+   "testing"
+  ]
  }
 ]

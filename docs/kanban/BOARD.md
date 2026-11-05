@@ -9,7 +9,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 - **Streaming chat reply in the browser** (2026-11-03) — Parked. Built behind CHAT_STREAM=1 (API reads Langflow's stream, the page shows a live draft), but your probe of 4 Nov showed Langflow's Agent sends no word events and a plain answer finishes in about 1.5 s, so nothing visible changes. Code stays, off by default.
 
-## In review (49)
+## In review (50)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -60,6 +60,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Parts of speech for words, tutor labelling and practice** (2026-10-30) — Each word can carry a part of speech from its language's own list; the tutor can label the unlabelled ones; Practice has a parts-of-speech round.
 - **Own-model failure reason shown in chat** (2026-11-03) — When the story tool's call to your own model fails but the Agent still answers, the chat now shows the provider's reason under the reply (key removed) instead of losing it.
 - **Own model for meanings, parts of speech and text tools** (2026-11-03) — Checked in the code: the shared AiRunner already sends tutor-written meanings, parts-of-speech labels, pronunciation and translation through a learner's own model when the account is switched on (a request limit instead of the shared token budget). Nothing new to build; card added so it is on the board.
+- **Automatic check for chat on your own model** (2026-11-05) — run-checks.bat --round now runs own_model_chat_check: a scripted fake provider plays the learner's model (no real key) and the check proves the key reaches it only from the API, the story tool's call goes the same way, a refused key does not fall back to the shared model, and the key is in no table. Built and tested here against the real API with a stand-in for Langflow; the first run on real Langflow is yours.
 
 ## Done (33)
 
