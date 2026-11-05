@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addWord, nav, register, unique } from "./helpers";
+import { addWord, makeStory, nav, register, unique } from "./helpers";
 
 // Runs against the stub tutor (a fixed dialogue) or the live one (a story the model writes), so it never looks for fixed words: a story is on
 // screen when its Save button is, and the Library shows a verdict whichever it is.
@@ -15,8 +15,7 @@ test.describe("Story Studio, Library and Practice", () => {
     await learnerWithWords(page, `story_${unique()}`);
 
     await nav(page, "Studio").click();
-    await page.getByRole("button", { name: "Make a story" }).click();
-    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible({ timeout: 90_000 });
+    await makeStory(page);
     await expect(page.getByRole("button", { name: "Save to library" })).toBeVisible();
     await page.getByRole("button", { name: "Save to library" }).click();
     await expect(page.getByRole("button", { name: "Saved" })).toBeDisabled();
@@ -53,7 +52,7 @@ test.describe("Story Studio, Library and Practice", () => {
   test("a story saved by one learner is invisible to another", async ({ page, browser }) => {
     await learnerWithWords(page, `own_${unique()}`);
     await nav(page, "Studio").click();
-    await page.getByRole("button", { name: "Make a story" }).click();
+    await makeStory(page);
     await page.getByRole("button", { name: "Save to library" }).click();
     await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
 

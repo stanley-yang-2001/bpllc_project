@@ -379,7 +379,7 @@ STAGES: list[Stage] = [
 ]
 BY_ID = {s.id: s for s in STAGES}
 
-# What the current round of changes (patches 0033 to 0050) needs: the unit and stack checks, plus only the live checks that touch what
+# What the current round of changes (patches 0033 to 0051) needs: the unit and stack checks, plus only the live checks that touch what
 # changed. The others (m3-live, routing-live, difficulty-live) passed earlier and nothing in this round reaches them; add --live to run them.
 ROUND_LIVE = ("pos-live", "rich-kinds-live", "routing-live", "meanings-live", "text-tools-live", "own-model-chat-live")
 ROUND_MANUAL = [
@@ -490,6 +490,9 @@ def table(rows: list[tuple[str, str, float, str]]) -> str:
 REPORT_TAIL_LINES = 70          # lines of a failing check's log that go into REPORT.txt
 REPORT_MAX_LOGS = 12            # failing logs quoted at most (the table still lists every check)
 _ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+REPORT_FAILURE_LINES = 30       # lines from the WHOLE log that say something failed, quoted ahead of the tail
+_FAIL_LINE = re.compile(r"\[FAIL\]|\bFAIL(?:ED)?\b|^\s*x\s+\d+\s|Traceback|\b\w*Error\b|test\(s\) failed|\d+ failed")
+_PASS_LINE = re.compile(r"^\s*(\[PASS\]|PASS\b|ok\s+\d+)")
 
 
 def clean_log_lines(text: str) -> list[str]:
@@ -500,6 +503,17 @@ def clean_log_lines(text: str) -> list[str]:
         if line or (out and out[-1]):
             out.append(line)
     return out
+
+
+def failure_lines(lines: list[str], limit: int = REPORT_FAILURE_LINES) -> list[str]:
+    """The lines of a log that report a failure, first to last, each once, not counting the passing ones. The container tests run dozens of
+    scripts one after another and a failure in the third is followed by hundreds of passing lines from the rest, so the tail alone
+    (REPORT_TAIL_LINES) can end with "All tests passed." and hide it (the 0049 and 0050 round)."""
+    found: list[str] = []
+    for line in lines:
+        if _FAIL_LINE.search(line) and not _PASS_LINE.match(line) and line not in found:
+            found.append(line)
+    return found[:limit]
 
 
 def write_report(report_dir: Path, rows: list[tuple[str, str, float, str]], checklist: str = "", tail: int = REPORT_TAIL_LINES) -> Path:
@@ -513,6 +527,9 @@ def write_report(report_dir: Path, rows: list[tuple[str, str, float, str]], chec
         lines = clean_log_lines(log.read_text(encoding="utf-8", errors="replace")) if log.exists() else ["(no log)"]
         cut = len(lines) - tail
         parts += ["", f"=== {name}: {status} " + "=" * 40, (f"(the last {tail} of {len(lines)} lines)" if cut > 0 else f"({len(lines)} lines)")]
+        earlier = [l for l in failure_lines(lines) if l not in lines[max(cut, 0):]] if cut > 0 else []
+        if earlier:
+            parts += ["(lines from the rest of the log that report a failure:)"] + earlier + ["(the end of the log:)"]
         parts += lines[max(cut, 0):]
     if len(bad) > REPORT_MAX_LOGS:
         parts += ["", f"({len(bad) - REPORT_MAX_LOGS} more failing checks: their logs are in {report_dir})"]

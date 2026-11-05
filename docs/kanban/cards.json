@@ -1567,19 +1567,20 @@
  },
  {
   "title": "Automatic check for chat on your own model",
-  "status": "In review",
+  "status": "Done",
   "area": "testing",
   "date": "2026-11-05",
-  "summary": "run-checks.bat --round now runs own_model_chat_check: a scripted fake provider plays the learner's model (no real key) and the check proves the key reaches it only from the API, the story tool's call goes the same way, a refused key does not fall back to the shared model, and the key is in no table. Built and tested here against the real API with a stand-in for Langflow; the first run on real Langflow is yours.",
+  "summary": "run-checks.bat --round runs own_model_chat_check: a scripted fake provider plays the learner's model (no real key) and the check proves the key reaches it only from the API, the story tool's call goes the same way, a refused key does not fall back to the shared model, and the key is in no table. Passed on the owner's stack on its first run (5 Nov, 85 s).",
   "done": [
    "Check script (api/scripts/own_model_chat_check.py)",
    "Compose override for the check only, always restored",
    "Stage own-model-chat-live in the round",
    "Tests (8 for the check, 4 for the stage)",
-   "Design section 10.6"
+   "Design section 10.6",
+   "First run on the owner's stack (5 Nov): PASS"
   ],
   "todo": [
-   "Apply patch 0049, run run-checks.bat --round and send REPORT.txt (needs LANGFLOW_API_KEY and LANGFLOW_PER_USER_TOOLS=1 in .env)"
+   "The by-hand check with a real provider (checklist item 12)"
   ],
   "labels": [
    "chat",
@@ -1598,10 +1599,11 @@
    "_length and _targets in tutor_core.tools (digits only, clamped)",
    "Agent instructions pass digits, 400 for 'more than 400'",
    "Routing case L1 (argument reaches the tool, reply at least 250 words)",
-   "Tests (core/API, flow file, wrappers, routing)"
+   "Tests (core/API, flow file, wrappers, routing)",
+   "Routing case L1 passed live on the owner's stack (5 Nov)"
   ],
   "todo": [
-   "Apply patch 0050, rebuild, run run-checks.bat --round and send REPORT.txt",
+   "By-hand check (checklist item 11)",
    "Decide whether the chat should say when 400 was the cap (needs a notice from the API)"
   ],
   "labels": [

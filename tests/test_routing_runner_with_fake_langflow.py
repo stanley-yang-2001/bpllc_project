@@ -144,6 +144,9 @@ def reply_for(message, session, learner, language):
             out = GUARD if not words else STORIES.get(shown_arg.lower(), STORIES["english"])
         if STATE["bug"] == "english_in_spanish" and arg == "Spanish" and learner is not None and out != GUARD:
             out = STORIES["english"]  # the model ignored the language
+        length = re.search(r"(\d+)[ -]?words?", low)
+        if length and out != GUARD:                    # a length the learner named: the tool gets it as digits and writes a long story
+            out = "\n".join([out] * 12)
         text = out
         if STATE["bug"] == "rewrite_reply":
             text = out.splitlines()[0] + " ... (Note: intentionally short)"
@@ -151,6 +154,8 @@ def reply_for(message, session, learner, language):
         tier = re.search(r"\b(easy|medium|hard)\b", low)
         if tier:                                       # the tool's optional difficulty, passed only when the learner named one
             args["difficulty"] = tier.group(1)
+        if length:                                     # the tool's optional length (patch 0050), passed only when the learner named one
+            args["length"] = length.group(1)
         return build_response(text, [tool("story_generator_tool", args, out)])
     if "story" in low:
         return build_response("Which language would you like?", [])

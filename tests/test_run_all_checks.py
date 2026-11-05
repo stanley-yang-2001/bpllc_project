@@ -130,6 +130,26 @@ def test_report_is_one_file_with_the_table_and_only_the_failing_logs(tmp_path):
     assert "To try by hand" in text
 
 
+def test_report_quotes_a_failure_that_is_far_above_the_end_of_the_log(tmp_path):
+    """The 0049/0050 round: the container tests failed in one script, then dozens of passing scripts followed, so the last 70 lines
+    ended in "All tests passed." and the report did not say what failed."""
+    lines = ["== tests/test_a.py", "[PASS] fine", "[FAIL] a healthy flow passes every turn (exit code 0)", "1 test(s) failed: ['x']"]
+    lines += [f"[PASS] later check {i} (failed logins are counted)" for i in range(300)] + ["All tests passed.", "[exit 1]"]
+    (tmp_path / "container-tests.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    text = rc.write_report(tmp_path, [("container-tests", rc.FAIL, 9.0, "")], tail=20).read_text(encoding="utf-8")
+    assert "[FAIL] a healthy flow passes every turn" in text and "1 test(s) failed" in text
+    assert "later check 5 " not in text, "passing lines that merely contain 'failed' are not quoted"
+    assert text.index("[FAIL] a healthy flow") < text.index("All tests passed."), "the failure comes first, then the end of the log"
+
+
+def test_failure_lines_are_found_once_and_passes_are_left_out():
+    log = ["[PASS] failed logins are counted", "  PASS  test_x", "ok 3 e2e a.spec.ts", "  x  54 e2e\\a.spec.ts:3:3 › a test (1.5m)", "Error: expect(locator).toBeVisible() failed",
+           "Traceback (most recent call last):", "Error: expect(locator).toBeVisible() failed", "2 failed", "plain line"]
+    assert rc.failure_lines(log) == ["  x  54 e2e\\a.spec.ts:3:3 › a test (1.5m)", "Error: expect(locator).toBeVisible() failed",
+                                     "Traceback (most recent call last):", "2 failed"]
+    assert len(rc.failure_lines([f"[FAIL] case {i}" for i in range(100)])) == rc.REPORT_FAILURE_LINES
+
+
 def test_report_stays_small_when_many_checks_fail(tmp_path):
     rows = []
     for i in range(30):

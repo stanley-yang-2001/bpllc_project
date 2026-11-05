@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addWord, nav, register, unique } from "./helpers";
+import { addWord, makeStory, nav, register, unique } from "./helpers";
 
 // Runs against the stub tutor or the live one (a story is on screen when its Save button is; its words are not fixed). Covers the newer controls: the kind-of-story picker with a kind of your own,
 // the topic picker, and the User ID row in Settings.
@@ -23,8 +23,7 @@ test.describe("Story Studio options and Settings", () => {
     await own.fill("a poem");
     await expect(make).toBeEnabled();
 
-    await make.click();
-    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible();
+    await makeStory(page);
     await expect(page.getByRole("button", { name: "Save to library" })).toBeVisible();
   });
 
@@ -37,8 +36,7 @@ test.describe("Story Studio options and Settings", () => {
     await page.getByLabel("Your own kind of text").fill("a diary");
     await expect(hint).toBeHidden();
     await page.getByLabel("Topic").selectOption({ index: 1 });
-    await page.getByRole("button", { name: "Make a story" }).click();
-    await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible({ timeout: 90_000 });
+    await makeStory(page);
   });
 
   test("Settings shows the learner's own User ID in the Account card", async ({ page }) => {

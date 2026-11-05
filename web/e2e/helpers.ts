@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 export const PASSWORD = "password123";
 export const unique = () => Math.random().toString(36).slice(2, 8);
@@ -35,4 +35,20 @@ export async function addWord(page: Page, word: string, meaning?: string) {
   if (meaning) await page.getByLabel("Meaning (optional)").fill(meaning);
   await page.getByRole("button", { name: "Add word" }).click();
   await expect(wordCell(page, word)).toBeVisible();
+}
+
+/** Press "Make a story" and wait for the quality report. A live story comes from Groq, which now and then answers "busy" or is slow, so one
+ *  error is waited out (20 s) and tried once more before the test fails; the failure then says what the screen said. */
+export async function makeStory(page: Page, attempts = 2) {
+  const report = page.getByRole("region", { name: "Quality report" });
+  const failed = page.getByRole("alert");
+  for (let attempt = 1; ; attempt++) {
+    await page.getByRole("button", { name: "Make a story" }).click();
+    await expect(report.or(failed.first())).toBeVisible({ timeout: 60_000 });
+    if (await report.isVisible()) return;
+    const why = (await failed.first().innerText()).trim();
+    if (attempt >= attempts) throw new Error(`Story Studio showed an error on each of ${attempts} tries; the last one was: ${why}`);
+    test.setTimeout(test.info().timeout + 100_000);        // the retry needs its own time
+    await page.waitForTimeout(20_000);
+  }
 }

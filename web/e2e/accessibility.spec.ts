@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { addWord, nav, register, unique } from "./helpers";
+import { addWord, makeStory, nav, register, unique } from "./helpers";
 
 /** Automated checks (axe-core, WCAG 2 A/AA rules including colour contrast) on every screen, in both themes.
  * Automated tools find about a third of accessibility problems; this is a floor, not a certificate. */
@@ -32,8 +32,7 @@ for (const scheme of ["light", "dark"] as const) {
       await register(page, `pat_${unique()}`, "Pat Doe");
       for (const [word, meaning] of [["hello", "a greeting"], ["friend", "someone you like"], ["water", "a drink"], ["please", "polite"], ["goodbye", "parting"]]) await addWord(page, word, meaning);
       await nav(page, "Studio").click();
-      await page.getByRole("button", { name: "Make a story" }).click();
-      await expect(page.getByRole("region", { name: "Quality report" })).toBeVisible({ timeout: 90_000 });
+      await makeStory(page);
       await scan(page, `studio with a story and report (${scheme})`);
       await page.getByRole("button", { name: "Save to library" }).click();
       await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
