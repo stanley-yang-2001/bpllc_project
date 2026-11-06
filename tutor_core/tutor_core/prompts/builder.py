@@ -12,7 +12,9 @@ _LENGTH_PHRASE = re.compile(r"([Aa])im for \d+ to \d+ (?:short )?(sentences|line
 
 _FINISH_RULE = ("The passage ends with the story itself: no thanks, goodbye, notes or translation after the last sentence. "
                 "Before you answer, re-read it once for grammar: articles, verb endings, and gender and number agreement.")
-_BEGIN = "Begin: planning, then delimiter, then passage."
+_NATURAL_RULE = ("Write complete, natural sentences: every sentence has a subject and a verb, with correct grammar. Do not just list words. "
+                 "The text has a beginning, a middle and an end.")
+_BEGIN = "Begin:"          # every template ends with a line that starts like this (the rest of the line differs)
 
 
 def _with_finish_rule(prompt: str) -> str:
@@ -20,6 +22,12 @@ def _with_finish_rule(prompt: str) -> str:
     agreement slips. A short rule before the final instruction, for target-language stories only."""
     i = prompt.rfind(_BEGIN)
     return prompt if i < 0 else prompt[:i] + _FINISH_RULE + "\n\n" + prompt[i:]
+
+
+def _with_natural_rule(prompt: str) -> str:
+    """6 Nov: telegraphic, list-like sentences came out of tight length caps. One short rule for every language but English, before the final instruction."""
+    i = prompt.rfind(_BEGIN)
+    return prompt if i < 0 else prompt[:i] + _NATURAL_RULE + "\n\n" + prompt[i:]
 
 
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
@@ -33,6 +41,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured.
     difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt."""
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
+    if not is_english(normalize_language(language)):       # the English prompts stay exactly as they were (pinned by tests); English grammar is handled by the repair and proofreading calls
+        prompt = _with_natural_rule(prompt)
     if vocab_in_target and not is_english(normalize_language(language)):
         prompt = _with_finish_rule(prompt)
     if difficulty:

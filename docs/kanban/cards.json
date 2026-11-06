@@ -1684,5 +1684,26 @@
     "labels": [
       "docs"
     ]
+  },
+  {
+    "title": "Grammar of generated stories",
+    "status": "In review",
+    "area": "stories",
+    "date": "2026-11-06",
+    "summary": "Code checks for list-like, repeated and monotonous sentences, one repair call naming the problem, an optional proofreading call (STORY_PROOFREAD=1), and a natural-sentence rule in non-English prompts. Rewrites are used only when safe.",
+    "done": [
+      "fluency checks",
+      "repair and proofread prompts",
+      "safe-rewrite rule",
+      "tests"
+    ],
+    "todo": [
+      "Run a story batch with STORY_PROOFREAD=1 and 0 and compare by reading",
+      "Decide: judge model, two-pass draft, example bank (not built)"
+    ],
+    "labels": [
+      "stories",
+      "quality"
+    ]
   }
 ]

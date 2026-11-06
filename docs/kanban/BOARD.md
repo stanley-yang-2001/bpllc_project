@@ -9,7 +9,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 - **Streaming chat reply in the browser** (2026-11-03) — Parked. Built behind CHAT_STREAM=1 (API reads Langflow's stream, the page shows a live draft), but your probe of 4 Nov showed Langflow's Agent sends no word events and a plain answer finishes in about 1.5 s, so nothing visible changes. Code stays, off by default.
 
-## In review (53)
+## In review (54)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -64,6 +64,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **More reliable story kinds in chat** (2026-11-05) — 'Tell me a dialogue in Spanish' now and then reached the story tool with no kind. The Agent instructions list every kind of text as a reason to call the tool, say a named kind is passed and 'story' alone is not a kind, and give five examples worded differently from the tests. New routing cases T4, T5, T6 and D2; every plain story case must leave the kind blank; T1 and T4 run several times and the runner prints pass rates like T1 2/3.
 - **PR description for the local commits** (2026-11-06) — docs/PR-DESCRIPTION.md: 87 commits grouped by theme, migrations 0008 to 0015, new settings, testing notes and what is not in the PR. You post it.
 - **Features document with dates** (2026-11-06) — docs/FEATURES.md lists every feature, the date it was implemented, what it does and whether it has been verified on your stack; linked from the README.
+- **Grammar of generated stories** (2026-11-06) — Code checks for list-like, repeated and monotonous sentences, one repair call naming the problem, an optional proofreading call (STORY_PROOFREAD=1), and a natural-sentence rule in non-English prompts. Rewrites are used only when safe.
 
 ## Done (34)
 

@@ -444,7 +444,10 @@ class Sequence:
         return f"plan\n{prompts.DELIMITER}\n{self.texts[min(len(self.prompts), len(self.texts)) - 1]}"
 
 
-LONG = " ".join(["Ana likes water and bread."] * 11)           # 55 words
+LONG = " ".join(["Ana likes water and bread.", "Her friend Ben comes at noon.", "Together they walk to the market.",
+                 "Water is cold in the morning.", "Ben buys bread for the family.", "The shop owner smiles at them.",
+                 "Later Ana drinks water by the river.", "A small bird sits near her.", "They share the bread with it.",
+                 "Then the friends go home slowly.", "Ana thanks Ben for a lovely day."])           # about 55 words, 11 different sentences (not repetitive)
 SHORT = "Ana: Hello."
 
 

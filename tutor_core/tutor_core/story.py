@@ -10,6 +10,7 @@ and never read or write it. What happens when the first story is not good enough
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass, replace
 from typing import Optional
@@ -133,5 +134,5 @@ def _make_story(conn, request: StoryRequest, call, rng) -> StoryResult:
     if not passage.strip():
         _log.warning("story generation returned no passage (%s); raw length %d", language, len(raw or ""))
         return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
-    passage = RetryPolicy(language, prompt, words, request.difficulty, call).improve(passage)
+    passage = RetryPolicy(language, prompt, words, request.difficulty, call, proofread=os.environ.get("STORY_PROOFREAD") == "1").improve(passage)
     return StoryResult(passage, True, None, **base)

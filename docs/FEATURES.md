@@ -2,7 +2,7 @@
 
 Dates are the day the work was committed or, for the earliest parts, the date the changelog gives. "Patch" numbers are the delivery files (`git am`) and match `CHANGELOG.md`, which has the full detail, numbers and reasons. **Status** says whether the owner has run it: *Verified* means it passed on the owner's machine in a `run-checks.bat --round` or a live run; *Built* means it was written and tested in the build environment and still waits for a run on the owner's stack. Keep this file current: add a row when a feature ships.
 
-Last updated: 6 November 2026 (through patch 0053).
+Last updated: 6 November 2026 (through patch 0055).
 
 ## Timeline: what was built, day by day
 
@@ -29,7 +29,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 3 Nov | One REPORT.txt per run; chat on your own model (option B); own-model failure notice in chat; streaming behind a switch; kanban board generator |
 | 4 Nov | Streaming probe, then streaming parked (off) |
 | 5 Nov | Automatic own-model chat check; length for chat stories (up to 400 words); round fixes; more reliable story kinds in chat |
-| 6 Nov | Features document, PR description, privacy policy options (docs only) |
+| 6 Nov | Features document, PR description, privacy policy options (docs only); grammar checks and repair for generated stories (0055) |
 
 ## 1. The foundation (September to 18 October 2026)
 
@@ -67,6 +67,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | Custom topic in Studio | 24 Oct | "Write my own..." topic, with the same limits and quoting as a custom kind. | Verified |
 | Length and ending fixes | 24 to 25 Oct | Chinese, Japanese and Korean lengths, one more try when the length is far off, cut-off and dangling endings caught, language check for short texts. | Verified |
 | Quality rules, stray words | 25 Oct to 1 Nov | Vocabulary scored outside English; Chinese, Japanese and Korean strays scored too (rules version 5); letter sign-offs finish a story (version 6). | Verified |
+| Grammar and fluency of stories | 6 Nov | Code checks for list-like, repeated and monotonous sentences; one repair call that names the problem; optional grammar proofreading call (`STORY_PROOFREAD=1`); a natural-sentence rule in non-English prompts. A rewrite is used only if still in the language, complete, about as long and keeping your words. | Built |
 | Richer English kinds | 30 Oct | Diary, letter and place stories can return to random picks behind `TUTOR_RICH_RANDOM`, after a stray-word retry. | Verified (check passes; switch off by default) |
 
 ## 4. Vocabulary, practice and reading aloud
