@@ -2,7 +2,34 @@
 
 Dates are the day the work was committed or, for the earliest parts, the date the changelog gives. "Patch" numbers are the delivery files (`git am`) and match `CHANGELOG.md`, which has the full detail, numbers and reasons. **Status** says whether the owner has run it: *Verified* means it passed on the owner's machine in a `run-checks.bat --round` or a live run; *Built* means it was written and tested in the build environment and still waits for a run on the owner's stack. Keep this file current: add a row when a feature ships.
 
-Last updated: 6 November 2026 (through patch 0052).
+Last updated: 6 November 2026 (through patch 0053).
+
+## Timeline: what was built, day by day
+
+Dates are commit dates (UTC), so a late-evening commit in Chicago can show the next day. The themed tables below give the detail and the verification status.
+
+| Date | What became available |
+|---|---|
+| 16 Sep to 18 Oct | Story pipeline and tutor Agent, per-learner tools, web app with accounts and isolation, Story Studio, Library, quality report, practice, preferences, nine site languages, privacy policy as data |
+| 19 Oct | Chat story tool takes a kind and a topic (own kinds allowed); non-English story prompts use the learner's own word list |
+| 20 Oct | Least-privilege database role for the Langflow tools (migration 0008); "story" alone is not a kind |
+| 21 Oct | User ID on Settings; routing cases for kind and topic; plainer English variety |
+| 22 Oct | Language check for own-language word lists; browser tests for the picker and User ID |
+| 23 Oct | Stories enabled in German, Italian, Portuguese, Chinese and Korean |
+| 24 Oct | Custom topic in Studio; fill-in-the-blank for Chinese, Japanese, Korean; chat in the study language (0010); difficulty tiers; own model for stories (0011); everyday-word lists for nine languages |
+| 25 Oct | Length and ending fixes for CJK; cut-off ending check; scored vocabulary outside English; chat story difficulty; kanban script |
+| 26 Oct | Word sets (0012); multiple choice; tutor-written meanings; read aloud; pronunciation guides and translation; sets ticked in the site limit chat stories |
+| 27 Oct | SOLID refactor, diagrams |
+| 28 Oct | One command for every test (`run-checks.bat`) |
+| 29 Oct | Meaning language (0013); voice picker; remembered practice with streak (0014); starter packs and first-run guide; dictation; CI workflow |
+| 30 Oct | `run-checks.bat --round`; parts of speech (0015); richer English kinds switch; back-end splits B3 to B9 |
+| 31 Oct | Splits B10 to B12 and F1 to F9; backlog round |
+| 1 Nov | CJK stray words scored (rules 5); letter sign-offs (rules 6); phase 2 spike |
+| 2 Nov | Spike and test fixes |
+| 3 Nov | One REPORT.txt per run; chat on your own model (option B); own-model failure notice in chat; streaming behind a switch; kanban board generator |
+| 4 Nov | Streaming probe, then streaming parked (off) |
+| 5 Nov | Automatic own-model chat check; length for chat stories (up to 400 words); round fixes; more reliable story kinds in chat |
+| 6 Nov | Features document, PR description, privacy policy options (docs only) |
 
 ## 1. The foundation (September to 18 October 2026)
 
