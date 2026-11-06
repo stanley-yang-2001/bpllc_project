@@ -9,7 +9,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 - **Streaming chat reply in the browser** (2026-11-03) — Parked. Built behind CHAT_STREAM=1 (API reads Langflow's stream, the page shows a live draft), but your probe of 4 Nov showed Langflow's Agent sends no word events and a plain answer finishes in about 1.5 s, so nothing visible changes. Code stays, off by default.
 
-## In review (51)
+## In review (53)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -62,6 +62,8 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Own model for meanings, parts of speech and text tools** (2026-11-03) — Checked in the code: the shared AiRunner already sends tutor-written meanings, parts-of-speech labels, pronunciation and translation through a learner's own model when the account is switched on (a request limit instead of the shared token budget). Nothing new to build; card added so it is on the board.
 - **Length for chat stories** (2026-11-05) — 'Create a story in English with more than 400 words' gave a five-line dialogue because the chat story tool knew only easy, medium and hard. The tool now takes a length in words (20 to 400, Story Studio's Custom limits; more than 400 is written at 400). Built and tested here; routing case L1 checks it on your stack.
 - **More reliable story kinds in chat** (2026-11-05) — 'Tell me a dialogue in Spanish' now and then reached the story tool with no kind. The Agent instructions list every kind of text as a reason to call the tool, say a named kind is passed and 'story' alone is not a kind, and give five examples worded differently from the tests. New routing cases T4, T5, T6 and D2; every plain story case must leave the kind blank; T1 and T4 run several times and the runner prints pass rates like T1 2/3.
+- **PR description for the local commits** (2026-11-06) — docs/PR-DESCRIPTION.md: 87 commits grouped by theme, migrations 0008 to 0015, new settings, testing notes and what is not in the PR. You post it.
+- **Features document with dates** (2026-11-06) — docs/FEATURES.md lists every feature, the date it was implemented, what it does and whether it has been verified on your stack; linked from the README.
 
 ## Done (34)
 
