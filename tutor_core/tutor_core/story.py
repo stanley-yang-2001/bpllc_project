@@ -67,7 +67,8 @@ class StoryRequest:
         return (self.learner_id, self.language, self.story_type or "", self.topic or "") \
             + ((tuple(sorted(self.difficulty.items())),) if self.difficulty else ()) \
             + ((tuple(sorted(self.set_ids)),) if self.set_ids is not None else ()) \
-            + (('two_pass',) if self.two_pass else ())
+            + (('two_pass',) if self.two_pass else ()) \
+            + (('range',) if self.difficulty and os.environ.get("STORY_RANGE_PROMPT") == "1" else ())
 
 
 def generate_story(

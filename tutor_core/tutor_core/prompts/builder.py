@@ -52,13 +52,15 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
         name = (normalize_language(language) or "").casefold()
         code = next((c for c, lang in LANGUAGES.items() if lang.name.casefold() == name or c == name), "en")
         asked = ask_size(code, difficulty["length"])
-        count = max(2, round(asked / 10))
+        from ..difficulty.note import SENTENCE_WORDS, range_prompt_on
+        per = SENTENCE_WORDS.get(difficulty.get("tier") if difficulty.get("tier") in SENTENCE_WORDS else "medium", 10) if range_prompt_on() else 10
+        count = max(2, round(asked / per))
         if code in ("zh", "ja"):       # 24 Oct: Chinese came out at 40 to 65% of the length asked; say the characters per sentence and in all
-            each = f"about {round(10 * CHARS_PER_WORD)} characters each, about {round(asked * CHARS_PER_WORD)} characters in all"
+            each = f"about {round(per * CHARS_PER_WORD)} characters each, about {round(asked * CHARS_PER_WORD)} characters in all"
         elif code == "ko":
-            each = f"about 10 words each, about {asked} words in all"
+            each = f"about {per} words each, about {asked} words in all"
         else:
-            each = "about 10 words each"
+            each = f"about {per} words each"
         prompt = _LENGTH_PHRASE.sub(lambda m: f"{m.group(1)}im for about {count} {m.group(2)} ({each})", prompt)
         prompt = prompt_note(code, difficulty) + "\n\n" + prompt
     return prompt
