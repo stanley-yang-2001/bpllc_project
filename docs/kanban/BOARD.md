@@ -9,7 +9,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 - **Streaming chat reply in the browser** (2026-11-03) — Parked. Built behind CHAT_STREAM=1 (API reads Langflow's stream, the page shows a live draft), but your probe of 4 Nov showed Langflow's Agent sends no word events and a plain answer finishes in about 1.5 s, so nothing visible changes. Code stays, off by default.
 
-## In review (56)
+## In review (57)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -67,6 +67,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Grammar of generated stories** (2026-11-06) — Code checks for list-like, repeated and monotonous sentences, one repair call naming the problem, an optional proofreading call (STORY_PROOFREAD=1), and a natural-sentence rule in non-English prompts. Rewrites are used only when safe.
 - **Two-pass story generation (draft, then adapt)** (2026-11-06) — Step 3 of the quality plan, off by default behind STORY_TWO_PASS. scripts/compare_story_versions.py shows old and new stories side by side. Needs your run on Groq to judge quality.
 - **Story score and example bank** (2026-11-06) — 0 to 100 score from six equal requirements, a two-per-language bank that replaces a story only for a higher score, a refresh script on starter-pack words, and an optional example in the prompt (off).
+- **Score v2 and rate-limit-proof testing** (2026-11-07) — Calibrated score (stuffing, blanks, repeated words, run-ons, softer length), a Groq wait-and-retry wrapper, and offline re-scoring of saved comparison runs.
 
 ## Done (34)
 

@@ -89,6 +89,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     from tutor_core import db as tc_db, difficulty as d, groq as tc_groq
+    from tutor_core.patient import patient
     from tutor_core.languages import LANGUAGES
 
     languages = list(LANGUAGES) if args.languages.strip().lower() == "all" else [c.strip() for c in args.languages.split(",") if c.strip()]
@@ -104,7 +105,7 @@ def main(argv=None):
         difficulty = d.resolve(args.tier) if args.tier else None
         for language in languages:
             print(f"{language} ({LANGUAGES[language].name}), {SEED_NOTE}:")
-            refresh_language(conn, language, rounds=args.rounds, per_round=args.per_round, call=tc_groq.call_groq, two_pass=args.two_pass,
+            refresh_language(conn, language, rounds=args.rounds, per_round=args.per_round, call=patient(tc_groq.call_groq, say=print), two_pass=args.two_pass,
                              difficulty=difficulty, delay=args.delay)
         print("\nSaved now:")
         short = status(conn, languages)

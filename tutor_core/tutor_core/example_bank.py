@@ -30,15 +30,17 @@ def offer(conn, language: str, text: str, scored: dict, *, story_type: Optional[
     values = (text, score, json.dumps(scored.get("parts") or {}), int(scored.get("version") or 1), story_type, topic, bool(two_pass), score < GOOD_ENOUGH)
     with conn, conn.cursor() as cur:
         cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", ("story_examples:" + language,))        # two refreshes never race
-        cur.execute("SELECT slot, score FROM tutor.story_examples WHERE language = %s ORDER BY score, slot", (language,))
+        cur.execute("SELECT slot, score, score_version FROM tutor.story_examples WHERE language = %s ORDER BY score, slot", (language,))
         rows = cur.fetchall()
         if len(rows) < SLOTS:
             free = next(s for s in range(1, SLOTS + 1) if s not in {r[0] for r in rows})
             cur.execute("""INSERT INTO tutor.story_examples (language, slot, text, score, sub_scores, score_version, story_type, topic, two_pass, provisional)
                            VALUES (%s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)""", (language, free) + values)
             return ADDED
-        lowest_slot, lowest = rows[0]
-        if score <= float(lowest):
+        version = int(scored.get("version") or 1)
+        stale = [r for r in rows if int(r[2] or 1) < version]          # saved under an older score: its number cannot be compared, so it yields first
+        lowest_slot, lowest = (stale or rows)[0][:2]
+        if not stale and score <= float(lowest):
             return KEPT
         cur.execute("""UPDATE tutor.story_examples SET text=%s, score=%s, sub_scores=%s::jsonb, score_version=%s, story_type=%s, topic=%s,
                        two_pass=%s, provisional=%s, updated_at=now() WHERE language=%s AND slot=%s""", values + (language, lowest_slot))

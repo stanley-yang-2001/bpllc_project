@@ -133,6 +133,19 @@ def test_translator():
     check("a failing translation gives an empty string", cmp.translator(lambda p: (_ for _ in ()).throw(RuntimeError()))("Hola.", "es") == "")
 
 
+def test_rescore_offline():
+    text = "María vive en una casa grande cerca del mar. Cada mañana abre la ventana y mira el agua. Su amigo llega con pan fresco. Los dos desayunan juntos."
+    old_score = {"score": 10.0}
+    version = {"text": text, "ok": True, "story_type": "story", "score": old_score, "calls": 1, "seconds": 1.0, "reason": None, "topic": None, "error": None, "translation": ""}
+    data = {"learner_id": 1, "vocabularies": {"Spanish": "casa, mar, pan"}, "samples": {"Spanish": [{"code": "es", "pair": {"old": version, "new": dict(version, ok=False)}}]}}
+    out = cmp.rescore(data)
+    got = out["samples"]["Spanish"][0]["pair"]
+    check("rescoring replaces the saved score with the current one", got["old"]["score"]["version"] == 2 and got["old"]["score"]["score"] != 10.0)
+    check("a failed story stays without a score", got["new"]["score"] is None)
+    check("the input is not changed", version["score"] is old_score)
+    check("rescored data renders", "Spanish" in cmp.render(out["samples"], out["vocabularies"]))
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

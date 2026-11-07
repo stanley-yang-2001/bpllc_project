@@ -1747,5 +1747,26 @@
       "stories",
       "quality"
     ]
+  },
+  {
+    "title": "Score v2 and rate-limit-proof testing",
+    "status": "In review",
+    "area": "stories",
+    "date": "2026-11-07",
+    "summary": "Calibrated score (stuffing, blanks, repeated words, run-ons, softer length), a Groq wait-and-retry wrapper, and offline re-scoring of saved comparison runs.",
+    "done": [
+      "score v2",
+      "patient call",
+      "--rescore",
+      "tests"
+    ],
+    "todo": [
+      "Run the comparison again and read the spread",
+      "Remaining plan steps: word-range prompt, candidates, judge, repair loop, 20-request set"
+    ],
+    "labels": [
+      "stories",
+      "quality"
+    ]
   }
 ]

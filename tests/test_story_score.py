@@ -68,6 +68,23 @@ def test_other_languages():
     check("English works without a language check", score_story(en, "en", ["house", "sea", "friend", "bread", "garden"], None, "story")["score"] > 80)
 
 
+def test_v2_detail_checks():
+    from tutor_core.quality.score import SCORE_VERSION
+    check("score version is 2", SCORE_VERSION == 2 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 2)
+    blank = GOOD.replace("María", "[Votre nom]")
+    r = score_story(blank, "es", WORDS, None, "story")
+    check("a template blank is a grammar problem and fails the format check", "placeholder" in r["problems"] and r["parts"]["language_format"] <= 75
+          and r["parts"]["grammar"] < 100)
+    rep = GOOD + " Siempre tranquilamente. " + " ".join(["tranquilamente"] * 12)
+    check("one word said over and over is a problem", "repeated_word" in score_story(rep, "es", WORDS, None, "story")["problems"])
+    check("a normal story has neither problem", not {"placeholder", "repeated_word"} & set(score_story(GOOD, "es", WORDS, None, "story")["problems"]))
+    stuffed = "Casa mar amigo jardín pan. Amigo pan casa mar jardín hoy. Mar casa jardín amigo pan sí."
+    full = score_story(stuffed, "es", WORDS, None, "story")
+    check("stuffing the learner's words lowers that part below the plain count", full["parts"]["own_words"] < 100 and full["measured"]["own_density"] > 0.25)
+    run = "我们去公园，看花，看树，看鸟，然后回家。"
+    check("a Chinese run-on is flagged", "run_on" in score_story(run * 3, "zh", ["公园"], None, "story")["problems"])
+
+
 def test_example_wording():
     p = build_story_prompt("Spanish", "a, b", vocab_in_target=True)
     q = with_example(p, "Ana come pan.")

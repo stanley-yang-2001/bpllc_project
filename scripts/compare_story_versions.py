@@ -220,6 +220,22 @@ def translator(call):
     return translate
 
 
+def rescore(data):
+    """The saved comparison with every story scored again by the current score. Offline: no database, no model. Returns the new data."""
+    samples = {}
+    for name, items in data["samples"].items():
+        words = [w.strip() for w in (data["vocabularies"].get(name) or "").split(",") if w.strip()]
+        samples[name] = []
+        for item in items:
+            pair = {}
+            for label, version in item["pair"].items():
+                version = dict(version)
+                version["score"] = score_of(version, words, item["code"]) if words and version.get("text") and version.get("ok") else None
+                pair[label] = version
+            samples[name].append({"code": item["code"], "pair": pair})
+    return {"learner_id": data.get("learner_id"), "vocabularies": data["vocabularies"], "samples": samples}
+
+
 def save(samples, vocabularies, learner_id, out):
     with open(out, "w", encoding="utf-8") as f:
         f.write(render(samples, vocabularies))
@@ -236,10 +252,20 @@ def main():
     parser.add_argument("--story-type", default=None)
     parser.add_argument("--no-seed", action="store_true", help="do not add starter words when the learner has none in a language")
     parser.add_argument("--no-translate", action="store_true", help="no English translation under each story (saves one call per story)")
+    parser.add_argument("--rescore", default=None, metavar="FILE.json", help="no model calls: score the stories saved in this earlier run again with the current score")
     parser.add_argument("--out", default=None, help="the .html file (default: /app/scripts/compare_<time>.html)")
     args = parser.parse_args()
 
+    if args.rescore:
+        with open(args.rescore, encoding="utf-8") as f:
+            data = rescore(json.load(f))
+        out = args.out or args.rescore.rsplit(".", 1)[0] + "_rescored.html"
+        save(data["samples"], data["vocabularies"], data["learner_id"], out)
+        print(f"Scored again with the current score: {out}")
+        return 0
     from tutor_core import db as tc_db, groq as tc_groq, story as tc_story, vocab as tc_vocab
+    from tutor_core.patient import patient
+    call = patient(tc_groq.call_groq, say=print)       # waits out the 429 rate limit instead of failing the story
     from tutor_core.languages import LANGUAGES, normalize_language
 
     learner_id = args.learner_id
@@ -251,7 +277,7 @@ def main():
     os.environ.setdefault("STORY_ALLOW_UNMEASURED", "1")
     wanted = list(LANGUAGES) if args.languages.strip().lower() == "all" else [l.strip() for l in args.languages.split(",") if l.strip()]
     out = args.out or f"/app/scripts/compare_{time.strftime('%Y%m%d_%H%M%S')}.html"
-    translate = None if args.no_translate else translator(tc_groq.call_groq)
+    translate = None if args.no_translate else translator(call)
     conn, samples, vocabularies = tc_db.connect(), {}, {}
     try:
         for language in wanted:
@@ -265,7 +291,7 @@ def main():
             name = LANGUAGES[code].name
             vocabularies[name], samples[name] = ", ".join(words), []
             for i in range(1, args.count + 1):
-                pair = make_pair(tc_story.generate_story, conn, learner_id, code, tc_groq.call_groq, seed=1000 + i, words=words,
+                pair = make_pair(tc_story.generate_story, conn, learner_id, code, call, seed=1000 + i, words=words,
                                  translate=translate, story_type=args.story_type)
                 samples[name].append({"code": code, "pair": pair})
                 a, b = (pair[k]["score"] for k in ("old", "new"))

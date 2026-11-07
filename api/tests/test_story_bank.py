@@ -66,6 +66,14 @@ def test_a_lower_or_equal_score_is_kept_out(conn):
     assert sorted(e["text"] for e in bank.examples(conn, "es")) == ["dos", "uno"]
 
 
+def test_a_story_saved_under_an_older_score_yields_to_the_current_score(conn):
+    bank.offer(conn, "es", "viejo", scored(95))                      # scored by version 1: its number cannot be compared with version 2
+    bank.offer(conn, "es", "nuevo", scored(60, version=2))
+    assert bank.offer(conn, "es", "mas", scored(55, version=2)) == "replaced"          # the old-version row goes first, even though 55 < 95
+    assert sorted(e["text"] for e in bank.examples(conn, "es")) == ["mas", "nuevo"]
+    assert bank.offer(conn, "es", "menos", scored(50, version=2)) == "kept"            # now both are current: the usual rule
+
+
 def test_the_gate_and_empty_text_never_get_in(conn):
     assert bank.offer(conn, "es", "x", scored(0.0, gated="wrong_language")) == "rejected"
     assert bank.offer(conn, "es", "x", scored(80, gated="empty")) == "rejected"

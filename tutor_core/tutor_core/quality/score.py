@@ -2,13 +2,15 @@
 
 Six requirements, each scored 0 to 100 and weighted the same, so the story score is their mean:
 
-    1 length            within 10% of the target = 100, 50% off or more = 0, a straight line between
-    2 your words        how many of the learner's words appear, against the target count (capped at 100)
+    1 length            within 15% of the target = 100, 60% off or more = 0, a straight line between
+    2 your words        how many of the learner's words appear, against the target count (capped at 100); 5 points off for each point
+                        the learner's words make up more than 25% of the story (word stuffing)
     3 uncommon words    the share of unusual words: at or below the target = 100, 20 points above it = 0
     4 sentence length   the mean sentence is 6 to 12 words (8 to 24 characters in Chinese and Japanese); 15 points off per word outside,
                         and 15 more if any sentence is over 20 words (40 characters)
-    5 grammar, fluency  100 minus 34 for each problem the code can see (list-like text, a repeated sentence, same openings)
-    6 language, format  25 each: in the requested language; ends on a finished sentence; no leaked plan; format fits the kind
+    5 grammar, fluency  100 minus 34 for each problem the code can see (list-like text, a repeated sentence, same openings, a blank like
+                        "[Your name]", one word repeated, a Chinese or Japanese run-on)
+    6 language, format  25 each: in the requested language; ends on a finished sentence; no blank left in or leaked plan; format fits the kind
 
 A story that is empty, a failure message, in the wrong language or that leaks the plan gets 0 whatever else it does (the gate): such a
 story must never be kept as an example. A requirement that cannot be measured (no everyday-word list for the language) is left out and
@@ -27,15 +29,40 @@ from .language import language_check
 from .passage import FAILURE_MARKERS, LEAK_PATTERN, _is_label, _read_shape
 from .vocabulary import _TOKEN, _norm
 
-SCORE_VERSION = 1
+SCORE_VERSION = 2
 NAMES = ("length", "own_words", "uncommon", "sentence_length", "grammar", "language_format")
 DEFAULT_LENGTH = {"dialogue": 50, "narration": 50}      # words, when no tier or length was asked; the other kinds: 80
 DEFAULT_OWN, DEFAULT_UNCOMMON = 3, 10
-LENGTH_FULL, LENGTH_ZERO = 0.10, 0.50
+LENGTH_FULL, LENGTH_ZERO = 0.15, 0.60
+STUFFING_FREE, PER_STUFFING_POINT = 0.25, 5            # share of the story that is the learner's words, and points lost per point above it
+REPEAT_SHARE, REPEAT_MIN, RUN_ON_COMMAS = 0.12, 4, 4
 UNCOMMON_ZERO_POINTS = 20
 SENTENCE_MEAN = {False: (6, 12), True: (8, 24)}           # per unit: words, or characters for Chinese and Japanese
 SENTENCE_LONGEST = {False: 20, True: 40}
 PER_WORD_OFF, LONGEST_PENALTY, PER_PROBLEM = 15, 15, 34
+
+
+_PLACEHOLDER = re.compile(r"\[[^\]\n]{1,40}\]|\{[^}\n]{1,40}\}|<[^>\n]{1,40}>|\bX{3,}\b|\b(?:insert|lorem ipsum)\b", re.I)
+_CLAUSE_BREAKS = "，、,"
+_SENTENCE_ENDS = re.compile(r"[。！？!?\n]+")
+
+
+def _detail_problems(text, unspaced, tokens):
+    """Problems the fluency check does not look for: a template blank left in, one word said over and over, a run-on in Chinese or Japanese."""
+    found = []
+    if _PLACEHOLDER.search(text):
+        found.append("placeholder")
+    if not unspaced and len(tokens) >= 20:
+        counts = {}
+        for tok in tokens:
+            low = tok.casefold()
+            if len(low) >= (3 if any(ord(c) > 0x400 for c in low) else 5):
+                counts[low] = counts.get(low, 0) + 1
+        if counts and max(counts.values()) >= max(REPEAT_MIN, round(REPEAT_SHARE * len(tokens))):
+            found.append("repeated_word")
+    if unspaced and any(sum(u.count(c) for c in _CLAUSE_BREAKS) >= RUN_ON_COMMAS for u in _SENTENCE_ENDS.split(text)):
+        found.append("run_on")
+    return found
 
 
 def _line(value, full, zero):
@@ -98,7 +125,10 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None) -> 
     shape = _read_shape(text)
     parts = {}
     parts["length"] = _line(abs(m["length"] - t_len) / t_len, LENGTH_FULL, LENGTH_ZERO)
-    parts["own_words"] = min(100.0, 100.0 * m["own_words"] / t_own)
+    tokens = _TOKEN.findall(text)
+    density = m["own_words"] / len(tokens) if tokens and not unspaced else 0.0
+    stuffing = max(0.0, density - STUFFING_FREE) * 100 * PER_STUFFING_POINT
+    parts["own_words"] = max(0.0, min(100.0, 100.0 * m["own_words"] / t_own) - stuffing)
     parts["uncommon"] = None if m["uncommon_pct"] is None else _line(m["uncommon_pct"], t_unc, t_unc + UNCOMMON_ZERO_POINTS)
 
     sizes = _unit_sizes(shape, unspaced) or [0]
@@ -107,12 +137,12 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None) -> 
     off = max(0.0, low - mean, mean - high)
     sentence = 100.0 - (PER_WORD_OFF / (2 if unspaced else 1)) * off - (LONGEST_PENALTY if max(sizes) > SENTENCE_LONGEST[unspaced] else 0)
     parts["sentence_length"] = max(0.0, sentence)
-    problems = fluency_problems(text, unspaced)
+    problems = fluency_problems(text, unspaced) + _detail_problems(text, unspaced, tokens)
     parts["grammar"] = max(0.0, 100.0 - PER_PROBLEM * len(problems))
-    checks = [True, ends_complete(text) and not has_dangling_sentence(text, language), True, _format_ok(shape, kind)]
+    checks = [True, ends_complete(text) and not has_dangling_sentence(text, language), "placeholder" not in problems, _format_ok(shape, kind)]
     parts["language_format"] = 25.0 * sum(checks)
     scored = {n: v for n, v in parts.items() if v is not None}
     return {"score": round(sum(scored.values()) / len(scored), 1), "parts": {n: (None if v is None else round(v, 1)) for n, v in parts.items()},
             "gated": None, "partial": len(scored) < len(NAMES), "problems": problems, "version": SCORE_VERSION,
             "targets": {"length": t_len, "own_words": t_own, "uncommon_pct": t_unc},
-            "measured": {"length": m["length"], "own_words": m["own_words"], "uncommon_pct": m["uncommon_pct"], "mean_sentence": round(mean, 1)}}
+            "measured": {"own_density": round(density, 2), "length": m["length"], "own_words": m["own_words"], "uncommon_pct": m["uncommon_pct"], "mean_sentence": round(mean, 1)}}
