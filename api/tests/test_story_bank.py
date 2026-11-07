@@ -170,6 +170,7 @@ def test_the_comparison_script_adds_starter_words_when_a_learner_has_none(conn, 
     words = cmp.seed_words(conn, learner, "de")
     assert len(words) == 25 and "Haus" in words
     assert cmp.seed_words(conn, learner, "de") == words                      # run twice: nothing doubled, nothing removed
-    assert cmp.seed_words(conn, learner, "en") == []                         # no starter list for English in that script
+    assert len(cmp.seed_words(conn, learner, "en")) == 25                    # English has a starter list too (6 Nov)
+    assert cmp.seed_words(conn, learner, "xx") == []                         # no starter list for an unknown language
     assert cmp.seed_words(conn, 99999, "es") == []                           # a learner id that does not exist: a message, not a crash
     assert "User ID shown in Settings" in capsys.readouterr().out

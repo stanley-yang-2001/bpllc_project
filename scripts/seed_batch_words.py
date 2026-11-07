@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, "/app/custom_components")
 
 WORDS = {
+    "en": "house water bread friend mother father book school cat dog table chair apple milk coffee street car train garden flower sun rain work teacher child",
     "de": "Haus Wasser Brot Freund Mutter Vater Buch Schule Katze Hund Tisch Stuhl Apfel Milch Kaffee Straße Auto Zug Garten Blume Sonne Regen Arbeit Lehrer Kind",
     "it": "casa acqua pane amico madre padre libro scuola gatto cane tavolo sedia mela latte caffè strada macchina treno giardino fiore sole pioggia lavoro maestro bambino",
     "pt": "casa água pão amigo mãe pai livro escola gato cachorro mesa cadeira maçã leite café rua carro trem jardim flor sol chuva trabalho professor criança",

@@ -2,7 +2,7 @@
 
 Dates are the day the work was committed or, for the earliest parts, the date the changelog gives. "Patch" numbers are the delivery files (`git am`) and match `CHANGELOG.md`, which has the full detail, numbers and reasons. **Status** says whether the owner has run it: *Verified* means it passed on the owner's machine in a `run-checks.bat --round` or a live run; *Built* means it was written and tested in the build environment and still waits for a run on the owner's stack. Keep this file current: add a row when a feature ships.
 
-Last updated: 6 November 2026 (through patch 0057).
+Last updated: 6 November 2026 (through patch 0059).
 
 ## Timeline: what was built, day by day
 
@@ -29,7 +29,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 3 Nov | One REPORT.txt per run; chat on your own model (option B); own-model failure notice in chat; streaming behind a switch; kanban board generator |
 | 4 Nov | Streaming probe, then streaming parked (off) |
 | 5 Nov | Automatic own-model chat check; length for chat stories (up to 400 words); round fixes; more reliable story kinds in chat |
-| 6 Nov | Features document, PR description, privacy policy options (docs only); grammar checks and repair for generated stories (0055); two-pass story generation and a comparison page (0056); story score 0 to 100 and the example bank (0057) |
+| 6 Nov | Features document, PR description, privacy policy options (docs only); grammar checks and repair for generated stories (0055); two-pass story generation and a comparison page (0056); story score 0 to 100 and the example bank (0057); comparison page with a tab per language, scores and translations (0059) |
 
 ## 1. The foundation (September to 18 October 2026)
 

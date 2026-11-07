@@ -92,14 +92,45 @@ def test_cache_key():
 def test_comparison_page():
     st.load_words = lambda conn, learner, language, set_ids=None: list(WORDS)
     model = Model()
-    pair = cmp.make_pair(st.generate_story, object(), 1, "es", model, 1001, story_type="story", topic="a market day")
+    pair = cmp.make_pair(st.generate_story, object(), 1, "es", model, 1001, words=WORDS, translate=lambda text, code: "EN: " + text[:12],
+                         story_type="story", topic="a market day")
     check("the pair has an old and a new story with their call counts", pair["old"]["text"] == ONE_CALL and pair["new"]["text"] == ADAPTED
           and pair["old"]["calls"] == 1 and pair["new"]["calls"] == 2)
-    page = cmp.render({"Spanish": [{"code": "es", "pair": pair}]}, {"Spanish": ", ".join(WORDS)})
-    check("the page shows both texts side by side and escapes them", ONE_CALL in page and ADAPTED in page and "Old: one call" in page and "New: two passes" in page and "class=row" in page)
-    check("the page counts your words and model calls", "your words used" in page and "2 model call(s)" in page)
+    check("both stories carry a 0 to 100 score with six parts", all(0 <= pair[k]["score"]["score"] <= 100 and len(pair[k]["score"]["parts"]) == 6 for k in ("old", "new")))
+    check("the adapted text scores higher than the four-sentence one", pair["new"]["score"]["score"] > pair["old"]["score"]["score"])
+    check("both carry a translation", pair["new"]["translation"].startswith("EN: ") and pair["old"]["translation"].startswith("EN: "))
+    plain = cmp.make_pair(st.generate_story, object(), 1, "es", model, 1001, story_type="story", topic="a market day")
+    check("without words or a translator there is no score and no translation", plain["old"]["score"] is None and plain["old"]["translation"] == "")
+
+    german = {"code": "de", "pair": pair}
+    page = cmp.render({"Spanish": [{"code": "es", "pair": pair}], "German": [german]}, {"Spanish": ", ".join(WORDS), "German": "Haus"})
+    check("the page has a Summary tab and a tab for each language", page.count("<button role=tab ") == 3 and "data-tab='summary'" in page
+          and "data-tab='es'" in page and "data-tab='de'" in page and "id='p-es'" in page and "id='p-de'" in page)
+    check("the page shows both texts, the scores and the six parts", ONE_CALL in page and ADAPTED in page and "Old: one call" in page and "New: two passes" in page
+          and "Language, format" in page and "/ 100" in page and "higher score" in page)
+    check("the summary compares the averages and the calls", "Old score" in page and "New score" in page and "1 / 2" in page)
+    check("the translation is offered under each story", "English translation" in page and "EN: " in page)
     pair["new"]["text"] = "<script>alert(1)</script>"
-    check("text from the model is escaped", "<script>alert" not in cmp.render({"Spanish": [{"code": "es", "pair": pair}]}, {"Spanish": "casa"}))
+    pair["new"]["score"] = None
+    check("text from the model is escaped and a missing score does not break the page",
+          "<script>alert" not in cmp.render({"Spanish": [{"code": "es", "pair": pair}]}, {"Spanish": "casa"}))
+    sm = cmp.summarize([{"code": "es", "pair": make_scored(80, 90)}, {"code": "es", "pair": make_scored(70, 60)}, {"code": "es", "pair": make_scored(50, 50)}])
+    check("the summary averages the scores and counts who was higher", sm["old"]["score"] == 66.7 and sm["new"]["score"] == 66.7 and sm["wins"] == {"old": 1, "new": 1, "tie": 1})
+
+
+def make_scored(old, new):
+    def version(score):
+        return {"text": "t", "ok": True, "reason": None, "story_type": "story", "topic": None, "calls": 1, "seconds": 1.0, "error": None,
+                "score": {"score": score, "parts": {}, "gated": None, "partial": False}, "translation": ""}
+    return {"old": version(old), "new": version(new)}
+
+
+def test_translator():
+    seen = []
+    t = cmp.translator(lambda prompt: seen.append(prompt) or " Hello. ")
+    check("the translator asks for a literal translation and returns the text", t("Hola.", "es") == "Hello." and "literally" in seen[0] and "Spanish" in seen[0])
+    check("English and empty text are not translated", t("Hello", "en") == "" and t("  ", "es") == "")
+    check("a failing translation gives an empty string", cmp.translator(lambda p: (_ for _ in ()).throw(RuntimeError()))("Hola.", "es") == "")
 
 
 if __name__ == "__main__":
