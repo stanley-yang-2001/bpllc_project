@@ -20,7 +20,8 @@ from .story_cache import StoryCache
 from .two_pass import two_pass_passage
 from .story_retries import STRAY_LIMIT, RetryPolicy      # noqa: F401  (STRAY_LIMIT: the old import path)
 from .languages import LANGUAGES, stories_enabled
-from .prompts import EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage, resolve_story_type
+from .example_bank import best_for_prompt
+from .prompts import EMPTY_VOCABULARY_MESSAGE, build_story_prompt, with_example, clean_topic, describe_prompt, extract_final_passage, resolve_story_type
 from .vocab import _check, clean_set_ids, load_words, max_prompt_words, sample_words
 
 _STORY_CACHE = StoryCache()
@@ -115,6 +116,27 @@ def generate_story(
 def _make_story(conn, request: StoryRequest, call, rng) -> StoryResult:
     language = request.language
     words = load_words(conn, request.learner_id, language, request.set_ids)
+    return _write_story(request, words, call, rng, conn if os.environ.get("STORY_EXAMPLES") == "1" else None)
+
+
+def story_from_words(language: str, words, call, *, story_type=None, topic=None, difficulty=None, two_pass=False, rng=None,
+                     with_example=False, conn=None) -> StoryResult:
+    """The same pipeline for a given word list, with no learner and no cache. For the example bank, which is written from seed and
+    starter-pack words and must never touch a learner's list. `with_example` is off here unless asked for."""
+    if not stories_enabled(language):
+        return StoryResult(f"Stories in {LANGUAGES[language].name} are not available yet.", False, "language_not_enabled", language)
+    if story_type is not None and str(story_type).strip().casefold() not in ("", "random"):
+        story_type = resolve_story_type(story_type)
+        if story_type is None:
+            return StoryResult(BAD_TYPE_MESSAGE, False, "bad_type", language)
+    else:
+        story_type = None
+    request = StoryRequest(0, language, story_type, clean_topic(topic) if topic else None, None, difficulty, None, bool(two_pass))
+    return _write_story(request, list(words), call, rng, conn if with_example else None)
+
+
+def _write_story(request: StoryRequest, words, call, rng, example_conn=None) -> StoryResult:
+    language = request.language
     if not words:
         return StoryResult(EMPTY_VOCABULARY_MESSAGE, False, "empty_vocabulary", language)
 
@@ -123,6 +145,9 @@ def _make_story(conn, request: StoryRequest, call, rng) -> StoryResult:
     # language; the prompt says so instead of asking the model to translate English meanings.
     prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), request.story_type, request.topic, rng, vocab_in_target=True,
                                 difficulty=request.difficulty)
+    if example_conn is not None:                        # an example from the bank, for the quality of the language only (prompts/example.py)
+        example = best_for_prompt(example_conn, language)
+        prompt = with_example(prompt, example) if example else prompt
     picked_type, picked_topic = describe_prompt(prompt)
     base = dict(language=language, story_type=picked_type, topic=picked_topic, words_total=len(words), words_used=len(used),
                 difficulty=request.difficulty)

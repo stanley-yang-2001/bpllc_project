@@ -10,7 +10,8 @@ Costs Groq calls: about 1 (old) + 2 (new) per sample, plus any retries, so keep 
     docker compose exec langflow python /app/scripts/compare_story_versions.py --learner-id 1 --languages German,Spanish --count 2
     docker compose exec langflow python /app/scripts/compare_story_versions.py --learner-id 1 --languages Japanese --count 3 --delay 25
 
-The page is written to ./scripts/compare_<time>.html. Read the stories yourself: the numbers below each text only count things that can
+If the learner has no words in a language, 25 starter words are added first (the script only ever adds words; --no-seed turns that off).
+The learner id must exist: it is the User ID shown in Settings. The page is written to ./scripts/compare_<time>.html. Read the stories yourself: the numbers below each text only count things that can
 be counted (length, how many of your words appear, sentence problems the code can see); grammar and naturalness need a reader.
 """
 import argparse
@@ -51,6 +52,23 @@ def stats(text, words, language, ok):
     return {"length": d.measure(text or "", language, words)["length"] if text else 0,
             "unit": "characters" if d.is_unspaced(language) else "words",
             "words_used": len(present), "words_total": len(words), "problems": fluency_problems(text or "", d.is_unspaced(language)) if ok else []}
+
+
+def seed_words(conn, learner_id, code):
+    """The learner has no words in this language: add the 25 starter words of scripts/seed_batch_words.py (it only ever ADDS words) and
+    return the list. An unknown learner id, or a language with no starter list, gives []."""
+    from tutor_core import vocab as tc_vocab
+    import seed_batch_words
+    if code not in seed_batch_words.WORDS:
+        return []
+    try:
+        added = seed_batch_words.seed(conn, learner_id, [code])[code][0]
+    except Exception as exc:
+        conn.rollback()
+        print(f"Could not add starter words for learner {learner_id} ({type(exc).__name__}). Is {learner_id} the User ID shown in Settings?")
+        return []
+    print(f"Added {added} starter words in {code} to learner {learner_id}.")
+    return tc_vocab.load_words(conn, learner_id, code)
 
 
 def make_pair(generate, conn, learner_id, code, call, seed, **options):
@@ -102,6 +120,7 @@ def main():
     parser.add_argument("--count", type=int, default=2, help="samples per language")
     parser.add_argument("--delay", type=float, default=20.0, help="seconds between model calls' groups (rate limit)")
     parser.add_argument("--story-type", default=None)
+    parser.add_argument("--no-seed", action="store_true", help="do not add starter words when the learner has none in a language")
     parser.add_argument("--out", default=None, help="the .html file (default: /app/scripts/compare_<time>.html)")
     args = parser.parse_args()
 
@@ -120,6 +139,8 @@ def main():
         for language in [l.strip() for l in args.languages.split(",") if l.strip()]:
             code = normalize_language(language)
             words = tc_vocab.load_words(conn, learner_id, code) if code else []
+            if code and not words and not args.no_seed:
+                words = seed_words(conn, learner_id, code)
             if not words:
                 print(f"Skipping {language}: no words for learner {learner_id}.")
                 continue

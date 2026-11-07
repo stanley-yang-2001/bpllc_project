@@ -1725,5 +1725,27 @@
       "stories",
       "quality"
     ]
+  },
+  {
+    "title": "Story score and example bank",
+    "status": "In review",
+    "area": "stories",
+    "date": "2026-11-06",
+    "summary": "0 to 100 score from six equal requirements, a two-per-language bank that replaces a story only for a higher score, a refresh script on starter-pack words, and an optional example in the prompt (off).",
+    "done": [
+      "score",
+      "table 0016",
+      "refresh script",
+      "example wording",
+      "tests"
+    ],
+    "todo": [
+      "Run refresh_story_bank.py and read the saved stories",
+      "Try STORY_EXAMPLES=1 with the comparison page"
+    ],
+    "labels": [
+      "stories",
+      "quality"
+    ]
   }
 ]

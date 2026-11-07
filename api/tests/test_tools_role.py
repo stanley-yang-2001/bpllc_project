@@ -111,7 +111,9 @@ def test_the_privilege_list_is_exactly_this(conn):
 def test_no_other_table_in_the_schema_is_granted_to_it(conn):
     with conn.cursor() as cur:
         cur.execute("SELECT DISTINCT table_name FROM information_schema.role_table_grants WHERE grantee = %s AND table_schema = 'tutor'", (TOOLS_ROLE,))
-        assert sorted(r[0] for r in cur.fetchall()) == ["user_languages", "words"]
+        assert sorted(r[0] for r in cur.fetchall()) == ["story_examples", "user_languages", "words"]      # story_examples (0016): read-only, and holds no learner's data
+        cur.execute("SELECT privilege_type FROM information_schema.role_table_grants WHERE grantee = %s AND table_name = 'story_examples'", (TOOLS_ROLE,))
+        assert [r[0] for r in cur.fetchall()] == ["SELECT"]
         cur.execute("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'tutor' AND c.relkind IN ('r', 'p') "
                     "AND NOT has_table_privilege(%s, c.oid, 'SELECT') AND NOT has_table_privilege(%s, c.oid, 'INSERT')", (TOOLS_ROLE, TOOLS_ROLE))
         denied = {r[0] for r in cur.fetchall()}

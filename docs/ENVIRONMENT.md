@@ -44,6 +44,7 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # CHAT_STREAM=0                  # 1 = the chat page shows the tutor's words as they are written (design section 11). With 0 the answer arrives whole, as before.
 # STORY_PROOFREAD=0              # 1 = every story is proofread once for grammar by a second model call and the corrected text is used only if it is still in the language, complete, about as long and keeps your words. Off by default (it doubles the calls per story). Broken or repetitive stories get a repair call whether this is on or not.
 # STORY_TWO_PASS=0              # 1 = two-pass stories: a draft without your word list, then a rewrite that uses the words (about twice the calls and waiting time). Off by default; compare both with scripts/compare_story_versions.py before switching it on.
+# STORY_EXAMPLES=0               # 1 = the story prompt quotes the best saved example of the language, for the quality of the sentences only (docs/STORY-SCORING.md). Off by default; fill the bank first with: docker compose exec api python scripts/refresh_story_bank.py
 # Switch an account on (off by default), from the project folder:
 #   docker compose exec api python -m app.custom_model_admin on you@example.com      (also: off, list)
 

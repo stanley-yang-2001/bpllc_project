@@ -6,6 +6,7 @@ Pure functions only (no database, no network). The work is split by what each pa
     language.py     is the passage written in the requested language?
     endings.py      does it end on a finished sentence?
     fluency.py      telegraphic, repeated or monotonous sentences
+    score.py        a 0 to 100 score against the requirements (example bank)
     passage.py      scoring one passage against all the rules
     reporting.py    the report Story Studio shows, and batch scoring with the same rules
     variety.py      are the stories different from one another?
@@ -14,8 +15,8 @@ Pure functions only (no database, no network). The work is split by what each pa
 This package keeps the one import path callers have always used (`tutor_core.quality.report`, `.check_passage`, ...), including the
 underscore helpers that scripts and tests reach for, by re-exporting every module-level name of its parts.
 """
-from . import cli, endings, fluency, language, passage, reporting, variety, vocabulary
+from . import cli, endings, fluency, language, passage, reporting, score, variety, vocabulary
 
-for _part in (vocabulary, language, endings, passage, fluency, reporting, variety, cli):
+for _part in (vocabulary, language, endings, passage, fluency, score, reporting, variety, cli):
     globals().update({k: v for k, v in vars(_part).items() if not k.startswith("__") and k not in ("annotations",)})
 del _part
