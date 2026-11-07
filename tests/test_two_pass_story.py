@@ -1,0 +1,110 @@
+"""Two-pass story generation and the side-by-side comparison page (6 Nov 2026). No database, no network: the model is a function and the
+learner's words are patched in.
+
+    PYTHONPATH=tutor_core:scripts python tests/test_two_pass_story.py
+"""
+import os
+import sys
+
+sys.path.insert(0, "tutor_core")
+sys.path.insert(0, "scripts")
+
+import compare_story_versions as cmp  # noqa: E402
+from tutor_core import story as st  # noqa: E402
+from tutor_core.prompts.templates import DELIMITER  # noqa: E402
+from tutor_core.two_pass import build_adapt_prompt, build_draft_prompt, form_of, target_length, two_pass_passage  # noqa: E402
+
+failures = []
+
+
+def check(label, condition):
+    print(("PASS" if condition else "FAIL"), label)
+    if not condition:
+        failures.append(label)
+
+
+WORDS = ["casa", "mar", "amigo", "jardín", "pan"]
+DRAFT = ("María vive en una casa pequeña cerca del mar. Cada mañana abre la ventana y mira el agua azul. Su amigo Pedro llega con pan fresco. "
+         "Los dos comen juntos en el jardín y hablan del día. Después caminan por la playa hasta la tarde.")
+ADAPTED = DRAFT.replace("pequeña", "grande")
+ONE_CALL = "Ana tiene una casa. Ella mira el mar cada día. Su amigo trae pan. Todos comen en el jardín."
+
+
+class Model:
+    def __init__(self, fail_second=False, empty_draft=False):
+        self.prompts, self.fail_second, self.empty_draft = [], fail_second, empty_draft
+
+    def __call__(self, prompt):
+        self.prompts.append(prompt)
+        if "Rewrite it so that it naturally includes" in prompt:
+            if self.fail_second:
+                raise RuntimeError("boom")
+            return f"{DELIMITER}\n{ADAPTED}"
+        if "Write " in prompt and "for a beginner learning" in prompt:
+            return "" if self.empty_draft else f"{DELIMITER}\n{DRAFT}"
+        return f"{DELIMITER}\n{ONE_CALL}"
+
+
+def run(two_pass, **kw):
+    st.load_words = lambda conn, learner, language, set_ids=None: list(WORDS)
+    model = Model(**kw)
+    res = st.generate_story(object(), 1, "es", call_groq_fn=model, use_cache=False, two_pass=two_pass, story_type="story", topic="a market day")
+    return res, model
+
+
+def test_prompts():
+    d = build_draft_prompt("Spanish", "es", "story", "a market day", 80)
+    check("the draft prompt has no word list and asks about 1.3 times the length", "104 words" in d and "casa" not in d and "market day" in d)
+    a = build_adapt_prompt("Spanish", "es", DRAFT, "casa, mar", 80)
+    check("the adapt prompt carries the words, the draft as quoted text and a length range", "casa, mar" in a and "<<<\n" + DRAFT in a and "between 68 and 92 words" in a)
+    check("Chinese and Japanese lengths are in characters", "characters" in build_draft_prompt("Japanese", "ja", "story", None, 80))
+    check("a tier length is the target", target_length("story", {"length": 120}) == 120 and target_length("dialogue", None) == 50 and target_length("diary", None) == 80)
+    check("every kind has a form", "dialogue" in form_of("dialogue") and 'kind "poem"' in form_of("poem") and form_of("diary").startswith("a diary"))
+
+
+def test_pipeline():
+    res, model = run(False)
+    check("off: the old pipeline makes one call and returns its text", res.ok and res.text == ONE_CALL and len(model.prompts) == 1)
+    res, model = run(True)
+    check("on: a draft call, then an adapt call, and the adapted text is the story", res.ok and res.text == ADAPTED and len(model.prompts) == 2)
+    check("on: the draft call came first and had no words", "for a beginner learning" in model.prompts[0] and "casa" not in model.prompts[0])
+    res, model = run(True, fail_second=True)
+    check("a failing second pass falls back to the one-call story", res.ok and res.text == ONE_CALL and len(model.prompts) == 3)
+    res, model = run(True, empty_draft=True)
+    check("an empty draft falls back to the one-call story", res.ok and res.text == ONE_CALL)
+    os.environ["STORY_TWO_PASS"] = "1"
+    try:
+        st.load_words = lambda *a, **k: list(WORDS)
+        model = Model()
+        res = st.generate_story(object(), 1, "es", call_groq_fn=model, use_cache=False, story_type="story")
+        check("STORY_TWO_PASS=1 switches it on when the argument is not given", res.text == ADAPTED)
+    finally:
+        del os.environ["STORY_TWO_PASS"]
+    check("two_pass_passage returns None on an error", two_pass_passage(lambda p: (_ for _ in ()).throw(RuntimeError()), "es", "Spanish", "x", WORDS, None) is None)
+
+
+def test_cache_key():
+    a = st.StoryRequest(1, "es", "story", None, None, None, None, False).cache_key()
+    b = st.StoryRequest(1, "es", "story", None, None, None, None, True).cache_key()
+    check("a two-pass story never answers for a one-call story from the cache", a != b)
+
+
+def test_comparison_page():
+    st.load_words = lambda conn, learner, language, set_ids=None: list(WORDS)
+    model = Model()
+    pair = cmp.make_pair(st.generate_story, object(), 1, "es", model, 1001, story_type="story", topic="a market day")
+    check("the pair has an old and a new story with their call counts", pair["old"]["text"] == ONE_CALL and pair["new"]["text"] == ADAPTED
+          and pair["old"]["calls"] == 1 and pair["new"]["calls"] == 2)
+    page = cmp.render({"Spanish": [{"code": "es", "pair": pair}]}, {"Spanish": ", ".join(WORDS)})
+    check("the page shows both texts side by side and escapes them", ONE_CALL in page and ADAPTED in page and "Old: one call" in page and "New: two passes" in page and "class=row" in page)
+    check("the page counts your words and model calls", "your words used" in page and "2 model call(s)" in page)
+    pair["new"]["text"] = "<script>alert(1)</script>"
+    check("text from the model is escaped", "<script>alert" not in cmp.render({"Spanish": [{"code": "es", "pair": pair}]}, {"Spanish": "casa"}))
+
+
+if __name__ == "__main__":
+    for name, fn in list(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            fn()
+    print("\nFAILED:", failures) if failures else print("\nall passed")
+    sys.exit(1 if failures else 0)

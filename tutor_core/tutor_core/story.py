@@ -17,6 +17,7 @@ from typing import Optional
 
 from . import groq as groq_module
 from .story_cache import StoryCache
+from .two_pass import two_pass_passage
 from .story_retries import STRAY_LIMIT, RetryPolicy      # noqa: F401  (STRAY_LIMIT: the old import path)
 from .languages import LANGUAGES, stories_enabled
 from .prompts import EMPTY_VOCABULARY_MESSAGE, build_story_prompt, clean_topic, describe_prompt, extract_final_passage, resolve_story_type
@@ -59,11 +60,13 @@ class StoryRequest:
     max_words: Optional[int] = None
     difficulty: Optional[dict] = None
     set_ids: Optional[list] = None          # None = every word; else only the words in those sets (0 = General)
+    two_pass: bool = False                  # draft first, then adapt it to the words (two_pass.py); off = the one-call pipeline
 
     def cache_key(self) -> tuple:
         return (self.learner_id, self.language, self.story_type or "", self.topic or "") \
             + ((tuple(sorted(self.difficulty.items())),) if self.difficulty else ()) \
-            + ((tuple(sorted(self.set_ids)),) if self.set_ids is not None else ())
+            + ((tuple(sorted(self.set_ids)),) if self.set_ids is not None else ()) \
+            + (('two_pass',) if self.two_pass else ())
 
 
 def generate_story(
@@ -78,6 +81,7 @@ def generate_story(
     max_words: Optional[int] = None,
     difficulty: Optional[dict] = None,
     set_ids=None,
+    two_pass=None,
     rng=None,
     clock=time.time,
 ) -> StoryResult:
@@ -97,7 +101,8 @@ def generate_story(
             return StoryResult(BAD_TYPE_MESSAGE, False, "bad_type", language)
     else:
         story_type = None
-    request = StoryRequest(learner_id, language, story_type, clean_topic(topic) if topic else None, max_words, difficulty, clean_set_ids(set_ids))
+    request = StoryRequest(learner_id, language, story_type, clean_topic(topic) if topic else None, max_words, difficulty, clean_set_ids(set_ids),
+                           os.environ.get("STORY_TWO_PASS") == "1" if two_pass is None else bool(two_pass))
     call = call_groq_fn or groq_module.call_groq
     now = clock()
 
@@ -122,13 +127,14 @@ def _make_story(conn, request: StoryRequest, call, rng) -> StoryResult:
     base = dict(language=language, story_type=picked_type, topic=picked_topic, words_total=len(words), words_used=len(used),
                 difficulty=request.difficulty)
 
+    adapted = two_pass_passage(call, language, LANGUAGES[language].name, prompt, used, request.difficulty) if request.two_pass else None
     try:
-        raw = call(prompt)
+        raw = call(prompt) if adapted is None else adapted      # a failed two-pass attempt falls back to the one-call prompt
     except Exception as exc:
         _log.warning("story generation failed (%s): %s", language, exc)
         return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
 
-    passage = extract_final_passage(raw)
+    passage = extract_final_passage(raw) if adapted is None else adapted
     # An empty passage (the model ran out of tokens, or returned nothing after the delimiter) must never reach the Agent
     # as an empty string: the Agent fills the gap by inventing its own story. It is a failure, cached briefly.
     if not passage.strip():

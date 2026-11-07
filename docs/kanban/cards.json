@@ -1705,5 +1705,25 @@
       "stories",
       "quality"
     ]
+  },
+  {
+    "title": "Two-pass story generation (draft, then adapt)",
+    "status": "In review",
+    "area": "stories",
+    "date": "2026-11-06",
+    "summary": "Step 3 of the quality plan, off by default behind STORY_TWO_PASS. scripts/compare_story_versions.py shows old and new stories side by side. Needs your run on Groq to judge quality.",
+    "done": [
+      "two_pass.py with fallback",
+      "comparison page",
+      "tests"
+    ],
+    "todo": [
+      "Run the comparison for German, Spanish, Japanese and read it",
+      "Decide whether to switch it on"
+    ],
+    "labels": [
+      "stories",
+      "quality"
+    ]
   }
 ]

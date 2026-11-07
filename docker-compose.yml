@@ -26,6 +26,7 @@ services:
       - MAX_PROMPT_WORDS=${MAX_PROMPT_WORDS:-150}
       - TUTOR_RICH_RANDOM=${TUTOR_RICH_RANDOM:-}      # 1: a random English story may be any kind (see api/scripts/rich_kinds_check.py)
       - STORY_PROOFREAD=${STORY_PROOFREAD:-}          # 1: every story is proofread once for grammar (an extra model call)
+      - STORY_TWO_PASS=${STORY_TWO_PASS:-}            # 1: a draft first, then a rewrite that uses your words (two calls per story)
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
       # Leave it empty in anything that is not your own machine; with it empty, a request without a learner is refused.
       - TUTOR_DEV_USER_ID=${TUTOR_DEV_USER_ID:-}
@@ -90,6 +91,7 @@ services:
       - CHAT_OWN_MODEL=${CHAT_OWN_MODEL:-0}
       - CHAT_STREAM=${CHAT_STREAM:-0}              # 1: the chat page shows the tutor's words as they are written
       - STORY_PROOFREAD=${STORY_PROOFREAD:-}          # 1: every story is proofread once for grammar (an extra model call)
+      - STORY_TWO_PASS=${STORY_TWO_PASS:-}            # 1: a draft first, then a rewrite that uses your words (two calls per story)
     depends_on:
       postgres:
         condition: service_healthy
