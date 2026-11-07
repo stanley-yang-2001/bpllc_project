@@ -125,6 +125,7 @@ docs/
 ├── FEATURES.md                  # Every implemented feature, the date it was built, and what it does
 ├── PR-DESCRIPTION.md            # Ready-to-post pull request description for the work since origin/main
 ├── PRIVACY-POLICY-OPTIONS.md    # DRAFT: wording options where the approved privacy policy no longer matches the code
+├── STORY-SCORING.md             # The 0 to 100 story score and the example bank
 ├── IMPLEMENTATION-GUIDE.md      # Build order (Steps 1–11 + bonus) with per-step status
 ├── AGENT-INSTRUCTIONS.md        # The Language Agent's final instructions (canvas-only setting)
 ├── STEP-10-TEST-PLAN.md         # Step 10 pass criteria, routing matrix, results and tuning log
