@@ -48,6 +48,9 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # LANGUAGETOOL_URL=http://localhost:8010   # optional self-hosted LanguageTool server for the grammar part of the score (never a public server)
 # GROQ_JUDGE_MODEL=openai/gpt-oss-20b      # optional: a different model for the story judge (patch 0064); GROQ_JUDGE_EFFORT=low|medium|high
 # GROQ_AUDIT_MODEL=openai/gpt-oss-20b      # optional: a different model for the grammar review; GROQ_AUDIT_EFFORT
+# STORY_CANDIDATES=1             # 2 to 5: write that many versions of the word-applying step and keep the highest score (each is one more call). Off by default.
+# STORY_JUDGE=0                  # 1: the best two candidates are also reviewed for grammar by a model (GROQ_JUDGE_MODEL, else the story model) and the repair is graded the same way
+# STORY_REPAIR=0                 # 1: after the usual retries, a repair that names every requirement the score still misses (up to 2 calls; a rewrite is kept only if its score is higher)
 # STORY_RANGE_PROMPT=0           # 1 = with a difficulty tier the prompt asks for a range (target plus or minus 15%) instead of "about N", and states the tier's level and sentence length. Off by default.
 # Switch an account on (off by default), from the project folder:
 #   docker compose exec api python -m app.custom_model_admin on you@example.com      (also: off, list)

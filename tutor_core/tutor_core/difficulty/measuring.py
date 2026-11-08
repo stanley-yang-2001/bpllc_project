@@ -177,3 +177,39 @@ def measure(text: str, language_code: str, vocab_words) -> dict:
         length = len(_tokens(text))
     return {"length": length, "length_unit": _unit(language_code), "own_words": _own_found(text, language_code, vocab_words),
             "uncommon_pct": _uncommon_share(text, language_code, vocab_words)}
+
+
+def missing_own_words(text: str, code: str, vocab_words) -> list[str]:
+    """The learner's words the story does not use, in the order given (so a repair can name them)."""
+    seen, out = set(), []
+    for w in vocab_words:
+        if w and w.strip() and w.casefold() not in seen:
+            seen.add(w.casefold())
+            if _own_found(text, code, [w]) == 0:
+                out.append(w)
+    return out
+
+
+def uncommon_words(text: str, code: str, vocab_words) -> list[str]:
+    """The words counted in the share of uncommon words (same rules as `_uncommon_share`), each once, in order of appearance."""
+    if not has_everyday_list(code):
+        return []
+    own = _own_set(vocab_words, code)
+    if code in splitter.SPLIT_LANGUAGES:
+        scan = _split_scan(text, code, own)
+        return list(dict.fromkeys(scan[0])) if scan else []
+    out, sentence_start, pos = [], True, 0
+    stripped = _LABEL.sub("", text)
+    for m in _TOKEN.finditer(stripped):
+        between = stripped[pos:m.start()]
+        if re.search(r"[.!?\u2026]\s*$|\n", between) or pos == 0:
+            sentence_start = True
+        pos = m.end()
+        word = m.group(0)
+        if word[0].isupper() and not sentence_start:
+            sentence_start = False
+            continue
+        sentence_start = False
+        if word.casefold() not in own and not is_everyday(word, code):
+            out.append(word)
+    return list(dict.fromkeys(out))

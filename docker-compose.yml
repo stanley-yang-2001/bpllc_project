@@ -29,6 +29,12 @@ services:
       - STORY_TWO_PASS=${STORY_TWO_PASS:-}            # 1: a draft first, then a rewrite that uses your words (two calls per story)
       - STORY_EXAMPLES=${STORY_EXAMPLES:-}            # 1: show the best saved example story in the prompt (docs/STORY-SCORING.md)
       - STORY_RANGE_PROMPT=${STORY_RANGE_PROMPT:-}    # 1: ask for a word range and name the tier's level (A1-A2, A2-B1, B1-B2) in the prompt
+      - STORY_CANDIDATES=${STORY_CANDIDATES:-}        # 2 to 5: write that many versions of the word-applying step and keep the best (extra calls)
+      - STORY_JUDGE=${STORY_JUDGE:-}                  # 1: a second model also reviews the best candidates for grammar (GROQ_JUDGE_MODEL)
+      - STORY_REPAIR=${STORY_REPAIR:-}                # 1: after the usual retries, repair what the score still finds wrong, by name (up to 2 calls)
+      - GROQ_JUDGE_MODEL=${GROQ_JUDGE_MODEL:-}
+      - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
+      - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
       # Leave it empty in anything that is not your own machine; with it empty, a request without a learner is refused.
       - TUTOR_DEV_USER_ID=${TUTOR_DEV_USER_ID:-}
@@ -96,6 +102,12 @@ services:
       - STORY_TWO_PASS=${STORY_TWO_PASS:-}            # 1: a draft first, then a rewrite that uses your words (two calls per story)
       - STORY_EXAMPLES=${STORY_EXAMPLES:-}            # 1: show the best saved example story in the prompt (docs/STORY-SCORING.md)
       - STORY_RANGE_PROMPT=${STORY_RANGE_PROMPT:-}    # 1: ask for a word range and name the tier's level (A1-A2, A2-B1, B1-B2) in the prompt
+      - STORY_CANDIDATES=${STORY_CANDIDATES:-}        # 2 to 5: write that many versions of the word-applying step and keep the best (extra calls)
+      - STORY_JUDGE=${STORY_JUDGE:-}                  # 1: a second model also reviews the best candidates for grammar (GROQ_JUDGE_MODEL)
+      - STORY_REPAIR=${STORY_REPAIR:-}                # 1: after the usual retries, repair what the score still finds wrong, by name (up to 2 calls)
+      - GROQ_JUDGE_MODEL=${GROQ_JUDGE_MODEL:-}
+      - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
+      - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -17,7 +17,11 @@ from typing import Optional
 
 from . import groq as groq_module
 from .story_cache import StoryCache
-from .two_pass import two_pass_passage
+from .two_pass import two_pass_passages
+from .story_options import StoryOptions
+from .story_candidates import choose as choose_candidate
+from .story_repair import repair_story
+from .quality import score_story
 from .story_retries import STRAY_LIMIT, RetryPolicy      # noqa: F401  (STRAY_LIMIT: the old import path)
 from .languages import LANGUAGES, stories_enabled
 from .example_bank import best_for_prompt
@@ -49,6 +53,7 @@ class StoryResult:
     words_total: int = 0            # the learner's full list (the quality check uses this one)
     words_used: int = 0             # what went into the prompt after the cap
     difficulty: Optional[dict] = None   # the targets asked for (tutor_core.difficulty.resolve), or None
+    notes: tuple = ()               # what the optional steps did (candidates, judge, repair), for the comparison report
 
 
 @dataclass(frozen=True)
@@ -62,12 +67,14 @@ class StoryRequest:
     difficulty: Optional[dict] = None
     set_ids: Optional[list] = None          # None = every word; else only the words in those sets (0 = General)
     two_pass: bool = False                  # draft first, then adapt it to the words (two_pass.py); off = the one-call pipeline
+    options: StoryOptions = StoryOptions()  # candidates, judge, repair (story_options.py); all off = the pipeline as it always was
 
     def cache_key(self) -> tuple:
         return (self.learner_id, self.language, self.story_type or "", self.topic or "") \
             + ((tuple(sorted(self.difficulty.items())),) if self.difficulty else ()) \
             + ((tuple(sorted(self.set_ids)),) if self.set_ids is not None else ()) \
             + (('two_pass',) if self.two_pass else ()) \
+            + self.options.cache_parts() \
             + (('range',) if self.difficulty and os.environ.get("STORY_RANGE_PROMPT") == "1" else ())
 
 
@@ -84,6 +91,8 @@ def generate_story(
     difficulty: Optional[dict] = None,
     set_ids=None,
     two_pass=None,
+    options=None,
+    judge_call=None,
     rng=None,
     clock=time.time,
 ) -> StoryResult:
@@ -104,24 +113,27 @@ def generate_story(
     else:
         story_type = None
     request = StoryRequest(learner_id, language, story_type, clean_topic(topic) if topic else None, max_words, difficulty, clean_set_ids(set_ids),
-                           os.environ.get("STORY_TWO_PASS") == "1" if two_pass is None else bool(two_pass))
+                           os.environ.get("STORY_TWO_PASS") == "1" if two_pass is None else bool(two_pass),
+                           (StoryOptions.from_env() if options is None else options).normalised())
     call = call_groq_fn or groq_module.call_groq
+    if judge_call is None and call_groq_fn is None and request.options.judge:
+        judge_call = groq_module.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT")       # None: the story model reviews
     now = clock()
 
     if use_cache and (cached := _STORY_CACHE.fresh(request.cache_key(), now)) is not None:
         return replace(cached, cached=True)
-    result = _make_story(conn, request, call, rng)
+    result = _make_story(conn, request, call, rng, judge_call)
     return _STORY_CACHE.remember(request.cache_key(), now, result) if use_cache and result.reason != "empty_vocabulary" else result
 
 
-def _make_story(conn, request: StoryRequest, call, rng) -> StoryResult:
+def _make_story(conn, request: StoryRequest, call, rng, judge_call=None) -> StoryResult:
     language = request.language
     words = load_words(conn, request.learner_id, language, request.set_ids)
-    return _write_story(request, words, call, rng, conn if os.environ.get("STORY_EXAMPLES") == "1" else None)
+    return _write_story(request, words, call, rng, conn if os.environ.get("STORY_EXAMPLES") == "1" else None, judge_call)
 
 
 def story_from_words(language: str, words, call, *, story_type=None, topic=None, difficulty=None, two_pass=False, rng=None,
-                     with_example=False, conn=None) -> StoryResult:
+                     with_example=False, conn=None, options=None, judge_call=None, proofread=None) -> StoryResult:
     """The same pipeline for a given word list, with no learner and no cache. For the example bank, which is written from seed and
     starter-pack words and must never touch a learner's list. `with_example` is off here unless asked for."""
     if not stories_enabled(language):
@@ -132,11 +144,12 @@ def story_from_words(language: str, words, call, *, story_type=None, topic=None,
             return StoryResult(BAD_TYPE_MESSAGE, False, "bad_type", language)
     else:
         story_type = None
-    request = StoryRequest(0, language, story_type, clean_topic(topic) if topic else None, None, difficulty, None, bool(two_pass))
-    return _write_story(request, list(words), call, rng, conn if with_example else None)
+    request = StoryRequest(0, language, story_type, clean_topic(topic) if topic else None, None, difficulty, None, bool(two_pass),
+                           (options or StoryOptions()).normalised())
+    return _write_story(request, list(words), call, rng, conn if with_example else None, judge_call, proofread)
 
 
-def _write_story(request: StoryRequest, words, call, rng, example_conn=None) -> StoryResult:
+def _write_story(request: StoryRequest, words, call, rng, example_conn=None, judge_call=None, proofread=None) -> StoryResult:
     language = request.language
     if not words:
         return StoryResult(EMPTY_VOCABULARY_MESSAGE, False, "empty_vocabulary", language)
@@ -153,18 +166,39 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None) -> 
     base = dict(language=language, story_type=picked_type, topic=picked_topic, words_total=len(words), words_used=len(used),
                 difficulty=request.difficulty)
 
-    adapted = two_pass_passage(call, language, LANGUAGES[language].name, prompt, used, request.difficulty) if request.two_pass else None
-    try:
-        raw = call(prompt) if adapted is None else adapted      # a failed two-pass attempt falls back to the one-call prompt
-    except Exception as exc:
-        _log.warning("story generation failed (%s): %s", language, exc)
-        return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
-
-    passage = extract_final_passage(raw) if adapted is None else adapted
+    opts = request.options
+    notes: list[str] = []
+    n = opts.candidates
+    texts = two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, n) if request.two_pass else []
+    if not texts:                                               # a failed two-pass attempt falls back to the one-call prompt
+        try:
+            raw = call(prompt)
+        except Exception as exc:
+            _log.warning("story generation failed (%s): %s", language, exc)
+            return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
+        texts = [extract_final_passage(raw)]
+        for _ in range(n - 1):
+            try:
+                texts.append(extract_final_passage(call(prompt)))
+            except Exception:           # noqa: BLE001 - a missing extra candidate is not a failed story
+                break
+    texts = [t for t in texts if t.strip()]
     # An empty passage (the model ran out of tokens, or returned nothing after the delimiter) must never reach the Agent
     # as an empty string: the Agent fills the gap by inventing its own story. It is a failure, cached briefly.
-    if not passage.strip():
-        _log.warning("story generation returned no passage (%s); raw length %d", language, len(raw or ""))
+    if not texts:
+        _log.warning("story generation returned no passage (%s)", language)
         return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
-    passage = RetryPolicy(language, prompt, words, request.difficulty, call, proofread=os.environ.get("STORY_PROOFREAD") == "1").improve(passage)
-    return StoryResult(passage, True, None, **base)
+
+    judge = (judge_call or call) if opts.judge else None
+    hits: list = []
+    if len(texts) > 1:
+        passage, hits, more = choose_candidate(texts, language, words, request.difficulty, picked_type, audit_call=judge)
+        notes += more
+    else:
+        passage = texts[0]
+    do_proofread = os.environ.get("STORY_PROOFREAD") == "1" if proofread is None else bool(proofread)
+    passage = RetryPolicy(language, prompt, words, request.difficulty, call, proofread=do_proofread).improve(passage)
+    if opts.repair:
+        passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge)
+        notes += more
+    return StoryResult(passage, True, None, notes=tuple(notes), **base)

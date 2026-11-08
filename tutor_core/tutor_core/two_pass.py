@@ -47,13 +47,13 @@ def _unit(language: str) -> str:
     return "characters" if _d.is_unspaced(language) else "words"
 
 
-def build_draft_prompt(language_name: str, language: str, kind: str, topic: Optional[str], length: int) -> str:
+def build_draft_prompt(language_name: str, language: str, kind: str, topic: Optional[str], length: int, level: Optional[str] = None) -> str:
     subject = f"about {topic}" if topic else "about an everyday situation"
     n = round(length * DRAFT_FACTOR)
     return (
         f"Write {form_of(kind)} in {language_name} {subject}, for a beginner learning {language_name}.\n\n"
         f"Length: about {n} {_unit(language)}.\n"
-        "Level: beginner (A1 to A2). Use simple, common everyday words and sentences of 6 to 12 words.\n"
+        + (f"{level}\n" if level else "Level: beginner (A1 to A2). Use simple, common everyday words and sentences of 6 to 12 words.\n") +
         "Write complete, natural sentences: every sentence has a subject and a verb, with correct grammar. Do not list words. "
         "The text has a beginning, a middle and an end, and ends on a finished sentence.\n"
         "Write only in " + language_name + ". No translation, no title, no notes.\n\n"
@@ -77,16 +77,39 @@ def build_adapt_prompt(language_name: str, language: str, draft: str, words: str
     )
 
 
-def two_pass_passage(call: Callable[[str], str], language: str, language_name: str, prompt: str, words: list,
-                     difficulty: Optional[dict]) -> Optional[str]:
-    """The adapted text, or None when it could not be made (the caller then uses the one-call pipeline)."""
+def _level(difficulty: Optional[dict]) -> Optional[str]:
+    """With the range prompt on, the draft names the tier's level (A1 to A2 ...) instead of always saying beginner (7 Nov 2026)."""
+    from .difficulty.note import LEVELS, range_prompt_on
+    if not difficulty or not range_prompt_on():
+        return None
+    return "Level: " + LEVELS.get(difficulty.get("tier") if difficulty.get("tier") in LEVELS else "medium") + " Use simple, common everyday words."
+
+
+def two_pass_passages(call: Callable[[str], str], language: str, language_name: str, prompt: str, words: list,
+                      difficulty: Optional[dict], n: int = 1) -> list:
+    """One draft, then `n` adaptations of it (7 Nov 2026: candidates). The list holds the adapted texts that were made; it is empty when the
+    draft failed, and the caller then uses the one-call pipeline."""
     kind, topic = describe_prompt(prompt)
     length = target_length(kind, difficulty)
     try:
-        draft = extract_final_passage(call(build_draft_prompt(language_name, language, kind, topic, length)))
-        if not draft.strip():
-            return None
-        adapted = extract_final_passage(call(build_adapt_prompt(language_name, language, draft, ", ".join(words), length)))
+        draft = extract_final_passage(call(build_draft_prompt(language_name, language, kind, topic, length, _level(difficulty))))
     except Exception:
-        return None
-    return adapted if adapted.strip() else None
+        return []
+    if not draft.strip():
+        return []
+    out = []
+    for _ in range(max(1, n)):
+        try:
+            adapted = extract_final_passage(call(build_adapt_prompt(language_name, language, draft, ", ".join(words), length)))
+        except Exception:
+            continue
+        if adapted.strip():
+            out.append(adapted)
+    return out
+
+
+def two_pass_passage(call: Callable[[str], str], language: str, language_name: str, prompt: str, words: list,
+                     difficulty: Optional[dict]) -> Optional[str]:
+    """The adapted text, or None when it could not be made (the caller then uses the one-call pipeline)."""
+    made = two_pass_passages(call, language, language_name, prompt, words, difficulty, 1)
+    return made[0] if made else None
