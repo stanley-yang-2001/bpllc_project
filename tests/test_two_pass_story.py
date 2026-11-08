@@ -140,7 +140,7 @@ def test_rescore_offline():
     data = {"learner_id": 1, "vocabularies": {"Spanish": "casa, mar, pan"}, "samples": {"Spanish": [{"code": "es", "pair": {"old": version, "new": dict(version, ok=False)}}]}}
     out = cmp.rescore(data)
     got = out["samples"]["Spanish"][0]["pair"]
-    check("rescoring replaces the saved score with the current one", got["old"]["score"]["version"] == 2 and got["old"]["score"]["score"] != 10.0)
+    check("rescoring replaces the saved score with the current one", got["old"]["score"]["version"] == 3 and got["old"]["score"]["score"] != 10.0)
     check("a failed story stays without a score", got["new"]["score"] is None)
     check("the input is not changed", version["score"] is old_score)
     check("rescored data renders", "Spanish" in cmp.render(out["samples"], out["vocabularies"]))

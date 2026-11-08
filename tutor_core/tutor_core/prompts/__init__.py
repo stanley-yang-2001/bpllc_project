@@ -11,8 +11,8 @@ The package keeps the one import path callers have always used (`tutor_core.prom
 underscore names tests reach for, by re-exporting every module-level name of its parts. Shared mutable state (`_RECENT_TOPICS`) is the same
 object everywhere, so clearing it from here clears it for the code that uses it.
 """
-from . import builder, example, extract, kinds, language_blocks, repair, templates
+from . import audit, builder, example, extract, kinds, language_blocks, repair, templates
 
-for _part in (templates, language_blocks, kinds, builder, extract, repair, example):
+for _part in (templates, language_blocks, kinds, builder, extract, repair, example, audit):
     globals().update({k: v for k, v in vars(_part).items() if not k.startswith("__") and k != "annotations"})
 del _part

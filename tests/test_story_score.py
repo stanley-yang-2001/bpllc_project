@@ -14,8 +14,8 @@ from tutor_core.quality.score import NAMES  # noqa: E402
 failures = []
 
 
-def check(label, condition):
-    print(("PASS" if condition else "FAIL"), label)
+def check(label, condition, detail=""):
+    print(("PASS" if condition else "FAIL"), label, "" if condition or not detail else f"-- {detail}")
     if not condition:
         failures.append(label)
 
@@ -70,7 +70,7 @@ def test_other_languages():
 
 def test_v2_detail_checks():
     from tutor_core.quality.score import SCORE_VERSION
-    check("score version is 2", SCORE_VERSION == 2 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 2)
+    check("score version is 3", SCORE_VERSION == 3 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 3)
     blank = GOOD.replace("María", "[Votre nom]")
     r = score_story(blank, "es", WORDS, None, "story")
     check("a template blank is a grammar problem and fails the format check", "placeholder" in r["problems"] and r["parts"]["language_format"] <= 75
@@ -83,6 +83,22 @@ def test_v2_detail_checks():
     check("stuffing the learner's words lowers that part below the plain count", full["parts"]["own_words"] < 100 and full["measured"]["own_density"] > 0.25)
     run = "我们去公园，看花，看树，看鸟，然后回家。"
     check("a Chinese run-on is flagged", "run_on" in score_story(run * 3, "zh", ["公园"], None, "story")["problems"])
+
+
+def test_v3_grammar_sees_mistakes():
+    clean = score_story(GOOD, "es", WORDS, None, "story")
+    check("a clean story has no grammar hits and full grammar", clean["grammar_hits"] == [] and clean["parts"]["grammar"] == 100.0)
+    wrong = GOOD.replace("una casa", "un casa", 1)
+    r = score_story(wrong, "es", WORDS, None, "story")
+    check("a wrong article lowers the grammar part and names the rule", r["parts"]["grammar"] < 100 and any(h["rule"].endswith("article_noun") for h in r["grammar_hits"]),
+          str(r["grammar_hits"]))
+    check("the story score drops with it", r["score"] < clean["score"])
+    from tutor_core.quality.grammar import Hit
+    extra = Hit(source="audit", rule="audit.verb", wrong="vive en", fix="viven en", kind="grammar", start=-1, end=-1, certain=False, note="")
+    r2 = score_story(GOOD, "es", WORDS, None, "story", hits=[extra])
+    check("hits passed in by the caller are counted when they can be located", r2["parts"]["grammar"] < 100 and r2["grammar_hits"][0]["source"] == "audit",
+          str(r2["grammar_hits"]))
+    check("scoring without hits never calls anything: same text, same score", score_story(GOOD, "es", WORDS, None, "story") == clean)
 
 
 def test_example_wording():

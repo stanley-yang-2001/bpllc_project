@@ -45,6 +45,9 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # STORY_PROOFREAD=0              # 1 = every story is proofread once for grammar by a second model call and the corrected text is used only if it is still in the language, complete, about as long and keeps your words. Off by default (it doubles the calls per story). Broken or repetitive stories get a repair call whether this is on or not.
 # STORY_TWO_PASS=0              # 1 = two-pass stories: a draft without your word list, then a rewrite that uses the words (about twice the calls and waiting time). Off by default; compare both with scripts/compare_story_versions.py before switching it on.
 # STORY_EXAMPLES=0               # 1 = the story prompt quotes the best saved example of the language, for the quality of the sentences only (docs/STORY-SCORING.md). Off by default; fill the bank first with: docker compose exec api python scripts/refresh_story_bank.py
+# LANGUAGETOOL_URL=http://localhost:8010   # optional self-hosted LanguageTool server for the grammar part of the score (never a public server)
+# GROQ_JUDGE_MODEL=openai/gpt-oss-20b      # optional: a different model for the story judge (patch 0064); GROQ_JUDGE_EFFORT=low|medium|high
+# GROQ_AUDIT_MODEL=openai/gpt-oss-20b      # optional: a different model for the grammar review; GROQ_AUDIT_EFFORT
 # STORY_RANGE_PROMPT=0           # 1 = with a difficulty tier the prompt asks for a range (target plus or minus 15%) instead of "about N", and states the tier's level and sentence length. Off by default.
 # Switch an account on (off by default), from the project folder:
 #   docker compose exec api python -m app.custom_model_admin on you@example.com      (also: off, list)

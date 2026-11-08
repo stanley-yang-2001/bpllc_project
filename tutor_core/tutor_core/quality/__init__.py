@@ -7,6 +7,7 @@ Pure functions only (no database, no network). The work is split by what each pa
     endings.py      does it end on a finished sentence?
     fluency.py      telegraphic, repeated or monotonous sentences
     score.py        a 0 to 100 score against the requirements (example bank)
+    grammar/        grammar findings from built-in rules, LanguageTool and a model review, all as one `Hit`
     passage.py      scoring one passage against all the rules
     reporting.py    the report Story Studio shows, and batch scoring with the same rules
     variety.py      are the stories different from one another?

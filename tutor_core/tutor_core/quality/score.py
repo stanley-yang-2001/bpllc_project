@@ -8,16 +8,20 @@ Six requirements, each scored 0 to 100 and weighted the same, so the story score
     3 uncommon words    the share of unusual words: at or below the target = 100, 20 points above it = 0
     4 sentence length   the mean sentence is 6 to 12 words (8 to 24 characters in Chinese and Japanese); 15 points off per word outside,
                         and 15 more if any sentence is over 20 words (40 characters)
-    5 grammar, fluency  100 minus 34 for each problem the code can see (list-like text, a repeated sentence, same openings, a blank like
-                        "[Your name]", one word repeated, a Chinese or Japanese run-on)
+    5 grammar, fluency  the share of sentences with no mistake in them (see below), minus 34 for each structural problem the code can see
+                        (list-like text, a repeated sentence, same openings, a blank like "[Your name]", one word repeated, a Chinese
+                        or Japanese run-on)
     6 language, format  25 each: in the requested language; ends on a finished sentence; no blank left in or leaked plan; format fits the kind
 
 A story that is empty, a failure message, in the wrong language or that leaks the plan gets 0 whatever else it does (the gate): such a
 story must never be kept as an example. A requirement that cannot be measured (no everyday-word list for the language) is left out and
 the rest share the weight; the result says `partial`.
 
-Grammar is only as good as the code can see: a wrong verb ending is invisible here. The optional model rating of grammar is not part
-of this module.
+Grammar (version 3, 7 Nov 2026). Mistakes come from three sources that all report a `Hit` (quality/grammar): the built-in rules, which
+always run and are narrow and almost free of false alarms; and, when the caller has run them and passes the hits in, a LanguageTool server
+and a model review (`audit`). A sentence with a mistake counts once however many it holds; a spelling mistake counts half. This module
+never calls a model or a server itself, so scoring stays pure and repeatable. Without the optional sources the grammar part sees only what
+the built-in rules and the fluency checks see: it does NOT mean the grammar is right.
 """
 from __future__ import annotations
 
@@ -25,11 +29,12 @@ import re
 
 from .endings import ends_complete, has_dangling_sentence
 from .fluency import fluency_problems
+from .grammar import affected_sentences, builtin_hits, merge
 from .language import language_check
 from .passage import FAILURE_MARKERS, LEAK_PATTERN, _is_label, _read_shape
 from .vocabulary import _TOKEN, _norm
 
-SCORE_VERSION = 2
+SCORE_VERSION = 3
 NAMES = ("length", "own_words", "uncommon", "sentence_length", "grammar", "language_format")
 DEFAULT_LENGTH = {"dialogue": 50, "narration": 50}      # words, when no tier or length was asked; the other kinds: 80
 DEFAULT_OWN, DEFAULT_UNCOMMON = 3, 10
@@ -109,8 +114,9 @@ def _format_ok(shape, kind):
     return (not any(labelled) or heading) and kind != "dialogue"
 
 
-def score_story(text: str, language: str, words, difficulty=None, kind=None) -> dict:
-    """{"score": 0 to 100, "parts": {name: 0 to 100 or None}, "gated": reason or None, "partial": bool, "targets": {...}, "measured": {...}}"""
+def score_story(text: str, language: str, words, difficulty=None, kind=None, hits=None) -> dict:
+    """`hits`: extra grammar findings (LanguageTool, a model review) already collected by the caller.
+    {"score": 0 to 100, "parts": {name: 0 to 100 or None}, "gated": reason or None, "partial": bool, "targets": {...}, "measured": {...}}"""
     from .. import difficulty as _d
     text = _norm(text or "").strip()
     gated = _gate(text, language)
@@ -138,11 +144,15 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None) -> 
     sentence = 100.0 - (PER_WORD_OFF / (2 if unspaced else 1)) * off - (LONGEST_PENALTY if max(sizes) > SENTENCE_LONGEST[unspaced] else 0)
     parts["sentence_length"] = max(0.0, sentence)
     problems = fluency_problems(text, unspaced) + _detail_problems(text, unspaced, tokens)
-    parts["grammar"] = max(0.0, 100.0 - PER_PROBLEM * len(problems))
+    all_hits = merge(builtin_hits(text, language, list(words)), list(hits or ()))
+    n_sentences, affected = affected_sentences(text, all_hits)
+    parts["grammar"] = max(0.0, 100.0 * (1 - affected / max(1, n_sentences)) - PER_PROBLEM * len(problems))
     checks = [True, ends_complete(text) and not has_dangling_sentence(text, language), "placeholder" not in problems, _format_ok(shape, kind)]
     parts["language_format"] = 25.0 * sum(checks)
     scored = {n: v for n, v in parts.items() if v is not None}
     return {"score": round(sum(scored.values()) / len(scored), 1), "parts": {n: (None if v is None else round(v, 1)) for n, v in parts.items()},
             "gated": None, "partial": len(scored) < len(NAMES), "problems": problems, "version": SCORE_VERSION,
+            "grammar_hits": [h.as_dict() for h in all_hits],
             "targets": {"length": t_len, "own_words": t_own, "uncommon_pct": t_unc},
-            "measured": {"own_density": round(density, 2), "length": m["length"], "own_words": m["own_words"], "uncommon_pct": m["uncommon_pct"], "mean_sentence": round(mean, 1)}}
+            "measured": {"own_density": round(density, 2), "length": m["length"], "own_words": m["own_words"], "uncommon_pct": m["uncommon_pct"], "mean_sentence": round(mean, 1),
+                         "sentences": n_sentences, "sentences_with_mistakes": round(affected, 2)}}

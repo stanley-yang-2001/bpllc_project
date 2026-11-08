@@ -1,0 +1,320 @@
+{
+ "note": "Each language: one clean text and mistakes injected one at a time (right -> wrong). Run scripts/grammar_probe.py.",
+ "languages": {
+  "en": {
+   "clean": "Anna lives in a small house near the sea. Every morning she drinks a cup of tea and eats an apple. Her brother has a dog. They walk to the park and talk about the day. In the evening they cook dinner together.",
+   "errors": [
+    {
+     "right": "Anna lives in a small house",
+     "wrong": "Anna live in a small house",
+     "type": "verb"
+    },
+    {
+     "right": "eats an apple",
+     "wrong": "eats a apple",
+     "type": "article"
+    },
+    {
+     "right": "Her brother has a dog",
+     "wrong": "Her brother have a dog",
+     "type": "verb"
+    },
+    {
+     "right": "They walk to the park",
+     "wrong": "They walks to the park",
+     "type": "verb"
+    },
+    {
+     "right": "they cook dinner",
+     "wrong": "they cooks dinner",
+     "type": "verb"
+    },
+    {
+     "right": "Anna lives",
+     "wrong": "anna lives",
+     "type": "capital"
+    }
+   ]
+  },
+  "es": {
+   "clean": "Ana vive en una casa pequeña cerca del mar. Cada mañana bebe un vaso de agua y come una manzana. Su hermano tiene un perro. Los dos van al parque y hablan del día. Por la noche cocinan la cena juntos.",
+   "errors": [
+    {
+     "right": "vive en una casa",
+     "wrong": "vive en un casa",
+     "type": "gender"
+    },
+    {
+     "right": "van al parque",
+     "wrong": "van a el parque",
+     "type": "contraction"
+    },
+    {
+     "right": "Su hermano tiene un perro",
+     "wrong": "Su hermano tienes un perro",
+     "type": "verb"
+    },
+    {
+     "right": "Los dos van",
+     "wrong": "Las dos van",
+     "type": "gender"
+    },
+    {
+     "right": "Por la noche cocinan",
+     "wrong": "Por la noche cocina",
+     "type": "verb"
+    },
+    {
+     "right": "come una manzana",
+     "wrong": "come un manzana",
+     "type": "gender"
+    }
+   ]
+  },
+  "fr": {
+   "clean": "Anne habite dans une petite maison près de la mer. Chaque matin elle boit un verre d'eau et mange une pomme. Son frère a un chien. Ils vont au parc et parlent de la journée. Le soir ils préparent le dîner ensemble.",
+   "errors": [
+    {
+     "right": "dans une petite maison",
+     "wrong": "dans un petite maison",
+     "type": "gender"
+    },
+    {
+     "right": "près de la mer",
+     "wrong": "près de le mer",
+     "type": "gender"
+    },
+    {
+     "right": "mange une pomme",
+     "wrong": "mange un pomme",
+     "type": "gender"
+    },
+    {
+     "right": "Son frère a un chien",
+     "wrong": "Son frère ont un chien",
+     "type": "verb"
+    },
+    {
+     "right": "Ils vont au parc",
+     "wrong": "Ils va au parc",
+     "type": "verb"
+    },
+    {
+     "right": "de la journée",
+     "wrong": "de le journée",
+     "type": "gender"
+    }
+   ]
+  },
+  "it": {
+   "clean": "Anna abita in una piccola casa vicino al mare. Ogni mattina beve un bicchiere d'acqua e mangia una mela. Suo fratello ha un cane. Vanno al parco e parlano della giornata. La sera preparano la cena insieme.",
+   "errors": [
+    {
+     "right": "in una piccola casa",
+     "wrong": "in un piccola casa",
+     "type": "gender"
+    },
+    {
+     "right": "vicino al mare",
+     "wrong": "vicino a il mare",
+     "type": "contraction"
+    },
+    {
+     "right": "mangia una mela",
+     "wrong": "mangia un mela",
+     "type": "gender"
+    },
+    {
+     "right": "Suo fratello ha un cane",
+     "wrong": "Suo fratello hai un cane",
+     "type": "verb"
+    },
+    {
+     "right": "Vanno al parco",
+     "wrong": "Va al parco",
+     "type": "verb"
+    },
+    {
+     "right": "parlano della giornata",
+     "wrong": "parlano di la giornata",
+     "type": "contraction"
+    }
+   ]
+  },
+  "pt": {
+   "clean": "Ana mora numa casa pequena perto do mar. Todas as manhãs ela bebe um copo de água e come uma maçã. O irmão dela tem um cachorro. Eles vão ao parque e falam do dia. À noite eles cozinham o jantar juntos.",
+   "errors": [
+    {
+     "right": "numa casa pequena",
+     "wrong": "num casa pequena",
+     "type": "gender"
+    },
+    {
+     "right": "perto do mar",
+     "wrong": "perto de o mar",
+     "type": "contraction"
+    },
+    {
+     "right": "come uma maçã",
+     "wrong": "come um maçã",
+     "type": "gender"
+    },
+    {
+     "right": "tem um cachorro",
+     "wrong": "têm um cachorro",
+     "type": "verb"
+    },
+    {
+     "right": "Eles vão ao parque",
+     "wrong": "Eles vai ao parque",
+     "type": "verb"
+    },
+    {
+     "right": "falam do dia",
+     "wrong": "falam de o dia",
+     "type": "contraction"
+    }
+   ]
+  },
+  "de": {
+   "clean": "Anna wohnt in einem kleinen Haus am Meer. Jeden Morgen trinkt sie ein Glas Wasser und isst einen Apfel. Ihr Bruder hat einen Hund. Sie gehen in den Park und sprechen über den Tag. Am Abend kochen sie zusammen das Essen.",
+   "errors": [
+    {
+     "right": "in einem kleinen Haus",
+     "wrong": "in einer kleinen Haus",
+     "type": "gender"
+    },
+    {
+     "right": "trinkt sie ein Glas",
+     "wrong": "trinken sie ein Glas",
+     "type": "verb"
+    },
+    {
+     "right": "Ihr Bruder hat einen Hund",
+     "wrong": "Ihr Bruder habe einen Hund",
+     "type": "verb"
+    },
+    {
+     "right": "Sie gehen in den Park",
+     "wrong": "Sie geht in den Park",
+     "type": "verb"
+    },
+    {
+     "right": "das Essen",
+     "wrong": "das essen",
+     "type": "capital"
+    },
+    {
+     "right": "Am Abend kochen sie",
+     "wrong": "Am Abend kocht sie",
+     "type": "verb"
+    }
+   ]
+  },
+  "zh": {
+   "clean": "安娜住在海边的一个小房子里。每天早上她喝一杯水，吃一个苹果。她的哥哥有一只狗。他们去公园，谈论这一天。晚上他们一起做晚饭。",
+   "errors": [
+    {
+     "right": "一只狗",
+     "wrong": "一个狗",
+     "type": "measure"
+    },
+    {
+     "right": "一个苹果",
+     "wrong": "一只苹果",
+     "type": "measure"
+    },
+    {
+     "right": "一个小房子",
+     "wrong": "一个小房子里里",
+     "type": "particle"
+    },
+    {
+     "right": "有一只狗",
+     "wrong": "不有一只狗",
+     "type": "negation"
+    },
+    {
+     "right": "一起做晚饭",
+     "wrong": "一起做的的晚饭",
+     "type": "particle"
+    },
+    {
+     "right": "喝一杯水",
+     "wrong": "喝一杯 water",
+     "type": "language"
+    }
+   ]
+  },
+  "ja": {
+   "clean": "アナは海の近くの小さい家に住んでいます。毎朝、水を飲んで、りんごを食べます。兄は犬を飼っています。二人は公園に行って、一日について話します。夜は一緒に晩ご飯を作ります。",
+   "errors": [
+    {
+     "right": "家に住んで",
+     "wrong": "家を住んで",
+     "type": "particle"
+    },
+    {
+     "right": "水を飲んで",
+     "wrong": "水が飲んで",
+     "type": "particle"
+    },
+    {
+     "right": "公園に行って",
+     "wrong": "公園を行って",
+     "type": "particle"
+    },
+    {
+     "right": "食べます",
+     "wrong": "食べるます",
+     "type": "verb"
+    },
+    {
+     "right": "晩ご飯を作ります",
+     "wrong": "晩ご飯をを作ります",
+     "type": "particle"
+    },
+    {
+     "right": "話します",
+     "wrong": "話しますです",
+     "type": "verb"
+    }
+   ]
+  },
+  "ko": {
+   "clean": "안나는 바다 근처의 작은 집에 살아요. 매일 아침 물을 마시고 사과를 먹어요. 오빠는 개가 있어요. 두 사람은 공원에 가서 하루에 대해 이야기해요. 저녁에는 함께 저녁을 만들어요.",
+   "errors": [
+    {
+     "right": "물을 마시고",
+     "wrong": "물를 마시고",
+     "type": "particle"
+    },
+    {
+     "right": "사과를 먹어요",
+     "wrong": "사과을 먹어요",
+     "type": "particle"
+    },
+    {
+     "right": "개가 있어요",
+     "wrong": "개이 있어요",
+     "type": "particle"
+    },
+    {
+     "right": "집에 살아요",
+     "wrong": "집을 살아요",
+     "type": "particle"
+    },
+    {
+     "right": "저녁을 만들어요",
+     "wrong": "저녁를 만들어요",
+     "type": "particle"
+    },
+    {
+     "right": "바다 근처의",
+     "wrong": "바다 근처으",
+     "type": "particle"
+    }
+   ]
+  }
+ }
+}
