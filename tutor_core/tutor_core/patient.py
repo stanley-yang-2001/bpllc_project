@@ -19,7 +19,7 @@ import time
 _HINT = re.compile(r"try again in\s+((?:\d+(?:\.\d+)?\s*(?:h|ms|m|s)\s*)+)", re.I)
 _PIECE = re.compile(r"(\d+(?:\.\d+)?)\s*(ms|h|m|s)", re.I)
 _UNIT = {"h": 3600.0, "m": 60.0, "s": 1.0, "ms": 0.001}
-COMPLETION_ESTIMATE = 1200          # tokens a reply is assumed to cost when pacing (reasoning tokens count)
+COMPLETION_ESTIMATE = 700           # tokens a reply is assumed to cost when pacing (reasoning tokens count); the runs of 7 Nov used 300 to 600
 
 
 def is_rate_limit(error) -> bool:

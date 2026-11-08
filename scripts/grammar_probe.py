@@ -80,7 +80,8 @@ def probe(layers: dict, languages=None, words=()) -> dict:
     return report
 
 
-def build_layers(use_audit: bool):
+def build_layers(use_audit: bool, models=None):
+    """`models`: {label: model id}: one `audit:<label>` layer per model, so Qwen and GPT can be compared on the same known mistakes."""
     layers = {"rules": lambda text, code: builtin_hits(text, code)}
     lt = languagetool.from_env()
     if lt:
@@ -88,22 +89,39 @@ def build_layers(use_audit: bool):
     if use_audit:
         from tutor_core import groq
         from tutor_core.patient import patient
-        call = patient(groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT") or groq.call_groq, say=print)
-        checker = AuditChecker(call)
-        layers["audit"] = lambda text, code: checker.check(text, code)
+        if models:
+            for label, name in models.items():
+                effort = "none" if label == "qwen" else None
+                call = patient(lambda prompt, _n=name, _e=effort: groq.call_groq(prompt, model=_n, effort=_e), say=print)
+                checker = AuditChecker(call)
+                layers[f"audit:{label}"] = lambda text, code, _c=checker: _c.check(text, code)
+        else:
+            call = patient(groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT") or groq.call_groq, say=print)
+            checker = AuditChecker(call)
+            layers["audit"] = lambda text, code: checker.check(text, code)
     return layers
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--audit", action="store_true", help="also run the model review (needs GROQ_API_KEY)")
+    ap.add_argument("--audit-models", help="compare reviewers: gpt, qwen or gpt,qwen (implies --audit); ids from --gpt-model / --qwen-model")
+    ap.add_argument("--gpt-model", default=None)
+    ap.add_argument("--qwen-model", default=None)
     ap.add_argument("--languages", help="comma-separated codes, e.g. es,fr (default: all nine)")
     ap.add_argument("--json", help="write the full report to this file")
     args = ap.parse_args(argv)
+    chosen = [x.strip() for x in (args.audit_models or "").split(",") if x.strip()]
+    if any(x not in ("gpt", "qwen") for x in chosen):
+        print("--audit-models takes gpt and/or qwen.")
+        return 2
+    args.audit = args.audit or bool(chosen)
+    ids = {"gpt": args.gpt_model or os.environ.get("GROQ_MODEL") or "openai/gpt-oss-120b",
+           "qwen": args.qwen_model or os.environ.get("GROQ_QWEN_MODEL") or "qwen/qwen3.6-27b"}
     if args.audit and not os.environ.get("GROQ_API_KEY"):
         print("--audit needs GROQ_API_KEY")
         return 2
-    report = probe(build_layers(args.audit), args.languages.split(",") if args.languages else None)
+    report = probe(build_layers(args.audit, {a: ids[a] for a in chosen} or None), args.languages.split(",") if args.languages else None)
     for name, r in report["layers"].items():
         print(f"\n{name}: found {r['found']}/{r['injected']} injected mistakes (recall {r['recall']}), false alarms on clean text: {r['false_alarms']}")
         for code, (f, n, fa) in r["by_language"].items():

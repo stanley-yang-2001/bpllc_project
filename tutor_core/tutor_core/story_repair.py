@@ -18,8 +18,9 @@ from .prompts import build_targeted_prompt, extract_final_passage
 from .quality import score_story
 from .quality.grammar import Hit, apply_certain
 from .quality.grammar.audit import run_audit
+from .story_gates import check as run_gates, requirements as gate_requirements
 
-MAX_CALLS = 2
+MAX_CALLS = 1          # repair once: a second rewrite gained about a point in the runs of 7 Nov and cost the most waiting
 GOOD = 85.0            # a part at or above this is not worth a call
 GRAMMAR_GOOD = 95.0
 MIN_GAIN = 0.5         # a rewrite must beat the text by this many points
@@ -62,6 +63,9 @@ def requirements(result: dict, text: str, language: str, words, difficulty: Opti
             out.append(f"Fix these grammar mistakes: {shown}.")
         for p in result.get("problems", []):
             out.append(_STRUCTURAL.get(p, p[:1].upper() + p[1:] + ("" if p.endswith(".") else ".")))
+    verdict = run_gates(text, language, words, difficulty, kind, result)
+    verdict["failed"] = [f for f in verdict["failed"] if f in ("stuffed", "tacked_on_words", "telegraphic", "too_many_errors")]   # length and word counts are above
+    out += [r for r in gate_requirements(verdict, language) if r not in out]
     if parts["language_format"] is not None and parts["language_format"] < 100 and not any("blank" in r for r in out):
         if kind == "dialogue":
             out.append("Write it as a dialogue: every line starts with a speaker name and a colon.")

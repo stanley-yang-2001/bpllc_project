@@ -18,13 +18,19 @@ class Variant:
     repair: bool = False
     proofread: bool = False
     examples: bool = False          # needs the example bank (the database): skipped without --db
+    plan: bool = False              # name only about one learner word per 17 words, and a maximum (story_plan.py)
+    mixed: bool = False             # candidates by different strategies (one-pass and two-pass)
+    gates: bool = False             # free pass/fail checks drop failing candidates before any review
+    story_model: str = None         # alias of the model that writes: "gpt" or "qwen" (None: the default story model)
+    judge_model: str = None         # alias of the model that judges (None: the default judge model, else the story model)
 
     def options(self) -> StoryOptions:
-        return StoryOptions(self.candidates, self.judge, self.repair)
+        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "label": self.label, "note": self.note, "range_prompt": self.range_prompt, "two_pass": self.two_pass,
-                "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples}
+                "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples,
+                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "story_model": self.story_model, "judge_model": self.judge_model}
 
 
 ALL = [
@@ -39,14 +45,40 @@ ALL = [
     Variant("examples", "+ saved example", "the full set plus an example from the bank (needs --db)", range_prompt=True, two_pass=True, candidates=3,
             judge=True, repair=True, examples=True),
 ]
+# The mixture (8 Nov 2026): who writes and who judges, the same method for all four: range prompt, two passes, 3 candidates, judge.
+_MIX = dict(range_prompt=True, two_pass=True, candidates=3, judge=True)
+ALL += [
+    Variant("baseline_qwen", "Baseline, Qwen writes", "today's one-call pipeline on the Qwen model", story_model="qwen"),
+    Variant("gpt_gpt", "GPT writes, GPT judges", "candidates + judge, both on the GPT model", story_model="gpt", judge_model="gpt", **_MIX),
+    Variant("qwen_qwen", "Qwen writes, Qwen judges", "candidates + judge, both on the Qwen model", story_model="qwen", judge_model="qwen", **_MIX),
+    Variant("gpt_qwen", "GPT writes, Qwen judges", "candidates by GPT, reviewed by Qwen", story_model="gpt", judge_model="qwen", **_MIX),
+    Variant("qwen_gpt", "Qwen writes, GPT judges", "candidates by Qwen, reviewed by GPT", story_model="qwen", judge_model="gpt", **_MIX),
+]
+# The cascade (8 Nov 2026): cheap first. Plan limits the featured words; mixed strategies; free gates drop bad candidates; only the best two are
+# reviewed (by the judge model); one repair for what is left; the last variant swaps the repair for one proofreading call.
+_CASCADE = dict(range_prompt=True, plan=True, mixed=True, candidates=4, gates=True)
+ALL += [
+    Variant("plan", "+ plan limits", "the prompt names about one word per 17 and a maximum", range_prompt=True, plan=True),
+    Variant("mixed_gates", "+ mixed candidates, gates", "2 one-pass and 2 two-pass candidates, free gates pick (no model review)", **_CASCADE),
+    Variant("cascade", "Cascade", "+ the best two reviewed by the judge, then one repair", judge=True, repair=True, **_CASCADE),
+    Variant("cascade_proofread", "Cascade, proofread", "the cascade with one proofreading call instead of the repair", judge=True, proofread=True, **_CASCADE),
+]
 DEFAULT = ["baseline", "range", "two_pass", "candidates", "judge", "repair"]
+CASCADE = ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]
+MIX = ["baseline", "baseline_qwen", "gpt_gpt", "qwen_qwen", "gpt_qwen", "qwen_gpt"]
 BY_NAME = {v.name: v for v in ALL}
 
 
 def resolve(spec: str) -> list[Variant]:
-    """'default' (the first six), 'all', or names separated by commas. An unknown name is an error that lists the valid ones."""
-    spec = (spec or "default").strip().lower()
-    names = DEFAULT if spec == "default" else [v.name for v in ALL] if spec == "all" else [n.strip() for n in spec.split(",") if n.strip()]
+    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'all', or names separated by commas. An unknown name is an error
+    that lists the valid ones."""
+    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "all": [v.name for v in ALL]}
+    names = []
+    for part in (spec or "default").strip().lower().split(","):
+        part = part.strip()
+        for n in groups.get(part, [part] if part else []):
+            if n not in names:
+                names.append(n)
     unknown = [n for n in names if n not in BY_NAME]
     if unknown:
         raise ValueError(f"unknown variant(s) {', '.join(unknown)}; choose from {', '.join(BY_NAME)}")
@@ -54,4 +86,6 @@ def resolve(spec: str) -> list[Variant]:
 
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
-CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3}
+CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3,
+         "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

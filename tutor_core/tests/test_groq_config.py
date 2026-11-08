@@ -98,3 +98,34 @@ def test_make_model_call_is_none_when_the_model_is_not_set():
         assert groq.make_model_call("GROQ_JUDGE_MODEL") is None
     with patch.dict("os.environ", {"GROQ_JUDGE_MODEL": "   "}, clear=True):
         assert groq.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT") is None
+
+
+# 8 Nov 2026: Qwen models (they think aloud unless told not to)
+def test_qwen_gets_no_thinking_and_other_efforts_are_ignored():
+    assert call_with({"GROQ_API_KEY": "k"}, model="qwen/qwen3.6-27b", effort="high")["reasoning_effort"] == "none"
+    assert call_with({"GROQ_API_KEY": "k"}, model="qwen/qwen3.6-27b", effort="default")["reasoning_effort"] == "default"
+
+
+def test_a_think_block_is_removed_from_the_reply():
+    assert groq._clean("<think>hmm, first the plan</think>\n===STORY===\nHola.") == "===STORY===\nHola."
+    assert groq._clean("plain text") == "plain text" and groq._clean(None) == ""
+
+
+def test_a_refused_reasoning_effort_is_asked_again_without_it():
+    import urllib.error
+    from io import BytesIO
+    sent = []
+
+    def fake_urlopen(req, timeout=None):
+        body = json.loads(req.data.decode("utf-8"))
+        sent.append(body)
+        if "reasoning_effort" in body:
+            raise urllib.error.HTTPError("u", 400, "bad", {}, BytesIO(b'{"error":{"message":"reasoning_effort is not supported with this model"}}'))
+        resp = MagicMock()
+        resp.read.return_value = json.dumps({"choices": [{"message": {"content": "<think>x</think>ok"}}]}).encode("utf-8")
+        resp.__enter__.return_value = resp
+        return resp
+
+    with patch.dict("os.environ", {"GROQ_API_KEY": "k"}, clear=True), patch("tutor_core.groq.urllib.request.urlopen", side_effect=fake_urlopen):
+        assert groq.call_groq("hi", model="qwen/qwen3.6-27b") == "ok"
+    assert len(sent) == 2 and "reasoning_effort" in sent[0] and "reasoning_effort" not in sent[1]

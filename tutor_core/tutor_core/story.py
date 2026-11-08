@@ -19,6 +19,7 @@ from . import groq as groq_module
 from .story_cache import StoryCache
 from .two_pass import two_pass_passages
 from .story_options import StoryOptions
+from .story_plan import plan_words
 from .story_candidates import choose as choose_candidate
 from .story_repair import repair_story
 from .quality import score_story
@@ -155,10 +156,15 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
         return StoryResult(EMPTY_VOCABULARY_MESSAGE, False, "empty_vocabulary", language)
 
     used = sample_words(words, request.max_words if request.max_words is not None else max_prompt_words(), rng)
+    plan_note = ""
+    if request.options.plan and request.difficulty:
+        used, plan_note = plan_words(used, request.difficulty, language, rng)
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
     prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), request.story_type, request.topic, rng, vocab_in_target=True,
                                 difficulty=request.difficulty)
+    if plan_note:
+        prompt = prompt.rstrip() + "\n" + plan_note
     if example_conn is not None:                        # an example from the bank, for the quality of the language only (prompts/example.py)
         example = best_for_prompt(example_conn, language)
         prompt = with_example(prompt, example) if example else prompt
@@ -169,19 +175,23 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     opts = request.options
     notes: list[str] = []
     n = opts.candidates
-    texts = two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, n) if request.two_pass else []
-    if not texts:                                               # a failed two-pass attempt falls back to the one-call prompt
+    one_pass = n if not opts.mixed else (n + 1) // 2 if n > 1 else 1        # mixed: about half the candidates are one-pass, half two-pass
+    two = 0 if opts.mixed and n <= 1 else (n - one_pass if opts.mixed else (n if request.two_pass else 0))
+    texts = two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, two) if two else []
+    if opts.mixed:
+        notes.append(f"mixed strategies: {one_pass} one-pass, {len(texts)} two-pass")
+    want_one = one_pass if (opts.mixed or not texts) else 0
+    first = True
+    for _ in range(want_one):
         try:
             raw = call(prompt)
         except Exception as exc:
-            _log.warning("story generation failed (%s): %s", language, exc)
-            return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
-        texts = [extract_final_passage(raw)]
-        for _ in range(n - 1):
-            try:
-                texts.append(extract_final_passage(call(prompt)))
-            except Exception:           # noqa: BLE001 - a missing extra candidate is not a failed story
-                break
+            if first and not texts:
+                _log.warning("story generation failed (%s): %s", language, exc)
+                return StoryResult(FAILURE_FALLBACK_MESSAGE, False, "failed", **base)
+            break                       # a missing extra candidate is not a failed story
+        first = False
+        texts.append(extract_final_passage(raw))
     texts = [t for t in texts if t.strip()]
     # An empty passage (the model ran out of tokens, or returned nothing after the delimiter) must never reach the Agent
     # as an empty string: the Agent fills the gap by inventing its own story. It is a failure, cached briefly.
@@ -192,7 +202,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     judge = (judge_call or call) if opts.judge else None
     hits: list = []
     if len(texts) > 1:
-        passage, hits, more = choose_candidate(texts, language, words, request.difficulty, picked_type, audit_call=judge)
+        passage, hits, more = choose_candidate(texts, language, words, request.difficulty, picked_type, audit_call=judge, gates=opts.gates)
         notes += more
     else:
         passage = texts[0]

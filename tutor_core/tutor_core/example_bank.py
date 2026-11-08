@@ -25,7 +25,7 @@ def offer(conn, language: str, text: str, scored: dict, *, story_type: Optional[
           two_pass: bool = False) -> str:
     """One candidate against the saved stories of its language. `scored` is the dict from quality.score_story."""
     score = float(scored.get("score") or 0)
-    if scored.get("gated") or score <= 0 or not (text or "").strip():
+    if scored.get("gated") or scored.get("passed") is False or score <= 0 or not (text or "").strip():
         return REJECTED
     values = (text, score, json.dumps(scored.get("parts") or {}), int(scored.get("version") or 1), story_type, topic, bool(two_pass), score < GOOD_ENOUGH)
     with conn, conn.cursor() as cur:

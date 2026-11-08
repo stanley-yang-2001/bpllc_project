@@ -5,6 +5,7 @@ Moved from custom_components/story_tool.py (M3). The request is unchanged except
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -21,12 +22,24 @@ _REASONING_EFFORT = "low"
 EFFORTS = ("low", "medium", "high")
 
 
+_THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
+
+
 def _reasoning_effort(model: str, effort: Optional[str]) -> Optional[str]:
-    """What to send as reasoning_effort: only the gpt-oss models take it here, and another model may refuse the whole request, so
-    none is sent to it. An effort that is not low, medium or high falls back to low."""
-    if "gpt-oss" not in model:
-        return None
-    return effort if effort in EFFORTS else _REASONING_EFFORT
+    """What to send as reasoning_effort. The gpt-oss models take low, medium or high (anything else means low). Qwen models think out loud
+    by default, which would eat the token budget and put the thinking into the story, so they get "none" unless "default" is asked for.
+    Any other model gets nothing: it may refuse the whole request."""
+    name = model.casefold()
+    if "gpt-oss" in name:
+        return effort if effort in EFFORTS else _REASONING_EFFORT
+    if "qwen" in name:
+        return "default" if effort == "default" else "none"
+    return None
+
+
+def _clean(content) -> str:
+    """The reply without a <think>...</think> block (a model that thinks aloud puts it in front of the answer)."""
+    return _THINK.sub("", content or "").strip() if content and "think>" in content.lower() else (content or "")
 
 
 def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str] = None) -> str:
@@ -52,11 +65,11 @@ def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str]
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     name = (model or "").strip() or (os.environ.get("GROQ_MODEL") or "").strip() or DEFAULT_MODEL
-    body = {"model": name, "messages": [{"role": "user", "content": prompt}], "max_tokens": _MAX_COMPLETION_TOKENS}
+    request_body = {"model": name, "messages": [{"role": "user", "content": prompt}], "max_tokens": _MAX_COMPLETION_TOKENS}
     reasoning = _reasoning_effort(name, effort)
     if reasoning:
-        body["reasoning_effort"] = reasoning
-    payload = json.dumps(body).encode("utf-8")
+        request_body["reasoning_effort"] = reasoning
+    payload = json.dumps(request_body).encode("utf-8")
 
     req = urllib.request.Request(
         url,
@@ -70,13 +83,20 @@ def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str]
     )
 
     last_error = None
+    dropped_effort = False
     for attempt in range(MAX_RETRIES):
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 body = json.loads(resp.read().decode("utf-8"))
-                return body["choices"][0]["message"]["content"]
+                return _clean(body["choices"][0]["message"]["content"])
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
+            if e.code == 400 and "reasoning" in detail.lower() and reasoning and not dropped_effort:
+                # a model that does not know this reasoning_effort value: ask again without it rather than fail the story
+                dropped_effort = True
+                request_body.pop("reasoning_effort", None)
+                req = urllib.request.Request(url, data=json.dumps(request_body).encode("utf-8"), headers=dict(req.header_items()), method="POST")
+                continue
             if e.code == 429 and attempt < MAX_RETRIES - 1:
                 time.sleep(BACKOFF_SECONDS)
                 last_error = RuntimeError(f"Groq API error {e.code}: {detail}")

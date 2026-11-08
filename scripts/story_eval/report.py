@@ -61,6 +61,10 @@ def rescore(data: dict) -> dict:
             entry["score"] = score_story(*args)
             hits = [Hit(**h) for h in (entry.get("audit") or {}).get("hits", [])]
             entry["audit_score"] = score_story(*args, hits=hits) if entry.get("audit", {}) and entry["audit"].get("ok") else None
+            entry["audit_scores"] = {}
+            for label, review in (entry.get("audits") or {}).items():
+                if review.get("ok"):
+                    entry["audit_scores"][label] = score_story(*args, hits=[Hit(**h) for h in review.get("hits", [])])
     return data
 
 
@@ -99,6 +103,19 @@ def _card(variant: dict, e: dict, best: bool) -> str:
         found = f"<details><summary>Model review: {len(hits)} mistake(s)</summary><ul>{lis}</ul></details>"
     elif e.get("audit"):
         found = f"<p class=num>Model review gave no usable answer ({html.escape(e['audit'].get('error') or '')[:80]}).</p>"
+    for label, review in list((e.get("audits") or {}).items())[1:]:
+        if review.get("ok"):
+            lis = "".join(f"<li>“{html.escape(h['wrong'])}” → “{html.escape(h['fix'])}” <i>{html.escape(h['note'])}</i></li>" for h in review["hits"])
+            found += f"<details><summary>Review by {html.escape(label)}: {len(review['hits'])} mistake(s)</summary><ul>{lis}</ul></details>"
+    first = next(iter(e.get("audits") or {}), None)
+    if first and len(e["audits"]) > 1:
+        found = found.replace("Model review:", f"Review by {html.escape(first)}:", 1)
+    gate = e.get("gate")
+    if gate is not None:
+        found += (f"<p class=num>Free checks: {'passed' if gate['passed'] else 'FAILED ' + html.escape(', '.join(gate['failed']))}"
+                  f" (own words {gate['limits']['own_min']}–{gate['limits']['own_max']})</p>")
+    if e["ok"] and not e.get("audit"):
+        found += "<p class=num>Grammar not reviewed by a model: the score cannot see most mistakes.</p>"
     rules = ""
     if sc and sc.get("grammar_hits"):
         lis = "".join(f"<li>“{html.escape(h['wrong'])}” → “{html.escape(h['fix'])}” <i>{html.escape(h['rule'])}</i></li>" for h in sc["grammar_hits"])
@@ -129,6 +146,39 @@ JS = ("<script>(function(){var b=document.querySelectorAll('nav button'),p=docum
       "var h=location.hash.slice(1);show(document.getElementById('p-'+h)?h:'summary')})();</script>")
 
 
+def reviewer_table(data: dict) -> str:
+    """Reviewers side by side: how many mistakes each finds, the score with its findings, its time, and how often two reviewers agree
+    that a story has (or has no) mistake. Empty when no run used --audit-models."""
+    labels = list(dict.fromkeys(l for row in data["results"].values() for e in row.values() for l in (e.get("audits") or {})))
+    if not labels:
+        return ""
+    allx = [e for row in data["results"].values() for e in row.values() if e.get("ok")]
+    head = "<tr><th>Reviewer</th><th>Stories reviewed</th><th>Mistakes per story</th><th>Stories with a mistake</th><th>Score with its review</th><th>Seconds per review</th><th>No usable answer</th></tr>"
+    rows = []
+    for l in labels:
+        rs = [e["audits"][l] for e in allx if l in (e.get("audits") or {})]
+        good = [r for r in rs if r.get("ok")]
+        rows.append(f"<tr><td><b>{html.escape(l)}</b></td><td>{len(good)}</td><td>{_fmt(_mean([len(r['hits']) for r in good]))}</td>"
+                    f"<td>{_fmt(round(sum(1 for r in good if r['hits']) / len(good), 3) if good else None, True)}</td>"
+                    f"<td>{_fmt(_mean([e['audit_scores'][l]['score'] for e in allx if l in (e.get('audit_scores') or {})]))}</td>"
+                    f"<td>{_fmt(_mean([r.get('seconds') for r in rs]))}</td><td>{len(rs) - len(good)}</td></tr>")
+    agree = ""
+    if len(labels) > 1:
+        a, b = labels[0], labels[1]
+        both = [e for e in allx if all((e.get("audits") or {}).get(x, {}).get("ok") for x in (a, b))]
+        same = sum(1 for e in both if bool(e["audits"][a]["hits"]) == bool(e["audits"][b]["hits"]))
+        agree = f"<p class=num>{html.escape(a)} and {html.escape(b)} agree on whether a story has any mistake in {same} of {len(both)} stories.</p>"
+    cross = ""
+    names = [v["name"] for v in data["variants"]]
+    if len(labels) > 1:
+        lines = "".join(f"<tr><td>{html.escape(v['label'])}</td>" + "".join(
+            f"<td>{_fmt(_mean([len(e['audits'][l]['hits']) for _, e in entries(data, v['name']) if e.get('ok') and (e.get('audits') or {}).get(l, {}).get('ok')]))}</td>"
+            for l in labels) + "</tr>" for v in data["variants"] if v["name"] in names)
+        cross = ("<h3>Mistakes found per story, by method and reviewer</h3><table class=sum><tr><th>Method</th>"
+                 + "".join(f"<th>{html.escape(l)}</th>" for l in labels) + f"</tr>{lines}</table>")
+    return f"<h3>Reviewers compared</h3><table class=sum>{head}{''.join(rows)}</table>{agree}{cross}"
+
+
 def _summary(data: dict) -> str:
     variants = data["variants"]
     base = stats(data, variants[0]["name"]) if variants else {}
@@ -152,7 +202,7 @@ def _summary(data: dict) -> str:
             "“Seconds in model” is time inside model calls; “seconds in all” also counts waiting for the free tier’s rate limit. "
             "The model review column appears only when the run used --audit: an independent model lists grammar mistakes in each final story, and the score is "
             "computed again with them.</p>" + (f"<p class=num>{html.escape(models)}</p>" if models else "")
-            + f"<table class=sum>{head}{''.join(rows)}</table><h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>")
+            + f"<table class=sum>{head}{''.join(rows)}</table>{reviewer_table(data)}<h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>")
 
 
 def render(data: dict) -> str:

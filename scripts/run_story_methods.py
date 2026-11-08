@@ -69,6 +69,9 @@ def main(argv=None) -> int:
     ap.add_argument("--count", type=int, default=2, help="requests per language (2 with all languages is the fixed set of 20)")
     ap.add_argument("--limit", type=int, default=None, help="only the first N requests")
     ap.add_argument("--audit", action="store_true", help="an independent model lists grammar mistakes in every final story (one more call each)")
+    ap.add_argument("--gpt-model", default=None, help="model for the 'gpt' side of the mix methods (default: GROQ_MODEL)")
+    ap.add_argument("--qwen-model", default=None, help="model for the 'qwen' side (default: GROQ_QWEN_MODEL, else qwen/qwen3.6-27b: check the id in the Groq console)")
+    ap.add_argument("--audit-models", default=None, help="reviewers of every story, e.g. 'gpt,qwen' (implies --audit): compares their grammar findings")
     ap.add_argument("--no-translate", action="store_true", help="no English translation under each story (saves one call per story)")
     ap.add_argument("--db", action="store_true", help="connect to the database (needed for the 'examples' method)")
     ap.add_argument("--tpm", type=int, default=7000, help="tokens per minute to stay under (free tier: 8000)")
@@ -96,6 +99,11 @@ def main(argv=None) -> int:
     if not requests:
         print("No requests: check --languages.")
         return 2
+    reviewers = [x.strip() for x in (args.audit_models or "").split(",") if x.strip()]
+    if any(x not in ("gpt", "qwen") for x in reviewers):
+        print("--audit-models takes gpt and/or qwen.")
+        return 2
+    args.audit = args.audit or bool(reviewers)
     size = runner.estimate(requests, chosen, args.audit, not args.no_translate, args.tpm)
     print(f"{size['requests']} requests x {size['variants']} methods: about {size['calls']} model calls, {size['tokens']:,} tokens, "
           f"at least {size['minutes']} minutes at {args.tpm} tokens a minute.")
@@ -119,10 +127,25 @@ def main(argv=None) -> int:
     story = runner.Channel(groq.call_groq, wrap)
     judge_raw = groq.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT")
     audit_raw = (groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT") or groq.call_groq) if args.audit else None
-    calls = runner.Calls(story, runner.Channel(judge_raw, wrap) if judge_raw else None, runner.Channel(audit_raw, wrap) if audit_raw else None,
-                         None if args.no_translate else translator(wrap(groq.call_groq)))
+    names = {"gpt": args.gpt_model or os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL,
+             "qwen": args.qwen_model or os.environ.get("GROQ_QWEN_MODEL") or "qwen/qwen3.6-27b"}
+    channels = {}
+
+    def model_channel(alias):
+        """One Channel (so one pacing meter) per model: Groq limits each model on its own."""
+        if alias not in channels:
+            name = names[alias]
+            raw = (lambda prompt, _m=name: groq.call_groq(prompt, model=_m, effort="none" if alias == "qwen" else None))
+            raw.model = name
+            channels[alias] = runner.Channel(raw, wrap)
+        return channels[alias]
+
+    audits = {a: model_channel(a) for a in reviewers} or None
+    calls = runner.Calls(story, runner.Channel(judge_raw, wrap) if judge_raw else None, runner.Channel(audit_raw, wrap) if audit_raw and not audits else None,
+                         None if args.no_translate else translator(wrap(groq.call_groq)), models=model_channel, audits=audits)
     meta = {"story model": os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL, "judge model": getattr(judge_raw, "model", None) or ("(story model)" if any(v.judge for v in chosen) else None),
-            "review model": (getattr(audit_raw, "model", None) or "(story model)") if audit_raw else None}
+            "review model": ", ".join(f"{a}={names[a]}" for a in reviewers) or ((getattr(audit_raw, "model", None) or "(story model)") if audit_raw else None),
+            "gpt model": names["gpt"], "qwen model": names["qwen"]}
     from tutor_core.quality.score import SCORE_VERSION
     meta["score_version"] = SCORE_VERSION
 

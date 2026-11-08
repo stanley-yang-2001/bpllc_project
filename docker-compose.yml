@@ -33,6 +33,12 @@ services:
       - STORY_JUDGE=${STORY_JUDGE:-}                  # 1: a second model also reviews the best candidates for grammar (GROQ_JUDGE_MODEL)
       - STORY_REPAIR=${STORY_REPAIR:-}                # 1: after the usual retries, repair what the score still finds wrong, by name (up to 2 calls)
       - GROQ_JUDGE_MODEL=${GROQ_JUDGE_MODEL:-}
+      - GROQ_AUDIT_MODEL=${GROQ_AUDIT_MODEL:-}          # the model that reviews grammar (--audit, and the review of the best candidates)
+      - GROQ_AUDIT_EFFORT=${GROQ_AUDIT_EFFORT:-}
+      - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
+      - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
+      - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
+      - STORY_PLAN=${STORY_PLAN:-}                    # 1: feature about one learner word per 17 words, the rest optional
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
@@ -106,6 +112,12 @@ services:
       - STORY_JUDGE=${STORY_JUDGE:-}                  # 1: a second model also reviews the best candidates for grammar (GROQ_JUDGE_MODEL)
       - STORY_REPAIR=${STORY_REPAIR:-}                # 1: after the usual retries, repair what the score still finds wrong, by name (up to 2 calls)
       - GROQ_JUDGE_MODEL=${GROQ_JUDGE_MODEL:-}
+      - GROQ_AUDIT_MODEL=${GROQ_AUDIT_MODEL:-}          # the model that reviews grammar (--audit, and the review of the best candidates)
+      - GROQ_AUDIT_EFFORT=${GROQ_AUDIT_EFFORT:-}
+      - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
+      - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
+      - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
+      - STORY_PLAN=${STORY_PLAN:-}                    # 1: feature about one learner word per 17 words, the rest optional
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
     depends_on:

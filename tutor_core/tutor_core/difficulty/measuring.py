@@ -81,11 +81,35 @@ def _own_found(text: str, code: str, vocab_words) -> int:
                     found += 1
             return found
         return sum(1 for w in words if w in folded)          # no splitter installed: look for the word anywhere in the text
-    tokens = {m.group(0).casefold() for m in _TOKEN.finditer(folded)}
+    sequence = [m.group(0).casefold() for m in _TOKEN.finditer(folded)]
+    tokens = set(sequence)
+    found = 0
+    for w in words:
+        parts = w.split()
+        if len(parts) == 1:
+            if code == "en":
+                from ..quality import word_forms
+                found += bool(tokens & set(word_forms(w)))
+            else:
+                found += w in tokens
+        elif parts:
+            found += _phrase_found(sequence, parts, code)
+    return found
+
+
+def _phrase_found(sequence: list, parts: list, code: str) -> bool:
+    """A learner word of several words ("thank you", "good morning", "to eat") is used when its words stand next to each other, each in
+    any form it can take in English. "to eat" is the verb: "eats", "ate" and "eating" count (8 Nov 2026: such entries were never found)."""
+    if code == "en" and parts[0] == "to" and len(parts) == 2:
+        from ..quality import word_forms
+        return bool(set(sequence) & set(word_forms(parts[1])))
     if code == "en":
         from ..quality import word_forms
-        return sum(1 for w in words if tokens & set(word_forms(w)))
-    return sum(1 for w in words if w in tokens)
+        options = [set(word_forms(p)) for p in parts]
+    else:
+        options = [{p} for p in parts]
+    n = len(parts)
+    return any(all(sequence[i + j] in options[j] for j in range(n)) for i in range(len(sequence) - n + 1))
 
 
 def _covered(piece: str, everyday: frozenset) -> bool:

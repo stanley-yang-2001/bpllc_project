@@ -43,11 +43,35 @@ def test_the_fixed_set_is_twenty_requests_and_never_changes():
 
 
 def test_variant_names_and_each_adds_one_thing():
-    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == 8
+    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 17
     with pytest.raises(ValueError, match="unknown variant"):
         vs.resolve("baseline,magic")
     o = vs.BY_NAME["repair"].options()
     assert (o.candidates, o.judge, o.repair) == (3, True, True) and vs.BY_NAME["baseline"].options().candidates == 1
+    assert [v.name for v in vs.resolve("cascade")] == ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]
+    c = vs.BY_NAME["cascade"].options()
+    assert (c.mixed, c.gates, c.plan, c.repair) == (True, True, True, True)
+    assert {v.story_model for v in vs.resolve("mix")} <= {None, "gpt", "qwen"} and len(vs.resolve("mix")) == 6
+
+
+def test_two_models_each_get_their_own_channel_and_reviewers_are_compared():
+    seen = {"gpt": [], "qwen": []}
+
+    def model_for(alias):
+        def call(prompt):
+            seen[alias].append(prompt)
+            return fake_model(prompt)
+        return call
+    chans = {a: runner.Channel(model_for(a)) for a in seen}
+    data, chosen = make("gpt_qwen")
+    c = runner.Calls(runner.Channel(fake_model), models=lambda a: chans[a], audits={"gpt": chans["gpt"], "qwen": chans["qwen"]})
+    runner.run(data, chosen, c, say=lambda *_: None, limit=1)
+    entry = next(iter(data["results"].values()))["gpt_qwen"]
+    assert seen["gpt"] and seen["qwen"] and set(entry["audits"]) == {"gpt", "qwen"} and entry["gate"] is not None
+    assert entry["audit"] == entry["audits"]["gpt"] and set(entry["audit_scores"]) == {"gpt", "qwen"}
+    page = report.render(data)
+    assert "Reviewers compared" in page and "Free checks" in page
+    assert set(report.rescore(data)["results"][next(iter(data["results"]))]["gpt_qwen"]["audit_scores"]) == {"gpt", "qwen"}
 
 
 def test_a_run_fills_every_request_and_method_and_counts_calls_and_time():

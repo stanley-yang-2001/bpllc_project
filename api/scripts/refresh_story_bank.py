@@ -52,6 +52,9 @@ def refresh_language(conn, language, *, rounds, per_round, call, two_pass=False,
             say(f"  {language} #{n}: no story ({result.reason})")
         else:
             scored = score_story(result.text, language, words, difficulty, result.story_type)
+            from tutor_core.story_gates import check as run_gates
+            if difficulty and not run_gates(result.text, language, words, difficulty, result.story_type, score=scored)["passed"]:
+                scored = dict(scored, passed=False)            # only stories that pass the free checks become few-shot examples
             outcome = bank.offer(conn, language, result.text, scored, story_type=result.story_type, topic=result.topic, two_pass=two_pass)
             outcomes.append(outcome)
             gate = f" (gate: {scored['gated']})" if scored["gated"] else ""

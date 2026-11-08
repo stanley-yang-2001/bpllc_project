@@ -2,7 +2,7 @@
 
 Dates are the day the work was committed or, for the earliest parts, the date the changelog gives. "Patch" numbers are the delivery files (`git am`) and match `CHANGELOG.md`, which has the full detail, numbers and reasons. **Status** says whether the owner has run it: *Verified* means it passed on the owner's machine in a `run-checks.bat --round` or a live run; *Built* means it was written and tested in the build environment and still waits for a run on the owner's stack. Keep this file current: add a row when a feature ships.
 
-Last updated: 6 November 2026 (through patch 0064).
+Last updated: 6 November 2026 (through patch 0065).
 
 ## Timeline: what was built, day by day
 
@@ -30,7 +30,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 4 Nov | Streaming probe, then streaming parked (off) |
 | 5 Nov | Automatic own-model chat check; length for chat stories (up to 400 words); round fixes; more reliable story kinds in chat |
 | 6 Nov | Features document, PR description, privacy policy options (docs only); grammar checks and repair for generated stories (0055); two-pass story generation and a comparison page (0056); story score 0 to 100 and the example bank (0057); comparison page with a tab per language, scores and translations (0059) |
-| 7 Nov | Story score version 2, waiting out the Groq rate limit, re-scoring saved comparison runs (0060); word-range prompt and level wording, off by default (0061); story score version 3: grammar mistakes found by built-in rules, optional LanguageTool and a verified model review, plus a probe corpus (0062); several candidates, optional judge and a targeted repair loop, all off by default (0063); multi-method timed comparison runner (0064) |
+| 7 Nov | Story score version 2, waiting out the Groq rate limit, re-scoring saved comparison runs (0060); word-range prompt and level wording, off by default (0061); story score version 3: grammar mistakes found by built-in rules, optional LanguageTool and a verified model review, plus a probe corpus (0062); several candidates, optional judge and a targeted repair loop, all off by default (0063); multi-method timed comparison runner (0064); cascade (planned word counts, mixed candidates, free checks, review, one repair) and a Qwen/GPT mix test (0065) |
 
 ## 1. The foundation (September to 18 October 2026)
 

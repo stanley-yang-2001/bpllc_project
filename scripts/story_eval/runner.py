@@ -72,6 +72,8 @@ class Calls:
     judge: Optional[Channel] = None
     audit: Optional[Channel] = None
     translate: Optional[Callable] = None        # (text, code) -> English text or ""
+    models: Optional[Callable] = None           # alias ("gpt", "qwen") -> Channel, for methods that name who writes and who judges
+    audits: Optional[dict] = None               # label -> Channel: several independent reviewers of every final story (else `audit`)
 
 
 @contextlib.contextmanager
@@ -97,32 +99,46 @@ def _score(text, ok, request, hits=None):
 def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
     """One story by one method: the entry saved in the results. Raises StopRun when the limit cannot be waited out."""
     code, difficulty = request["code"], _d.resolve(request["tier"])
-    story_t = calls.story.meter
-    judge_t = calls.judge.meter if calls.judge else None
-    for channel in (calls.story, calls.judge, calls.audit):
-        if channel:
-            channel.reset()
+    story_ch = calls.models(variant.story_model) if variant.story_model and calls.models else calls.story
+    judge_ch = calls.models(variant.judge_model) if variant.judge_model and calls.models else calls.judge
+    used = [story_ch] + ([judge_ch] if judge_ch is not None and judge_ch is not story_ch else [])
+    for channel in used:
+        channel.reset()
     started = time.monotonic()
     with _env(STORY_RANGE_PROMPT="1" if variant.range_prompt else "0"):
-        result = story_from_words(code, request["words"], calls.story.call, story_type=request["story_type"], topic=request["topic"],
+        result = story_from_words(code, request["words"], story_ch.call, story_type=request["story_type"], topic=request["topic"],
                                   difficulty=difficulty, two_pass=variant.two_pass, rng=random.Random(request["seed"]),
                                   with_example=variant.examples and conn is not None, conn=conn, options=variant.options(),
-                                  judge_call=calls.judge.call if calls.judge else None, proofread=variant.proofread)
+                                  judge_call=judge_ch.call if judge_ch is not None else None, proofread=variant.proofread)
     wall = time.monotonic() - started
-    error = story_t.error or (judge_t.error if judge_t else None)
+    error = next((c.meter.error for c in used if c.meter.error), None)
     if result.reason == "failed" and error and is_rate_limit(error):
         raise StopRun(error)
-    model = story_t.seconds + (judge_t.seconds if judge_t else 0.0)
+    model = sum(c.meter.seconds for c in used)
+    n_calls = sum(c.meter.calls for c in used)
     entry = {"text": result.text, "ok": result.ok, "reason": result.reason, "story_type": result.story_type, "topic": result.topic,
-             "calls": story_t.calls + (judge_t.calls if judge_t else 0), "seconds": round(wall, 1), "model_seconds": round(model, 1),
+             "calls": n_calls, "seconds": round(wall, 1), "model_seconds": round(model, 1),
              "wait_seconds": round(max(0.0, wall - model), 1), "error": error, "notes": list(result.notes), "translation": "",
-             "audit": None, "audit_seconds": None, "audit_score": None}
+             "audit": None, "audit_seconds": None, "audit_score": None, "audits": {}, "audit_scores": {}, "models": {
+                 "story": getattr(story_ch.meter.call, "model", None) or variant.story_model or "default",
+                 "judge": (getattr(judge_ch.meter.call, "model", None) or variant.judge_model or "default") if variant.judge else None}}
+    entry["gate"] = None
     entry["score"] = _score(result.text, result.ok, request)
-    if result.ok and calls.audit:
-        review = run_audit(calls.audit.call, result.text, LANGUAGES[code].name)
-        entry["audit"], entry["audit_seconds"] = review.as_dict(), round(calls.audit.meter.seconds, 1)
-        if review.ok:
-            entry["audit_score"] = _score(result.text, True, request, review.hits)
+    if result.ok:
+        from tutor_core.story_gates import check as run_gates
+        entry["gate"] = run_gates(result.text, code, request["words"], difficulty, request.get("story_type"))
+    reviewers = calls.audits or ({"review": calls.audit} if calls.audit else {})
+    if result.ok:
+        for label, channel in reviewers.items():
+            channel.reset()
+            review = run_audit(channel.call, result.text, LANGUAGES[code].name)
+            entry["audits"][label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1))
+            if review.ok:
+                entry["audit_scores"][label] = _score(result.text, True, request, review.hits)
+        if entry["audits"]:
+            first = next(iter(entry["audits"]))
+            entry["audit"], entry["audit_seconds"] = entry["audits"][first], entry["audits"][first]["seconds"]
+            entry["audit_score"] = entry["audit_scores"].get(first)
     if result.ok and calls.translate:
         entry["translation"] = calls.translate(result.text, code)
     return entry

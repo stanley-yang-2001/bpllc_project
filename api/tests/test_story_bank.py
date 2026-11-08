@@ -182,3 +182,8 @@ def test_the_comparison_script_adds_starter_words_when_a_learner_has_none(conn, 
     assert cmp.seed_words(conn, learner, "xx") == []                         # no starter list for an unknown language
     assert cmp.seed_words(conn, 99999, "es") == []                           # a learner id that does not exist: a message, not a crash
     assert "User ID shown in Settings" in capsys.readouterr().out
+
+
+def test_a_story_that_fails_the_free_checks_is_never_offered_as_an_example(conn):
+    assert bank.offer(conn, "es", GOOD, dict(scored(90), passed=False)) == bank.REJECTED
+    assert bank.examples(conn, "es") == []

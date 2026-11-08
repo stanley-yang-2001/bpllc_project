@@ -48,6 +48,10 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # LANGUAGETOOL_URL=http://localhost:8010   # optional self-hosted LanguageTool server for the grammar part of the score (never a public server)
 # GROQ_JUDGE_MODEL=openai/gpt-oss-20b      # optional: a different model for the story judge (patch 0064); GROQ_JUDGE_EFFORT=low|medium|high
 # GROQ_AUDIT_MODEL=openai/gpt-oss-20b      # optional: a different model for the grammar review; GROQ_AUDIT_EFFORT
+# GROQ_QWEN_MODEL=qwen/qwen3.6-27b        # the 'qwen' side of scripts/run_story_methods.py mix methods (patch 0065); check the id in the Groq console
+# STORY_PLAN=0                   # 1: feature about one learner word per 17 words of target length, the rest optional
+# STORY_MIXED=0                  # 1: candidates use both strategies (one-pass and two-pass)
+# STORY_GATES=0                  # 1: free checks (length, own-word range, fragments, structure) drop bad candidates before any review
 # STORY_CANDIDATES=1             # 2 to 5: write that many versions of the word-applying step and keep the highest score (each is one more call). Off by default.
 # STORY_JUDGE=0                  # 1: the best two candidates are also reviewed for grammar by a model (GROQ_JUDGE_MODEL, else the story model) and the repair is graded the same way
 # STORY_REPAIR=0                 # 1: after the usual retries, a repair that names every requirement the score still misses (up to 2 calls; a rewrite is kept only if its score is higher)
