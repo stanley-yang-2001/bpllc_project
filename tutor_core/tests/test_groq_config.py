@@ -129,3 +129,33 @@ def test_a_refused_reasoning_effort_is_asked_again_without_it():
     with patch.dict("os.environ", {"GROQ_API_KEY": "k"}, clear=True), patch("tutor_core.groq.urllib.request.urlopen", side_effect=fake_urlopen):
         assert groq.call_groq("hi", model="qwen/qwen3.6-27b") == "ok"
     assert len(sent) == 2 and "reasoning_effort" in sent[0] and "reasoning_effort" not in sent[1]
+
+
+def test_a_step_can_use_a_second_account_key(monkeypatch):
+    import json as _json
+    from tutor_core import groq
+    sent = []
+
+    class Resp:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return _json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+
+    def fake_open(req, timeout=0):
+        sent.append(req.get_header("Authorization"))
+        return Resp()
+    monkeypatch.setattr(groq.urllib.request, "urlopen", fake_open)
+    monkeypatch.setenv("GROQ_API_KEY", "key-account-one-1111")
+    monkeypatch.delenv("GROQ_QWEN_API_KEY", raising=False)
+    groq.call_groq("hi", key_var="GROQ_QWEN_API_KEY")                    # unset: the main key
+    monkeypatch.setenv("GROQ_QWEN_API_KEY", "key-account-two-2222")
+    groq.call_groq("hi", key_var="GROQ_QWEN_API_KEY")
+    groq.call_groq("hi")                                                 # no key_var: always the main key
+    assert sent == ["Bearer key-account-one-1111", "Bearer key-account-two-2222", "Bearer key-account-one-1111"]
+    assert groq.key_label("GROQ_QWEN_API_KEY") == "GROQ_QWEN_API_KEY (...2222)" and "two" not in groq.key_label("GROQ_QWEN_API_KEY")
+    monkeypatch.delenv("GROQ_QWEN_API_KEY")
+    assert groq.key_label("GROQ_QWEN_API_KEY") == "GROQ_API_KEY (...1111)"
+    monkeypatch.setenv("GROQ_AUDIT_MODEL", "m")
+    monkeypatch.setenv("GROQ_AUDIT_API_KEY", "key-account-two-2222")
+    groq.make_model_call("GROQ_AUDIT_MODEL", None, "GROQ_AUDIT_API_KEY")("hi")
+    assert sent[-1] == "Bearer key-account-two-2222"

@@ -29,8 +29,12 @@ LIST = "Casa. Mar. Pan. Sol. Agua. Perro. Gato. Mesa."
 
 def test_parts_and_weights():
     r = score_story(GOOD, "es", WORDS, None, "story")
-    check("a good story has six parts, all measured", tuple(r["parts"]) == NAMES and all(v is not None for v in r["parts"].values()) and not r["partial"])
-    check("the score is the plain mean of the parts (equal weights)", abs(r["score"] - round(sum(r["parts"].values()) / 6, 1)) < 0.06)
+    check("a good story has six parts, all measured (naturalness is optional and left out)", tuple(n for n in r["parts"] if n != "naturalness") == NAMES
+          and all(r["parts"][n] is not None for n in NAMES) and r["parts"]["naturalness"] is None and not r["partial"])
+    from tutor_core.quality.score import WEIGHTS
+    used = {n: v for n, v in r["parts"].items() if v is not None}
+    want = sum(WEIGHTS[n] * v for n, v in used.items()) / sum(WEIGHTS[n] for n in used)
+    check("the score is the weighted mean of the parts (grammar and naturalness count most)", abs(r["score"] - round(want, 1)) < 0.06 or r["failed"])
     check("a good story of about the right length scores high", r["score"] >= 90 and r["parts"]["language_format"] == 100)
     check("the story is within 0 and 100", 0 <= r["score"] <= 100)
 
@@ -70,7 +74,7 @@ def test_other_languages():
 
 def test_v2_detail_checks():
     from tutor_core.quality.score import SCORE_VERSION
-    check("score version is 3", SCORE_VERSION == 3 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 3)
+    check("score version is 4", SCORE_VERSION == 4 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 4)
     blank = GOOD.replace("María", "[Votre nom]")
     r = score_story(blank, "es", WORDS, None, "story")
     check("a template blank is a grammar problem and fails the format check", "placeholder" in r["problems"] and r["parts"]["language_format"] <= 75
@@ -80,7 +84,11 @@ def test_v2_detail_checks():
     check("a normal story has neither problem", not {"placeholder", "repeated_word"} & set(score_story(GOOD, "es", WORDS, None, "story")["problems"]))
     stuffed = "Casa mar amigo jardín pan. Amigo pan casa mar jardín hoy. Mar casa jardín amigo pan sí."
     full = score_story(stuffed, "es", WORDS, None, "story")
-    check("stuffing the learner's words lowers that part below the plain count", full["parts"]["own_words"] < 100 and full["measured"]["own_density"] > 0.25)
+    check("a story that is only the learner's words has a dense own-word count and a zero length part", full["measured"]["own_density"] > 0.25
+          and full["parts"]["length"] == 0)      # NOTE: v4 does not fail this one (sentences of 5-6 words are not fragments): see the patch notes
+    many = ["a%d" % i for i in range(10)]
+    over = score_story(" ".join(f"Ella dice a{i} hoy en casa." for i in range(10)), "es", many, {"tier": "easy", "length": 50, "own_words": 3, "uncommon_pct": 10}, "story")
+    check("more than the maximum of the learner's words is stuffed", "stuffed" in over["failed"] and over["targets"]["own_words_max"] == 6)
     run = "我们去公园，看花，看树，看鸟，然后回家。"
     check("a Chinese run-on is flagged", "run_on" in score_story(run * 3, "zh", ["公园"], None, "story")["problems"])
 

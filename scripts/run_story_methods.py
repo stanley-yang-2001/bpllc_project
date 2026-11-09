@@ -110,6 +110,9 @@ def main(argv=None) -> int:
     if size["tokens"] > 150_000:
         print("That is more than the free tier's daily token allowance for one model may cover. Run it in parts with --limit N, then --resume; "
               "a second model for the judge and the review (GROQ_JUDGE_MODEL, GROQ_AUDIT_MODEL) has its own allowance.")
+    from tutor_core import groq as _g
+    print("Keys: story/gpt = " + _g.key_label() + "; qwen = " + _g.key_label("GROQ_QWEN_API_KEY") + "; judge = " + _g.key_label("GROQ_JUDGE_API_KEY")
+          + "; review = " + _g.key_label("GROQ_AUDIT_API_KEY"))
     if args.dry_run:
         return 0
     if not os.environ.get("GROQ_API_KEY"):
@@ -125,8 +128,8 @@ def main(argv=None) -> int:
         return patient(call, tpm=args.tpm, say=print)
 
     story = runner.Channel(groq.call_groq, wrap)
-    judge_raw = groq.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT")
-    audit_raw = (groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT") or groq.call_groq) if args.audit else None
+    judge_raw = groq.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT", "GROQ_JUDGE_API_KEY")
+    audit_raw = (groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT", "GROQ_AUDIT_API_KEY") or groq.call_groq) if args.audit else None
     names = {"gpt": args.gpt_model or os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL,
              "qwen": args.qwen_model or os.environ.get("GROQ_QWEN_MODEL") or "qwen/qwen3.6-27b"}
     channels = {}
@@ -135,7 +138,8 @@ def main(argv=None) -> int:
         """One Channel (so one pacing meter) per model: Groq limits each model on its own."""
         if alias not in channels:
             name = names[alias]
-            raw = (lambda prompt, _m=name: groq.call_groq(prompt, model=_m, effort="none" if alias == "qwen" else None))
+            raw = (lambda prompt, _m=name: groq.call_groq(prompt, model=_m, effort="none" if alias == "qwen" else None,
+                                                          key_var="GROQ_QWEN_API_KEY" if alias == "qwen" else None))
             raw.model = name
             channels[alias] = runner.Channel(raw, wrap)
         return channels[alias]

@@ -92,11 +92,11 @@ def build_layers(use_audit: bool, models=None):
         if models:
             for label, name in models.items():
                 effort = "none" if label == "qwen" else None
-                call = patient(lambda prompt, _n=name, _e=effort: groq.call_groq(prompt, model=_n, effort=_e), say=print)
+                call = patient(lambda prompt, _n=name, _e=effort, _l=label: groq.call_groq(prompt, model=_n, effort=_e, key_var="GROQ_QWEN_API_KEY" if _l == "qwen" else None), say=print)
                 checker = AuditChecker(call)
                 layers[f"audit:{label}"] = lambda text, code, _c=checker: _c.check(text, code)
         else:
-            call = patient(groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT") or groq.call_groq, say=print)
+            call = patient(groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT", "GROQ_AUDIT_API_KEY") or groq.call_groq, say=print)
             checker = AuditChecker(call)
             layers["audit"] = lambda text, code: checker.check(text, code)
     return layers

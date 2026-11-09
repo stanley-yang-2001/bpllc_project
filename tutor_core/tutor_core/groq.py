@@ -37,17 +37,36 @@ def _reasoning_effort(model: str, effort: Optional[str]) -> Optional[str]:
     return None
 
 
+PLACEHOLDER_KEY = "your-groq-api-key-here"
+
+
+def key_for(key_var: Optional[str] = None) -> str:
+    """The Groq key for a step: the one in `key_var` when that is set, else GROQ_API_KEY."""
+    own = (os.environ.get(key_var) or "").strip() if key_var else ""
+    return own or os.environ.get("GROQ_API_KEY", "")
+
+
+def key_label(key_var: Optional[str] = None) -> str:
+    """Which key a step uses, safe to print: the variable's name and the last 4 characters (never the key)."""
+    var = key_var if key_var and (os.environ.get(key_var) or "").strip() else "GROQ_API_KEY"
+    key = key_for(key_var)
+    return f"{var} (...{key[-4:]})" if len(key) >= 8 else f"{var} (not set)"
+
+
 def _clean(content) -> str:
     """The reply without a <think>...</think> block (a model that thinks aloud puts it in front of the answer)."""
     return _THINK.sub("", content or "").strip() if content and "think>" in content.lower() else (content or "")
 
 
-def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str] = None) -> str:
+def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str] = None, key_var: Optional[str] = None) -> str:
     """Real Groq call with automatic retry on rate limiting (HTTP 429).
 
     `model` and `effort` (7 Nov 2026) let one step use another model than the story: the story judge and the grammar review use a
     different model so that a model does not mark its own work, and Groq counts the free tier's tokens per model. Without them the
     request is exactly what it always was: GROQ_MODEL (or the default) and low reasoning effort.
+
+    `key_var` (8 Nov 2026) names an environment variable that holds ANOTHER Groq key for this step (GROQ_JUDGE_API_KEY, GROQ_AUDIT_API_KEY,
+    GROQ_QWEN_API_KEY): a second account has its own free-tier allowance. Empty or unset means GROQ_API_KEY, exactly as before.
 
     Same request pattern already proven working in scripts/smoke_test.py — including the
     User-Agent header, without which Cloudflare blocks the request (HTTP 1010).
@@ -59,9 +78,9 @@ def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str]
     MAX_RETRIES = 3
     BACKOFF_SECONDS = 1.5
 
-    api_key = os.environ.get("GROQ_API_KEY", "")
-    if not api_key or api_key == "your-groq-api-key-here":
-        raise RuntimeError("GROQ_API_KEY is missing or still the placeholder value.")
+    api_key = key_for(key_var)
+    if not api_key or api_key == PLACEHOLDER_KEY:
+        raise RuntimeError(f"{key_var if key_var and (os.environ.get(key_var) or '').strip() else 'GROQ_API_KEY'} is missing or still the placeholder value.")
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     name = (model or "").strip() or (os.environ.get("GROQ_MODEL") or "").strip() or DEFAULT_MODEL
@@ -106,7 +125,7 @@ def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str]
     raise last_error
 
 
-def make_model_call(model_var: str, effort_var: Optional[str] = None) -> Optional[Callable[[str], str]]:
+def make_model_call(model_var: str, effort_var: Optional[str] = None, key_var: Optional[str] = None) -> Optional[Callable[[str], str]]:
     """A story function `prompt -> text` for ONE named step (the judge, the grammar review), or None when the model for that step is not
     set. The model name comes from the environment variable `model_var` (GROQ_JUDGE_MODEL, GROQ_AUDIT_MODEL) and the reasoning effort
     from `effort_var`; the story's own model is untouched. None tells the caller to use the story model, or to skip the step."""
@@ -116,9 +135,10 @@ def make_model_call(model_var: str, effort_var: Optional[str] = None) -> Optiona
     effort = ((os.environ.get(effort_var) or "").strip().lower() or None) if effort_var else None
 
     def call(prompt: str) -> str:
-        return call_groq(prompt, model=model, effort=effort)
+        return call_groq(prompt, model=model, effort=effort, key_var=key_var)
 
     call.model = model          # shown in reports: which model graded
+    call.key_var = key_var
     return call
 
 

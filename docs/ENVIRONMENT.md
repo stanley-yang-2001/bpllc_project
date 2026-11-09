@@ -48,6 +48,12 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # LANGUAGETOOL_URL=http://localhost:8010   # optional self-hosted LanguageTool server for the grammar part of the score (never a public server)
 # GROQ_JUDGE_MODEL=openai/gpt-oss-20b      # optional: a different model for the story judge (patch 0064); GROQ_JUDGE_EFFORT=low|medium|high
 # GROQ_AUDIT_MODEL=openai/gpt-oss-20b      # optional: a different model for the grammar review; GROQ_AUDIT_EFFORT
+# --- a second Groq account (optional; patch 0066) ---
+# Groq counts the free tier per account and per model. A second account's key doubles the allowance for the tests. Any step may use it;
+# an empty line means that step uses GROQ_API_KEY. Put the key on the line of the step that should use the second account:
+# GROQ_QWEN_API_KEY=       # key of account 2: used whenever the 'qwen' side runs (mix methods, --audit-models qwen, grammar_probe)
+# GROQ_JUDGE_API_KEY=      # key for the judge (GROQ_JUDGE_MODEL must be set too, it may equal the story model)
+# GROQ_AUDIT_API_KEY=      # key for the grammar review (GROQ_AUDIT_MODEL must be set too)
 # GROQ_QWEN_MODEL=qwen/qwen3.6-27b        # the 'qwen' side of scripts/run_story_methods.py mix methods (patch 0065); check the id in the Groq console
 # STORY_PLAN=0                   # 1: feature about one learner word per 17 words of target length, the rest optional
 # STORY_MIXED=0                  # 1: candidates use both strategies (one-pass and two-pass)
@@ -66,3 +72,21 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # TUTOR_DEV_USER_ID=               # DEVELOPMENT ONLY: acts as this learner when a request sends none. Keep EMPTY otherwise.
 # TUTOR_DEV_LANGUAGE=en            # ... and this language
 ```
+
+## Using two Groq accounts (optional)
+
+1. Make a second account at console.groq.com (a different email), open **API Keys** and create a key. Account 1's key stays where it is.
+2. Open `.env` (next to `docker-compose.yml`) and keep `GROQ_API_KEY=<key of account 1>`. Add, for example:
+   ```
+   GROQ_QWEN_API_KEY=<key of account 2>
+   GROQ_QWEN_MODEL=qwen/qwen3.6-27b      # check the exact id in account 2's console under Models
+   ```
+   Account 2 then serves everything Qwen does; account 1 serves the GPT side, the story and the translation. To spread GPT work too, use
+   `GROQ_JUDGE_MODEL` + `GROQ_JUDGE_API_KEY` and/or `GROQ_AUDIT_MODEL` + `GROQ_AUDIT_API_KEY` (a model name is required with its key).
+3. Apply it: `docker compose up -d --build` (the variables are passed to the `api` and `langflow` containers in `docker-compose.yml`).
+4. Check: `docker compose exec langflow python /app/scripts/run_story_methods.py --variants mix --dry-run` prints a line
+   `Keys: story/gpt = GROQ_API_KEY (...1234); qwen = GROQ_QWEN_API_KEY (...5678); ...` with the last 4 characters of each key, so you can see
+   which account each step uses. Keys are never printed in full or saved in the results.
+
+The pacing (`--tpm`) is kept per model, so two accounts running at the same time do not slow each other. Never put a key in the code, a
+test, a commit or a chat message.

@@ -118,7 +118,7 @@ def generate_story(
                            (StoryOptions.from_env() if options is None else options).normalised())
     call = call_groq_fn or groq_module.call_groq
     if judge_call is None and call_groq_fn is None and request.options.judge:
-        judge_call = groq_module.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT")       # None: the story model reviews
+        judge_call = groq_module.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT", "GROQ_JUDGE_API_KEY")       # None: the story model reviews
     now = clock()
 
     if use_cache and (cached := _STORY_CACHE.fresh(request.cache_key(), now)) is not None:

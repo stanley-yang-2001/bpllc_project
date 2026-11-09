@@ -35,6 +35,9 @@ services:
       - GROQ_JUDGE_MODEL=${GROQ_JUDGE_MODEL:-}
       - GROQ_AUDIT_MODEL=${GROQ_AUDIT_MODEL:-}          # the model that reviews grammar (--audit, and the review of the best candidates)
       - GROQ_AUDIT_EFFORT=${GROQ_AUDIT_EFFORT:-}
+      - GROQ_QWEN_API_KEY=${GROQ_QWEN_API_KEY:-}        # optional: a second Groq account's key for the qwen side (empty = GROQ_API_KEY)
+      - GROQ_JUDGE_API_KEY=${GROQ_JUDGE_API_KEY:-}      # optional: key for the judge model (empty = GROQ_API_KEY)
+      - GROQ_AUDIT_API_KEY=${GROQ_AUDIT_API_KEY:-}      # optional: key for the grammar review (empty = GROQ_API_KEY)
       - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
       - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
@@ -114,6 +117,9 @@ services:
       - GROQ_JUDGE_MODEL=${GROQ_JUDGE_MODEL:-}
       - GROQ_AUDIT_MODEL=${GROQ_AUDIT_MODEL:-}          # the model that reviews grammar (--audit, and the review of the best candidates)
       - GROQ_AUDIT_EFFORT=${GROQ_AUDIT_EFFORT:-}
+      - GROQ_QWEN_API_KEY=${GROQ_QWEN_API_KEY:-}        # optional: a second Groq account's key for the qwen side (empty = GROQ_API_KEY)
+      - GROQ_JUDGE_API_KEY=${GROQ_JUDGE_API_KEY:-}      # optional: key for the judge model (empty = GROQ_API_KEY)
+      - GROQ_AUDIT_API_KEY=${GROQ_AUDIT_API_KEY:-}      # optional: key for the grammar review (empty = GROQ_API_KEY)
       - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
       - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review

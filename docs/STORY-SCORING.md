@@ -12,7 +12,7 @@ Version 3 (patch 0062) changes only requirement 5. It used to see list-like text
 
 ## Free checks and the next score (patch 0065)
 
-`tutor_core/story_gates.py` gives a pass/fail verdict next to the score: length range, own words within [target, max(target+3, 2x target)], words tacked on after a comma, fragment-heavy text, structural problems, too many sentences with a mistake, and a failed story from the score itself (`passed` is False). The score version 4 that weights grammar heavily is supplied separately; the code already tolerates its extra fields (`passed`, `failed`, `warnings`, `reviewed`).
+`tutor_core/story_gates.py` gives a pass/fail verdict next to the score: length range, own words within [target, max(target+3, 2x target)], words tacked on after a comma, fragment-heavy text, structural problems, too many sentences with a mistake, and a failed story from the score itself (`passed` is False). Score version 4 (patch 0066, `quality/score.py`) weights grammar 40, naturalness 25 (optional), own words 15, the rest 3 to 6, and cuts a failed story to 60%. Known gap: a text made only of the learner's words in 5 to 6 word sentences still passes.
 
 ## Version 2 (kept for history)
 

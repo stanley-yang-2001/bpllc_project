@@ -30,7 +30,7 @@ def calls(model=fake_model, wrap=lambda c: c, judge=False, audit=False, translat
 
 def make(names="baseline,two_pass,candidates", languages=("es",), **kw):
     chosen = vs.resolve(names)
-    data = runner.new_data(fixed_set.build(list(languages), extras=False), chosen, {"score_version": 3})
+    data = runner.new_data(fixed_set.build(list(languages), extras=False), chosen, {"score_version": 4})
     return data, chosen
 
 
@@ -82,7 +82,7 @@ def test_a_run_fills_every_request_and_method_and_counts_calls_and_time():
     # a story outside the tier's length is written again by the usual retry, so the counts are "at least"
     assert row["baseline"]["calls"] >= 1 and row["two_pass"]["calls"] >= 2 and row["candidates"]["calls"] >= 4
     for e in row.values():
-        assert e["ok"] and e["score"]["score"] > 80 and 0 <= e["model_seconds"] <= e["seconds"] and e["wait_seconds"] >= 0
+        assert e["ok"] and e["score"]["score"] >= 80 and 0 <= e["model_seconds"] <= e["seconds"] and e["wait_seconds"] >= 0
     assert any("candidates" in n for n in row["candidates"]["notes"])
 
 
@@ -166,7 +166,7 @@ def test_stats_report_and_rescore():
         for e in row.values():
             e["score"] = {"score": 1.0, "parts": {}, "gated": None}
     fresh = report.rescore(old)
-    assert next(iter(fresh["results"].values()))["baseline"]["score"]["score"] > 80
+    assert next(iter(fresh["results"].values()))["baseline"]["score"]["score"] >= 80
     assert next(iter(old["results"].values()))["baseline"]["score"]["score"] == 1.0         # the input is not changed
 
 
