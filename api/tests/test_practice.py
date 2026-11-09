@@ -49,7 +49,8 @@ def test_flashcards_are_this_learners_words_with_meanings_in_this_language(make_
     body = alice.get("/api/practice/flashcards?language=en&limit=50").json()
     assert sorted(c["word"] for c in body["items"]) == sorted(WORDS) and body["total"] == len(WORDS)
     assert {c["word"]: c["meaning"] for c in body["items"]} == WORDS
-    assert set(body["items"][0]) == {"id", "word", "meaning"}
+    assert set(body["items"][0]) == {"id", "word", "meaning", "status", "ease", "interval_days", "lapses", "reps", "leech", "due_at", "preview"}
+    assert (body["selection"], body["new"], body["due"]) == (len(WORDS), len(WORDS), 0)
 
 
 def test_flashcards_are_shuffled_and_limited(make_user):
@@ -62,10 +63,10 @@ def test_flashcards_are_shuffled_and_limited(make_user):
 
 
 def test_flashcards_with_nothing_to_show_are_an_empty_set(make_user):
-    assert make_user("alice").get("/api/practice/flashcards?language=en").json() == {"items": [], "total": 0}
+    assert make_user("alice").get("/api/practice/flashcards?language=en").json() == {"items": [], "total": 0, "selection": 0, "due": 0, "new": 0}
 
 
-@pytest.mark.parametrize("query", ["language=xx", "language=en&limit=0", "language=en&limit=51", ""])
+@pytest.mark.parametrize("query", ["language=xx", "language=en&limit=0", ""])
 def test_bad_flashcard_requests_are_validation_errors(make_user, query):
     r = make_user("alice").get(f"/api/practice/flashcards?{query}")
     assert r.status_code == 422 and r.json()["error"]["code"] == "validation_error"

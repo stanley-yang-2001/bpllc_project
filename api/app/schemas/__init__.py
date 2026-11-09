@@ -1,6 +1,6 @@
 """Response and request models, by area (user, words, stories, practice, system). Everything is re-exported here, so
 `from app.schemas import X` keeps working."""
-from .practice import FlashcardOut, FlashcardSet, PosCard, PosSet, DictationOut, DictationSet, ChoiceOut, ChoiceSet, AnswerIn, AnswersIn, ProgressOut, ClozeItem, ClozeSet
+from .practice import FlashcardOut, FlashcardSet, PosCard, PosSet, DictationOut, DictationSet, ChoiceOut, ChoiceSet, AnswerIn, AnswersIn, ProgressOut, ClozeItem, ClozeSet, Preview, ReviewIn, ReviewsIn, ReviewResult, ReviewResults, StudyStats, StatsDay, ForecastDay, HardWord, HardWords
 from .stories import DifficultyLimits, DifficultyOptions, DifficultyTargets, StoryOptionsOut, GeneratedStoryOut, StoryCard, StoryFull, StoryPage, MAX_STORY_BODY, DifficultyIn, GenerateIn, SaveIn
 from .system import LanguageOut, MetaOut, PolicyOut, StatusOut, ServiceCheck, HealthOut, ToolCallOut, ChatOut
 from .user import CustomColors, PreferencesOut, UserOut
@@ -11,6 +11,16 @@ __all__ = [
     "DifficultyOptions",
     "DifficultyTargets",
     "AnswerIn",
+    "Preview",
+    "ReviewIn",
+    "ReviewsIn",
+    "ReviewResult",
+    "ReviewResults",
+    "StudyStats",
+    "StatsDay",
+    "ForecastDay",
+    "HardWord",
+    "HardWords",
     "AnswersIn",
     "ChatOut",
     "ChoiceOut",

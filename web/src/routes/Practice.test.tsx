@@ -5,7 +5,11 @@ import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
 
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
-const CARDS = { items: [{ id: 1, word: "water", meaning: "a drink" }, { id: 2, word: "bread", meaning: "baked food" }, { id: 3, word: "house", meaning: "a home" }], total: 3 };
+const PREVIEW = { again: 60, hard: 90, good: 600, easy: 345600 };
+const card = (id: number, word: string, meaning: string, over: Record<string, unknown> = {}) => ({ id, word, meaning, status: "new", ease: 2.5, interval_days: 0, lapses: 0, reps: 0, leech: false, due_at: null, preview: PREVIEW, ...over });
+const CARDS = { items: [card(1, "water", "a drink"), card(2, "bread", "baked food"), card(3, "house", "a home")], total: 3, selection: 3, due: 0, new: 3 };
+const RESULT = (word_id: number, over: Record<string, unknown> = {}) => ({ word_id, delay_seconds: 86400, status: "young", counted: true, correct: true, box: 2, ease: 2.5, interval_days: 1, lapses: 0, preview: PREVIEW, ...over });
+const REVIEWS = (calls: { method: string; path: string; body: any }[]) => calls.filter((c) => c.method === "POST" && c.path === "/practice/reviews").map((c) => c.body.reviews[0]);
 const item = (answer: string, over: Record<string, unknown> = {}) => ({ before: "Ana: I want ", after: " please.", answer, hint: "a drink", choices: [answer, "bread", "house"], word_id: null, ...over });
 const CLOZE = { story_id: 5, language: "en", items: [item("water"), item("bread", { before: "Ben: Here is some ", after: ".", hint: "baked food", choices: ["water", "bread", "house"] })] };
 const STORIES = { items: [{ id: 5, language: "en", story_type: "dialogue", topic: null, body: "Ana: Hello.\nBen: Hi.", passed: true, created_at: "2026-10-16T10:00:00Z" }], total: 1, limit: 100, offset: 0 };
@@ -15,40 +19,113 @@ describe("practice page", () => {
   it("offers flashcards and fill-in-the-blank, and says practice costs nothing", async () => {
     mockApi(base);
     renderApp("/practice");
-    expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
     expect(await screen.findByLabelText("Story")).toBeInTheDocument();
     expect(screen.getByText(/costs nothing from the shared limit/)).toBeInTheDocument();
   });
 
-  it("asks for ten flashcards in the active language and shows the word, then the meaning", async () => {
+  it("asks for the due flashcards with no limit and shows the word, then the meaning", async () => {
     const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS });
     renderApp("/practice");
-    await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
     expect(await screen.findByText("water")).toBeInTheDocument();
     expect(screen.queryByText("a drink")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Show meaning" }));
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
     expect(screen.getByText("a drink")).toBeInTheDocument();
-    expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&limit=10");
+    expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&scope=due");
   });
 
-  it("counts the cards the learner knew and offers another round with a fresh request", async () => {
-    const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS });
+  it("can practise every word ahead of time", async () => {
+    const { calls } = mockApi({ ...base, "GET /practice/progress": { language: "en", new: 2, learning: 1, known: 3, due: 4, streak: 0, practised_today: false }, "GET /practice/flashcards": CARDS });
     renderApp("/practice");
-    await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
-    for (const knew of [true, false, true]) {
-      await userEvent.click(await screen.findByRole("button", { name: "Show meaning" }));
-      await userEvent.click(screen.getByRole("button", { name: knew ? "I knew it" : "Not yet" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Practise all 6 words" }));
+    await screen.findByText("water");
+    expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&scope=all");
+  });
+
+  it("shows the interval each answer would give, grades with the button or the keys 1 to 4, and saves it with the times", async () => {
+    const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    await screen.findByText("water");
+    await userEvent.keyboard(" ");                                          // space shows the answer
+    expect(screen.getByText("a drink")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Again\s*1m/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Good\s*10m/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Easy\s*4d/ })).toBeInTheDocument();
+    await userEvent.keyboard("3");
+    await screen.findByText("bread");
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Hard/ }));
+    await waitFor(() => expect(REVIEWS(calls)).toHaveLength(2));
+    const [first, second] = REVIEWS(calls);
+    expect([first.word_id, first.grade, first.mode, first.direction]).toEqual([1, 3, "flashcards", "word"]);
+    expect([second.word_id, second.grade]).toEqual([2, 2]);
+    expect(first.think_ms).toBeGreaterThanOrEqual(0);
+    expect(first.rate_ms).toBeGreaterThanOrEqual(0);
+  });
+
+  it("keeps a word that is in a short learning step in the session and shows its new times", async () => {
+    const reply = (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id, { delay_seconds: 60, status: "learning", counted: true, correct: false, interval_days: 0, lapses: 0, preview: { again: 60, hard: 90, good: 600, easy: 345600 } })) } });
+    mockApi({ ...base, "GET /practice/flashcards": { ...CARDS, items: [CARDS.items[0]], total: 1 }, "POST /practice/reviews": reply });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    await screen.findByText("water");
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Again/ }));
+    expect(await screen.findByText("1 left")).toBeInTheDocument();           // the same word again, not the result screen
+    expect(screen.getByText("water")).toBeInTheDocument();
+    expect(screen.queryByText("a drink")).not.toBeInTheDocument();
+  });
+
+  it("can show the meaning first", async () => {
+    const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    await screen.findByText("water");
+    await userEvent.click(screen.getByRole("button", { name: "The meaning" }));
+    expect(screen.getByText("a drink")).toBeInTheDocument();
+    expect(screen.queryByText("water")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
+    expect(screen.getByText("water")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Good/ }));
+    await waitFor(() => expect(REVIEWS(calls)[0].direction).toBe("meaning"));
+  });
+
+  it("ends with the grades, accuracy, the slowest and the missed words, and can practise just the missed ones", async () => {
+    const reply = (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id, r.grade === 1 ? { delay_seconds: 86400, status: "relearning" } : {})) } });
+    const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": reply });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    for (const g of ["Good", "Again", "Easy"]) {
+      await userEvent.click(await screen.findByRole("button", { name: "Show answer" }));
+      await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${g}`) }));
     }
-    expect(await screen.findByText("You knew 2 of 3")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Practise again" }));
-    expect(await screen.findByText("Card 1 of 3")).toBeInTheDocument();
-    await waitFor(() => expect(calls.filter((c) => c.path.startsWith("/practice/flashcards"))).toHaveLength(2));
+    expect(await screen.findByText("Session complete")).toBeInTheDocument();
+    expect(screen.getByText("3 answers on 3 words")).toBeInTheDocument();
+    expect(screen.getByText("Again 1 · Hard 0 · Good 1 · Easy 1")).toBeInTheDocument();
+    expect(screen.getByText("67%")).toBeInTheDocument();
+    expect(screen.getAllByText("bread").length).toBeGreaterThan(0);           // the missed word is listed
+    await userEvent.click(screen.getByRole("button", { name: "Practise the 1 missed" }));
+    await screen.findByText("3 left");                                       // (the mock returns its three cards whatever is asked)
+    expect(calls.filter((c) => c.path.startsWith("/practice/flashcards")).at(-1)!.path).toBe("/practice/flashcards?language=en&scope=ids&ids=2");
+  });
+
+  it("warns about a word forgotten many times, and says when practising ahead does not move the schedule", async () => {
+    const hard = { ...CARDS, items: [card(1, "water", "a drink", { status: "mature", leech: true, lapses: 9 })] };
+    mockApi({ ...base, "GET /practice/progress": { language: "en", new: 0, learning: 0, known: 1, due: 0, streak: 0, practised_today: false }, "GET /practice/flashcards": hard });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Practise all 1 words" }));
+    await screen.findByText("water");
+    expect(screen.getByText(/Practising ahead/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
+    expect(screen.getByText(/forgotten this word many times/)).toBeInTheDocument();
   });
 
   it("says what to do when no word has a meaning", async () => {
-    mockApi({ ...base, "GET /practice/flashcards": { items: [], total: 0 } });
+    mockApi({ ...base, "GET /practice/flashcards": { items: [], total: 0, selection: 0, due: 0, new: 0 } });
     renderApp("/practice");
-    await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Practise all 0 words" }));
     expect(await screen.findByText("No flashcards yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Add meanings in Vocabulary" })).toHaveAttribute("href", "/vocabulary");
   });
@@ -99,7 +176,7 @@ describe("practice page", () => {
   it("ignores an address that is not a story number", async () => {
     const { calls } = mockApi(base);
     renderApp("/practice?story=abc");
-    expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
     expect(calls.some((c) => c.path.startsWith("/practice/cloze"))).toBe(false);
   });
 
@@ -115,7 +192,7 @@ describe("practice page", () => {
     await userEvent.click(await screen.findByRole("button", { name: "water" }));
     await userEvent.click(screen.getByRole("button", { name: "See result" }));
     await userEvent.click(await screen.findByRole("button", { name: "Back" }));
-    expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
   });
 
   it("keeps the answer out of the sentence until the learner has chosen, and shows the hint", async () => {
@@ -132,7 +209,7 @@ describe("practice page", () => {
     for (const bad of ["0", "-3", "2.5"]) {
       const { calls } = mockApi(base);
       const { ui } = renderApp(`/practice?story=${bad}`);
-      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
       expect(calls.some((c) => c.path.startsWith("/practice/cloze")), bad).toBe(false);
       ui.unmount();
     }
@@ -141,10 +218,10 @@ describe("practice page", () => {
   it("leaves a flashcard round when the language changes", async () => {
     mockApi({ ...base, "GET /me": { ...ALICE, languages: ["en", "es"] }, "GET /practice/flashcards": CARDS });
     renderApp("/practice");
-    await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
-    await screen.findByText("Card 1 of 3");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    await screen.findByText("3 left");
     await userEvent.selectOptions(screen.getByLabelText("Active language"), "es");
-    expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
   });
   describe("remembered results and review", () => {
     const PROGRESS = { language: "en", new: 2, learning: 1, known: 3, due: 4, streak: 5, practised_today: true };
@@ -161,12 +238,12 @@ describe("practice page", () => {
     it("hides the progress card when no word has a meaning yet, and when it cannot be loaded", async () => {
       mockApi({ ...base, "GET /practice/progress": { ...PROGRESS, new: 0, learning: 0, known: 0, due: 0, streak: 0 } });
       const { ui } = renderApp("/practice");
-      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
       expect(screen.queryByText("Your progress")).not.toBeInTheDocument();
       ui.unmount();
       mockApi({ ...base, "GET /practice/progress": err(500, "internal", "boom") });
       renderApp("/practice");
-      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
       expect(screen.queryByText("Your progress")).not.toBeInTheDocument();
     });
 
@@ -175,7 +252,7 @@ describe("practice page", () => {
       renderApp("/practice");
       await userEvent.click(await screen.findByRole("button", { name: "Review due words" }));
       expect(await screen.findByText("water")).toBeInTheDocument();
-      expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&limit=10&due=true");
+      expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&scope=due");
     });
 
     it("says nothing is due instead of offering a review button", async () => {
@@ -196,23 +273,23 @@ describe("practice page", () => {
     });
 
     it("explains an empty due round and goes back", async () => {
-      mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/flashcards": { items: [], total: 0 } });
+      mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/flashcards": { items: [], total: 0, selection: 0, due: 0, new: 0 } });
       renderApp("/practice");
       await userEvent.click(await screen.findByRole("button", { name: "Review due words" }));
       expect(await screen.findByText("Nothing due right now")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: "Back" }));
-      expect(await screen.findByRole("button", { name: "Start flashcards" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Study what's due" })).toBeInTheDocument();
     });
 
-    it("records each flashcard answer as it is given", async () => {
-      const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/answers": { status: 204 } });
+    it("records each flashcard grade as it is given", async () => {
+      const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
       renderApp("/practice");
-      await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
-      for (const knew of [true, false]) {
-        await userEvent.click(await screen.findByRole("button", { name: "Show meaning" }));
-        await userEvent.click(screen.getByRole("button", { name: knew ? "I knew it" : "Not yet" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+      for (const g of ["Good", "Again"]) {
+        await userEvent.click(await screen.findByRole("button", { name: "Show answer" }));
+        await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${g}`) }));
       }
-      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 1, correct: true }, { word_id: 2, correct: false }]));
+      await waitFor(() => expect(REVIEWS(calls).map((r) => [r.word_id, r.grade])).toEqual([[1, 3], [2, 1]]));
     });
 
     it("records multiple-choice answers once each, even if the learner clicks again", async () => {
@@ -222,7 +299,7 @@ describe("practice page", () => {
       await userEvent.click(await screen.findByRole("button", { name: "Start multiple choice" }));
       await userEvent.click(await screen.findByRole("button", { name: "x" }));
       await userEvent.click(screen.getByRole("button", { name: "a drink" }));
-      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 7, correct: false }]));
+      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 7, correct: false, think_ms: expect.any(Number), mode: "choices", direction: "word" }]));
     });
 
     it("records fill-in-the-blank answers against the word, and skips a blank with no word", async () => {
@@ -232,17 +309,17 @@ describe("practice page", () => {
       await userEvent.click(await screen.findByRole("button", { name: "water" }));
       await userEvent.click(screen.getByRole("button", { name: "Next" }));
       await userEvent.click(await screen.findByRole("button", { name: "bread" }));
-      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 3, correct: true }]));
+      await waitFor(() => expect(ANSWERS(calls)).toEqual([{ word_id: 3, correct: true, think_ms: expect.any(Number), mode: "cloze" }]));
     });
 
     it("tells the learner on the result screen when answers could not be saved", async () => {
-      mockApi({ ...base, "GET /practice/flashcards": { items: [CARDS.items[0]], total: 1 }, "POST /practice/answers": err(500, "internal", "boom") });
+      mockApi({ ...base, "GET /practice/flashcards": { ...CARDS, items: [CARDS.items[0]], total: 1 }, "POST /practice/reviews": err(500, "internal", "boom") });
       renderApp("/practice");
-      await userEvent.click(await screen.findByRole("button", { name: "Start flashcards" }));
-      await userEvent.click(await screen.findByRole("button", { name: "Show meaning" }));
-      await userEvent.click(screen.getByRole("button", { name: "I knew it" }));
-      expect(await screen.findByText("You knew 1 of 1")).toBeInTheDocument();
-      expect(await screen.findByText(/couldn't be saved this time/)).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+      await userEvent.click(await screen.findByRole("button", { name: "Show answer" }));
+      await userEvent.click(screen.getByRole("button", { name: /^Good/ }));
+      expect(await screen.findByText("Session complete")).toBeInTheDocument();
+      expect(await screen.findByText(/last answer couldn't be saved/)).toBeInTheDocument();
     });
   });
 });

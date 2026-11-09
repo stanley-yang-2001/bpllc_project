@@ -56,7 +56,7 @@ describe("dictation", () => {
     const heard = spoken[0];
     await typeAndCheck(heard.toUpperCase());
     expect(await screen.findByText("Correct!")).toBeInTheDocument();
-    await waitFor(() => expect(answers(calls)).toEqual([{ word_id: WORDS.items.find((w) => w.word === heard)!.id, correct: true }]));
+    await waitFor(() => expect(answers(calls)).toEqual([{ word_id: WORDS.items.find((w) => w.word === heard)!.id, correct: true, think_ms: expect.any(Number), mode: "dictation" }]));
   });
 
   it("tells a wrong answer from a missing accent, shows the meaning, and totals the score", async () => {
@@ -72,7 +72,7 @@ describe("dictation", () => {
     expect(screen.getByText("a drink")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "See result" }));
     expect(await screen.findByText("You got 0 of 2.")).toBeInTheDocument();
-    await waitFor(() => expect(answers(calls)).toEqual([{ word_id: 2, correct: false }, { word_id: 1, correct: false }]));
+    await waitFor(() => expect(answers(calls)).toEqual([{ word_id: 2, correct: false, think_ms: expect.any(Number), mode: "dictation" }, { word_id: 1, correct: false, think_ms: expect.any(Number), mode: "dictation" }]));
   });
 
   it("will not check an empty answer, and locks the answer once checked", async () => {

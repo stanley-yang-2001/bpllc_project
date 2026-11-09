@@ -21,9 +21,13 @@ def build(conn, user_id: int) -> dict:
         cur.execute("SELECT w.language, w.word, w.meaning, w.pos, s.name AS set_name, w.created_at FROM words w "
                     "LEFT JOIN word_sets s ON s.id = w.set_id WHERE w.user_id = %s ORDER BY w.language, w.word", (user_id,))
         out["words"] = cur.fetchall()           # set_name null = the General set
-        cur.execute("SELECT w.language, w.word, p.box, p.due_at, p.right_count, p.wrong_count, p.last_answered_at FROM word_progress p "
+        cur.execute("SELECT w.language, w.word, p.box, p.phase, p.ease, p.interval_days, p.lapses, p.last_grade, p.due_at, p.right_count, p.wrong_count, "
+                    "p.last_answered_at FROM word_progress p "
                     "JOIN words w ON w.id = p.word_id WHERE p.user_id = %s ORDER BY w.language, w.word", (user_id,))
         out["word_progress"] = cur.fetchall()           # which words you practised and how they went
+        cur.execute("SELECT w.language, w.word, l.reviewed_at, l.mode, l.direction, l.grade, l.think_ms, l.rate_ms, l.phase_before, l.was_due, l.counted, "
+                    "l.delay_seconds FROM review_log l JOIN words w ON w.id = l.word_id WHERE l.user_id = %s ORDER BY l.reviewed_at, l.id", (user_id,))
+        out["review_log"] = cur.fetchall()              # every answer: when, how it was graded and how long it took
         cur.execute("SELECT day, answers FROM practice_days WHERE user_id = %s ORDER BY day", (user_id,))
         out["practice_days"] = cur.fetchall()
         cur.execute("SELECT language, name, created_at FROM word_sets WHERE user_id = %s ORDER BY language, name", (user_id,))

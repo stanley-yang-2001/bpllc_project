@@ -8,7 +8,7 @@ import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
 import { CARDS } from "./constants";
-import { useAnswerRecorder } from "./useRecorder";
+import { useAnswerRecorder, useThinkTimer } from "./useRecorder";
 
 export type Direction = "meaning" | "word";
 
@@ -23,6 +23,7 @@ export function Choices({ language, set, direction, due = false, onDone }: { lan
   const [picked, setPicked] = useState<string | null>(null);
   const [right, setRight] = useState(0);
   const { record, failed } = useAnswerRecorder(language);
+  const elapsed = useThinkTimer(index, cards.isSuccess);
   const again = () => { setRound((r) => r + 1); setIndex(0); setPicked(null); setRight(0); };
 
   if (cards.isPending) return <Skeleton className="h-40 w-full" />;
@@ -48,10 +49,11 @@ export function Choices({ language, set, direction, due = false, onDone }: { lan
       </div>
     );
   const item = items[index];
+  const wordIsPrompt = direction === "meaning";               // the prompt is the word (the options are meanings)
   const choose = (c: string) => {
     if (picked !== null) return;
     setPicked(c);
-    record(item.id, c === item.answer);
+    record(item.id, c === item.answer, { think_ms: elapsed(), mode: "choices", direction: wordIsPrompt ? "word" : "meaning" });
     if (c === item.answer) setRight(right + 1);
   };
   const wordSide = direction === "meaning";        // the question is a word; the options are meanings

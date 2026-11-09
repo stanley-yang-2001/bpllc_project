@@ -31,6 +31,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 5 Nov | Automatic own-model chat check; length for chat stories (up to 400 words); round fixes; more reliable story kinds in chat |
 | 6 Nov | Features document, PR description, privacy policy options (docs only); grammar checks and repair for generated stories (0055); two-pass story generation and a comparison page (0056); story score 0 to 100 and the example bank (0057); comparison page with a tab per language, scores and translations (0059) |
 | 7 Nov | Story score version 2, waiting out the Groq rate limit, re-scoring saved comparison runs (0060); word-range prompt and level wording, off by default (0061); story score version 3: grammar mistakes found by built-in rules, optional LanguageTool and a verified model review, plus a probe corpus (0062); several candidates, optional judge and a targeted repair loop, all off by default (0063); multi-method timed comparison runner (0064); cascade (planned word counts, mixed candidates, free checks, review, one repair) and a Qwen/GPT mix test (0065); score version 4 (grammar-weighted, failed stories) and a second Groq account key (0066) |
+| 9 Nov | Spaced-repetition flashcards with four answers, no card limit, several sets at once, answer timing, memory statistics and hardest words (0069, migration 0017) |
 
 ## 1. The foundation (September to 18 October 2026)
 
@@ -86,6 +87,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | Starter packs and first-run guide | 29 Oct | A new learner adds a ready word pack from Home and follows a three-step guide. | Verified |
 | Dictation | 29 Oct | Hear a word, type it; three kinds of feedback. | Verified; by-hand check |
 | Parts of speech | 30 Oct | A part-of-speech label for every word (per-language choices, such as i-adjective for Japanese), set by hand or by the tutor, plus a practice for them (migration 0015). | Verified |
+| Spaced-repetition flashcards | 9 Nov | SM-2 schedule with Again/Hard/Good/Easy, no card limit, several sets at once, answer timing, statistics and hardest words (migration 0017). | Built and tested here; not run on your machine |
 
 ## 5. Your own AI model
 

@@ -5,7 +5,7 @@ import { api, type ClozeItem } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, ErrorText, Skeleton } from "../components/ui";
-import { useAnswerRecorder } from "./useRecorder";
+import { useAnswerRecorder, useThinkTimer } from "./useRecorder";
 
 /** Fill in the blank in a saved story, one word at a time. Each answer is remembered against the learner's word. */
 export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => void }) {
@@ -16,6 +16,7 @@ export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => voi
   const [picked, setPicked] = useState<string | null>(null);
   const [right, setRight] = useState(0);
   const { record, failed } = useAnswerRecorder(set.data?.language ?? "");
+  const elapsed = useThinkTimer(index, set.isSuccess);
   useEffect(() => { setIndex(0); setPicked(null); setRight(0); }, [storyId]);
 
   if (set.isPending) return <Skeleton className="h-40 w-full" />;
@@ -36,7 +37,7 @@ export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => voi
   const choose = (choice: string) => {
     if (picked !== null) return;
     setPicked(choice);
-    record(item.word_id, choice === item.answer);
+    record(item.word_id, choice === item.answer, { think_ms: elapsed(), mode: "cloze" });
     if (choice === item.answer) setRight(right + 1);
   };
   return (

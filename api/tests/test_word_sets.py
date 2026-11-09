@@ -157,6 +157,10 @@ def test_filter_clause_all_general_id_and_a_bad_value():
     assert filter_clause("12") == (" AND set_id = %s", [12]) and filter_clause(12) == (" AND set_id = %s", [12])
     assert filter_clause("general", "w.set_id") == (" AND w.set_id IS NULL", [])
     assert filter_clause("3", "w.set_id") == (" AND w.set_id = %s", [3])
-    for bad in ("nope", "1; DROP TABLE x", "-1", "1.5"):
+    # several sets at once: any of them, General included
+    assert filter_clause("3,7") == (" AND (set_id = ANY(%s))", [[3, 7]])
+    assert filter_clause("general,7,3") == (" AND (set_id IS NULL OR set_id = ANY(%s))", [[3, 7]])
+    assert filter_clause("5,5") == (" AND set_id = %s", [5]) and filter_clause("general,general") == (" AND set_id IS NULL", [])
+    for bad in ("nope", "1; DROP TABLE x", "-1", "1.5", "all,3", "3,", "1,,2"):
         with pytest.raises(AppError):
             filter_clause(bad)

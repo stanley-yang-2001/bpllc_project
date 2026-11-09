@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { GraduationCap, Headphones, Layers, ListChecks, Tags, TextCursorInput } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, type SetFilter } from "../api/client";
-import { setsKey, storiesKey } from "../api/keys";
+import { api } from "../api/client";
+import { progressKey, storiesKey } from "../api/keys";
+import type { FlashcardScope } from "../api/types";
 import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
@@ -15,6 +16,8 @@ import { Dictation } from "../practice/Dictation";
 import { Flashcards } from "../practice/Flashcards";
 import { PosPractice } from "../practice/PosPractice";
 import { ProgressCard } from "../practice/ProgressCard";
+import { pickedToFilter, SetPicker } from "../practice/SetPicker";
+import { StudyStats } from "../practice/StudyStats";
 import { speechSupported, voiceFor } from "../speech/speak";
 import { useVoices } from "../speech/useVoices";
 
@@ -31,19 +34,24 @@ export default function Practice() {
   const storyId = Number.isInteger(storyParam) && storyParam > 0 ? storyParam : null;
   const [mode, setMode] = useState<"cards" | "choice" | "dictation" | "pos" | null>(null);
   const [direction, setDirection] = useState<Direction>("meaning");
-  const [setPick, setSetPick] = useState("all");                 // "all", "general" or a set id
+  const [picked, setPicked] = useState<string[]>([]);          // the sets chosen ("general" or a set id); none = every word
+  const [cardScope, setCardScope] = useState<FlashcardScope>("due");
+  const [cardIds, setCardIds] = useState<number[]>([]);          // for scope "ids": exactly these words
   const [dueOnly, setDueOnly] = useState(false);                 // only words that are due for review (then never-practised ones)
-  const sets = useQuery({ queryKey: setsKey(user!.id, active), queryFn: () => api.sets(active) });
-  const filter: SetFilter = setPick === "all" || setPick === "general" ? setPick : Number(setPick);
+  const filter = pickedToFilter(picked);
+  const progress = useQuery({ queryKey: [...progressKey(user!.id, active), String(filter)], queryFn: () => api.practiceProgress(active, filter) });
   const stories = useQuery({ queryKey: storiesKey(user!.id, "practice-list", active), queryFn: () => api.stories({ language: active, limit: 100 }) });
-  useEffect(() => { setMode(null); setSetPick("all"); setDueOnly(false); }, [active]);
+  useEffect(() => { setMode(null); setPicked([]); setDueOnly(false); }, [active]);
 
   const back = () => { setMode(null); setParams({}); };
+  const study = (scope: FlashcardScope, ids: number[] = []) => { setCardScope(scope); setCardIds(ids); setMode("cards"); };
+  const p = progress.data;
+  const wordCount = p ? p.new + p.learning + p.known : 0;
   return (
     <div>
       <PageHeader title={t("nav.practice")} description={t("practice.description")} actions={<Badge tone="brand"><span lang={active}>{name}</span></Badge>} />
       {mode === "cards" ? (
-        <Card><Flashcards language={active} set={filter} due={dueOnly} onDone={back} /></Card>
+        <Card><Flashcards language={active} set={filter} scope={cardScope} ids={cardIds} onDone={back} onPractise={(ids) => study("ids", ids)} /></Card>
       ) : mode === "pos" ? (
         <Card><PosPractice language={active} set={filter} due={dueOnly} onDone={back} /></Card>
       ) : mode === "dictation" ? (
@@ -54,17 +62,9 @@ export default function Practice() {
         <Card><Blanks storyId={storyId} onDone={back} /></Card>
       ) : (
         <>
-        <ProgressCard language={active} onReview={() => { setDueOnly(true); setMode("cards"); }} />
-        {(sets.data?.items.length ?? 0) > 0 && (
-          <div className="mb-4 max-w-xs">
-            <label htmlFor="practice-set" className="mb-1 block text-sm font-medium text-slate-700">{t("practice.set")}</label>
-            <select id="practice-set" className={inputCls} value={setPick} onChange={(e) => setSetPick(e.target.value)}>
-              <option value="all">{t("sets.all")}</option>
-              <option value="general">{t("sets.general")}</option>
-              {sets.data!.items.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
-          </div>
-        )}
+        <SetPicker language={active} picked={picked} onChange={setPicked} />
+        <ProgressCard language={active} set={filter} onReview={() => study("due")} />
+        <StudyStats language={active} set={filter} onPractise={(ids) => study("ids", ids)} />
         <label className="mb-4 flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" checked={dueOnly} onChange={(e) => setDueOnly(e.target.checked)} />{t("practice.dueOnly")}
         </label>
@@ -83,8 +83,12 @@ export default function Practice() {
           </Card>
           <Card className="space-y-3">
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Layers aria-hidden className="size-5" />{t("practice.flashcards.title")}</h2>
-            <p className="text-sm text-slate-600">{t("practice.flashcards.text", { language: name })}</p>
-            <Button onClick={() => setMode("cards")}>{t("practice.flashcards.start")}</Button>
+            <p className="text-sm text-slate-600">{t("practice.cards.text", { language: name })}</p>
+            {p && <p className="text-xs text-slate-600">{t("practice.cards.counts", { due: p.due, new: p.new, n: wordCount })}</p>}
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => study("due")}>{t("practice.cards.studyDue")}</Button>
+              <Button variant="secondary" onClick={() => study("all")}>{t("practice.cards.studyAll", { n: wordCount })}</Button>
+            </div>
           </Card>
           <Card className="space-y-3">
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Tags aria-hidden className="size-5" />{t("practice.pos.title")}</h2>

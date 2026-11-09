@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Flame } from "lucide-react";
-import { api } from "../api/client";
+import { api, type SetFilter } from "../api/client";
 import { progressKey } from "../api/keys";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
@@ -8,10 +8,10 @@ import { Button, Card, Skeleton } from "../components/ui";
 
 /** How the learner is doing in this language: what is due, what is new, what is known, and the day streak.
  * A failed load just hides the card: practice works without it. */
-export function ProgressCard({ language, onReview }: { language: string; onReview: () => void }) {
+export function ProgressCard({ language, set = "all", onReview }: { language: string; set?: SetFilter; onReview: () => void }) {
   const { user } = useAuth();
   const { t } = useI18n();
-  const q = useQuery({ queryKey: progressKey(user!.id, language), queryFn: () => api.practiceProgress(language) });
+  const q = useQuery({ queryKey: [...progressKey(user!.id, language), String(set)], queryFn: () => api.practiceProgress(language, set) });
   if (q.isPending) return <Skeleton className="mb-4 h-24 w-full" />;
   if (q.isError) return null;
   const p = q.data;

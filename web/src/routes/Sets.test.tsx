@@ -185,7 +185,7 @@ describe("multiple choice practice", () => {
   it("asks the API for the chosen direction and set, then marks right and wrong answers and scores", async () => {
     const { calls } = mockApi({ ...base, "GET /stories": { items: [], total: 0, limit: 100, offset: 0 }, "GET /practice/choices": CH });
     renderApp("/practice");
-    await userEvent.selectOptions(await screen.findByLabelText("Words from"), "7");
+    await userEvent.click(await screen.findByRole("button", { name: /^Food/ }));
     await userEvent.click(screen.getByRole("button", { name: "Start multiple choice" }));
     await userEvent.click(await screen.findByRole("button", { name: "a drink" }));
     expect(screen.getByText("Correct!")).toBeInTheDocument();
@@ -195,6 +195,17 @@ describe("multiple choice practice", () => {
     await userEvent.click(screen.getByRole("button", { name: "See result" }));
     expect(await screen.findByText("You got 1 of 2.")).toBeInTheDocument();
     expect(calls.find((c) => c.path.startsWith("/practice/choices"))!.path).toBe("/practice/choices?language=en&limit=10&direction=meaning&set=7");
+  });
+
+  it("can pick several sets, and General, to practise together", async () => {
+    const { calls } = mockApi({ ...base, "GET /stories": { items: [], total: 0, limit: 100, offset: 0 }, "GET /practice/choices": CH });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: /^Travel/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^Food/ }));
+    await userEvent.click(screen.getByRole("button", { name: /^General/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Start multiple choice" }));
+    await screen.findByRole("button", { name: "a drink" });
+    expect(calls.find((c) => c.path.startsWith("/practice/choices"))!.path).toContain("set=general%2C7%2C8");
   });
 
   it("can ask for the word given the meaning", async () => {

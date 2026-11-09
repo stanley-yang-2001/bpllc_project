@@ -9,7 +9,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { Button, EmptyState, ErrorText, inputCls, Skeleton } from "../components/ui";
 import { CARDS } from "./constants";
 import { checkTyped, type TypedResult } from "./typed";
-import { useAnswerRecorder } from "./useRecorder";
+import { useAnswerRecorder, useThinkTimer } from "./useRecorder";
 
 /** Hear a word read aloud by the browser, type it, and be told. Each answer is remembered like any other practice. */
 export function Dictation({ language, set, due = false, onDone }: { language: string; set: SetFilter; due?: boolean; onDone: () => void }) {
@@ -22,6 +22,7 @@ export function Dictation({ language, set, due = false, onDone }: { language: st
   const [result, setResult] = useState<TypedResult | null>(null);
   const [right, setRight] = useState(0);
   const { record, failed } = useAnswerRecorder(language);
+  const elapsed = useThinkTimer(index, words.isSuccess);
   useEffect(() => { setTyped(""); setResult(null); }, [index]);
   const again = () => { setRound((r) => r + 1); setIndex(0); setRight(0); };
 
@@ -53,7 +54,7 @@ export function Dictation({ language, set, due = false, onDone }: { language: st
     if (result !== null || typed.trim() === "") return;
     const r = checkTyped(typed, item.word);
     setResult(r);
-    record(item.id, r === "right");
+    record(item.id, r === "right", { think_ms: elapsed(), mode: "dictation" });
     if (r === "right") setRight(right + 1);
   };
   return (

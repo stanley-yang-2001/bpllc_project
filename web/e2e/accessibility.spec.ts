@@ -47,8 +47,8 @@ for (const scheme of ["light", "dark"] as const) {
       await scan(page, `fill in the blank, answered (${scheme})`);
       await nav(page, "Practice").click();
       await scan(page, `practice menu (${scheme})`);
-      await page.getByRole("button", { name: "Start flashcards" }).click();
-      await page.getByRole("button", { name: "Show meaning" }).click();
+      await page.getByRole("button", { name: "Study what's due" }).click();
+      await page.getByRole("button", { name: "Show answer" }).click();
       await scan(page, `flashcard (${scheme})`);
     });
 

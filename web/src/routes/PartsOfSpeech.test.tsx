@@ -83,7 +83,7 @@ describe("parts-of-speech practice", () => {
     expect(screen.getByText("Not quite. It is: adjective")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "See result" }));
     expect(await screen.findByText("You got 1 of 2.")).toBeInTheDocument();
-    await waitFor(() => expect(calls.filter((c) => c.path === "/practice/answers").map((c) => c.body.answers[0])).toEqual([{ word_id: 1, correct: true }, { word_id: 2, correct: false }]));
+    await waitFor(() => expect(calls.filter((c) => c.path === "/practice/answers").map((c) => c.body.answers[0])).toEqual([{ word_id: 1, correct: true, think_ms: expect.any(Number), mode: "pos" }, { word_id: 2, correct: false, think_ms: expect.any(Number), mode: "pos" }]));
   });
 
   it("points to Vocabulary when no word has a label", async () => {

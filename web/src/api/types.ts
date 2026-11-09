@@ -21,6 +21,18 @@ export type SavedStory = Schemas["StoryFull"];
 export type StoryPage = Schemas["StoryPage"];
 export type StoryCard = Schemas["StoryCard"];
 export type FlashcardSet = Schemas["FlashcardSet"];
+export type Flashcard = Schemas["FlashcardOut"];
+export type CardPreview = Schemas["Preview"];
+export type ReviewResult = Schemas["ReviewResult"];
+export type StudyStats = Schemas["StudyStats"];
+export type HardWord = Schemas["HardWord"];
+export type HardWords = Schemas["HardWords"];
+/** 1 again, 2 hard, 3 good, 4 easy. */
+export type Grade = 1 | 2 | 3 | 4;
+export type PracticeMode = "flashcards" | "choices" | "dictation" | "pos" | "cloze";
+export interface Review { word_id: number; grade: Grade; think_ms?: number; rate_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" }
+/** What to practise in flashcards: every word, what is due now, or exactly these words. */
+export type FlashcardScope = "all" | "due" | "ids";
 export type ClozeSet = Schemas["ClozeSet"];
 export type ClozeItem = Schemas["ClozeItem"];
 export type WordSet = Schemas["SetOut"];
@@ -34,8 +46,8 @@ export type DictationSet = Schemas["DictationSet"];
 export type StarterPackList = Schemas["StarterPackList"];
 export type StarterAdded = Schemas["StarterAdded"];
 export type PracticeProgress = Schemas["ProgressOut"];
-export interface Answer { word_id: number; correct: boolean }
+export interface Answer { word_id: number; correct: boolean; think_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" }
 export type ChoiceCard = Schemas["ChoiceOut"];
-/** Which words to show or practise: every word, the General set, or one set by id (sent as "all", "general" or the number). */
-export type SetFilter = "all" | "general" | number;
+/** Which words to show or practise: every word, the General set, one set by id, or several at once as a comma list ("3,7,general"). */
+export type SetFilter = "all" | "general" | number | string;
 export interface DefineResult { defined: number; failed: number; remaining: number }

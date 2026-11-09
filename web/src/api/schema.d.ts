@@ -372,7 +372,7 @@ export interface paths {
         put?: never;
         /**
          * Record Answers
-         * @description Remember which words the learner got right or wrong, so the due ones come back (spaced repetition).
+         * @description Right/wrong answers from the modes without grade buttons: right counts as Good, wrong as Again (with how long it took).
          */
         post: operations["record_answers_api_practice_answers_post"];
         delete?: never;
@@ -450,9 +450,30 @@ export interface paths {
         };
         /**
          * Flashcards
-         * @description due=true: only the words that are due now, then words never practised.
+         * @description The cards of the chosen sets with no size limit (limit is optional). scope=all: every word, shuffled; scope=due (or due=true):
+         *     what the schedule asks for now; scope=ids&ids=1,2,3: exactly those words. Each card carries what every answer would schedule.
          */
         get: operations["flashcards_api_practice_flashcards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/practice/hardest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Hardest
+         * @description The words this learner finds hardest, from their own answers (misses, time taken, lapses).
+         */
+        get: operations["hardest_api_practice_hardest_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -490,6 +511,46 @@ export interface paths {
         };
         /** Get Progress */
         get: operations["get_progress_api_practice_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/practice/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Reviews
+         * @description Graded flashcard answers (1 again, 2 hard, 3 good, 4 easy) with how long the learner took. Returns when each word is due again.
+         */
+        post: operations["record_reviews_api_practice_reviews_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/practice/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats
+         * @description How the chosen words stand and how the last 30 days of answers went (retention, time taken, forecast).
+         */
+        get: operations["stats_api_practice_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -825,6 +886,15 @@ export interface components {
         AnswerIn: {
             /** Correct */
             correct: boolean;
+            /** Direction */
+            direction?: string | null;
+            /**
+             * Mode
+             * @default flashcards
+             */
+            mode: string;
+            /** Think Ms */
+            think_ms?: number | null;
             /** Word Id */
             word_id: number;
         };
@@ -1012,19 +1082,50 @@ export interface components {
         };
         /** FlashcardOut */
         FlashcardOut: {
+            /** Due At */
+            due_at: string | null;
+            /** Ease */
+            ease: number;
             /** Id */
             id: number;
+            /** Interval Days */
+            interval_days: number;
+            /** Lapses */
+            lapses: number;
+            /** Leech */
+            leech: boolean;
             /** Meaning */
             meaning: string;
+            preview: components["schemas"]["Preview"];
+            /** Reps */
+            reps: number;
+            /** Status */
+            status: string;
             /** Word */
             word: string;
         };
         /** FlashcardSet */
         FlashcardSet: {
+            /** Due */
+            due: number;
             /** Items */
             items: components["schemas"]["FlashcardOut"][];
+            /** New */
+            new: number;
+            /** Selection */
+            selection: number;
             /** Total */
             total: number;
+        };
+        /** ForecastDay */
+        ForecastDay: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Due */
+            due: number;
         };
         /** GenerateIn */
         GenerateIn: {
@@ -1068,6 +1169,40 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HardWord */
+        HardWord: {
+            /** Avg Think Ms */
+            avg_think_ms?: number | null;
+            /** Due At */
+            due_at?: string | null;
+            /** Ease */
+            ease: number;
+            /** Id */
+            id: number;
+            /** Lapses */
+            lapses: number;
+            /** Meaning */
+            meaning?: string | null;
+            /** Miss Rate */
+            miss_rate: number;
+            /** Reasons */
+            reasons: string[];
+            /** Reviews */
+            reviews: number;
+            /** Score */
+            score: number;
+            /** Status */
+            status: string;
+            /** Word */
+            word: string;
+        };
+        /** HardWords */
+        HardWords: {
+            /** Items */
+            items: components["schemas"]["HardWord"][];
+            /** Typical Think Ms */
+            typical_think_ms?: number | null;
         };
         /** HealthOut */
         HealthOut: {
@@ -1235,6 +1370,20 @@ export interface components {
             /** Ui Follows Study Language */
             ui_follows_study_language?: boolean | null;
         };
+        /**
+         * Preview
+         * @description Seconds until the word comes back for each answer, so the buttons can say "10m" or "3d".
+         */
+        Preview: {
+            /** Again */
+            again: number;
+            /** Easy */
+            easy: number;
+            /** Good */
+            good: number;
+            /** Hard */
+            hard: number;
+        };
         /** ProfilePatch */
         ProfilePatch: {
             /** Display Name */
@@ -1297,6 +1446,56 @@ export interface components {
             language: string;
             /** Password */
             password: string;
+        };
+        /** ReviewIn */
+        ReviewIn: {
+            /** Direction */
+            direction?: string | null;
+            /** Grade */
+            grade: number;
+            /**
+             * Mode
+             * @default flashcards
+             */
+            mode: string;
+            /** Rate Ms */
+            rate_ms?: number | null;
+            /** Think Ms */
+            think_ms?: number | null;
+            /** Word Id */
+            word_id: number;
+        };
+        /** ReviewResult */
+        ReviewResult: {
+            /** Box */
+            box: number;
+            /** Correct */
+            correct: boolean;
+            /** Counted */
+            counted: boolean;
+            /** Delay Seconds */
+            delay_seconds: number;
+            /** Ease */
+            ease: number;
+            /** Interval Days */
+            interval_days: number;
+            /** Lapses */
+            lapses: number;
+            preview: components["schemas"]["Preview"];
+            /** Status */
+            status: string;
+            /** Word Id */
+            word_id: number;
+        };
+        /** ReviewResults */
+        ReviewResults: {
+            /** Results */
+            results: components["schemas"]["ReviewResult"][];
+        };
+        /** ReviewsIn */
+        ReviewsIn: {
+            /** Reviews */
+            reviews: components["schemas"]["ReviewIn"][];
         };
         /** SaveIn */
         SaveIn: {
@@ -1392,6 +1591,20 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** StatsDay */
+        StatsDay: {
+            /** Avg Think Ms */
+            avg_think_ms?: number | null;
+            /** Correct */
+            correct: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Reviews */
+            reviews: number;
+        };
         /** StatusOut */
         StatusOut: {
             /** Status */
@@ -1463,6 +1676,47 @@ export interface components {
             offset: number;
             /** Total */
             total: number;
+        };
+        /** StudyStats */
+        StudyStats: {
+            /** Accuracy 30D */
+            accuracy_30d?: number | null;
+            /** Avg Rate Ms */
+            avg_rate_ms?: number | null;
+            /** Avg Think Ms */
+            avg_think_ms?: number | null;
+            /** Days */
+            days: components["schemas"]["StatsDay"][];
+            /** Due Now */
+            due_now: number;
+            /** Forecast */
+            forecast: components["schemas"]["ForecastDay"][];
+            /** Language */
+            language: string;
+            /** Learning */
+            learning: number;
+            /** Leeches */
+            leeches: number;
+            /** Mature */
+            mature: number;
+            /** Median Think Ms */
+            median_think_ms?: number | null;
+            /** New */
+            new: number;
+            /** Relearning */
+            relearning: number;
+            /** Retention 30D */
+            retention_30d?: number | null;
+            /** Reviews 30D */
+            reviews_30d: number;
+            /** Studied Seconds 30D */
+            studied_seconds_30d: number;
+            /** Today Reviews */
+            today_reviews: number;
+            /** Words */
+            words: number;
+            /** Young */
+            young: number;
         };
         /** ToolCallOut */
         ToolCallOut: {
@@ -2229,6 +2483,7 @@ export interface operations {
                 language: string;
                 limit?: number;
                 direction?: string;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
                 set?: string | null;
                 due?: boolean;
             };
@@ -2294,6 +2549,7 @@ export interface operations {
             query: {
                 language: string;
                 limit?: number;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
                 set?: string | null;
                 due?: boolean;
             };
@@ -2327,9 +2583,12 @@ export interface operations {
         parameters: {
             query: {
                 language: string;
-                limit?: number;
+                limit?: number | null;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
                 set?: string | null;
                 due?: boolean;
+                scope?: string | null;
+                ids?: string | null;
             };
             header?: never;
             path?: never;
@@ -2357,11 +2616,46 @@ export interface operations {
             };
         };
     };
+    hardest_api_practice_hardest_get: {
+        parameters: {
+            query: {
+                language: string;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
+                set?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HardWords"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pos_practice_api_practice_pos_get: {
         parameters: {
             query: {
                 language: string;
                 limit?: number;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
                 set?: string | null;
                 due?: boolean;
             };
@@ -2395,6 +2689,8 @@ export interface operations {
         parameters: {
             query: {
                 language: string;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
+                set?: string | null;
             };
             header?: never;
             path?: never;
@@ -2409,6 +2705,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_reviews_api_practice_reviews_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stats_api_practice_stats_get: {
+        parameters: {
+            query: {
+                language: string;
+                /** @description all, general, a set id, or a comma list of them (3,7,general) */
+                set?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyStats"];
                 };
             };
             /** @description Validation Error */

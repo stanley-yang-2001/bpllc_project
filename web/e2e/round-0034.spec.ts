@@ -22,17 +22,18 @@ test.describe("Starter packs, remembered practice and dictation", () => {
     await nav(page, "Practice").click();
     await expect(page.getByText("Your progress")).toBeVisible();
     await page.getByRole("button", { name: "Review due words" }).click();
-    for (let i = 0; i < 10; i++) {
-      await page.getByRole("button", { name: "Show meaning" }).click();
-      await page.getByRole("button", { name: "I knew it" }).click();
+    for (let i = 0; i < 12; i++) {                                       // no card limit: all twelve words are in the session
+      await page.getByRole("button", { name: "Show answer" }).click();
+      await page.getByRole("button", { name: /^Easy/ }).click();         // easy skips the learning steps, so each word is answered once
     }
-    await expect(page.getByText("You knew 10 of 10")).toBeVisible();
+    await expect(page.getByText("Session complete")).toBeVisible();
+    await expect(page.getByText("12 answers on 12 words")).toBeVisible();
     await page.getByRole("button", { name: "Back" }).click();
 
     await expect(page.getByText("1-day streak")).toBeVisible();
     const due = page.getByText("Due now").locator("xpath=following-sibling::dd");
-    await expect(due).toHaveText("0");                                   // the ten answered words now rest
-    await expect(page.getByText("Learning").locator("xpath=following-sibling::dd")).toHaveText("10");
+    await expect(due).toHaveText("0");                                   // the answered words now rest
+    await expect(page.getByText("Learning").locator("xpath=following-sibling::dd")).toHaveText("12");
   });
 
   test("dictation runs through to a score when the browser has a voice", async ({ page }) => {

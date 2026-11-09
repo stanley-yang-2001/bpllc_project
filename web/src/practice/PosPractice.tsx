@@ -9,7 +9,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
 import { posKeyOf } from "../vocab/usePos";
 import { CARDS } from "./constants";
-import { useAnswerRecorder } from "./useRecorder";
+import { useAnswerRecorder, useThinkTimer } from "./useRecorder";
 
 /** Is this word a noun, a verb, an adjective ...? The options are the categories of the language being studied (each language has
  * its own list). Uses the learner's own labelled words; each answer is remembered like any other practice. */
@@ -22,6 +22,7 @@ export function PosPractice({ language, set, due = false, onDone }: { language: 
   const [picked, setPicked] = useState<string | null>(null);
   const [right, setRight] = useState(0);
   const { record, failed } = useAnswerRecorder(language);
+  const elapsed = useThinkTimer(index, cards.isSuccess);
   const again = () => { setRound((r) => r + 1); setIndex(0); setPicked(null); setRight(0); };
   const name = (code: string) => { const k = posKeyOf(code); return k ? t(k) : code; };
 
@@ -51,7 +52,7 @@ export function PosPractice({ language, set, due = false, onDone }: { language: 
   const choose = (code: string) => {
     if (picked !== null) return;
     setPicked(code);
-    record(item.id, code === item.answer);
+    record(item.id, code === item.answer, { think_ms: elapsed(), mode: "pos" });
     if (code === item.answer) setRight(right + 1);
   };
   return (

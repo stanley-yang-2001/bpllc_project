@@ -41,12 +41,13 @@ test.describe("Story Studio, Library and Practice", () => {
   test("flashcards run through to a score", async ({ page }) => {
     await learnerWithWords(page, `cards_${unique()}`);
     await nav(page, "Practice").click();
-    await page.getByRole("button", { name: "Start flashcards" }).click();
+    await page.getByRole("button", { name: "Study what's due" }).click();
     for (let i = 0; i < WORDS.length; i++) {
-      await page.getByRole("button", { name: "Show meaning" }).click();
-      await page.getByRole("button", { name: "I knew it" }).click();
+      await page.getByRole("button", { name: "Show answer" }).click();
+      await page.getByRole("button", { name: /^Easy/ }).click();
     }
-    await expect(page.getByText(`You knew ${WORDS.length} of ${WORDS.length}`)).toBeVisible();
+    await expect(page.getByText("Session complete")).toBeVisible();
+    await expect(page.getByText(`${WORDS.length} answers on ${WORDS.length} words`)).toBeVisible();
   });
 
   test("a story saved by one learner is invisible to another", async ({ page, browser }) => {

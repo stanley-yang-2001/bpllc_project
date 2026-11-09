@@ -80,17 +80,33 @@ def delete(conn, user_id: int, set_id: int) -> int:
     return moved
 
 
+MAX_CHOSEN = 20 + 1       # every set of a language plus General
+
+
 def filter_clause(set_filter, column: str = "set_id") -> tuple[str, list]:
     """The one meaning of the set choice, as a piece of SQL to add to a WHERE that already limits to the learner's own words:
-    None or "all" = every word (nothing added), "general" = words in no set, a number = that set. `column` is for queries that
-    name the table. Anything else is refused. Returns (" AND ...", params)."""
-    if not set_filter or set_filter == "all":
+    None or "all" = every word (nothing added), "general" = words in no set, a number = that set, and a comma list ("3,7,general")
+    = any of those (so a learner can pick several sets to study together). `column` is for queries that name the table. Anything
+    else is refused. Returns (" AND ...", params)."""
+    if not set_filter:
         return "", []
-    if set_filter == "general":
+    parts = [p.strip() for p in str(set_filter).split(",")]
+    if "all" in parts and len(parts) == 1:
+        return "", []
+    if len(parts) > MAX_CHOSEN or not all(p == "general" or p.isdigit() for p in parts):
+        raise validation_error("Choose all, general or your sets.")
+    ids = sorted({int(p) for p in parts if p.isdigit()})
+    if len(ids) == 1 and "general" not in parts:
+        return f" AND {column} = %s", ids
+    if not ids and "general" in parts:
         return f" AND {column} IS NULL", []
-    if str(set_filter).isdigit():
-        return f" AND {column} = %s", [int(set_filter)]
-    raise validation_error("Choose all, general or one of your sets.")
+    clauses, params = [], []
+    if "general" in parts:
+        clauses.append(f"{column} IS NULL")
+    if ids:
+        clauses.append(f"{column} = ANY(%s)")
+        params.append(ids)
+    return f" AND ({' OR '.join(clauses)})", params
 
 
 def owned(conn, user_id: int, set_id: int, language: str | None = None) -> dict:

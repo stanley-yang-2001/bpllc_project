@@ -7,6 +7,37 @@
             "title": "Correct",
             "type": "boolean"
           },
+          "direction": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "mode": {
+            "default": "flashcards",
+            "maxLength": 12,
+            "title": "Mode",
+            "type": "string"
+          },
+          "think_ms": {
+            "anyOf": [
+              {
+                "maximum": 3600000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Think Ms"
+          },
           "word_id": {
             "title": "Word Id",
             "type": "integer"
@@ -572,12 +603,51 @@
       },
       "FlashcardOut": {
         "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "ease": {
+            "title": "Ease",
+            "type": "number"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
           },
+          "interval_days": {
+            "title": "Interval Days",
+            "type": "number"
+          },
+          "lapses": {
+            "title": "Lapses",
+            "type": "integer"
+          },
+          "leech": {
+            "title": "Leech",
+            "type": "boolean"
+          },
           "meaning": {
             "title": "Meaning",
+            "type": "string"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/Preview"
+          },
+          "reps": {
+            "title": "Reps",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
             "type": "string"
           },
           "word": {
@@ -588,19 +658,39 @@
         "required": [
           "id",
           "word",
-          "meaning"
+          "meaning",
+          "status",
+          "ease",
+          "interval_days",
+          "lapses",
+          "reps",
+          "leech",
+          "due_at",
+          "preview"
         ],
         "title": "FlashcardOut",
         "type": "object"
       },
       "FlashcardSet": {
         "properties": {
+          "due": {
+            "title": "Due",
+            "type": "integer"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/FlashcardOut"
             },
             "title": "Items",
             "type": "array"
+          },
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
+          "selection": {
+            "title": "Selection",
+            "type": "integer"
           },
           "total": {
             "title": "Total",
@@ -609,9 +699,31 @@
         },
         "required": [
           "items",
-          "total"
+          "total",
+          "selection",
+          "due",
+          "new"
         ],
         "title": "FlashcardSet",
+        "type": "object"
+      },
+      "ForecastDay": {
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "due": {
+            "title": "Due",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "due"
+        ],
+        "title": "ForecastDay",
         "type": "object"
       },
       "GenerateIn": {
@@ -777,6 +889,123 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HardWord": {
+        "properties": {
+          "avg_think_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Think Ms"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "ease": {
+            "title": "Ease",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lapses": {
+            "title": "Lapses",
+            "type": "integer"
+          },
+          "meaning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning"
+          },
+          "miss_rate": {
+            "title": "Miss Rate",
+            "type": "number"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "reviews": {
+            "title": "Reviews",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "word",
+          "score",
+          "reasons",
+          "reviews",
+          "miss_rate",
+          "lapses",
+          "ease",
+          "status"
+        ],
+        "title": "HardWord",
+        "type": "object"
+      },
+      "HardWords": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HardWord"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "typical_think_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typical Think Ms"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "HardWords",
         "type": "object"
       },
       "HealthOut": {
@@ -1300,6 +1529,35 @@
         "title": "PreferencesPatch",
         "type": "object"
       },
+      "Preview": {
+        "description": "Seconds until the word comes back for each answer, so the buttons can say \"10m\" or \"3d\".",
+        "properties": {
+          "again": {
+            "title": "Again",
+            "type": "integer"
+          },
+          "easy": {
+            "title": "Easy",
+            "type": "integer"
+          },
+          "good": {
+            "title": "Good",
+            "type": "integer"
+          },
+          "hard": {
+            "title": "Hard",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "again",
+          "hard",
+          "good",
+          "easy"
+        ],
+        "title": "Preview",
+        "type": "object"
+      },
       "ProfilePatch": {
         "properties": {
           "display_name": {
@@ -1476,6 +1734,160 @@
           "accept_privacy"
         ],
         "title": "RegisterBody",
+        "type": "object"
+      },
+      "ReviewIn": {
+        "properties": {
+          "direction": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "grade": {
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Grade",
+            "type": "integer"
+          },
+          "mode": {
+            "default": "flashcards",
+            "maxLength": 12,
+            "title": "Mode",
+            "type": "string"
+          },
+          "rate_ms": {
+            "anyOf": [
+              {
+                "maximum": 3600000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate Ms"
+          },
+          "think_ms": {
+            "anyOf": [
+              {
+                "maximum": 3600000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Think Ms"
+          },
+          "word_id": {
+            "title": "Word Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "word_id",
+          "grade"
+        ],
+        "title": "ReviewIn",
+        "type": "object"
+      },
+      "ReviewResult": {
+        "properties": {
+          "box": {
+            "title": "Box",
+            "type": "integer"
+          },
+          "correct": {
+            "title": "Correct",
+            "type": "boolean"
+          },
+          "counted": {
+            "title": "Counted",
+            "type": "boolean"
+          },
+          "delay_seconds": {
+            "title": "Delay Seconds",
+            "type": "integer"
+          },
+          "ease": {
+            "title": "Ease",
+            "type": "number"
+          },
+          "interval_days": {
+            "title": "Interval Days",
+            "type": "number"
+          },
+          "lapses": {
+            "title": "Lapses",
+            "type": "integer"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/Preview"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "word_id": {
+            "title": "Word Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "word_id",
+          "delay_seconds",
+          "status",
+          "counted",
+          "correct",
+          "box",
+          "ease",
+          "interval_days",
+          "lapses",
+          "preview"
+        ],
+        "title": "ReviewResult",
+        "type": "object"
+      },
+      "ReviewResults": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "title": "ReviewResults",
+        "type": "object"
+      },
+      "ReviewsIn": {
+        "properties": {
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewIn"
+            },
+            "maxItems": 50,
+            "title": "Reviews",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reviews"
+        ],
+        "title": "ReviewsIn",
         "type": "object"
       },
       "SaveIn": {
@@ -1786,6 +2198,41 @@
         "title": "StarterPackOut",
         "type": "object"
       },
+      "StatsDay": {
+        "properties": {
+          "avg_think_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Think Ms"
+          },
+          "correct": {
+            "title": "Correct",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "reviews": {
+            "title": "Reviews",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "reviews",
+          "correct"
+        ],
+        "title": "StatsDay",
+        "type": "object"
+      },
       "StatusOut": {
         "properties": {
           "status": {
@@ -2000,6 +2447,145 @@
           "offset"
         ],
         "title": "StoryPage",
+        "type": "object"
+      },
+      "StudyStats": {
+        "properties": {
+          "accuracy_30d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy 30D"
+          },
+          "avg_rate_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Rate Ms"
+          },
+          "avg_think_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Think Ms"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/StatsDay"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "due_now": {
+            "title": "Due Now",
+            "type": "integer"
+          },
+          "forecast": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastDay"
+            },
+            "title": "Forecast",
+            "type": "array"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "learning": {
+            "title": "Learning",
+            "type": "integer"
+          },
+          "leeches": {
+            "title": "Leeches",
+            "type": "integer"
+          },
+          "mature": {
+            "title": "Mature",
+            "type": "integer"
+          },
+          "median_think_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Think Ms"
+          },
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
+          "relearning": {
+            "title": "Relearning",
+            "type": "integer"
+          },
+          "retention_30d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retention 30D"
+          },
+          "reviews_30d": {
+            "title": "Reviews 30D",
+            "type": "integer"
+          },
+          "studied_seconds_30d": {
+            "title": "Studied Seconds 30D",
+            "type": "integer"
+          },
+          "today_reviews": {
+            "title": "Today Reviews",
+            "type": "integer"
+          },
+          "words": {
+            "title": "Words",
+            "type": "integer"
+          },
+          "young": {
+            "title": "Young",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "language",
+          "words",
+          "new",
+          "learning",
+          "relearning",
+          "young",
+          "mature",
+          "due_now",
+          "leeches",
+          "reviews_30d",
+          "studied_seconds_30d",
+          "today_reviews",
+          "days",
+          "forecast"
+        ],
+        "title": "StudyStats",
         "type": "object"
       },
       "ToolCallOut": {
@@ -3096,7 +3682,7 @@
     },
     "/api/practice/answers": {
       "post": {
-        "description": "Remember which words the learner got right or wrong, so the due ones come back (spaced repetition).",
+        "description": "Right/wrong answers from the modes without grade buttons: right counts as Good, wrong as Again (with how long it took).",
         "operationId": "record_answers_api_practice_answers_post",
         "requestBody": {
           "content": {
@@ -3167,19 +3753,21 @@
             }
           },
           {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
             "in": "query",
             "name": "set",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 12,
+                  "maxLength": 200,
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
               "title": "Set"
             }
           },
@@ -3292,19 +3880,21 @@
             }
           },
           {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
             "in": "query",
             "name": "set",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 12,
+                  "maxLength": 200,
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
               "title": "Set"
             }
           },
@@ -3349,7 +3939,7 @@
     },
     "/api/practice/flashcards": {
       "get": {
-        "description": "due=true: only the words that are due now, then words never practised.",
+        "description": "The cards of the chosen sets with no size limit (limit is optional). scope=all: every word, shuffled; scope=due (or due=true):\nwhat the schedule asks for now; scope=ids&ids=1,2,3: exactly those words. Each card carries what every answer would schedule.",
         "operationId": "flashcards_api_practice_flashcards_get",
         "parameters": [
           {
@@ -3366,27 +3956,35 @@
             "name": "limit",
             "required": false,
             "schema": {
-              "default": 20,
-              "maximum": 50,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "maximum": 2000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
             }
           },
           {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
             "in": "query",
             "name": "set",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 12,
+                  "maxLength": 200,
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
               "title": "Set"
             }
           },
@@ -3398,6 +3996,40 @@
               "default": false,
               "title": "Due",
               "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 8,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1500,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ids"
             }
           }
         ],
@@ -3424,6 +4056,80 @@
           }
         },
         "summary": "Flashcards",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/hardest": {
+      "get": {
+        "description": "The words this learner finds hardest, from their own answers (misses, time taken, lapses).",
+        "operationId": "hardest_api_practice_hardest_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          },
+          {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
+              "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HardWords"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Hardest",
         "tags": [
           "practice"
         ]
@@ -3456,19 +4162,21 @@
             }
           },
           {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
             "in": "query",
             "name": "set",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 12,
+                  "maxLength": 200,
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
               "title": "Set"
             }
           },
@@ -3523,6 +4231,25 @@
               "title": "Language",
               "type": "string"
             }
+          },
+          {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
+              "title": "Set"
+            }
           }
         ],
         "responses": {
@@ -3548,6 +4275,110 @@
           }
         },
         "summary": "Get Progress",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/reviews": {
+      "post": {
+        "description": "Graded flashcard answers (1 again, 2 hard, 3 good, 4 easy) with how long the learner took. Returns when each word is due again.",
+        "operationId": "record_reviews_api_practice_reviews_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewResults"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Reviews",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/stats": {
+      "get": {
+        "description": "How the chosen words stand and how the last 30 days of answers went (retention, time taken, forecast).",
+        "operationId": "stats_api_practice_stats_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          },
+          {
+            "description": "all, general, a set id, or a comma list of them (3,7,general)",
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "all, general, a set id, or a comma list of them (3,7,general)",
+              "title": "Set"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stats",
         "tags": [
           "practice"
         ]
