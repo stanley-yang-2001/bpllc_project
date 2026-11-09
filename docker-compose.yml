@@ -41,6 +41,7 @@ services:
       - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
       - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
+      - STORY_NATURALNESS=${STORY_NATURALNESS:-}      # 1: the judge also rates how natural the best candidates read (1-5)
       - STORY_PLAN=${STORY_PLAN:-}                    # 1: feature about one learner word per 17 words, the rest optional
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
@@ -123,6 +124,7 @@ services:
       - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
       - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
+      - STORY_NATURALNESS=${STORY_NATURALNESS:-}      # 1: the judge also rates how natural the best candidates read (1-5)
       - STORY_PLAN=${STORY_PLAN:-}                    # 1: feature about one learner word per 17 words, the rest optional
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}

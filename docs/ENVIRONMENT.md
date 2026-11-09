@@ -56,6 +56,7 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # GROQ_AUDIT_API_KEY=      # key for the grammar review (GROQ_AUDIT_MODEL must be set too)
 # GROQ_QWEN_MODEL=qwen/qwen3.6-27b        # the 'qwen' side of scripts/run_story_methods.py mix methods (patch 0065); check the id in the Groq console
 # STORY_PLAN=0                   # 1: feature about one learner word per 17 words of target length, the rest optional
+# STORY_NATURALNESS=0            # 1: the judge also rates how natural the best candidates read, 1 to 5 (weight 35 in the score; 2 or less fails the story)
 # STORY_MIXED=0                  # 1: candidates use both strategies (one-pass and two-pass)
 # STORY_GATES=0                  # 1: free checks (length, own-word range, fragments, structure) drop bad candidates before any review
 # STORY_CANDIDATES=1             # 2 to 5: write that many versions of the word-applying step and keep the highest score (each is one more call). Off by default.

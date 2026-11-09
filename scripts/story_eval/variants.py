@@ -21,16 +21,17 @@ class Variant:
     plan: bool = False              # name only about one learner word per 17 words, and a maximum (story_plan.py)
     mixed: bool = False             # candidates by different strategies (one-pass and two-pass)
     gates: bool = False             # free pass/fail checks drop failing candidates before any review
+    naturalness: bool = False       # the judge also rates how natural the best candidates read (1-5)
     story_model: str = None         # alias of the model that writes: "gpt" or "qwen" (None: the default story model)
     judge_model: str = None         # alias of the model that judges (None: the default judge model, else the story model)
 
     def options(self) -> StoryOptions:
-        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan)
+        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "label": self.label, "note": self.note, "range_prompt": self.range_prompt, "two_pass": self.two_pass,
                 "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples,
-                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "story_model": self.story_model, "judge_model": self.judge_model}
+                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "story_model": self.story_model, "judge_model": self.judge_model}
 
 
 ALL = [
@@ -60,8 +61,8 @@ _CASCADE = dict(range_prompt=True, plan=True, mixed=True, candidates=4, gates=Tr
 ALL += [
     Variant("plan", "+ plan limits", "the prompt names about one word per 17 and a maximum", range_prompt=True, plan=True),
     Variant("mixed_gates", "+ mixed candidates, gates", "2 one-pass and 2 two-pass candidates, free gates pick (no model review)", **_CASCADE),
-    Variant("cascade", "Cascade", "+ the best two reviewed by the judge, then one repair", judge=True, repair=True, **_CASCADE),
-    Variant("cascade_proofread", "Cascade, proofread", "the cascade with one proofreading call instead of the repair", judge=True, proofread=True, **_CASCADE),
+    Variant("cascade", "Cascade", "+ the best two reviewed (grammar and naturalness) by the judge, then one repair", judge=True, repair=True, naturalness=True, **_CASCADE),
+    Variant("cascade_proofread", "Cascade, proofread", "the cascade with one proofreading call instead of the repair", judge=True, proofread=True, naturalness=True, **_CASCADE),
 ]
 DEFAULT = ["baseline", "range", "two_pass", "candidates", "judge", "repair"]
 CASCADE = ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]

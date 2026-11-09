@@ -19,6 +19,7 @@ v4.1 (9 Nov 2026), from reading 38 real stories next to their scores (docs/STORY
   - tacked-on words fail at 20% of the sentences (was 25%: the stories at 22% read as word lists);
   - telegraphic also when 12+ sentences average under 4.5 words (a letter of 34 four-word lines scored 96.6);
   - problems gain "dangling_end" (a sentence cut off on "y", "de", "con", "and", "with"...) and "no_space" (escuela.entro);
+  - naturalness weighs 35 (was 25), the biggest part after grammar's 40; own words 12, length 5, uncommon 5, sentence length 4;
   - `merge_reviews` joins the findings of several reviewers (each one misses things the other catches) for one score.
 
 Six parts (same names as v3, so nothing downstream breaks) plus one optional part, each 0 to 100:
@@ -59,7 +60,7 @@ from .vocabulary import _TOKEN, _norm
 
 SCORE_VERSION = 4.1                                     # 9 Nov 2026: see "v4.1" in the docstring
 NAMES = ("length", "own_words", "uncommon", "sentence_length", "grammar", "language_format")
-WEIGHTS = {"grammar": 40, "naturalness": 25, "own_words": 15, "length": 6, "uncommon": 6, "sentence_length": 5, "language_format": 3}
+WEIGHTS = {"grammar": 40, "naturalness": 35, "own_words": 12, "length": 5, "uncommon": 5, "sentence_length": 4, "language_format": 3}   # naturalness 25 -> 35 on 9 Nov 2026
 FAIL_FACTOR = 0.6                                       # a story that breaks a quality rule keeps its order but cannot beat a passing one
 DEFAULT_LENGTH = {"dialogue": 50, "narration": 50}      # words, when no tier or length was asked; the other kinds: 80
 DEFAULT_OWN, DEFAULT_UNCOMMON = 3, 10

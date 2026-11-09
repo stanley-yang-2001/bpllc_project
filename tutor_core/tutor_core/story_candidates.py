@@ -4,7 +4,7 @@ The cascade, cheapest first:
     1  score every candidate (offline, no model)
     2  gates (`gates=True`, story_gates.py): a candidate that fails a gate is dropped when another one passes, with no model call
     3  review (`audit_call`, the judge model): the best JUDGED candidates are reviewed for grammar mistakes (every quote checked against the
-       text, quality/grammar/audit.py) and scored again with what was found
+       text, quality/grammar/audit.py) and, with `naturalness=True`, rated 1 to 5 for how natural they read (naturalness.py); scored again
     4  pairwise pick: when the two best are within PAIRWISE_GAP points, the judge is asked which reads better, in both orders; the pick counts only
        when both orders agree, otherwise the higher score stands
 
@@ -17,6 +17,7 @@ from typing import Callable, Optional
 from .languages import LANGUAGES
 from .prompts import build_pairwise_prompt
 from .quality import score_story
+from .naturalness import rate as rate_naturalness
 from .quality.grammar.audit import run_audit
 from .story_gates import check as run_gates
 
@@ -40,7 +41,7 @@ def _pick(call: Callable[[str], str], name: str, a: str, b: str) -> Optional[int
 
 
 def choose(texts: list[str], language: str, words, difficulty: Optional[dict], kind: Optional[str], *,
-           audit_call: Optional[Callable[[str], str]] = None, gates: bool = False) -> tuple[str, list, list[str]]:
+           audit_call: Optional[Callable[[str], str]] = None, gates: bool = False, naturalness: bool = False) -> tuple[str, list, list[str]]:
     """(the chosen text, its model-found hits ([] without a judge), notes). `texts` must not be empty."""
     name = LANGUAGES[language].name if language in LANGUAGES else language
     scored = [score_story(t, language, words, difficulty, kind) for t in texts]
@@ -61,10 +62,14 @@ def choose(texts: list[str], language: str, words, difficulty: Optional[dict], k
             if scored[i]["gated"]:
                 continue
             review = run_audit(audit_call, texts[i], name)
+            rating = rate_naturalness(audit_call, texts[i], name) if naturalness else None
             if review.ok:
                 hits[i] = review.hits
-                scored[i] = score_story(texts[i], language, words, difficulty, kind, hits=review.hits)
-            notes.append(f"judge reviewed #{i + 1}: " + (f"{len(review.hits)} mistake(s) found" if review.ok else f"no usable answer ({review.error[:60]})"))
+            if review.ok or (rating is not None and rating.ok):
+                scored[i] = score_story(texts[i], language, words, difficulty, kind, hits=review.hits if review.ok else None,
+                                        naturalness=rating.score if rating is not None and rating.ok else None)
+            notes.append(f"judge reviewed #{i + 1}: " + (f"{len(review.hits)} mistake(s) found" if review.ok else f"no usable answer ({review.error[:60]})")
+                         + (f"; naturalness {rating.score:g}/5" if rating is not None and rating.ok else ""))
         pool = ranked
     order = sorted(pool, key=lambda i: (-scored[i]["score"], i))
     best = order[0]

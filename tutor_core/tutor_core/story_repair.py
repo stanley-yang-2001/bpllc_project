@@ -64,7 +64,7 @@ def requirements(result: dict, text: str, language: str, words, difficulty: Opti
         for p in result.get("problems", []):
             out.append(_STRUCTURAL.get(p, p[:1].upper() + p[1:] + ("" if p.endswith(".") else ".")))
     verdict = run_gates(text, language, words, difficulty, kind, result)
-    verdict["failed"] = [f for f in verdict["failed"] if f in ("stuffed", "tacked_on_words", "telegraphic", "too_many_errors")]   # length and word counts are above
+    verdict["failed"] = [f for f in verdict["failed"] if f in ("stuffed", "tacked_on_words", "telegraphic", "too_many_errors", "unnatural", "markdown")]   # length and word counts are above
     out += [r for r in gate_requirements(verdict, language) if r not in out]
     if parts["language_format"] is not None and parts["language_format"] < 100 and not any("blank" in r for r in out):
         if kind == "dialogue":

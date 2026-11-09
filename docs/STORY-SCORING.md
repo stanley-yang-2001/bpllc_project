@@ -52,3 +52,8 @@ Six requirements, each 0 to 100, **equal weight**; the story score is their mean
 Two runs of `run_story_methods.py` (en, es, fr; GPT-OSS-120B and Qwen 3.8 writing, judging and reviewing) were read by hand and graded 0-100, then compared with the scores. The offline v4 score agreed only loosely (Pearson 0.54): it passed stories with a markdown leak, gender mistakes hidden by it, 34 four-word lines, words stuck on after commas at 22% of the sentences, and sentences cut off on "y". Fixes are listed at the top of `quality/score.py`. Each reviewer misses things the other finds (GPT-OSS missed "una libro"; Qwen missed padding words such as "inside still", "outside today"), so `merge_reviews` joins their findings. Findings that overlap on the same words count once.
 
 Still not seen by any check: stories that read as nonsense but are grammatical ("Cinco amigos comen pasto"), and filler adverbs added to every line. A model review of naturalness (the optional `naturalness=` 1-5 input, weight 25) is the planned answer.
+
+
+## Naturalness review (patch 0068)
+
+The part with the most weight after grammar (35 of 104; the score divides by the weights of the parts present, so a story without a rating is scored on the rest). A model reads the story as a native reader and answers 1 to 5: 5 flows and makes sense; 3 is stiff (padding words, word lists, choppy lines); 2 or less fails the story. It is asked separately from the grammar review so a model cannot hide a stiff text behind "no mistakes found". Use a different model than the writer, and read the ratings of both reviewers side by side in "Reviewers compared": if they disagree a lot, trust the one whose ratings match your own reading of a few stories.

@@ -64,3 +64,42 @@ def test_mixed_strategies_write_one_pass_and_two_pass_candidates():
                          options=StoryOptions(candidates=4, mixed=True, gates=True, plan=True))
     assert r.ok and any("mixed" in n.lower() for n in r.notes)
     assert StoryOptions(candidates=4, mixed=True).cache_parts() != StoryOptions(candidates=4).cache_parts()
+
+
+def test_naturalness_rating_is_read_and_never_raises():
+    from tutor_core import naturalness as N
+    assert N.parse('{"score": 4, "reason": "flows well"}').score == 4 and N.parse('```json\n{"score": 2.4, "reason": "x"}\n```').score == 2.5
+    assert N.parse("I would say 3").score == 3 and not N.parse("no idea").ok and not N.parse('{"score": 9}').ok
+    assert not N.rate(lambda p: 1 / 0, GOOD, "English").ok
+    assert N.combine([4, None, 3]) == 3.5 and N.combine([None]) is None
+    from tutor_core.prompts import build_naturalness_prompt
+    assert "NATURAL" in build_naturalness_prompt("Spanish", "Hola.") and "<<<" in build_naturalness_prompt("Spanish", "Hola.")
+
+
+def test_naturalness_weighs_most_after_grammar_and_two_or_less_fails():
+    from tutor_core.quality import score_story
+    from tutor_core.quality.score import WEIGHTS
+    assert WEIGHTS["naturalness"] == 35 and WEIGHTS["naturalness"] > WEIGHTS["own_words"] and WEIGHTS["grammar"] > WEIGHTS["naturalness"]
+    d = D.resolve("easy")
+    five, three, two = (score_story(GOOD, "en", WORDS, d, "story", naturalness=n) for n in (5, 3, 2))
+    assert five["score"] > three["score"] > two["score"] and two["failed"] == ["unnatural"] and not two["passed"]
+    assert five["parts"]["naturalness"] == 100.0 and score_story(GOOD, "en", WORDS, d, "story")["parts"]["naturalness"] is None
+
+
+def test_choose_rates_the_best_two_and_the_rating_moves_the_choice():
+    d = D.resolve("easy")
+    other = GOOD.replace("Maria", "Marta")
+
+    def call(prompt):
+        if "NATURAL" in prompt:
+            return json.dumps({"score": 5 if "Marta" in prompt else 2, "reason": "r"})
+        return json.dumps({"errors": []})
+    text, hits, notes = choose([GOOD, other], "en", WORDS, d, "story", audit_call=call, naturalness=True)
+    assert "Marta" in text and any("naturalness 5/5" in n for n in notes) and any("naturalness 2/5" in n for n in notes)
+    text2, _, notes2 = choose([GOOD, other], "en", WORDS, d, "story", audit_call=call)
+    assert not any("naturalness" in n for n in notes2)
+
+
+def test_the_option_and_the_gate_name_unnatural_stories():
+    assert StoryOptions.from_env({"STORY_NATURALNESS": "1"}).naturalness and ("naturalness",) in StoryOptions(naturalness=True).cache_parts()
+    assert G.requirements({"failed": ["unnatural", "markdown"], "limits": {}}, "en")

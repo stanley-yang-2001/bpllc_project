@@ -202,7 +202,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     judge = (judge_call or call) if opts.judge else None
     hits: list = []
     if len(texts) > 1:
-        passage, hits, more = choose_candidate(texts, language, words, request.difficulty, picked_type, audit_call=judge, gates=opts.gates)
+        passage, hits, more = choose_candidate(texts, language, words, request.difficulty, picked_type, audit_call=judge, gates=opts.gates, naturalness=opts.naturalness)
         notes += more
     else:
         passage = texts[0]

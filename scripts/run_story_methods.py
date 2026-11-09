@@ -72,6 +72,7 @@ def main(argv=None) -> int:
     ap.add_argument("--gpt-model", default=None, help="model for the 'gpt' side of the mix methods (default: GROQ_MODEL)")
     ap.add_argument("--qwen-model", default=None, help="model for the 'qwen' side (default: GROQ_QWEN_MODEL, else qwen/qwen3.6-27b: check the id in the Groq console)")
     ap.add_argument("--audit-models", default=None, help="reviewers of every story, e.g. 'gpt,qwen' (implies --audit): compares their grammar findings")
+    ap.add_argument("--no-naturalness", action="store_true", help="with --audit: skip the 1-5 naturalness rating (saves one call per story and reviewer)")
     ap.add_argument("--no-translate", action="store_true", help="no English translation under each story (saves one call per story)")
     ap.add_argument("--db", action="store_true", help="connect to the database (needed for the 'examples' method)")
     ap.add_argument("--tpm", type=int, default=7000, help="tokens per minute to stay under (free tier: 8000)")
@@ -146,7 +147,7 @@ def main(argv=None) -> int:
 
     audits = {a: model_channel(a) for a in reviewers} or None
     calls = runner.Calls(story, runner.Channel(judge_raw, wrap) if judge_raw else None, runner.Channel(audit_raw, wrap) if audit_raw and not audits else None,
-                         None if args.no_translate else translator(wrap(groq.call_groq)), models=model_channel, audits=audits)
+                         None if args.no_translate else translator(wrap(groq.call_groq)), models=model_channel, audits=audits, rate=not args.no_naturalness)
     meta = {"story model": os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL, "judge model": getattr(judge_raw, "model", None) or ("(story model)" if any(v.judge for v in chosen) else None),
             "review model": ", ".join(f"{a}={names[a]}" for a in reviewers) or ((getattr(audit_raw, "model", None) or "(story model)") if audit_raw else None),
             "gpt model": names["gpt"], "qwen model": names["qwen"]}

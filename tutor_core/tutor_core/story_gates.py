@@ -71,6 +71,9 @@ def check(text: str, language: str, words, difficulty: Optional[dict], kind: Opt
         failed.append("structural")
     if m.get("sentences") and m.get("sentences_with_mistakes", 0) / m["sentences"] > ERROR_SHARE:
         failed.append("too_many_errors")
+    for reason in ("unnatural", "markdown"):
+        if reason in (result.get("failed") or []):
+            failed.append(reason)
     if result.get("passed") is False:
         failed.append("score_rules")
     return {"passed": not failed, "failed": failed, "limits": {"own_min": low, "own_max": high, "length": t["length"]}}
@@ -87,6 +90,9 @@ def requirements(verdict: dict, language: str) -> list[str]:
         "tacked_on_words": "Do not stick a word on after a comma at the end of a sentence (like \"The market is busy, thank you.\"): use each word inside "
                            "a sentence that makes sense.",
         "telegraphic": "Write full sentences with a subject and a verb, at least four words each, not short fragments.",
+        "unnatural": "Rewrite it so it reads naturally, as a good writer would: events that follow one another, no filler words added to every line, no word stuck "
+                     "on after a comma.",
+        "markdown": "Write plain text only: no asterisks, no bold, no headings or other formatting marks.",
         "too_many_errors": "Correct the grammar of every sentence: articles, verb forms, agreement and prepositions.",
     }
     return [text[f] for f in verdict.get("failed", []) if f in text]

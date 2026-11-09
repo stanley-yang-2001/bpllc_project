@@ -26,6 +26,7 @@ from tutor_core.languages import LANGUAGES
 from tutor_core.patient import is_rate_limit
 from tutor_core.quality import score_story
 from tutor_core.quality.grammar import Hit
+from tutor_core.naturalness import combine as combine_ratings, rate as rate_naturalness
 from tutor_core.quality.grammar.audit import run_audit
 from tutor_core.story import story_from_words
 
@@ -74,6 +75,7 @@ class Calls:
     audit: Optional[Channel] = None
     translate: Optional[Callable] = None        # (text, code) -> English text or ""
     models: Optional[Callable] = None           # alias ("gpt", "qwen") -> Channel, for methods that name who writes and who judges
+    rate: bool = True                           # also ask every reviewer for a 1-5 naturalness rating (one more call per story and reviewer)
     audits: Optional[dict] = None               # label -> Channel: several independent reviewers of every final story (else `audit`)
 
 
@@ -91,10 +93,10 @@ def _env(**values):
                 os.environ[k] = v
 
 
-def _score(text, ok, request, hits=None):
+def _score(text, ok, request, hits=None, naturalness=None):
     if not ok:
         return None
-    return score_story(text, request["code"], request["words"], _d.resolve(request["tier"]), request.get("story_type"), hits=hits)
+    return score_story(text, request["code"], request["words"], _d.resolve(request["tier"]), request.get("story_type"), hits=hits, naturalness=naturalness)
 
 
 def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
@@ -133,13 +135,17 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
         for label, channel in reviewers.items():
             channel.reset()
             review = run_audit(channel.call, result.text, LANGUAGES[code].name)
-            entry["audits"][label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1))
-            if review.ok:
-                entry["audit_scores"][label] = _score(result.text, True, request, review.hits)
+            rating = rate_naturalness(channel.call, result.text, LANGUAGES[code].name) if calls.rate else None
+            entry["audits"][label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1),
+                                          naturalness=rating.as_dict() if rating is not None else None)
+            if review.ok or (rating is not None and rating.ok):
+                entry["audit_scores"][label] = _score(result.text, True, request, review.hits if review.ok else None,
+                                                      rating.score if rating is not None and rating.ok else None)
         if len(entry["audit_scores"]) > 1:
             from tutor_core.quality.score import merge_reviews
             entry["audit_union"] = _score(result.text, True, request, merge_reviews(*(
-                [Hit(**h) for h in r["hits"]] for r in entry["audits"].values() if r.get("ok"))))
+                [Hit(**h) for h in r["hits"]] for r in entry["audits"].values() if r.get("ok"))),
+                combine_ratings([(r.get("naturalness") or {}).get("score") for r in entry["audits"].values()]))
         if entry["audits"]:
             first = next(iter(entry["audits"]))
             entry["audit"], entry["audit_seconds"] = entry["audits"][first], entry["audits"][first]["seconds"]
@@ -202,7 +208,7 @@ def run(data: dict, variants: list, calls: Calls, *, conn=None, on_saved: Callab
 def estimate(requests: list, variants: list, audit: bool, translate: bool, tpm: int = 7000) -> dict:
     """Rough size of a run: model calls, tokens and minutes at the pacing limit (about 1800 tokens a call, a guess)."""
     from .variants import CALLS
-    per = sum(CALLS.get(v.name, 3.0) + (1 if audit else 0) + (1 if translate else 0) for v in variants)
+    per = sum(CALLS.get(v.name, 3.0) + (2 if audit else 0) + (1 if translate else 0) for v in variants)
     calls = round(per * len(requests))
     tokens = calls * 1800
     return {"requests": len(requests), "variants": len(variants), "calls": calls, "tokens": tokens, "minutes": round(tokens / tpm)}

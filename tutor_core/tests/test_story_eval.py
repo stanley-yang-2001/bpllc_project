@@ -68,6 +68,7 @@ def test_two_models_each_get_their_own_channel_and_reviewers_are_compared():
     runner.run(data, chosen, c, say=lambda *_: None, limit=1)
     entry = next(iter(data["results"].values()))["gpt_qwen"]
     assert seen["gpt"] and seen["qwen"] and set(entry["audits"]) == {"gpt", "qwen"} and entry["gate"] is not None
+    assert "naturalness" in entry["audits"]["gpt"] and entry["audits"]["gpt"]["naturalness"] is not None
     assert entry["audit"] == entry["audits"]["gpt"] and set(entry["audit_scores"]) == {"gpt", "qwen"}
     page = report.render(data)
     assert "Reviewers compared" in page and "Free checks" in page
