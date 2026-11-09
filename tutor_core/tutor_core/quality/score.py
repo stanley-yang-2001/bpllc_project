@@ -13,6 +13,14 @@ no. Maria feels sad, sorry. Apple tastes sweet, good night." scored 96.8 offline
   3. Grammar counted "sentences with a finding" and weighed every finding the same. Now each finding is weighted by severity (major 3,
      moderate 1, minor 0.5), findings on the same text count once, and grammar = 100 * exp(-ERROR_DECAY * weighted findings per 100 words).
 
+v4.1 (9 Nov 2026), from reading 38 real stories next to their scores (docs/STORY-SCORING.md): 10 stories a reader rates under 60 still scored 80+.
+  - markdown: **bold**, # headings and `code` in a story fail it ("markdown"); the marks are blanked (same length) so the grammar rules still see the
+    words ("una **libro**" went unnoticed, the story scored 99.7);
+  - tacked-on words fail at 20% of the sentences (was 25%: the stories at 22% read as word lists);
+  - telegraphic also when 12+ sentences average under 4.5 words (a letter of 34 four-word lines scored 96.6);
+  - problems gain "dangling_end" (a sentence cut off on "y", "de", "con", "and", "with"...) and "no_space" (escuela.entro);
+  - `merge_reviews` joins the findings of several reviewers (each one misses things the other catches) for one score.
+
 Six parts (same names as v3, so nothing downstream breaks) plus one optional part, each 0 to 100:
 
     length            within 15% of the target = 100, 60% off or more = 0, a straight line between
@@ -49,7 +57,7 @@ from .language import language_check
 from .passage import FAILURE_MARKERS, LEAK_PATTERN, _is_label, _read_shape
 from .vocabulary import _TOKEN, _norm
 
-SCORE_VERSION = 4
+SCORE_VERSION = 4.1                                     # 9 Nov 2026: see "v4.1" in the docstring
 NAMES = ("length", "own_words", "uncommon", "sentence_length", "grammar", "language_format")
 WEIGHTS = {"grammar": 40, "naturalness": 25, "own_words": 15, "length": 6, "uncommon": 6, "sentence_length": 5, "language_format": 3}
 FAIL_FACTOR = 0.6                                       # a story that breaks a quality rule keeps its order but cannot beat a passing one
@@ -67,9 +75,10 @@ OWN_MAX_PLUS, OWN_MAX_TIMES = 3, 2.0                    # at most max(target + 3
 PER_OVER_WORD, STUFFED_OVER = 12, 3                     # points off per word over the maximum; this many over = failed
 PACK_ORDER_RUN, PACK_ORDER_PENALTY, PACK_ORDER_MIN_WORDS = 5, 20, 6
 # telegraphic text
-TAIL_MIN_SENTENCES, TAIL_SHARE, TAIL_MIN_BEFORE = 3, 0.25, 3     # words tacked on after a comma at the end of the sentence
+TAIL_MIN_SENTENCES, TAIL_SHARE, TAIL_MIN_BEFORE = 3, 0.20, 3     # words tacked on after a comma at the end of the sentence
 FRAGMENT_SIZE = {False: 4, True: 6}                     # a sentence shorter than this (words, or characters) is a fragment
 FRAGMENT_SHARE, FRAGMENT_MIN_SENTENCES = 0.30, 3
+CHOPPY_MEAN, CHOPPY_MIN_SENTENCES = {False: 4.5, True: 7.0}, 12      # many very short sentences in a row
 # grammar
 SEVERITY = {"major": 3.0, "moderate": 1.0, "minor": 0.5}
 ERROR_DECAY = 0.1                                       # 1 major per 100 words = 74, 3 majors = 41, 1 minor = 95
@@ -81,6 +90,16 @@ MIN_WORDS_FOR_DENSITY = 30                              # so a very short story 
 _PLACEHOLDER = re.compile(r"\[[^\]\n]{1,40}\]|\{[^}\n]{1,40}\}|<[^>\n]{1,40}>|\bX{3,}\b|\b(?:insert|lorem ipsum)\b", re.I)
 _CLAUSE_BREAKS = "，、,"
 _SENTENCE_ENDS = re.compile(r"[。！？!?\n]+")
+_MARKDOWN = re.compile(r"\*\*|__|`|^\s{0,3}#{1,6}\s|(?<!\w)\*(?=\w)[^*\n]{1,60}(?<=\w)\*(?!\w)", re.M)
+_MARK_CHARS = re.compile(r"[*_`#]")
+_NO_SPACE = re.compile(r"[a-zà-ÿ]{2,}[.!?][A-Za-zÀ-ÿ]{2,}")
+_FUNCTION_ENDINGS = {                    # a sentence that stops on one of these was cut off
+    "en": {"and", "or", "but", "with", "of", "the", "a", "an", "because"},
+    "es": {"y", "e", "o", "u", "de", "con", "en", "un", "una", "el", "la", "los", "las", "que", "para", "mi", "su", "sin", "pero"},
+    "fr": {"et", "ou", "de", "du", "des", "avec", "dans", "un", "une", "le", "la", "les", "que", "pour", "mon", "ma", "son", "sa", "mais"},
+    "de": {"und", "oder", "mit", "von", "in", "an", "auf", "der", "die", "das", "ein", "eine", "zu", "für", "aber", "weil", "dass"},
+    "it": {"e", "o", "di", "con", "un", "una", "il", "lo", "che", "per", "ma", "del", "della"},
+}
 _COMMA_BEFORE = re.compile(r"[,;]\s*[\"“«'‘]?\s*$")
 _ALPHA = re.compile(r"[^\W\d_]")
 
@@ -178,7 +197,19 @@ def _stuffing_signs(units, patterns, kind_is_dialogue, unspaced):
 
 # ---------------------------------------------------------------- unchanged from v3
 
-def _detail_problems(text, unspaced, tokens):
+def _dangling(text, language):
+    """True when a sentence stops on a word that cannot end one ("... arroz fresco y.")."""
+    ends = _FUNCTION_ENDINGS.get(language)
+    if not ends:
+        return False
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        words = _TOKEN.findall(sentence)
+        if len(words) >= 3 and words[-1].casefold() in ends and sentence.rstrip().endswith((".", "!", "?")):
+            return True
+    return False
+
+
+def _detail_problems(text, unspaced, tokens, language="en"):
     """Problems the fluency check does not look for: a template blank left in, one word said over and over, a run-on in Chinese or Japanese."""
     found = []
     if _PLACEHOLDER.search(text):
@@ -191,6 +222,10 @@ def _detail_problems(text, unspaced, tokens):
                 counts[low] = counts.get(low, 0) + 1
         if counts and max(counts.values()) >= max(REPEAT_MIN, round(REPEAT_SHARE * len(tokens))):
             found.append("repeated_word")
+    if _NO_SPACE.search(text):
+        found.append("no_space")
+    if not unspaced and _dangling(text, language):
+        found.append("dangling_end")
     if unspaced and any(sum(u.count(c) for c in _CLAUSE_BREAKS) >= RUN_ON_COMMAS for u in _SENTENCE_ENDS.split(text)):
         found.append("run_on")
     return found
@@ -254,6 +289,9 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None, hit
         return {"score": 0.0, "passed": False, "failed": [], "parts": {n: None for n in NAMES}, "gated": gated, "partial": False,
                 "reviewed": hits is not None, "targets": {}, "measured": {}, "version": SCORE_VERSION}
     words = list(words)
+    marked = bool(_MARKDOWN.search(text))
+    if marked:
+        text = _MARK_CHARS.sub(" ", text)           # same length: the offsets of a review's findings stay right
     unspaced = _d.is_unspaced(language)
     m = _d.measure(text, language, words)
     t_len = _target_length(language, difficulty, kind)
@@ -265,6 +303,8 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None, hit
     tokens = _TOKEN.findall(text)
     n_words = len(tokens) if not unspaced else m["length"] / _d.CHARS_PER_WORD
     failed, warnings, parts = [], [], {}
+    if marked:
+        failed.append("markdown")
 
     parts["length"] = _line(abs(m["length"] - t_len) / t_len, LENGTH_FULL, LENGTH_ZERO)
 
@@ -293,9 +333,11 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None, hit
     fragment_share = sum(1 for s in sizes if s < FRAGMENT_SIZE[unspaced]) / len(sizes)
     if not dialogue and len(sizes) >= FRAGMENT_MIN_SENTENCES and fragment_share >= FRAGMENT_SHARE:
         failed.append("telegraphic")
+    elif not dialogue and len(sizes) >= CHOPPY_MIN_SENTENCES and mean < CHOPPY_MEAN[unspaced]:
+        failed.append("telegraphic")
 
     # grammar: severity-weighted findings per 100 words
-    problems = fluency_problems(text, unspaced) + _detail_problems(text, unspaced, tokens)
+    problems = fluency_problems(text, unspaced) + _detail_problems(text, unspaced, tokens, language)
     all_hits = merge(builtin_hits(text, language, words), list(hits or ()))
     n_sentences, affected = affected_sentences(text, all_hits)
     weighted, majors = summarize_findings(all_hits)
@@ -327,3 +369,12 @@ def score_story(text: str, language: str, words, difficulty=None, kind=None, hit
                          "own_words_counted_by_measure": m["own_words"], "uncommon_pct": m["uncommon_pct"], "mean_sentence": round(mean, 1),
                          "sentences": n_sentences, "sentences_with_mistakes": round(affected, 2), "findings_per_100_words": round(per_100, 1), "major_findings": majors,
                          "tacked_on_share": round(tail_share, 2), "fragment_share": round(fragment_share, 2), "word_list_run": order_run}}
+
+
+def merge_reviews(*reviews):
+    """The findings of several reviewers as one list for `hits`: each reviewer misses what another finds (a story with "una libro" passed one
+    reviewer with no finding at all). Findings on the same words count once (see summarize_findings)."""
+    out = []
+    for hits in reviews:
+        out.extend(hits or ())
+    return out

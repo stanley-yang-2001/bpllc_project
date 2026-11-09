@@ -8,6 +8,7 @@ import html
 from tutor_core import difficulty as _d
 from tutor_core.languages import LANGUAGES
 from tutor_core.quality import score_story
+from tutor_core.quality.score import merge_reviews
 from tutor_core.quality.grammar import Hit
 
 PART_LABELS = {"length": "Length", "own_words": "Your words", "uncommon": "Uncommon words", "sentence_length": "Sentence length",
@@ -40,7 +41,7 @@ def stats(data: dict, variant: str, code: str = None) -> dict:
     scored = [e["score"] for e in made if e["score"]]
     audited = [e for e in made if e.get("audit") and e["audit"].get("ok")]
     return {"requests": len(items), "stories": len(made), "score": _mean([s["score"] for s in scored]),
-            "audit_score": _mean([e["audit_score"]["score"] for e in audited if e.get("audit_score")]),
+            "audit_score": _mean([(e.get("audit_union") or e["audit_score"])["score"] for e in audited if e.get("audit_union") or e.get("audit_score")]),
             "pass_rate": round(sum(1 for s in scored if passes(s)) / len(items), 3) if items else None,
             "parts": {k: _mean([s["parts"].get(k) for s in scored]) for k in PART_LABELS},
             "calls": _mean([e["calls"] for e in items]), "model_seconds": _mean([e["model_seconds"] for e in items]),
@@ -65,6 +66,10 @@ def rescore(data: dict) -> dict:
             for label, review in (entry.get("audits") or {}).items():
                 if review.get("ok"):
                     entry["audit_scores"][label] = score_story(*args, hits=[Hit(**h) for h in review.get("hits", [])])
+            entry["audit_union"] = None
+            if len(entry["audit_scores"]) > 1:       # the findings of every reviewer together: each misses things the others find
+                joined = merge_reviews(*([Hit(**h) for h in r.get("hits", [])] for r in entry["audits"].values() if r.get("ok")))
+                entry["audit_union"] = score_story(*args, hits=joined)
     return data
 
 
@@ -85,7 +90,7 @@ def _bars(sc):
 
 
 def _card(variant: dict, e: dict, best: bool) -> str:
-    sc, au = e.get("score"), e.get("audit_score")
+    sc, au = e.get("score"), e.get("audit_union") or e.get("audit_score")
     if sc is None:
         big = "<div class=score>–</div>"
     elif sc["gated"]:
@@ -162,6 +167,8 @@ def reviewer_table(data: dict) -> str:
                     f"<td>{_fmt(round(sum(1 for r in good if r['hits']) / len(good), 3) if good else None, True)}</td>"
                     f"<td>{_fmt(_mean([e['audit_scores'][l]['score'] for e in allx if l in (e.get('audit_scores') or {})]))}</td>"
                     f"<td>{_fmt(_mean([r.get('seconds') for r in rs]))}</td><td>{len(rs) - len(good)}</td></tr>")
+    if len(labels) > 1:
+        rows.append(f"<tr><td><b>both together</b></td><td></td><td></td><td></td><td>{_fmt(_mean([e['audit_union']['score'] for e in allx if e.get('audit_union')]))}</td><td></td><td></td></tr>")
     agree = ""
     if len(labels) > 1:
         a, b = labels[0], labels[1]

@@ -30,7 +30,7 @@ def calls(model=fake_model, wrap=lambda c: c, judge=False, audit=False, translat
 
 def make(names="baseline,two_pass,candidates", languages=("es",), **kw):
     chosen = vs.resolve(names)
-    data = runner.new_data(fixed_set.build(list(languages), extras=False), chosen, {"score_version": 4})
+    data = runner.new_data(fixed_set.build(list(languages), extras=False), chosen, {"score_version": 4.1})
     return data, chosen
 
 

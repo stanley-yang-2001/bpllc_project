@@ -74,7 +74,7 @@ def test_other_languages():
 
 def test_v2_detail_checks():
     from tutor_core.quality.score import SCORE_VERSION
-    check("score version is 4", SCORE_VERSION == 4 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 4)
+    check("score version is 4.1", SCORE_VERSION == 4.1 and score_story(GOOD, "es", WORDS, None, "story")["version"] == 4.1)
     blank = GOOD.replace("María", "[Votre nom]")
     r = score_story(blank, "es", WORDS, None, "story")
     check("a template blank is a grammar problem and fails the format check", "placeholder" in r["problems"] and r["parts"]["language_format"] <= 75
@@ -107,6 +107,29 @@ def test_v3_grammar_sees_mistakes():
     check("hits passed in by the caller are counted when they can be located", r2["parts"]["grammar"] < 100 and r2["grammar_hits"][0]["source"] == "audit",
           str(r2["grammar_hits"]))
     check("scoring without hits never calls anything: same text, same score", score_story(GOOD, "es", WORDS, None, "story") == clean)
+
+
+def test_v41_checks_from_the_38_story_reading():
+    from tutor_core.quality.score import merge_reviews
+    bold = "María vive en una casa grande cerca del mar. Cada mañana ella abre la ventana y mira el **agua**. Su amigo Pedro llega con **pan** fresco. " + GOOD.split(". ", 3)[3]
+    r = score_story(bold, "es", WORDS, None, "story")
+    check("markdown marks fail the story and are named", "markdown" in r["failed"] and not r["passed"])
+    wrong = GOOD.replace("un libro", "una **libro**")
+    check("the grammar rules still see a word that was in bold", any("libro" in h["wrong"] for h in score_story(wrong, "es", WORDS, None, "story")["grammar_hits"])
+          or "markdown" in score_story(wrong, "es", WORDS, None, "story")["failed"])
+    choppy = " ".join(f"Yo veo la casa {i}." if False else "Mi hijo come pan." for _ in range(14))
+    check("14 four-word sentences in a row are telegraphic", "telegraphic" in score_story(choppy, "es", WORDS, None, "story")["failed"])
+    cut = GOOD.replace("Al final del día los dos duermen contentos.", "Después fuimos a la tienda a comprar tomate, aceite y.")
+    check("a sentence cut off on a function word is a problem", "dangling_end" in score_story(cut, "es", WORDS, None, "story")["problems"])
+    check("a sentence ending on 'her' is not", "dangling_end" not in score_story("A man brings a light basket to her. " * 3, "en", ["man"], None, "story")["problems"])
+    check("a missing space after a full stop is a problem", "no_space" in score_story(GOOD.replace("playa hasta", "playa.hasta"), "es", WORDS, None, "story")["problems"])
+    tacked = "Market is busy, thank you. The sun is warm, hello. We buy bread, please. The day ends, goodbye. They rest at home today with calm."
+    check("tacked-on words fail at 20% of the sentences", "tacked_on_words" in score_story(tacked, "en", ["thank you", "hello", "please", "goodbye"], None, "story")["failed"])
+    from tutor_core.quality.grammar import Hit
+    a, b = [Hit("audit", "x", "casa", kind="grammar", start=0, end=4)], [Hit("audit", "y", "mar", kind="grammar", start=20, end=23)]
+    both = score_story(GOOD, "es", WORDS, None, "story", hits=merge_reviews(a, b))
+    one = score_story(GOOD, "es", WORDS, None, "story", hits=a)
+    check("two reviewers' findings together cost more than one's", both["parts"]["grammar"] < one["parts"]["grammar"])
 
 
 def test_example_wording():

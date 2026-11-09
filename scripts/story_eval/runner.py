@@ -25,6 +25,7 @@ from tutor_core import difficulty as _d
 from tutor_core.languages import LANGUAGES
 from tutor_core.patient import is_rate_limit
 from tutor_core.quality import score_story
+from tutor_core.quality.grammar import Hit
 from tutor_core.quality.grammar.audit import run_audit
 from tutor_core.story import story_from_words
 
@@ -119,7 +120,7 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
     entry = {"text": result.text, "ok": result.ok, "reason": result.reason, "story_type": result.story_type, "topic": result.topic,
              "calls": n_calls, "seconds": round(wall, 1), "model_seconds": round(model, 1),
              "wait_seconds": round(max(0.0, wall - model), 1), "error": error, "notes": list(result.notes), "translation": "",
-             "audit": None, "audit_seconds": None, "audit_score": None, "audits": {}, "audit_scores": {}, "models": {
+             "audit": None, "audit_seconds": None, "audit_score": None, "audits": {}, "audit_scores": {}, "audit_union": None, "models": {
                  "story": getattr(story_ch.meter.call, "model", None) or variant.story_model or "default",
                  "judge": (getattr(judge_ch.meter.call, "model", None) or variant.judge_model or "default") if variant.judge else None}}
     entry["gate"] = None
@@ -135,6 +136,10 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
             entry["audits"][label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1))
             if review.ok:
                 entry["audit_scores"][label] = _score(result.text, True, request, review.hits)
+        if len(entry["audit_scores"]) > 1:
+            from tutor_core.quality.score import merge_reviews
+            entry["audit_union"] = _score(result.text, True, request, merge_reviews(*(
+                [Hit(**h) for h in r["hits"]] for r in entry["audits"].values() if r.get("ok"))))
         if entry["audits"]:
             first = next(iter(entry["audits"]))
             entry["audit"], entry["audit_seconds"] = entry["audits"][first], entry["audits"][first]["seconds"]
