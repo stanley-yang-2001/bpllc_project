@@ -57,3 +57,21 @@ Still not seen by any check: stories that read as nonsense but are grammatical (
 ## Naturalness review (patch 0068)
 
 The part with the most weight after grammar (35 of 104; the score divides by the weights of the parts present, so a story without a rating is scored on the rest). A model reads the story as a native reader and answers 1 to 5: 5 flows and makes sense; 3 is stiff (padding words, word lists, choppy lines); 2 or less fails the story. It is asked separately from the grammar review so a model cannot hide a stiff text behind "no mistakes found". Use a different model than the writer, and read the ratings of both reviewers side by side in "Reviewers compared": if they disagree a lot, trust the one whose ratings match your own reading of a few stories.
+
+
+## Offline signals (patch 0072)
+
+Can something that is not an LLM judge grammar and naturalness? `scripts/eval_signals.py` measures every story in a saved run with signals that need no Groq call and checks each against my hand grades (`scripts/data/hand_grades.json`, 38 stories graded 9 November).
+
+| Signal | What it measures | Needs |
+|---|---|---|
+| `languagetool` | errors per 100 words (style hints excluded) | a LanguageTool server, `LANGUAGETOOL_URL` (default `http://localhost:8010`); none for Korean |
+| `perplexity` | how surprised a local multilingual model is by the text (lower is more natural) | `pip install torch transformers`; model from `MODEL` (default `Qwen/Qwen2.5-0.5B`) |
+| `worst_sentence` | the same, for the single most surprising sentence | same |
+
+Run it after the overnight run (so it does not compete for Docker):
+
+    docker run -d -p 8010:8010 erikvl87/languagetool
+    PYTHONPATH=tutor_core:scripts python scripts/eval_signals.py scripts/*methods_*.json --signals languagetool,perplexity,worst_sentence
+
+The table shows Pearson and Spearman against the hand grades, after z-scoring within each language so a harder language does not look like a worse signal; a `meta` row averages the signals with no fitting (38 grades is too few to fit anything). Baseline to beat, with no signals: story score v4.1 Pearson 0.69, model review 0.72. A signal is worth adding to the score only if it correlates at least as well as these and the correlation holds on the next run; with this few grades, treat differences under about 0.2 as noise. To add a signal, write one class with `name`, `higher_is_better` and `measure(text, language)` in `story_eval/signals.py`.

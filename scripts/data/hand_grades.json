@@ -1,0 +1,61 @@
+{
+ "note": "hand grades 0-100 (grammar and naturalness first, then fit to request), 9 Nov 2026. runs are keyed by the run file's 'created' stamp; each story is request id -> {variant: grade}",
+ "runs": {
+  "2026-11-09 03:56:37": {
+   "en-0": {
+    "baseline": 55,
+    "baseline_qwen": 65,
+    "gpt_gpt": 30,
+    "qwen_qwen": 40,
+    "gpt_qwen": 30,
+    "qwen_gpt": 40
+   },
+   "en-1": {
+    "baseline": 60,
+    "baseline_qwen": 55,
+    "gpt_gpt": 70,
+    "qwen_qwen": 85,
+    "gpt_qwen": 70,
+    "qwen_gpt": 60
+   }
+  },
+  "2026-11-09 04:07:41": {
+   "en-0": {
+    "baseline": 80,
+    "baseline_qwen": 78,
+    "gpt_gpt": 40,
+    "qwen_qwen": 70,
+    "gpt_qwen": 75,
+    "qwen_gpt": 25
+   },
+   "en-1": {
+    "baseline": 62,
+    "baseline_qwen": 75,
+    "gpt_gpt": 85,
+    "qwen_qwen": 75,
+    "gpt_qwen": 50,
+    "qwen_gpt": 60
+   },
+   "es-2": {
+    "baseline": 88,
+    "baseline_qwen": 45,
+    "gpt_gpt": 55,
+    "qwen_qwen": 20,
+    "gpt_qwen": 62,
+    "qwen_gpt": 58
+   },
+   "es-3": {
+    "baseline": 92,
+    "baseline_qwen": 78,
+    "gpt_gpt": 50,
+    "qwen_qwen": 72,
+    "gpt_qwen": 38,
+    "qwen_gpt": 38
+   },
+   "fr-4": {
+    "baseline": 50,
+    "baseline_qwen": 85
+   }
+  }
+ }
+}
