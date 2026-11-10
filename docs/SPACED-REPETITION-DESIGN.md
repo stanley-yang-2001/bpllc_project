@@ -1,4 +1,4 @@
-# Spaced repetition for flashcards (patches 0069 and 0070, 9 November 2026)
+# Spaced repetition for flashcards (patches 0069 to 0071, 9 November 2026)
 
 Flashcards now follow a schedule instead of a fixed round of ten. This page says what the scheduler does, what is recorded, and where the code is.
 
@@ -6,8 +6,8 @@ Flashcards now follow a schedule instead of a fixed round of ten. This page says
 
 - **No card limit.** A session is every word the schedule asks for (or every word of the chosen sets, or exactly the words chosen). An optional `limit` exists in the API; the page does not use it.
 - **Several sets at once.** The Practice page has one chip per set (and General); any number can be on. None on = every word. The API takes `set=3,7,general`. The choice also drives the progress card, the statistics and the hardest words, and the other practice modes.
-- **Four answers, clicks only (patch 0070).** The word is shown; one click on "Show answer", then one click on Again / Hard / Good / Easy, each saying when the word would come back ("1m", "10m", "1d", "4d"). There is no keyboard shortcut, no direction switch (the word is always first; the log still has a `direction` column) and no help text to read.
-- **A session lasts as long as the learner chooses (patch 0070):** 2, 5, 10, 20 or 30 minutes, or no limit (default 10, remembered in the browser). A clock counts down; when it reaches zero the card being answered can still be graded, then the summary appears. Words not reached stay due.
+- **Four answers, clicks only (patch 0070).** The word is shown; one click on "Show answer", then one click on Again / Hard / Good / Easy, each saying when the word would come back ("1m", "10m", "1d", "4d"). (Patch 0071 adds the keys 1 to 4 back: grade with a click or a key, whichever you like; the keys work only once the answer is showing.) There is no direction switch (the word is always first; the log still has a `direction` column) and no help text to read.
+- **A session lasts as long as the learner chooses (patch 0070):** 2, 5, 10, 20 or 30 minutes, a custom length in minutes and seconds (patch 0071; at least 10 seconds, up to 180 minutes), or no limit (default 10 minutes, remembered in the browser as seconds). A clock counts down; when it reaches zero the card being answered can still be graded, then the summary appears. Words not reached stay due.
 - **Study what's due** (learning words first, then reviews that are due, then new words) or **Practise all N words** (ahead of time). Practising early and remembering does not move the schedule; a miss always does.
 - **End of session:** grades, share not missed, average time to answer, the slowest words, the missed words, "Practise the N missed", and (patch 0070) an **All time** block under it: answers, words practised and days studied, share not missed, retention, average time to answer and time studied, over everything ever answered in the chosen sets (`total_*` fields of `/practice/stats`).
 - **Memory statistics** (Practice page): retention, share not missed, time to answer, time studied (30 days), answers today, where the words stand (new / learning / relearning / young / mature), a 7 day forecast, words that keep being forgotten.

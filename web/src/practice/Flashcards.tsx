@@ -13,8 +13,8 @@ import { answered, delayParts, formatMs, remaining, startSession, summarize, tak
 /** Spaced-repetition flashcards. `scope` "due" is what the schedule asks for now (words in learning first, then reviews that are due,
  * then new words), "all" is every word of the chosen sets (practising ahead), "ids" is exactly those words. There is no card limit.
  * Each answer is one of four grades and is saved at once with how long it took; the server says when the word is due again. */
-export function Flashcards({ language, set, scope, ids, minutes, onDone, onPractise }: {
-  language: string; set: SetFilter; scope: FlashcardScope; ids?: number[]; minutes: number | null; onDone: () => void; onPractise: (ids: number[]) => void;
+export function Flashcards({ language, set, scope, ids, seconds, onDone, onPractise }: {
+  language: string; set: SetFilter; scope: FlashcardScope; ids?: number[]; seconds: number | null; onDone: () => void; onPractise: (ids: number[]) => void;
 }) {
   const { user } = useAuth();
   const { t, err } = useI18n();
@@ -37,11 +37,11 @@ export function Flashcards({ language, set, scope, ids, minutes, onDone, onPract
         {t("practice.flashcards.noneBody")}
       </EmptyState>
     );
-  return <Round key={`${round}`} language={language} set={set} scope={scope} minutes={minutes} cards={items} onDone={onDone} onMore={() => setRound((r) => r + 1)} onPractise={onPractise} />;
+  return <Round key={`${round}`} language={language} set={set} scope={scope} seconds={seconds} cards={items} onDone={onDone} onMore={() => setRound((r) => r + 1)} onPractise={onPractise} />;
 }
 
-function Round({ language, set, scope, minutes, cards, onDone, onMore, onPractise }: {
-  language: string; set: SetFilter; scope: FlashcardScope; minutes: number | null; cards: Flashcard[]; onDone: () => void; onMore: () => void; onPractise: (ids: number[]) => void;
+function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractise }: {
+  language: string; set: SetFilter; scope: FlashcardScope; seconds: number | null; cards: Flashcard[]; onDone: () => void; onMore: () => void; onPractise: (ids: number[]) => void;
 }) {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -49,7 +49,7 @@ function Round({ language, set, scope, minutes, cards, onDone, onMore, onPractis
   const [start] = useState(() => take(startSession(cards), Date.now()));
   const [session, setSession] = useState<Session>(start.session);
   const [card, setCard] = useState<Flashcard | null>(start.card);
-  const [deadline] = useState(() => (minutes ? Date.now() + minutes * 60_000 : null));
+  const [deadline] = useState(() => (seconds ? Date.now() + seconds * 1000 : null));
   const [now, setNow] = useState(() => Date.now());
   const [timeUp, setTimeUp] = useState(false);
   const [revealed, setRevealed] = useState(false);
@@ -87,6 +87,17 @@ function Round({ language, set, scope, minutes, cards, onDone, onMore, onPractis
       .then((r) => finish(r[0]))
       .catch(() => { setFailed(true); finish(null); });
   }, [card, revealed, saving, session, qc, user]);
+
+  useEffect(() => {                                           // keys 1 to 4 grade the answer, same as the buttons
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
+      if (revealed && ["1", "2", "3", "4"].includes(e.key)) grade(Number(e.key) as Grade);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [revealed, grade]);
 
   useEffect(() => {
     if (deadline === null) return;
@@ -131,9 +142,10 @@ function Round({ language, set, scope, minutes, cards, onDone, onMore, onPractis
         <Button onClick={reveal}>{t("practice.cards.reveal")}</Button>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label={t("practice.cards.gradeHelp")}>
-          {grades.map(([g, label, seconds]) => (
-            <Button key={g} variant={g === 3 ? "primary" : "secondary"} disabled={saving} onClick={() => grade(g)} className="flex-col gap-0.5 py-2">
-              <span>{label}</span><span className="text-xs font-normal opacity-80">{delay(seconds)}</span>
+          {grades.map(([g, label, secs]) => (
+            <Button key={g} variant={g === 3 ? "primary" : "secondary"} disabled={saving} onClick={() => grade(g)} className="relative flex-col gap-0.5 py-2">
+              <kbd aria-hidden className="absolute left-2 top-1 text-xs font-normal opacity-60">{g}</kbd>
+              <span>{label}</span><span className="text-xs font-normal opacity-80">{delay(secs)}</span>
             </Button>
           ))}
         </div>
