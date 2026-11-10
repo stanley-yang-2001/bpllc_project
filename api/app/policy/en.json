@@ -1,9 +1,9 @@
 {
  "language": "en",
- "version": "2026-10-24",
+ "version": "2026-11-09",
  "status": "approved",
  "approved_by": "Project owner",
- "approved_on": "2026-10-24",
+ "approved_on": "2026-11-09",
  "title": "Privacy Policy",
  "summary": {
   "title": "In short",
@@ -56,6 +56,10 @@
       [
        "Words, meanings and stories you add",
        "To run the learning features. This is your own study material. A story you make in Story Studio is kept only if you choose Save to library; then it is stored with its quality report (what the checker found), and nothing else about it."
+      ],
+      [
+       "Your practice progress and answer times",
+       "For each word you practise: when it is next due, how well you remembered it, how many times you were right and wrong, and when you last answered. For each answer: the time, which practice it was in, how you rated it, and how long you took (from seeing the question to checking or choosing your answer, and from seeing the answer to rating it; a time over two minutes is kept as two minutes). For each day, how many answers you gave (for your streak). Used only to choose what to practise next and to show you your own progress, such as your hardest words and how long you take to answer. Never sent to an AI service. Part of your download; removed when you delete your account."
       ],
       [
        "Your chat with the tutor",
@@ -141,7 +145,7 @@
    "blocks": [
     {
      "type": "p",
-     "text": "Until you delete your account. Deleting your account (Settings → Delete account) permanently removes your name, email, password hash, words, languages, saved stories, display preferences, chat history and sign-in records straight away. If your chat history cannot be removed at that moment, nothing is deleted and you are asked to try again, so your account is never left half-deleted. The app itself keeps no backups. If the operator makes database backups, deleted information can remain in them until they expire; ask the operator how long."
+     "text": "Until you delete your account. Deleting your account (Settings → Delete account) permanently removes your name, email, password hash, words, languages, saved stories, practice progress and answer times, display preferences, chat history and sign-in records straight away. If your chat history cannot be removed at that moment, nothing is deleted and you are asked to try again, so your account is never left half-deleted. The app itself keeps no backups. If the operator makes database backups, deleted information can remain in them until they expire; ask the operator how long."
     }
    ]
   },
@@ -152,7 +156,7 @@
     {
      "type": "list",
      "items": [
-      "**See and take your data:** Settings → Data & privacy → Download my data (a file you can open or move elsewhere; for chat it lists your chat sessions and when they started, but not the messages, which stay in the tutor service until you delete your account).",
+      "**See and take your data:** Settings → Data & privacy → Download my data (a file you can open or move elsewhere, including your practice progress and every answer with its time; for chat it lists your chat sessions and when they started, but not the messages, which stay in the tutor service until you delete your account).",
       "**Correct it:** change your name, email, password or display preferences in Settings.",
       "**Delete it:** Settings → Delete account.",
       "**Withdraw consent:** you can delete your account at any time. Nothing is held back."

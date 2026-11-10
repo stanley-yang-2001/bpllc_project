@@ -68,7 +68,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Two-pass story generation (draft, then adapt)** (2026-11-06) — Step 3 of the quality plan, off by default behind STORY_TWO_PASS. scripts/compare_story_versions.py shows old and new stories side by side. Needs your run on Groq to judge quality.
 - **Story score and example bank** (2026-11-06) — 0 to 100 score from six equal requirements, a two-per-language bank that replaces a story only for a higher score, a refresh script on starter-pack words, and an optional example in the prompt (off).
 - **Score v2 and rate-limit-proof testing** (2026-11-07) — Calibrated score (stuffing, blanks, repeated words, run-ons, softer length), a Groq wait-and-retry wrapper, and offline re-scoring of saved comparison runs.
-- **Spaced-repetition flashcards** (2026-11-09) — SM-2 schedule (Again/Hard/Good/Easy), no card limit, several sets at once, a review log with answer timing, memory statistics and hardest words.
+- **Spaced-repetition flashcards** (2026-11-09) — SM-2 schedule (Again/Hard/Good/Easy) answered by clicks only, session length you choose, no card limit, several sets at once, review log with answer timing, statistics, hardest words, all-time totals, privacy policy updated.
 
 ## Done (34)
 

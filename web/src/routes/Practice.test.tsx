@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ALICE, err, LANGS, mockApi, renderApp } from "../test/helpers";
@@ -43,17 +43,17 @@ describe("practice page", () => {
     expect(calls.find((c) => c.path.startsWith("/practice/flashcards"))!.path).toBe("/practice/flashcards?language=en&scope=all");
   });
 
-  it("shows the interval each answer would give, grades with the button or the keys 1 to 4, and saves it with the times", async () => {
+  it("shows the interval each answer would give, grades with a click, and saves it with the times", async () => {
     const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
     renderApp("/practice");
     await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
     await screen.findByText("water");
-    await userEvent.keyboard(" ");                                          // space shows the answer
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
     expect(screen.getByText("a drink")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Again\s*1m/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Good\s*10m/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Easy\s*4d/ })).toBeInTheDocument();
-    await userEvent.keyboard("3");
+    await userEvent.click(screen.getByRole("button", { name: /^Good/ }));
     await screen.findByText("bread");
     await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
     await userEvent.click(screen.getByRole("button", { name: /^Hard/ }));
@@ -78,18 +78,71 @@ describe("practice page", () => {
     expect(screen.queryByText("a drink")).not.toBeInTheDocument();
   });
 
-  it("can show the meaning first", async () => {
-    const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
+  it("has nothing to set while studying but the buttons: no direction switch, no keyboard help", async () => {
+    mockApi({ ...base, "GET /practice/flashcards": CARDS });
     renderApp("/practice");
     await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
     await screen.findByText("water");
-    await userEvent.click(screen.getByRole("button", { name: "The meaning" }));
-    expect(screen.getByText("a drink")).toBeInTheDocument();
-    expect(screen.queryByText("water")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
-    expect(screen.getByText("water")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Good/ }));
-    await waitFor(() => expect(REVIEWS(calls)[0].direction).toBe("meaning"));
+    expect(screen.queryByRole("button", { name: "The meaning" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Keys 1 to 4/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show answer" })).toBeInTheDocument();
+  });
+
+  it("lets the learner choose how long a session lasts, remembers it, and shows the time left", async () => {
+    mockApi({ ...base, "GET /practice/flashcards": CARDS });
+    renderApp("/practice");
+    expect(await screen.findByRole("button", { name: "10 min" })).toHaveAttribute("aria-pressed", "true");     // the default
+    for (const n of ["2 min", "5 min", "20 min", "30 min", "No limit"]) expect(screen.getByRole("button", { name: n })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "5 min" }));
+    expect(localStorage.getItem("tutor.cards.minutes")).toBe("5");
+    await userEvent.click(screen.getByRole("button", { name: "Study what's due" }));
+    await screen.findByText("water");
+    expect(screen.getByLabelText("Time left")).toHaveTextContent(/^(5:00|4:59)$/);
+  });
+
+  it("has no clock when there is no limit, and keeps the last choice", async () => {
+    localStorage.setItem("tutor.cards.minutes", "0");
+    mockApi({ ...base, "GET /practice/flashcards": CARDS });
+    renderApp("/practice");
+    expect(await screen.findByRole("button", { name: "No limit" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Study what's due" }));
+    await screen.findByText("water");
+    expect(screen.queryByLabelText("Time left")).not.toBeInTheDocument();
+  });
+
+  it("ends with the summary when the time is up, after the card being answered", async () => {
+    localStorage.setItem("tutor.cards.minutes", "2");
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
+      renderApp("/practice");
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await user.click(await screen.findByRole("button", { name: "Study what's due" }));
+      await screen.findByText("water");
+      await user.click(screen.getByRole("button", { name: "Show answer" }));
+      await act(async () => { vi.advanceTimersByTime(125_000); });            // the time runs out while the answer is showing
+      expect(screen.queryByText("Time is up")).not.toBeInTheDocument();       // that answer can still be given
+      await user.click(screen.getByRole("button", { name: /^Good/ }));
+      expect(await screen.findByText("Time is up")).toBeInTheDocument();
+      expect(screen.getByText("1 answers on 1 words")).toBeInTheDocument();
+      expect(REVIEWS(calls)).toHaveLength(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("shows the running total of all past answers under the session summary", async () => {
+    const stats = { language: "en", words: 3, new: 0, learning: 1, relearning: 0, young: 2, mature: 0, due_now: 0, leeches: 0, reviews_30d: 40, accuracy_30d: 0.85, retention_30d: 0.9,
+      avg_think_ms: 3000, median_think_ms: 2800, avg_rate_ms: 700, studied_seconds_30d: 600, today_reviews: 3, total_reviews: 212, total_words_practised: 48, total_days: 9,
+      total_accuracy: 0.82, total_retention: 0.88, total_avg_think_ms: 3400, total_studied_seconds: 3600, days: [], forecast: [] };
+    mockApi({ ...base, "GET /practice/flashcards": { ...CARDS, items: [CARDS.items[0]], total: 1 }, "GET /practice/stats": stats, "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Show answer" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Easy/ }));
+    expect(await screen.findByText("Session complete")).toBeInTheDocument();
+    expect(await screen.findByText("All time")).toBeInTheDocument();
+    expect(screen.getByText("212 answers on 48 words over 9 days")).toBeInTheDocument();
+    expect(screen.getByText(/82% not missed · 3.4s on average to answer · 60 min studied/)).toBeInTheDocument();
+    expect(screen.getByText(/88% retention/)).toBeInTheDocument();
   });
 
   it("ends with the grades, accuracy, the slowest and the missed words, and can practise just the missed ones", async () => {

@@ -2560,6 +2560,55 @@
             "title": "Today Reviews",
             "type": "integer"
           },
+          "total_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Accuracy"
+          },
+          "total_avg_think_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Avg Think Ms"
+          },
+          "total_days": {
+            "title": "Total Days",
+            "type": "integer"
+          },
+          "total_retention": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Retention"
+          },
+          "total_reviews": {
+            "title": "Total Reviews",
+            "type": "integer"
+          },
+          "total_studied_seconds": {
+            "title": "Total Studied Seconds",
+            "type": "integer"
+          },
+          "total_words_practised": {
+            "title": "Total Words Practised",
+            "type": "integer"
+          },
           "words": {
             "title": "Words",
             "type": "integer"
@@ -2582,6 +2631,10 @@
           "reviews_30d",
           "studied_seconds_30d",
           "today_reviews",
+          "total_reviews",
+          "total_words_practised",
+          "total_days",
+          "total_studied_seconds",
           "days",
           "forecast"
         ],

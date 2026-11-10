@@ -21,6 +21,19 @@ import { StudyStats } from "../practice/StudyStats";
 import { speechSupported, voiceFor } from "../speech/speak";
 import { useVoices } from "../speech/useVoices";
 
+const MINUTE_CHOICES = [2, 5, 10, 20, 30];
+const MINUTES_KEY = "tutor.cards.minutes";
+const DEFAULT_MINUTES = 10;
+/** The session length the learner chose last time (0 = no limit), or 10 minutes. */
+function storedMinutes(): number | null {
+  try {
+    const v = localStorage.getItem(MINUTES_KEY);
+    if (v === null) return DEFAULT_MINUTES;
+    const n = Number(v);
+    return n === 0 ? null : MINUTE_CHOICES.includes(n) ? n : DEFAULT_MINUTES;
+  } catch { return DEFAULT_MINUTES; }
+}
+
 export default function Practice() {
   const { active, info } = useActiveLanguage();
   const { user } = useAuth();
@@ -36,7 +49,9 @@ export default function Practice() {
   const [direction, setDirection] = useState<Direction>("meaning");
   const [picked, setPicked] = useState<string[]>([]);          // the sets chosen ("general" or a set id); none = every word
   const [cardScope, setCardScope] = useState<FlashcardScope>("due");
-  const [cardIds, setCardIds] = useState<number[]>([]);          // for scope "ids": exactly these words
+  const [cardIds, setCardIds] = useState<number[]>([]);
+  const [minutes, setMinutes] = useState<number | null>(storedMinutes);    // how long a flashcard session lasts; null = until the words run out
+  const chooseMinutes = (m: number | null) => { setMinutes(m); try { localStorage.setItem(MINUTES_KEY, String(m ?? 0)); } catch { /* not kept */ } };          // for scope "ids": exactly these words
   const [dueOnly, setDueOnly] = useState(false);                 // only words that are due for review (then never-practised ones)
   const filter = pickedToFilter(picked);
   const progress = useQuery({ queryKey: [...progressKey(user!.id, active), String(filter)], queryFn: () => api.practiceProgress(active, filter) });
@@ -51,7 +66,7 @@ export default function Practice() {
     <div>
       <PageHeader title={t("nav.practice")} description={t("practice.description")} actions={<Badge tone="brand"><span lang={active}>{name}</span></Badge>} />
       {mode === "cards" ? (
-        <Card><Flashcards language={active} set={filter} scope={cardScope} ids={cardIds} onDone={back} onPractise={(ids) => study("ids", ids)} /></Card>
+        <Card><Flashcards language={active} set={filter} scope={cardScope} ids={cardIds} minutes={minutes} onDone={back} onPractise={(ids) => study("ids", ids)} /></Card>
       ) : mode === "pos" ? (
         <Card><PosPractice language={active} set={filter} due={dueOnly} onDone={back} /></Card>
       ) : mode === "dictation" ? (
@@ -85,6 +100,15 @@ export default function Practice() {
             <h2 className="flex items-center gap-2 font-semibold text-slate-900"><Layers aria-hidden className="size-5" />{t("practice.flashcards.title")}</h2>
             <p className="text-sm text-slate-600">{t("practice.cards.text", { language: name })}</p>
             {p && <p className="text-xs text-slate-600">{t("practice.cards.counts", { due: p.due, new: p.new, n: wordCount })}</p>}
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("practice.cards.length")}>
+              <span className="text-sm text-slate-700">{t("practice.cards.length")}</span>
+              {[...MINUTE_CHOICES, null].map((m) => (
+                <button key={m ?? "none"} type="button" aria-pressed={minutes === m} onClick={() => chooseMinutes(m)}
+                  className={`rounded-full border px-3 py-1 text-sm ${minutes === m ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-surface text-slate-700 hover:bg-slate-100/70"}`}>
+                  {m === null ? t("practice.cards.noLimit") : t("practice.stats.minutes", { n: m })}
+                </button>
+              ))}
+            </div>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => study("due")}>{t("practice.cards.studyDue")}</Button>
               <Button variant="secondary" onClick={() => study("all")}>{t("practice.cards.studyAll", { n: wordCount })}</Button>

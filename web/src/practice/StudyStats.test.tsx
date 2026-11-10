@@ -8,7 +8,7 @@ afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.cl
 const day = (n: number) => `2026-11-${String(9 + n).padStart(2, "0")}`;
 const STATS = {
   language: "en", words: 20, new: 5, learning: 3, relearning: 1, young: 7, mature: 4, due_now: 6, leeches: 2, reviews_30d: 40, accuracy_30d: 0.85,
-  retention_30d: 0.9, avg_think_ms: 3200, median_think_ms: 2800, avg_rate_ms: 700, studied_seconds_30d: 600, today_reviews: 12,
+  retention_30d: 0.9, avg_think_ms: 3200, median_think_ms: 2800, avg_rate_ms: 700, studied_seconds_30d: 600, today_reviews: 12, total_reviews: 212, total_words_practised: 18, total_days: 9, total_accuracy: 0.82, total_retention: 0.88, total_avg_think_ms: 3400, total_studied_seconds: 3600,
   days: [{ day: day(0), reviews: 12, correct: 10, avg_think_ms: 3000 }], forecast: [0, 1, 2, 3, 4, 5, 6].map((n) => ({ day: day(n), due: n === 0 ? 6 : n })),
 };
 const HARD = { typical_think_ms: 2800, items: [

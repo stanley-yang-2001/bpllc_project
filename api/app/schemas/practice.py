@@ -146,6 +146,13 @@ class StudyStats(BaseModel):
     avg_rate_ms: int | None = None
     studied_seconds_30d: int
     today_reviews: int
+    total_reviews: int                  # everything ever answered in the chosen sets
+    total_words_practised: int
+    total_days: int                     # days with at least one answer
+    total_accuracy: float | None = None
+    total_retention: float | None = None
+    total_avg_think_ms: int | None = None
+    total_studied_seconds: int
     days: list[StatsDay]
     forecast: list[ForecastDay]
 

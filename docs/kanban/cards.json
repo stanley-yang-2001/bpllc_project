@@ -1774,19 +1774,22 @@
     "status": "In review",
     "area": "practice",
     "date": "2026-11-09",
-    "summary": "SM-2 schedule (Again/Hard/Good/Easy), no card limit, several sets at once, a review log with answer timing, memory statistics and hardest words.",
+    "summary": "SM-2 schedule (Again/Hard/Good/Easy) answered by clicks only, session length you choose, no card limit, several sets at once, review log with answer timing, statistics, hardest words, all-time totals, privacy policy updated.",
     "done": [
       "scheduler (srs.py) and tests",
       "migration 0017 and review log",
       "review, stats and hardest endpoints",
       "flashcard session, set picker, statistics panel",
       "nine-language text",
-      "tests"
+      "tests",
+      "clicks-only answering",
+      "chosen session length",
+      "all-time summary",
+      "privacy policy row and version 2026-11-09"
     ],
     "todo": [
       "Apply patch 0069 and run it with real words for a few days",
       "Native-speaker check of the new text",
-      "Decide whether the privacy policy should mention answer timing",
       "Run the end-to-end specs"
     ],
     "labels": [

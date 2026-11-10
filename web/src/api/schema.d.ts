@@ -1713,6 +1713,20 @@ export interface components {
             studied_seconds_30d: number;
             /** Today Reviews */
             today_reviews: number;
+            /** Total Accuracy */
+            total_accuracy?: number | null;
+            /** Total Avg Think Ms */
+            total_avg_think_ms?: number | null;
+            /** Total Days */
+            total_days: number;
+            /** Total Retention */
+            total_retention?: number | null;
+            /** Total Reviews */
+            total_reviews: number;
+            /** Total Studied Seconds */
+            total_studied_seconds: number;
+            /** Total Words Practised */
+            total_words_practised: number;
             /** Words */
             words: number;
             /** Young */

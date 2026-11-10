@@ -79,6 +79,15 @@ def stats(conn, user_id: int, language: str, set_filter=None) -> dict:
             f"FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id WHERE w.user_id = %s AND w.language = %s{extra} "
             "AND l.reviewed_at > now() - make_interval(days => %s)", [*base, WINDOW_DAYS])
         a = cur.fetchone()
+        # everything ever answered in the chosen sets (the running total shown under each session summary)
+        cur.execute(
+            "SELECT count(*) AS n, count(*) FILTER (WHERE l.grade >= 2) AS ok, count(DISTINCT l.word_id) AS words, "
+            "count(DISTINCT (l.reviewed_at AT TIME ZONE 'UTC')::date) AS days, avg(l.think_ms) AS think, "
+            "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review') AS due_reviews, "
+            "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review' AND l.grade >= 2) AS due_ok, "
+            "COALESCE(sum(COALESCE(l.think_ms, 0) + COALESCE(l.rate_ms, 0)), 0) AS ms "
+            f"FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id WHERE w.user_id = %s AND w.language = %s{extra}", base)
+        t = cur.fetchone()
         cur.execute(
             f"SELECT (l.reviewed_at AT TIME ZONE 'UTC')::date AS day, count(*) AS reviews, count(*) FILTER (WHERE l.grade >= 2) AS correct, "
             "avg(l.think_ms) AS think FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id "
@@ -102,5 +111,9 @@ def stats(conn, user_id: int, language: str, set_filter=None) -> dict:
         "avg_think_ms": None if a["think"] is None else int(round(a["think"])),
         "median_think_ms": None if a["think_med"] is None else int(round(a["think_med"])),
         "avg_rate_ms": None if a["rate"] is None else int(round(a["rate"])),
-        "studied_seconds_30d": int(a["ms"] // 1000), "today_reviews": a["today"], "days": days, "forecast": forecast})
+        "studied_seconds_30d": int(a["ms"] // 1000), "today_reviews": a["today"], "days": days, "forecast": forecast,
+        "total_reviews": t["n"], "total_words_practised": t["words"], "total_days": t["days"],
+        "total_accuracy": round(t["ok"] / t["n"], 3) if t["n"] else None,
+        "total_retention": round(t["due_ok"] / t["due_reviews"], 3) if t["due_reviews"] else None,
+        "total_avg_think_ms": None if t["think"] is None else int(round(t["think"])), "total_studied_seconds": int(t["ms"] // 1000)})
     return out

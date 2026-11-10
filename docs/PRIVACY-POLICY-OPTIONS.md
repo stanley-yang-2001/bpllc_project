@@ -1,6 +1,6 @@
 # Privacy policy: options for you to approve
 
-**Status: DRAFT (5 November 2026). Nothing here is live.** The approved English copy (`api/app/policy/en.json`, version `2026-10-24`, approved by the project owner) and `POLICY_VERSION` are untouched. This file only lists where the approved wording no longer matches what the app does, and offers wording for each place. Pick an option per topic (or write your own), and I will make the change you approve.
+**Status: DRAFT (5 November 2026), except one change made on the owner's instruction on 9 November 2026: the English policy (version `2026-11-09`) now has a row for practice progress and answer times, and the deletion and download lists mention them (topic 1 below, in part). Everything else here is not live.** The approved English copy (`api/app/policy/en.json`, version `2026-10-24`, approved by the project owner) and `POLICY_VERSION` are untouched. This file only lists where the approved wording no longer matches what the app does, and offers wording for each place. Pick an option per topic (or write your own), and I will make the change you approve.
 
 I am not a lawyer. The wording below states what the code does; whether it meets the rules where your learners live (for example the EU/UK GDPR or California law) is for you, or someone you ask, to judge.
 

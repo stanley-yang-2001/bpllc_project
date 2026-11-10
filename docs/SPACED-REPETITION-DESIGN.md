@@ -1,4 +1,4 @@
-# Spaced repetition for flashcards (patch 0069, 9 November 2026)
+# Spaced repetition for flashcards (patches 0069 and 0070, 9 November 2026)
 
 Flashcards now follow a schedule instead of a fixed round of ten. This page says what the scheduler does, what is recorded, and where the code is.
 
@@ -6,10 +6,10 @@ Flashcards now follow a schedule instead of a fixed round of ten. This page says
 
 - **No card limit.** A session is every word the schedule asks for (or every word of the chosen sets, or exactly the words chosen). An optional `limit` exists in the API; the page does not use it.
 - **Several sets at once.** The Practice page has one chip per set (and General); any number can be on. None on = every word. The API takes `set=3,7,general`. The choice also drives the progress card, the statistics and the hardest words, and the other practice modes.
-- **Four answers.** After "Show answer" the learner grades Again / Hard / Good / Easy; each button says when the word would come back ("1m", "10m", "1d", "4d"). Keys: Space shows the answer, 1 to 4 grade it.
-- **Word first or meaning first**, switchable before the answer is shown; the direction is recorded.
+- **Four answers, clicks only (patch 0070).** The word is shown; one click on "Show answer", then one click on Again / Hard / Good / Easy, each saying when the word would come back ("1m", "10m", "1d", "4d"). There is no keyboard shortcut, no direction switch (the word is always first; the log still has a `direction` column) and no help text to read.
+- **A session lasts as long as the learner chooses (patch 0070):** 2, 5, 10, 20 or 30 minutes, or no limit (default 10, remembered in the browser). A clock counts down; when it reaches zero the card being answered can still be graded, then the summary appears. Words not reached stay due.
 - **Study what's due** (learning words first, then reviews that are due, then new words) or **Practise all N words** (ahead of time). Practising early and remembering does not move the schedule; a miss always does.
-- **End of session:** grades, share not missed, average time to answer, the slowest words, the missed words, and "Practise the N missed".
+- **End of session:** grades, share not missed, average time to answer, the slowest words, the missed words, "Practise the N missed", and (patch 0070) an **All time** block under it: answers, words practised and days studied, share not missed, retention, average time to answer and time studied, over everything ever answered in the chosen sets (`total_*` fields of `/practice/stats`).
 - **Memory statistics** (Practice page): retention, share not missed, time to answer, time studied (30 days), answers today, where the words stand (new / learning / relearning / young / mature), a 7 day forecast, words that keep being forgotten.
 - **Hardest words:** a score of 0 to 100 per word from the learner's own answers, with the reasons (often missed, slow to answer, forgotten again and again, keeps coming back, very hard) and "Practise these".
 - Multiple choice, dictation, parts of speech and fill-in-the-blank still record right/wrong (counted as Good or Again) and now also how long the learner took.
@@ -41,7 +41,7 @@ SM-2 family, as Anki made familiar.
 
 New `tutor.review_log`, one row per answer: when, mode (flashcards, choices, dictation, pos, cloze), direction (word or meaning), grade, `think_ms` (card shown until the learner checked or chose the answer), `rate_ms` (answer shown until graded), phase before, whether it was due, whether it counted, ease after and the delay scheduled. A time over 2 minutes is stored as 2 minutes (a card left open is not a slow answer). The database clock is the only clock (`now()` is read once per request).
 
-**Privacy:** the log is new personal data (what was answered and how long it took). It belongs to the learner (`ON DELETE CASCADE`), is in "Download my data" (`review_log`), is never sent to a model or third party, and is read only for the learner's own statistics. The approved privacy-policy copies and `POLICY_VERSION` were not touched; whether the policy text should mention answer timing is for you to decide.
+**Privacy:** the log is new personal data (what was answered and how long it took). It belongs to the learner (`ON DELETE CASCADE`), is in "Download my data" (`review_log`), is never sent to a model or third party, and is read only for the learner's own statistics. Patch 0070 adds this to the approved English policy (new table row "Your practice progress and answer times", the deletion list and the download bullet) and moves `POLICY_VERSION` to `2026-11-09`, as you asked; the only copy is English, so nothing else needs updating.
 
 ## API
 

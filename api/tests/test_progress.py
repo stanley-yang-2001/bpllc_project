@@ -399,6 +399,11 @@ def test_stats_count_words_by_stage_retention_and_time(make_user):
     assert s["retention_30d"] == 0.5 and s["accuracy_30d"] == 0.75
     assert s["avg_think_ms"] == 4000 and s["avg_rate_ms"] == 500 and s["median_think_ms"] == 4000
     assert len(s["forecast"]) == 7 and s["forecast"][0]["due"] >= 1 and len(s["days"]) == 1 and s["days"][0]["reviews"] == 4
+    # the running total over everything ever answered (here the same four answers on one word, one day)
+    assert (s["total_reviews"], s["total_words_practised"], s["total_days"], s["total_accuracy"], s["total_retention"], s["total_avg_think_ms"]) == (4, 1, 1, 0.75, 0.5, 4000)
+    old = rows("UPDATE tutor.review_log SET reviewed_at = now() - interval '60 days' WHERE id = (SELECT min(id) FROM tutor.review_log)")
+    s = c.get("/api/practice/stats?language=en").json()
+    assert s["reviews_30d"] == 3 and s["total_reviews"] == 4 and s["total_days"] == 2
 
 
 def test_stats_follow_the_chosen_sets_and_belong_to_the_learner(make_user):

@@ -10,13 +10,11 @@ import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
 import { answered, delayParts, formatMs, remaining, startSession, summarize, take, type Session } from "./session";
 
-type Face = "word" | "meaning";
-
 /** Spaced-repetition flashcards. `scope` "due" is what the schedule asks for now (words in learning first, then reviews that are due,
  * then new words), "all" is every word of the chosen sets (practising ahead), "ids" is exactly those words. There is no card limit.
  * Each answer is one of four grades and is saved at once with how long it took; the server says when the word is due again. */
-export function Flashcards({ language, set, scope, ids, onDone, onPractise }: {
-  language: string; set: SetFilter; scope: FlashcardScope; ids?: number[]; onDone: () => void; onPractise: (ids: number[]) => void;
+export function Flashcards({ language, set, scope, ids, minutes, onDone, onPractise }: {
+  language: string; set: SetFilter; scope: FlashcardScope; ids?: number[]; minutes: number | null; onDone: () => void; onPractise: (ids: number[]) => void;
 }) {
   const { user } = useAuth();
   const { t, err } = useI18n();
@@ -39,11 +37,11 @@ export function Flashcards({ language, set, scope, ids, onDone, onPractise }: {
         {t("practice.flashcards.noneBody")}
       </EmptyState>
     );
-  return <Round key={`${round}`} language={language} scope={scope} cards={items} onDone={onDone} onMore={() => setRound((r) => r + 1)} onPractise={onPractise} />;
+  return <Round key={`${round}`} language={language} set={set} scope={scope} minutes={minutes} cards={items} onDone={onDone} onMore={() => setRound((r) => r + 1)} onPractise={onPractise} />;
 }
 
-function Round({ language, scope, cards, onDone, onMore, onPractise }: {
-  language: string; scope: FlashcardScope; cards: Flashcard[]; onDone: () => void; onMore: () => void; onPractise: (ids: number[]) => void;
+function Round({ language, set, scope, minutes, cards, onDone, onMore, onPractise }: {
+  language: string; set: SetFilter; scope: FlashcardScope; minutes: number | null; cards: Flashcard[]; onDone: () => void; onMore: () => void; onPractise: (ids: number[]) => void;
 }) {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -51,7 +49,9 @@ function Round({ language, scope, cards, onDone, onMore, onPractise }: {
   const [start] = useState(() => take(startSession(cards), Date.now()));
   const [session, setSession] = useState<Session>(start.session);
   const [card, setCard] = useState<Flashcard | null>(start.card);
-  const [face, setFace] = useState<Face>("word");
+  const [deadline] = useState(() => (minutes ? Date.now() + minutes * 60_000 : null));
+  const [now, setNow] = useState(() => Date.now());
+  const [timeUp, setTimeUp] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -74,7 +74,7 @@ function Round({ language, scope, cards, onDone, onMore, onPractise }: {
       const moved = answered(session, card, g, result, Date.now(), think, rate);
       const next = take(moved, Date.now());
       setSession(next.session);
-      setCard(next.card);
+      setCard(deadline !== null && Date.now() >= deadline ? null : next.card);
       setRevealed(false);
       revealedAt.current = null;
       shownAt.current = performance.now();
@@ -83,27 +83,22 @@ function Round({ language, scope, cards, onDone, onMore, onPractise }: {
       void qc.invalidateQueries({ queryKey: ["practice", user!.id, "stats"] });
       void qc.invalidateQueries({ queryKey: ["practice", user!.id, "hardest"] });
     };
-    api.recordReviews([{ word_id: card.id, grade: g, think_ms: think, rate_ms: rate, mode: "flashcards", direction: face }])
+    api.recordReviews([{ word_id: card.id, grade: g, think_ms: think, rate_ms: rate, mode: "flashcards", direction: "word" }])
       .then((r) => finish(r[0]))
       .catch(() => { setFailed(true); finish(null); });
-  }, [card, revealed, saving, session, face, qc, user]);
+  }, [card, revealed, saving, session, qc, user]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (!revealed && (e.key === " " || e.key === "Enter")) { e.preventDefault(); reveal(); }
-      else if (revealed && ["1", "2", "3", "4"].includes(e.key)) grade(Number(e.key) as Grade);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [revealed, reveal, grade]);
+    if (deadline === null) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [deadline]);
+  // when the time is up the card on screen is finished (so the answer being given is not lost), then the summary comes
+  const over = deadline !== null && now >= deadline;
+  useEffect(() => { if (over && !revealed && !saving) setTimeUp(true); }, [over, revealed, saving]);
 
-  if (card === null) return <Done language={language} session={session} failed={failed} onMore={onMore} onDone={onDone} onPractise={onPractise} />;
+  if (card === null || timeUp || (over && !revealed)) return <Done language={language} set={set} session={session} failed={failed} timeUp={over} onMore={onMore} onDone={onDone} onPractise={onPractise} />;
 
-  const front = face === "word" ? card.word : card.meaning;
-  const back = face === "word" ? card.meaning : card.word;
   const delay = (seconds: number) => { const { n, unit } = delayParts(seconds); return t(`practice.cards.in.${unit}`, { n }); };
   const grades: [Grade, string, number][] = [
     [1, t("practice.cards.again"), card.preview.again], [2, t("practice.cards.hard"), card.preview.hard],
@@ -114,26 +109,17 @@ function Round({ language, scope, cards, onDone, onMore, onPractise }: {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-slate-600" role="status">{t("practice.cards.left", { n: remaining(session) + 1 })}</p>
-        <div className="flex items-center gap-2" role="group" aria-label={t("practice.cards.direction")}>
-          <span className="text-xs text-slate-600">{t("practice.cards.direction")}</span>
-          {(["word", "meaning"] as Face[]).map((f) => (
-            <button key={f} type="button" aria-pressed={face === f} disabled={revealed} onClick={() => setFace(f)}
-              className={`rounded-full border px-2.5 py-0.5 text-xs disabled:opacity-60 ${face === f ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-surface text-slate-700"}`}>
-              {t(f === "word" ? "practice.cards.dirWord" : "practice.cards.dirMeaning")}
-            </button>
-          ))}
-        </div>
+        {deadline !== null && <p className="text-sm tabular-nums text-slate-600" aria-label={t("practice.cards.timeLeft")}>{clock(deadline - now)}</p>}
       </div>
       <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-8 text-center dark:bg-slate-100/40">
         <div className="mb-3 flex justify-center gap-2">
           <Badge tone={card.status === "new" ? "brand" : "neutral"}>{t(`practice.cards.status.${card.status as "new"}`)}</Badge>
         </div>
-        <p lang={face === "word" ? language : undefined} className="text-2xl font-semibold text-slate-900">{front}</p>
-        {face === "word" && <SpeakButton text={card.word} language={language} />}
+        <p lang={language} className="text-2xl font-semibold text-slate-900">{card.word}</p>
+        <SpeakButton text={card.word} language={language} />
         {revealed && (
           <div className="mt-4 border-t border-slate-200 pt-4">
-            <p lang={face === "meaning" ? language : undefined} className="text-xl text-slate-800">{back}</p>
-            {face === "meaning" && <SpeakButton text={card.word} language={language} />}
+            <p className="text-xl text-slate-800">{card.meaning}</p>
           </div>
         )}
       </div>
@@ -153,21 +139,25 @@ function Round({ language, scope, cards, onDone, onMore, onPractise }: {
         </div>
       )}
       {ahead && <p className="text-xs text-slate-600">{t("practice.cards.early")}</p>}
-      <p className="text-xs text-slate-600">{t("practice.cards.gradeHelp")}</p>
     </div>
   );
 }
 
-function Done({ language, session, failed, onMore, onDone, onPractise }: {
-  language: string; session: Session; failed: boolean; onMore: () => void; onDone: () => void; onPractise: (ids: number[]) => void;
+/** Time left as m:ss (never below 0:00). */
+const clock = (ms: number) => { const total = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`; };
+
+function Done({ language, set, session, failed, timeUp, onMore, onDone, onPractise }: {
+  language: string; set: SetFilter; session: Session; failed: boolean; timeUp: boolean; onMore: () => void; onDone: () => void; onPractise: (ids: number[]) => void;
 }) {
   const { t } = useI18n();
+  const { user } = useAuth();
   const s = summarize(session.log);
   const c = s.counts;
+  const total = useQuery({ queryKey: ["practice", user!.id, "stats", language, String(set)], queryFn: () => api.studyStats(language, set) }).data;
   return (
     <div className="space-y-4" role="status">
       <div className="text-center">
-        <p className="text-lg font-semibold text-slate-900">{t("practice.cards.doneTitle")}</p>
+        <p className="text-lg font-semibold text-slate-900">{t(timeUp ? "practice.cards.timeUpTitle" : "practice.cards.doneTitle")}</p>
         <p className="text-sm text-slate-700">{t("practice.cards.summary", { answers: s.answers, words: s.words })}</p>
       </div>
       <dl className="grid grid-cols-2 gap-3 text-center">
@@ -185,6 +175,16 @@ function Done({ language, session, failed, onMore, onDone, onPractise }: {
         <div>
           <h3 className="text-sm font-medium text-slate-700">{t("practice.cards.missed")}</h3>
           <p lang={language} className="text-sm text-slate-800">{s.missed.map((w) => w.word).join(", ")}</p>
+        </div>
+      )}
+      {total && total.total_reviews > 0 && (
+        <div className="rounded-lg border border-slate-200 p-3">
+          <h3 className="text-sm font-medium text-slate-700">{t("practice.cards.allTime")}</h3>
+          <p className="mt-1 text-sm text-slate-800">{t("practice.cards.allTimeLine", { answers: total.total_reviews, words: total.total_words_practised, days: total.total_days })}</p>
+          <p className="text-sm text-slate-800">
+            {t("practice.cards.allTimeRates", { pct: Math.round((total.total_accuracy ?? 0) * 100), time: total.total_avg_think_ms == null ? "–" : formatMs(total.total_avg_think_ms), studied: t("practice.stats.minutes", { n: Math.max(1, Math.round(total.total_studied_seconds / 60)) }) })}
+            {total.total_retention != null && <> · {t("practice.cards.allTimeRetention", { pct: Math.round(total.total_retention * 100) })}</>}
+          </p>
         </div>
       )}
       {failed && <ErrorText>{t("practice.cards.saveFailed")}</ErrorText>}
