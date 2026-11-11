@@ -126,6 +126,7 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
                  "story": getattr(story_ch.meter.call, "model", None) or variant.story_model or "default",
                  "judge": (getattr(judge_ch.meter.call, "model", None) or variant.judge_model or "default") if variant.judge else None}}
     entry["gate"] = None
+    entry["trace"] = list(getattr(result, "trace", ()) or [])
     entry["score"] = _score(result.text, result.ok, request)
     if result.ok:
         from tutor_core.story_gates import check as run_gates

@@ -75,3 +75,15 @@ Run it after the overnight run (so it does not compete for Docker):
     PYTHONPATH=tutor_core:scripts python scripts/eval_signals.py scripts/*methods_*.json --signals languagetool,perplexity,worst_sentence
 
 The table shows Pearson and Spearman against the hand grades, after z-scoring within each language so a harder language does not look like a worse signal; a `meta` row averages the signals with no fitting (38 grades is too few to fit anything). Baseline to beat, with no signals: story score v4.1 Pearson 0.69, model review 0.72. A signal is worth adding to the score only if it correlates at least as well as these and the correlation holds on the next run; with this few grades, treat differences under about 0.2 as noise. To add a signal, write one class with `name`, `higher_is_better` and `measure(text, language)` in `story_eval/signals.py`.
+
+
+## Refine: check, then fix only what was found (patch 0073)
+
+`refine` = one writer call, then a bounded loop (max 2 rounds): **observe** (rules, gates, LanguageTool if set, a model review) → **plan** (flagged sentences, whole-text needs) → **repair** (one call, only the flagged sentences) → **verify** (keep only if the score rises by 0.5, the text changed, and at least 70% of the unflagged sentences are untouched). It is a fixed loop, not a free-form agent, so every run is comparable and costs at most 1 + 2 repair calls + 3 reviews.
+
+Test on 10 English stories (a part at a time, because of the daily Groq limit):
+
+    docker compose exec langflow python /app/scripts/run_story_methods.py --variants refine --languages en --count 10 --limit 5 --no-translate --audit-models gpt,qwen --out /app/scripts/refine_en.html
+    docker compose exec langflow python /app/scripts/run_story_methods.py --variants refine --languages en --count 10 --no-translate --audit-models gpt,qwen --resume /app/scripts/refine_en.json
+
+Add `--variants baseline,refine` to see the same ten requests written by the plain one-call pipeline next to the refined one. The report's "Pipeline detail" lists each phase; the JSON keeps the full `trace` for every story.

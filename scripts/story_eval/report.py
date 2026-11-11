@@ -82,6 +82,38 @@ def _fmt(v, pct=False):
     return f"{v * 100:.0f}%" if pct else f"{v:g}"
 
 
+def _trace(e) -> str:
+    """The refine loop, phase by phase (patch 0073): what each tool saw, which sentences were flagged, what the model sent back, and why a rewrite was kept or thrown away."""
+    steps = e.get("trace") or []
+    if not steps:
+        return ""
+    out = []
+    for t in steps:
+        ph = t["phase"]
+        if ph == "observe":
+            tools = "; ".join(f"{html.escape(x['tool'])}: {x['found']}" + (f" (error: {html.escape(str(x['error'])[:60])})" if x.get("error") else "") for x in t["tools"])
+            hits = "".join(f"<li>“{html.escape(h['wrong'])}” → “{html.escape(h['fix'])}” <i>{html.escape(h['note'])}</i></li>" for h in t["hits"])
+            gates = f" · free checks failed: {html.escape(', '.join(t['gates']))}" if t["gates"] else ""
+            out.append(f"<li><b>Observe ({html.escape(t['label'])})</b>: score {t['score']['score']:g}; {tools}{gates}" + (f"<ul>{hits}</ul>" if hits else "") + "</li>")
+        elif ph == "code fix":
+            out.append(f"<li><b>Code fix</b>: {len(t['changes'])} certain mistake(s) fixed with no model call</li>")
+        elif ph == "plan":
+            fl = "".join(f"<li>sentence {f['sentence']}: {html.escape(f['text'])}<br><i>{html.escape('; '.join(f['problems']))}</i></li>" for f in t["flagged"])
+            wt = "".join(f"<li>{html.escape(r)}</li>" for r in t["whole_text"])
+            out.append(f"<li><b>Plan, round {t['round']}</b>: {len(t['flagged'])} sentence(s) flagged, {len(t['whole_text'])} whole-text need(s)<ul>{fl}{wt}</ul></li>")
+        elif ph == "repair":
+            body = html.escape(t.get("error") or "") or f"<div class=text>{html.escape(t.get('reply') or '')}</div>"
+            out.append(f"<li><b>Repair, round {t['round']}</b> (one model call){'' if t.get('error') else ': the model sent back'}{body}</li>")
+        elif ph == "verify":
+            verdict = "KEPT" if t.get("kept") else "THROWN AWAY"
+            why = f" ({html.escape(t['reason'])})" if t.get("reason") else ""
+            nums = f", score {t['before']:g} → {t['after']:g}" if "after" in t else ""
+            share = f", {round(t['unchanged_share'] * 100)}% of the other sentences untouched" if "unchanged_share" in t else ""
+            still = f", still in the text: {html.escape('; '.join(t['findings_still_in_text']))}" if t.get("findings_still_in_text") else ""
+            out.append(f"<li><b>Verify, round {t['round']}</b>: {verdict}{why}{nums}{share}{still}</li>")
+    return f"<details open><summary>Pipeline detail: {len(steps)} step(s)</summary><ol>{''.join(out)}</ol></details>"
+
+
 def _bars(sc):
     if not sc:
         return ""
@@ -133,7 +165,7 @@ def _card(variant: dict, e: dict, best: bool) -> str:
         rules = f"<details><summary>Rules found {len(sc['grammar_hits'])} mistake(s)</summary><ul>{lis}</ul></details>"
     tr = (f"<details><summary>English translation (machine, a rough guide)</summary><div class=text>{html.escape(e['translation'])}</div></details>"
           if e.get("translation") else "")
-    return (f"<div class=card><h4>{html.escape(variant['label'])}{badge}</h4>{big}<div class=text>{html.escape(e['text'])}</div>{bad}{tr}{rules}{found}"
+    return (f"<div class=card><h4>{html.escape(variant['label'])}{badge}</h4>{big}<div class=text>{html.escape(e['text'])}</div>{bad}{tr}{rules}{found}{_trace(e)}"
             f"{_bars(sc)}<p class=num>{e['calls']} call(s) · {e['model_seconds']} s in the model · {e['seconds']} s in all (waiting {e['wait_seconds']} s)</p>"
             f"{'<ul class=notes>' + notes + '</ul>' if notes else ''}</div>")
 

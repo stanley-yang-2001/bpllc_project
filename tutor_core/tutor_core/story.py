@@ -21,6 +21,7 @@ from .two_pass import two_pass_passages
 from .story_options import StoryOptions
 from .story_plan import plan_words
 from .story_candidates import choose as choose_candidate
+from .story_refine import refine_story, refine_tools
 from .story_repair import repair_story
 from .quality import score_story
 from .story_retries import STRAY_LIMIT, RetryPolicy      # noqa: F401  (STRAY_LIMIT: the old import path)
@@ -55,6 +56,7 @@ class StoryResult:
     words_used: int = 0             # what went into the prompt after the cap
     difficulty: Optional[dict] = None   # the targets asked for (tutor_core.difficulty.resolve), or None
     notes: tuple = ()               # what the optional steps did (candidates, judge, repair), for the comparison report
+    trace: tuple = ()               # the refine loop's phase records (story_refine.py), for the comparison report
 
 
 @dataclass(frozen=True)
@@ -211,4 +213,9 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     if opts.repair:
         passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge)
         notes += more
-    return StoryResult(passage, True, None, notes=tuple(notes), **base)
+    trace: list = []
+    if opts.refine:
+        done = refine_story(passage, language, words, request.difficulty, picked_type, call, tools=refine_tools(), review_call=judge_call or call, rounds=opts.refine)
+        passage, trace = done.text, done.trace
+        notes += done.notes
+    return StoryResult(passage, True, None, notes=tuple(notes), trace=tuple(trace), **base)

@@ -21,17 +21,18 @@ class Variant:
     plan: bool = False              # name only about one learner word per 17 words, and a maximum (story_plan.py)
     mixed: bool = False             # candidates by different strategies (one-pass and two-pass)
     gates: bool = False             # free pass/fail checks drop failing candidates before any review
+    refine: int = 0                 # rounds of check-then-fix-flagged-sentences (story_refine.py)
     naturalness: bool = False       # the judge also rates how natural the best candidates read (1-5)
     story_model: str = None         # alias of the model that writes: "gpt" or "qwen" (None: the default story model)
     judge_model: str = None         # alias of the model that judges (None: the default judge model, else the story model)
 
     def options(self) -> StoryOptions:
-        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness)
+        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "label": self.label, "note": self.note, "range_prompt": self.range_prompt, "two_pass": self.two_pass,
                 "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples,
-                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "story_model": self.story_model, "judge_model": self.judge_model}
+                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "refine": self.refine, "story_model": self.story_model, "judge_model": self.judge_model}
 
 
 ALL = [
@@ -64,6 +65,9 @@ ALL += [
     Variant("cascade", "Cascade", "+ the best two reviewed (grammar and naturalness) by the judge, then one repair", judge=True, repair=True, naturalness=True, **_CASCADE),
     Variant("cascade_proofread", "Cascade, proofread", "the cascade with one proofreading call instead of the repair", judge=True, proofread=True, naturalness=True, **_CASCADE),
 ]
+# Check, then fix only what was found (10 Nov 2026): one-call writer, free checks + model review, sentence-level repair, kept only if the score rises.
+ALL += [Variant("refine", "Refine", "one call writes; checks + review; fixes only the flagged sentences (up to 2 rounds, kept only if the score rises)",
+                story_model="gpt", judge_model="gpt", refine=2)]
 DEFAULT = ["baseline", "range", "two_pass", "candidates", "judge", "repair"]
 CASCADE = ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]
 MIX = ["baseline", "baseline_qwen", "gpt_gpt", "qwen_qwen", "gpt_qwen", "qwen_gpt"]
@@ -88,5 +92,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "refine": 6.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

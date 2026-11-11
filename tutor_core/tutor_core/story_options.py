@@ -4,6 +4,7 @@
     candidates  write n versions of the word-applying step and keep the best one           STORY_CANDIDATES=3
     mixed       candidates by different strategies: half one-pass, half two-pass          STORY_MIXED=1
     gates       free pass/fail checks first; a failing candidate is dropped unseen       STORY_GATES=1
+    refine      check, then fix only the flagged sentences, up to n rounds (story_refine.py)  STORY_REFINE=2
     naturalness the judge also rates how natural the best candidates read (1-5)          STORY_NATURALNESS=1
     plan        name only about one learner word per 17 words, and a maximum              STORY_PLAN=1
     judge       choose among candidates with the score plus a model review of grammar      STORY_JUDGE=1
@@ -20,6 +21,14 @@ import os
 from dataclasses import dataclass, fields
 
 MAX_CANDIDATES = 5
+MAX_REFINE = 3
+
+
+def _int(value) -> int:
+    try:
+        return int(value or 0)
+    except ValueError:
+        return 0
 
 
 @dataclass(frozen=True)
@@ -31,6 +40,7 @@ class StoryOptions:
     gates: bool = False
     plan: bool = False
     naturalness: bool = False
+    refine: int = 0                  # rounds of check-then-fix-flagged-sentences (story_refine.py); 0 = off
 
     @classmethod
     def from_env(cls, env=None) -> "StoryOptions":
@@ -41,11 +51,11 @@ class StoryOptions:
             n = 1
         return cls(candidates=max(1, min(MAX_CANDIDATES, n)), judge=env.get("STORY_JUDGE") == "1", repair=env.get("STORY_REPAIR") == "1",
                    mixed=env.get("STORY_MIXED") == "1", gates=env.get("STORY_GATES") == "1", plan=env.get("STORY_PLAN") == "1",
-                   naturalness=env.get("STORY_NATURALNESS") == "1")
+                   naturalness=env.get("STORY_NATURALNESS") == "1", refine=max(0, min(MAX_REFINE, _int(env.get("STORY_REFINE")))))
 
     def normalised(self) -> "StoryOptions":
         return StoryOptions(max(1, min(MAX_CANDIDATES, int(self.candidates))), bool(self.judge), bool(self.repair), bool(self.mixed),
-                            bool(self.gates), bool(self.plan), bool(self.naturalness))
+                            bool(self.gates), bool(self.plan), bool(self.naturalness), max(0, min(MAX_REFINE, int(self.refine))))
 
     def cache_parts(self) -> tuple:
         """What to add to a cache key: nothing when every option is off, so the default key is the one it always was."""
@@ -60,6 +70,8 @@ class StoryOptions:
         for name in ("mixed", "gates", "plan", "naturalness"):
             if getattr(o, name):
                 parts += ((name,),)
+        if o.refine:
+            parts += (("refine", o.refine),)
         return parts
 
     def as_dict(self) -> dict:
