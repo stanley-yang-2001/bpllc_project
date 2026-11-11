@@ -75,6 +75,8 @@ def main(argv=None) -> int:
     ap.add_argument("--no-naturalness", action="store_true", help="with --audit: skip the 1-5 naturalness rating (saves one call per story and reviewer)")
     ap.add_argument("--no-translate", action="store_true", help="no English translation under each story (saves one call per story)")
     ap.add_argument("--db", action="store_true", help="connect to the database (needed for the 'examples' method)")
+    ap.add_argument("--key-budget", type=int, default=0, metavar="TOKENS", help="switch to the next key for the same model BEFORE a key has spent about this many tokens (0: switch only when Groq refuses). "
+                    "Extra keys are GROQ_API_KEY_2, _3 ... (and GROQ_QWEN_API_KEY_2, GROQ_JUDGE_API_KEY_2, GROQ_AUDIT_API_KEY_2) in .env")
     ap.add_argument("--tpm", type=int, default=7000, help="tokens per minute to stay under (free tier: 8000)")
     ap.add_argument("--resume", default=None, metavar="FILE.json", help="continue an earlier run: only missing stories are made")
     ap.add_argument("--rescore", default=None, metavar="FILE.json", help="no model calls: score the saved stories again with the current score")
@@ -114,6 +116,10 @@ def main(argv=None) -> int:
     from tutor_core import groq as _g
     print("Keys: story/gpt = " + _g.key_label() + "; qwen = " + _g.key_label("GROQ_QWEN_API_KEY") + "; judge = " + _g.key_label("GROQ_JUDGE_API_KEY")
           + "; review = " + _g.key_label("GROQ_AUDIT_API_KEY"))
+    from tutor_core import key_pool as _kp
+    extra = {base or "GROQ_API_KEY": len(_kp.key_vars(base)) for base in (None, "GROQ_QWEN_API_KEY", "GROQ_JUDGE_API_KEY", "GROQ_AUDIT_API_KEY")}
+    print("Keys per family (the next one is used when a key hits its limit): " + ", ".join(f"{k} x{n}" for k, n in extra.items()) +
+          (f"; switching early at {args.key_budget:,} tokens a key" if args.key_budget else "; switching only when Groq refuses"))
     if args.dry_run:
         return 0
     if not os.environ.get("GROQ_API_KEY"):
@@ -128,9 +134,23 @@ def main(argv=None) -> int:
     def wrap(call):
         return patient(call, tpm=args.tpm, say=print)
 
-    story = runner.Channel(groq.call_groq, wrap)
-    judge_raw = groq.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT", "GROQ_JUDGE_API_KEY")
-    audit_raw = (groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT", "GROQ_AUDIT_API_KEY") or groq.call_groq) if args.audit else None
+    from tutor_core import key_pool
+    pools = {}
+
+    def pool_of(base, model=None):
+        """One pool per key family AND model (Groq counts the limit per model), so channels that share both share their blocks and their spend."""
+        tag = (base, model or os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL)
+        if tag not in pools:
+            pools[tag] = key_pool.KeyPool(key_pool.key_vars(base), args.key_budget, say=print)
+        return pools[tag]
+
+    def rotating_default(base=None, **kw):
+        pool = pool_of(base)
+        return key_pool.rotating(lambda prompt, kv: groq.call_groq(prompt, key_var=kv, **kw), pool)
+
+    story = runner.Channel(rotating_default(), wrap)
+    judge_raw = groq.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT", "GROQ_JUDGE_API_KEY", pool=pool_of("GROQ_JUDGE_API_KEY", os.environ.get("GROQ_JUDGE_MODEL")))
+    audit_raw = (groq.make_model_call("GROQ_AUDIT_MODEL", "GROQ_AUDIT_EFFORT", "GROQ_AUDIT_API_KEY", pool=pool_of("GROQ_AUDIT_API_KEY", os.environ.get("GROQ_AUDIT_MODEL"))) or rotating_default()) if args.audit else None
     names = {"gpt": args.gpt_model or os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL,
              "qwen": args.qwen_model or os.environ.get("GROQ_QWEN_MODEL") or "qwen/qwen3.6-27b"}
     channels = {}
@@ -139,8 +159,9 @@ def main(argv=None) -> int:
         """One Channel (so one pacing meter) per model: Groq limits each model on its own."""
         if alias not in channels:
             name = names[alias]
-            raw = (lambda prompt, _m=name: groq.call_groq(prompt, model=_m, effort="none" if alias == "qwen" else None,
-                                                          key_var="GROQ_QWEN_API_KEY" if alias == "qwen" else None))
+            base = "GROQ_QWEN_API_KEY" if alias == "qwen" else None
+            raw = key_pool.rotating(lambda prompt, kv, _m=name, _a=alias: groq.call_groq(prompt, model=_m, effort="none" if _a == "qwen" else None, key_var=kv),
+                                    pool_of(base, name))
             raw.model = name
             channels[alias] = runner.Channel(raw, wrap)
         return channels[alias]
@@ -174,6 +195,9 @@ def main(argv=None) -> int:
     finally:
         if conn:
             conn.close()
+    switches = [e for pool in pools.values() for e in pool.events]
+    if switches:
+        data["meta"]["key switches"] = "; ".join(switches)
     write_outputs(data, out)
     print(f"\n{'Finished' if done else 'Saved so far'}: {out}  (the numbers are in the .json next to it)")
     return 0 if done else 1

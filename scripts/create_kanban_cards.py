@@ -57,7 +57,7 @@ def add_to_project(project, owner, url):
     return "added to the board"
 
 
-WANT = {"Done": ["done"], "In review": ["in review", "review", "in progress"], "Backlog": ["backlog", "todo", "to do"]}
+WANT = {"Done": ["done"], "Needs your decision": ["needs your decision", "in review", "review"], "In review": ["in review", "review", "in progress"], "Backlog": ["backlog", "todo", "to do"]}
 
 
 def board_status_setup(project, owner):

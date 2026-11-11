@@ -125,7 +125,7 @@ def call_groq(prompt: str, *, model: Optional[str] = None, effort: Optional[str]
     raise last_error
 
 
-def make_model_call(model_var: str, effort_var: Optional[str] = None, key_var: Optional[str] = None) -> Optional[Callable[[str], str]]:
+def make_model_call(model_var: str, effort_var: Optional[str] = None, key_var: Optional[str] = None, pool=None) -> Optional[Callable[[str], str]]:
     """A story function `prompt -> text` for ONE named step (the judge, the grammar review), or None when the model for that step is not
     set. The model name comes from the environment variable `model_var` (GROQ_JUDGE_MODEL, GROQ_AUDIT_MODEL) and the reasoning effort
     from `effort_var`; the story's own model is untouched. None tells the caller to use the story model, or to skip the step."""
@@ -137,6 +137,9 @@ def make_model_call(model_var: str, effort_var: Optional[str] = None, key_var: O
     def call(prompt: str) -> str:
         return call_groq(prompt, model=model, effort=effort, key_var=key_var)
 
+    if pool is not None:        # the comparison runs only: more keys for the same model (key_pool.py); the app never passes a pool
+        from .key_pool import rotating
+        call = rotating(lambda prompt, kv: call_groq(prompt, model=model, effort=effort, key_var=kv), pool)
     call.model = model          # shown in reports: which model graded
     call.key_var = key_var
     return call

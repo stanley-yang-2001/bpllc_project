@@ -54,6 +54,12 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # GROQ_QWEN_API_KEY=       # key of account 2: used whenever the 'qwen' side runs (mix methods, --audit-models qwen, grammar_probe)
 # GROQ_JUDGE_API_KEY=      # key for the judge (GROQ_JUDGE_MODEL must be set too, it may equal the story model)
 # GROQ_AUDIT_API_KEY=      # key for the grammar review (GROQ_AUDIT_MODEL must be set too)
+# --- more keys for the SAME model, used when a key hits its limit (patch 0074; scripts/run_story_methods.py) ---
+# Add GROQ_API_KEY_2, _3, _4 (and GROQ_QWEN_API_KEY_2 ..., GROQ_JUDGE_API_KEY_2 ..., GROQ_AUDIT_API_KEY_2 ...). A step with no key of its own
+# uses the GROQ_API_KEY family. On a rate limit (a minute's or the daily one) the same prompt goes to the next key at once; a blocked key is
+# tried again after the time Groq names. --key-budget 90000 switches BEFORE a key has spent about that many tokens (estimated).
+# GROQ_API_KEY_2=
+# GROQ_API_KEY_3=
 # GROQ_QWEN_MODEL=qwen/qwen3.6-27b        # the 'qwen' side of scripts/run_story_methods.py mix methods (patch 0065); check the id in the Groq console
 # STORY_PLAN=0                   # 1: feature about one learner word per 17 words of target length, the rest optional
 # STORY_NATURALNESS=0            # 1: the judge also rates how natural the best candidates read, 1 to 5 (weight 35 in the score; 2 or less fails the story)

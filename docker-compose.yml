@@ -38,6 +38,19 @@ services:
       - GROQ_QWEN_API_KEY=${GROQ_QWEN_API_KEY:-}        # optional: a second Groq account's key for the qwen side (empty = GROQ_API_KEY)
       - GROQ_JUDGE_API_KEY=${GROQ_JUDGE_API_KEY:-}      # optional: key for the judge model (empty = GROQ_API_KEY)
       - GROQ_AUDIT_API_KEY=${GROQ_AUDIT_API_KEY:-}      # optional: key for the grammar review (empty = GROQ_API_KEY)
+      # more keys for the SAME model, used when a key hits its limit (tutor_core/key_pool.py; scripts/run_story_methods.py only): _2, _3, _4 of each
+      - GROQ_API_KEY_2=${GROQ_API_KEY_2:-}
+      - GROQ_API_KEY_3=${GROQ_API_KEY_3:-}
+      - GROQ_API_KEY_4=${GROQ_API_KEY_4:-}
+      - GROQ_QWEN_API_KEY_2=${GROQ_QWEN_API_KEY_2:-}
+      - GROQ_QWEN_API_KEY_3=${GROQ_QWEN_API_KEY_3:-}
+      - GROQ_QWEN_API_KEY_4=${GROQ_QWEN_API_KEY_4:-}
+      - GROQ_JUDGE_API_KEY_2=${GROQ_JUDGE_API_KEY_2:-}
+      - GROQ_JUDGE_API_KEY_3=${GROQ_JUDGE_API_KEY_3:-}
+      - GROQ_JUDGE_API_KEY_4=${GROQ_JUDGE_API_KEY_4:-}
+      - GROQ_AUDIT_API_KEY_2=${GROQ_AUDIT_API_KEY_2:-}
+      - GROQ_AUDIT_API_KEY_3=${GROQ_AUDIT_API_KEY_3:-}
+      - GROQ_AUDIT_API_KEY_4=${GROQ_AUDIT_API_KEY_4:-}
       - GROQ_QWEN_MODEL=${GROQ_QWEN_MODEL:-}            # the 'qwen' side of the mix methods; check the id in the Groq console
       - STORY_MIXED=${STORY_MIXED:-}                  # 1: candidates use mixed strategies (one-pass and two-pass)
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
