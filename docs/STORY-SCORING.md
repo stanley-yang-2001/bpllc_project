@@ -87,3 +87,8 @@ Test on 10 English stories (a part at a time, because of the daily Groq limit):
     docker compose exec langflow python /app/scripts/run_story_methods.py --variants refine --languages en --count 10 --no-translate --audit-models gpt,qwen --resume /app/scripts/refine_en.json
 
 Add `--variants baseline,refine` to see the same ten requests written by the plain one-call pipeline next to the refined one. The report's "Pipeline detail" lists each phase; the JSON keeps the full `trace` for every story.
+
+
+## What is left on each key (patch 0075)
+
+`scripts/key_status.py` makes one 1-token call per key and model and prints and saves Groq's counters (`key_status.json`, names only). Each call uses one request of the day. A key that is already refused reports which limit it hit (per-minute or per-day tokens) and how much it used. The run JSON's `meta["key events"]` lists every refusal a story test saw, with the same fields.

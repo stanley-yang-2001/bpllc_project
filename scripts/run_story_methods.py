@@ -198,6 +198,7 @@ def main(argv=None) -> int:
     switches = [e for pool in pools.values() for e in pool.events]
     if switches:
         data["meta"]["key switches"] = "; ".join(switches)
+        data["meta"]["key events"] = [dict(r, model=tag[1]) for tag, pool in pools.items() for r in pool.records]
     write_outputs(data, out)
     print(f"\n{'Finished' if done else 'Saved so far'}: {out}  (the numbers are in the .json next to it)")
     return 0 if done else 1

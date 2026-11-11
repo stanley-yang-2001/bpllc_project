@@ -96,3 +96,12 @@ def test_the_budget_never_blocks_a_call_when_every_key_is_over_it():
     fake = Fake()
     pool = KeyPool([None, "K2"], budget=1, clock=Clock())
     assert rotating(fake, pool)("x") .startswith("answer from")
+
+
+def test_records_say_whether_it_was_a_minute_or_a_day_limit():
+    day = "Error 429: Rate limit reached for model `m` on tokens per day (TPD): Limit 200000, Used 199100, Requested 1500. Please try again in 6m0s"
+    fake = Fake({None: day})
+    pool = KeyPool([None, "K2"], clock=Clock())
+    rotating(fake, pool)("x")
+    assert pool.records == [{"key": "GROQ_API_KEY", "kind": "TPD", "limit": 200000, "used": 199100, "try_again_in": 360.0}]
+    assert "[TPD]" in pool.events[0]

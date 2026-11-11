@@ -15,12 +15,15 @@ Any other error is raised at once. The clock is a parameter so tests do not wait
 from __future__ import annotations
 
 import os
+import re
 import time
 from typing import Callable, Optional
 
 from .patient import _tokens, is_rate_limit, wait_hint
 
 MAX_KEYS = 9
+_KIND = re.compile(r"\((TPM|TPD|RPM|RPD)\)", re.I)
+_NUMS = re.compile(r"Limit\s+(\d+),\s*Used\s+(\d+)", re.I)
 PLACEHOLDER = "your-groq-api-key-here"
 DEFAULT_BLOCK_SECONDS = 60.0
 
@@ -50,6 +53,7 @@ class KeyPool:
         self.blocked_until = {n: 0.0 for n in self.names}
         self.current = 0
         self.events: list[str] = []
+        self.records: list[dict] = []        # one dict per rate limit seen, for the test-details page: key, kind (TPM/TPD/RPM/RPD), limit, used, wait
         self.last_error: Optional[Exception] = None
 
     @staticmethod
@@ -102,7 +106,11 @@ def rotating(call: Callable[[str, Optional[str]], str], pool: KeyPool) -> Callab
                 hint = wait_hint(error)
                 pool.last_error = error
                 pool.block(name, hint if hint is not None else DEFAULT_BLOCK_SECONDS)
-                pool._note(f"{pool.label(name)} is rate limited" + (f" (try again in {hint:.0f}s)" if hint is not None else ""))
+                kind, nums = _KIND.search(str(error)), _NUMS.search(str(error))
+                pool.records.append({"key": pool.label(name), "kind": kind.group(1).upper() if kind else None, "limit": int(nums.group(1)) if nums else None,
+                                     "used": int(nums.group(2)) if nums else None, "try_again_in": hint})
+                pool._note(f"{pool.label(name)} is rate limited" + (f" (try again in {hint:.0f}s)" if hint is not None else "")
+                           + (f" [{kind.group(1).upper()}]" if kind else ""))
                 continue
             pool.spend(name, cost)
             return out
