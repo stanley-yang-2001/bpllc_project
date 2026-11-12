@@ -1,0 +1,382 @@
+<title>Story Test Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a lab bench log. A slim header, a row of findings, then one panel per question: what ran, what it scored, what the keys can still do. */
+:root{
+  --bg:#F3F5F8; --surface:#FFFFFF; --ink:#16212C; --muted:#5B6877; --line:#D9DFE7; --accent:#2F5BEA; --accent-ink:#FFFFFF;
+  --good:#1D7F55; --warn:#A86A12; --bad:#B8402F; --heat-l:88%; --heat-s:62%; --bar-ok:#2F5BEA; --bar-bad:#B8402F; --bar-unk:#8A96A5; --bar-checks:#B9C6F5;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F151C; --surface:#18212B; --ink:#E6ECF3; --muted:#93A1B1; --line:#2A3644; --accent:#7C9CFF; --accent-ink:#0F151C;
+  --good:#4CC38A; --warn:#E0A64F; --bad:#F0806F; --heat-l:26%; --heat-s:48%; --bar-ok:#7C9CFF; --bar-bad:#F0806F; --bar-unk:#6F7D8C; --bar-checks:#2C3C66; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F151C; --surface:#18212B; --ink:#E6ECF3; --muted:#93A1B1; --line:#2A3644; --accent:#7C9CFF; --accent-ink:#0F151C;
+  --good:#4CC38A; --warn:#E0A64F; --bad:#F0806F; --heat-l:26%; --heat-s:48%; --bar-ok:#7C9CFF; --bar-bad:#F0806F; --bar-unk:#6F7D8C; --bar-checks:#2C3C66; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;
+  padding-block:0 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+header{padding-top:28px;display:flex;flex-direction:column;gap:6px}
+h1{font-size:clamp(26px,4vw,34px);line-height:1.15;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);max-width:68ch;margin:0}
+h2{font-size:19px;margin:0;font-weight:650;text-wrap:balance}
+h3{font-size:14px;margin:0 0 6px;font-weight:650}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.label{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+section{display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.finds{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.find{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.find b{font-size:15px}
+.find p{margin:0;color:var(--muted);font-size:14px}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.pill.good{color:var(--good)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}.pill.unk{color:var(--muted)}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;white-space:nowrap}
+td.num,th.num{text-align:right}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button,.btn{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.heat{display:grid;grid-template-columns:minmax(150px,1.3fr) repeat(5,minmax(78px,1fr));gap:4px;min-width:640px}
+.heat .h{font-size:12px;font-weight:600;color:var(--muted);padding:4px 6px;display:flex;align-items:flex-end}
+.heat .rowname{padding:6px;font-size:13px;display:flex;flex-direction:column;justify-content:center}
+.heat .rowname small{color:var(--muted)}
+.cell{border-radius:6px;padding:8px 6px;text-align:center;font-family:var(--mono);font-size:14px;font-weight:500;
+  background:hsl(var(--h,0) var(--heat-s) var(--heat-l));color:var(--ink);border:0;cursor:pointer}
+.cell.none{background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.cell[aria-pressed="true"]{outline:3px solid var(--accent);outline-offset:1px}
+.bars{display:grid;gap:10px}
+.barrow{display:grid;grid-template-columns:minmax(130px,190px) 1fr;gap:10px;align-items:center}
+.track{display:flex;flex-direction:column;gap:3px;min-width:0}
+.bar{height:16px;border-radius:3px;position:relative;min-width:2px;display:flex;align-items:center}
+.bar i{position:absolute;left:100%;margin-left:6px;font:500 12px var(--mono);font-style:normal;color:var(--ink);white-space:nowrap}
+.bar.off{background:var(--bar-unk)}.bar.rev{background:var(--accent)}.bar.live{background:var(--good)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.detail{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.kv{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:5px 0;font-size:14px}
+.kv span:first-child{color:var(--muted)}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.key{border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface);min-width:0}
+.key .name{font:600 13px var(--mono);overflow-wrap:anywhere}
+.meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.meter>div{height:100%;background:var(--good)}
+.meter.low>div{background:var(--warn)}.meter.out>div{background:var(--bad)}
+.small{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--accent);padding:6px 0 6px 12px;color:var(--ink);font-size:14px;max-width:75ch}
+.drop{border:1.5px dashed var(--line);border-radius:10px;padding:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.drop.over{border-color:var(--accent)}
+code,pre{font-family:var(--mono);font-size:13px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:0}
+svg text{fill:var(--muted);font:11px var(--mono)}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .lab{fill:var(--ink);font:12px var(--font)}
+.b-ok{fill:var(--bar-ok)}.b-run{fill:var(--accent)}.b-bad{fill:var(--bar-bad)}.b-unk{fill:var(--bar-unk)}.b-chk{fill:var(--bar-checks)}
+details summary{cursor:pointer;font-weight:600}
+@media (max-width:560px){.barrow{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:no-preference){.meter>div{transition:width .4s}}
+
+.live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);margin-right:6px}
+.live-dot.off{background:var(--muted)}
+.run-now{display:flex;flex-direction:column;gap:10px}
+.progress{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.progress>div{height:100%;background:var(--accent)}
+select{font:inherit;font-size:13px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="label">Language Tutor · story pipeline</span>
+  <h1>Story Test Desk</h1>
+  <p class="sub" id="sub"></p>
+  <div class="row small" id="status"></div>
+</header>
+
+<section id="nowSection" hidden><h2>Running now</h2><div class="panel run-now" id="now"></div></section>
+
+<section aria-label="Findings"><div class="finds" id="finds"></div></section>
+
+<section>
+  <h2>What ran, and when</h2>
+  <div class="panel"><div class="legend" style="margin-bottom:10px">
+    <span><span class="sw" style="background:var(--bar-ok)"></span>story test finished</span>
+    <span><span class="sw" style="background:var(--bar-bad)"></span>killed (exit 137) or failed</span>
+    <span><span class="sw" style="background:var(--accent)"></span>running</span>
+    <span><span class="sw" style="background:var(--bar-unk)"></span>ended without an exit code</span>
+    <span><span class="sw" style="background:var(--bar-checks)"></span>checks step</span></div>
+    <div class="scroll"><div id="gantt" style="min-width:640px"></div></div>
+    <p class="small" id="ganttNote" style="margin:10px 0 0"></p></div>
+  <div class="panel scroll"><table id="runsTable"></table></div>
+</section>
+
+<section id="resultsSection">
+  <div class="row"><h2>What each method scored</h2><label class="small">Run <select id="runPick" aria-label="Run shown"></select></label></div>
+  <p class="sub" id="resultsSub"></p>
+  <div class="panel">
+    <h3>Average by method</h3>
+    <div class="legend" style="margin-bottom:10px"><span><span class="sw" style="background:var(--bar-unk)"></span>offline score</span><span><span class="sw" style="background:var(--accent)"></span>reviewed score, naturalness included</span></div>
+    <div class="bars" id="avgBars"></div>
+    <p class="note" style="margin:14px 0 0" id="avgNote"></p>
+  </div>
+  <div class="panel">
+    <div class="row" style="margin-bottom:10px"><h3 style="margin:0">Every story and method</h3><div class="tabs" id="metricTabs" role="group" aria-label="Score shown"></div></div>
+    <div class="scroll"><div class="heat" id="heat"></div></div>
+    <div id="cellDetail" style="margin-top:14px"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Keys and their limits</h2>
+  <p class="sub">Groq counts the free allowance per account and per model. Names only, never the keys.</p>
+  <div class="keys" id="families"></div>
+  <div class="panel scroll"><h3>Limits the runs hit</h3><table id="keyTable"></table>
+    <p class="small" style="margin:10px 0 0" id="keyNote"></p></div>
+  <div class="panel"><div class="row"><h3 style="margin:0">Live reading</h3><button class="btn primary" id="checkKeys" type="button" hidden>Check keys now</button></div>
+    <p class="small" style="margin:8px 0 10px" id="liveHelp"></p>
+    <div id="checkMsg" class="small"></div>
+    <div class="drop" id="drop" hidden><span id="dropMsg">Drop <code>key_status.json</code> here or choose it.</span>
+      <label class="btn primary" for="file">Load key status</label><input type="file" id="file" accept="application/json,.json" style="position:absolute;opacity:0;width:1px;height:1px"></div>
+    <div id="live" class="keys" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<section><h2>Still missing</h2><div class="panel"><ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px" id="missing"></ul></div></section>
+</div>
+<script>
+let DATA = /*DATA*/null;
+const LIVE_URL = 'api/state';
+const $ = (s, r = document) => r.querySelector(s);
+const el = (t, a = {}, ...kids) => { const n = document.createElement(t); for (const [k, v] of Object.entries(a)) { if (k === 'class') n.className = v; else n.setAttribute(k, v); } kids.flat().forEach(c => n.append(c)); return n; };
+const clock = s => s == null ? '–' : `${Math.floor(s / 3600)}:${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}`;
+const clockS = s => s == null ? '–' : `${clock(s)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const mins = s => s == null ? '–' : (s / 60 >= 10 ? Math.round(s / 60) : (s / 60).toFixed(1)) + ' min';
+const f1 = v => v == null ? '–' : (Math.round(v * 10) / 10).toString();
+const runLabel = r => `${+r.id.slice(9, 11)}:${r.id.slice(11, 13)}${r.kind === 'refine' ? ' refine' : ''}`;
+const localSeconds = epoch => { const d = new Date(epoch * 1000); return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(); };
+const waitOf = r => r.pacing.seconds + r.waits.reduce((a, w) => a + w.wait, 0);
+const endOf = r => r.checksEnd || r.storyEnd || (r.running && DATA.now ? localSeconds(DATA.now) : (r.storyStart || r.start || 0) + r.entries.reduce((a, e) => a + e.seconds, 0));
+const METRICS = [['reviewed', 'Reviewed (both)'], ['offline', 'Offline'], ['gpt', 'GPT review'], ['qwen', 'Qwen review'], ['natGpt', 'Naturalness, GPT'], ['natQwen', 'Naturalness, Qwen']];
+const KEYNAMES = (k, n) => [k, ...Array.from({ length: Math.max(0, n - 1) }, (_, i) => `${k}_${i + 2}`)];
+let metric = 'reviewed', picked = null, chosenRun = null, paused = false, timer = null, lastHash = '';
+
+function render() {
+  if (!DATA) return;
+  renderStatus(); renderNow(); renderFinds(); renderGantt(); renderRuns(); renderResults(); renderKeys(); renderMissing();
+}
+
+function renderStatus() {
+  $('#sub').textContent = DATA.live ? 'Reads your test folders every 10 seconds, so results, waits and key switches appear while a test runs. Times are this computer’s.' : 'A snapshot of the 11 November runs. Use the local version for live updates. Times are Central.';
+  const s = $('#status'); s.innerHTML = '';
+  if (DATA.live) {
+    const b = el('button', { class: 'btn', type: 'button' }, paused ? 'Resume updates' : 'Pause updates'); b.onclick = () => { paused = !paused; schedule(); renderStatus(); };
+    s.append(el('span', {}, el('span', { class: 'live-dot' + (paused ? ' off' : '') }), paused ? 'Paused' : 'Live', ` · read ${new Date(DATA.now * 1000).toLocaleTimeString()}`), b);
+  } else s.append(el('span', {}, el('span', { class: 'live-dot off' }), 'Snapshot'));
+}
+
+function renderNow() {
+  const sec = $('#nowSection'), now = DATA.runs.filter(r => r.running);
+  sec.hidden = !DATA.live;
+  const root = $('#now'); root.innerHTML = '';
+  if (!DATA.live) return;
+  if (!now.length) {
+    const last = DATA.runs[DATA.runs.length - 1];
+    root.append(el('p', { class: 'small', style: 'margin:0' }, last ? `No story test is running. The last one started at ${runLabel(last)} and ${last.exit === 0 ? 'finished' : 'ended'} at ${clock(last.storyEnd)}.` : 'No story test has run yet in test-reports.'));
+    return;
+  }
+  now.forEach(r => {
+    const total = r.total || 0, n = r.entries.length, pct = total ? 100 * n / total : 0;
+    const eta = n && total && n < total ? r.entries.reduce((a, e) => a + e.seconds, 0) / n * (total - n) : null;
+    root.append(el('div', { class: 'row' }, el('div', {}, el('span', { class: 'pill good' }, 'running'), ' ', el('b', {}, `Started ${runLabel(r)}`)), el('span', { class: 'small mono' }, `${n} of ${total || '?'} results${eta ? ` · about ${mins(eta)} to go` : ''}`)),
+      el('div', { class: 'progress', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': String(total), 'aria-valuenow': String(n) }, el('div', { style: `width:${pct}%` })),
+      el('div', { class: 'small' }, `Waiting so far ${mins(waitOf(r))} · ${r.limits.length} key refusals, ${r.limits.filter(l => l.to).length} switches · log updated ${r.ageSeconds} s ago`),
+      el('div', { class: 'small mono' }, r.last));
+    if (n) {
+      const t = el('table'); t.innerHTML = '<thead><tr><th>Story</th><th>Method</th><th class="num">Offline</th><th class="num">Calls</th><th class="num">Seconds</th></tr></thead>';
+      const b = el('tbody'); r.entries.slice(-6).reverse().forEach(e => b.append(el('tr', {}, el('td', { class: 'mono' }, `${e.id} ${e.tier}`), el('td', {}, e.variant), el('td', { class: 'num mono' }, f1(e.offline)), el('td', { class: 'num mono' }, String(e.calls)), el('td', { class: 'num mono' }, f1(e.seconds)))));
+      t.append(b); root.append(el('div', { class: 'scroll' }, t), el('p', { class: 'small', style: 'margin:0' }, 'Offline scores appear as each method finishes. The reviews and naturalness arrive in the results below after each story is saved.'));
+    }
+  });
+}
+
+function renderFinds() {
+  const items = [], runs = DATA.runs, res = DATA.results;
+  const overlaps = runs.filter((r, i) => runs.some((o, j) => j !== i && r.storyStart != null && o.storyStart != null && o.storyStart < endOf(r) && r.storyStart < endOf(o)));
+  if (overlaps.length > 1) items.push(['warn', 'Runs overlapped', `${overlaps.length} of ${runs.length} story tests ran at the same time as another. They share the same keys and the same Docker containers, so start one at a time.`]);
+  else if (runs.length) items.push(['good', 'One at a time', 'No two story tests overlapped.']);
+  const killed = runs.filter(r => r.exit != null && r.exit !== 0);
+  if (killed.length) items.push(['warn', `${killed.length} did not finish`, `Exit codes ${killed.map(r => r.exit).join(', ')} at ${killed.map(r => runLabel(r)).join(', ')}. Exit 137 means the container was restarted under the test.`]);
+  if (res && res.byVariant.length) {
+    const off = res.byVariant.map(v => v.offline).filter(v => v != null), rev = res.byVariant.map(v => v.reviewed).filter(v => v != null);
+    if (rev.length) items.push([Math.max(...off) - Math.min(...off) < 10 && Math.max(...rev) - Math.min(...rev) >= 10 ? 'good' : 'warn', 'Naturalness is counted in the reviews', `Offline scores span ${f1(Math.min(...off))} to ${f1(Math.max(...off))} with naturalness empty. Reviewed scores, which include it, span ${f1(Math.min(...rev))} to ${f1(Math.max(...rev))}.`]);
+  }
+  const sw = runs.reduce((a, r) => a + r.limits.filter(l => l.to).length, 0), ref = runs.reduce((a, r) => a + r.limits.length, 0);
+  if (ref) items.push(['good', 'Key switching', `${ref} key refusals across ${runs.length} runs, ${sw} switched to another key at once.`]);
+  const full = runs.filter(r => r.exit === 0 && r.storyEnd && r.storyStart).slice(-1)[0];
+  if (full) { const total = full.storyEnd - full.storyStart, w = waitOf(full); items.push(['warn', 'Waiting is most of the time', `Run ${runLabel(full)} took ${mins(total)}. ${mins(w)} of it (${Math.round(100 * w / total)}%) was waiting under the token limits.`]); }
+  const root = $('#finds'); root.innerHTML = '';
+  root.append(...items.map(([k, t, p]) => el('div', { class: 'find' }, el('span', { class: 'pill ' + k }, k === 'good' ? 'Works' : 'Check'), el('b', {}, t), el('p', {}, p))));
+}
+
+function renderGantt() {
+  const root = $('#gantt'); root.innerHTML = '';
+  const rs = DATA.runs.filter(r => r.start != null).sort((a, b) => a.start - b.start);
+  const clusters = []; rs.forEach(r => { const c = clusters[clusters.length - 1]; if (c && r.start - c[c.length - 1].start < 5400) c.push(r); else clusters.push([r]); });
+  const W = 760, left = 70, right = 14, rowH = 26;
+  clusters.slice(-3).forEach((c, ci) => {
+    const t0 = Math.floor((Math.min(...c.map(r => r.start)) - 60) / 60) * 60, t1 = Math.ceil((Math.max(...c.map(endOf)) + 90) / 60) * 60;
+    const step = (t1 - t0) > 3600 ? 900 : 300, x = t => left + (t - t0) / (t1 - t0) * (W - left - right), H = 24 + c.length * rowH + 4;
+    let g = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Runs timeline ${ci + 1}">`;
+    for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) g += `<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="18" y2="${H - 2}"/><text x="${x(t)}" y="12" text-anchor="middle">${clock(t)}</text>`;
+    c.forEach((r, i) => {
+      const y = 22 + i * rowH, end = endOf(r), cls = r.running ? 'b-run' : r.exit === 0 ? 'b-ok' : r.exit != null ? 'b-bad' : 'b-unk';
+      g += `<text class="lab" x="0" y="${y + 13}">${runLabel(r)} start</text>`;
+      const s0 = r.storyStart ?? r.start, s1 = r.storyEnd ?? (r.running ? end : end);
+      g += `<rect class="${cls}" x="${x(s0)}" y="${y}" width="${Math.max(2, x(s1) - x(s0))}" height="16" rx="3"><title>${runLabel(r)}: ${clockS(s0)} to ${clockS(s1)}, ${r.entries.length} results</title></rect>`;
+      const ce = r.checksEnd || (r.finished && r.storyEnd && r.finished > r.storyEnd ? r.finished : null);
+      if (ce && r.storyEnd) g += `<rect class="b-chk" x="${x(r.storyEnd)}" y="${y}" width="${Math.max(2, x(ce) - x(r.storyEnd))}" height="16" rx="3"><title>checks ${clockS(r.storyEnd)} to ${clockS(ce)}</title></rect>`;
+    });
+    root.insertAdjacentHTML('beforeend', g + '</svg>');
+  });
+  $('#ganttNote').textContent = rs.length ? 'Bars start when the story test starts. Runs that start close together share keys and containers.' : 'No runs found.';
+}
+
+function renderRuns() {
+  const t = $('#runsTable');
+  t.innerHTML = '<thead><tr><th>Start</th><th>Story test</th><th class="num">Results</th><th class="num">Waiting</th><th>Keys switched</th><th>Saved</th></tr></thead>';
+  const b = el('tbody');
+  DATA.runs.slice().reverse().forEach(r => {
+    const done = r.running ? ['good', 'running'] : r.exit === 0 ? ['good', 'finished'] : r.exit === 137 ? ['bad', 'killed'] : r.dockerFailed ? ['bad', 'docker failed'] : r.exit != null ? ['bad', 'exit ' + r.exit] : ['unk', 'stopped'];
+    const sw = r.limits.filter(l => l.to).map(l => `${l.key.replace('GROQ_API_KEY', 'KEY').replace('KEY_', '')} → ${l.to.replace('GROQ_API_KEY_', '')}`);
+    b.append(el('tr', {}, el('td', { class: 'mono' }, runLabel(r)), el('td', {}, el('span', { class: 'pill ' + done[0] }, done[1]), ' ', el('span', { class: 'small mono' }, `${clock(r.storyStart)}–${clock(r.storyEnd)}`)),
+      el('td', { class: 'num mono' }, `${r.entries.length} of ${r.total || '?'}`), el('td', { class: 'num mono' }, mins(waitOf(r))), el('td', { class: 'small' }, sw.length ? sw.join(', ') : 'none'), el('td', { class: 'small' }, r.json ? 'results JSON found' : 'no JSON yet')));
+  });
+  t.append(b);
+}
+
+function renderResults() {
+  const pick = $('#runPick'); pick.innerHTML = '';
+  DATA.runs.filter(r => r.json).reverse().forEach(r => pick.append(el('option', { value: r.id }, `${runLabel(r)} (${r.entries.length} results)`)));
+  pick.value = DATA.resultsRun || ''; pick.onchange = () => { chosenRun = pick.value; poll(); };
+  const res = DATA.results, sec = $('#resultsSection');
+  $('#avgBars').innerHTML = ''; $('#heat').innerHTML = ''; $('#metricTabs').innerHTML = '';
+  if (!res) { $('#resultsSub').textContent = 'No results file yet. The runner saves one after every story, so the first numbers appear when the first story finishes.'; $('#avgNote').textContent = ''; $('#cellDetail').innerHTML = ''; return; }
+  const nS = res.stories.length, nM = res.variants.length, got = res.cells.length;
+  $('#resultsSub').textContent = `Run ${DATA.resultsRun}: ${got} of ${nS * nM} results saved, ${nS} stories through ${nM} methods. The offline score checks length, words, grammar rules and format. The reviewed score adds what the reviewers found, including their naturalness rating.`;
+  res.byVariant.forEach(v => {
+    const bar = (cls, val) => el('div', { class: 'bar ' + cls, style: `width:${Math.max(1, val || 0) * 0.82}%` }, el('i', {}, f1(val)));
+    $('#avgBars').append(el('div', { class: 'barrow' }, el('div', {}, el('div', { style: 'font-weight:600;font-size:14px' }, v.label), el('div', { class: 'small mono' }, `${f1(v.calls)} ${v.calls === 1 ? 'call' : 'calls'} · ${Math.round(v.seconds || 0)} s · n=${v.n}`)), el('div', { class: 'track' }, bar('off', v.offline), bar('rev', v.reviewed))));
+  });
+  const have = res.byVariant.filter(v => v.offline != null && v.reviewed != null);
+  $('#avgNote').textContent = have.length > 1 ? `Offline averages run from ${f1(Math.min(...have.map(v => v.offline)))} to ${f1(Math.max(...have.map(v => v.offline)))}. Reviewed averages run from ${f1(Math.min(...have.map(v => v.reviewed)))} to ${f1(Math.max(...have.map(v => v.reviewed)))}. With few stories, treat gaps under about 10 points as noise.` : '';
+  $('#metricTabs').append(...METRICS.map(([k, t]) => { const b = el('button', { type: 'button', 'aria-pressed': String(k === metric) }, t); b.onclick = () => { metric = k; renderResults(); }; return b; }));
+  const root = $('#heat'); root.style.gridTemplateColumns = `minmax(150px,1.3fr) repeat(${nM},minmax(78px,1fr))`;
+  root.append(el('div', { class: 'h' }, ''));
+  res.variants.forEach(v => root.append(el('div', { class: 'h', title: v.note }, v.label)));
+  res.stories.forEach(s => {
+    root.append(el('div', { class: 'rowname' }, el('span', {}, `${s.id} · ${s.kind}`), el('small', {}, `${(s.lang || '').toUpperCase()}, ${s.tier}, “${s.topic}”`)));
+    res.variants.forEach(v => {
+      const c = res.cells.find(c => c.story === s.id && c.variant === v.name), val = c ? c[metric] : null;
+      const sel = picked && picked.story === s.id && picked.variant === v.name;
+      const b = el('button', { class: 'cell' + (val == null ? ' none' : ''), type: 'button', 'aria-pressed': String(!!sel), 'aria-label': `${s.id} ${v.label} ${METRICS.find(m => m[0] === metric)[1]} ${val ?? 'not rated'}` }, f1(val));
+      if (val != null) b.style.setProperty('--h', Math.max(0, Math.min(100, val)) * 1.35 + 5);
+      b.onclick = () => { picked = c || null; renderResults(); };
+      root.append(b);
+    });
+  });
+  const d = $('#cellDetail'); d.innerHTML = '';
+  if (!picked) { d.append(el('p', { class: 'small', style: 'margin:0' }, 'Choose a cell to see its numbers and what the pipeline did.')); return; }
+  const c = picked, v = res.variants.find(x => x.name === c.variant), s = res.stories.find(x => x.id === c.story);
+  const kv = (a, b) => el('div', { class: 'kv' }, el('span', {}, a), el('span', { class: 'mono' }, b));
+  d.append(el('h3', {}, `${s.id}, ${v.label}`), el('div', { class: 'detail' },
+    el('div', {}, kv('Offline score', f1(c.offline)), kv('Reviewed, both', f1(c.reviewed)), kv('GPT review', `${f1(c.gpt)} · ${c.hitsGpt ?? '–'} findings`), kv('Qwen review', `${f1(c.qwen)} · ${c.hitsQwen ?? '–'} findings`)),
+    el('div', {}, kv('Naturalness, GPT', f1(c.natGpt)), kv('Naturalness, Qwen', f1(c.natQwen)), kv('Judge naturalness (1 to 5)', c.judgeNat.length ? c.judgeNat.join(', ') : 'not rated'), kv('Offline naturalness', c.offlineNat == null ? 'empty' : f1(c.offlineNat))),
+    el('div', {}, kv('Model calls', c.calls), kv('Total time', f1(c.seconds) + ' s'), kv('Model time', f1(c.model) + ' s'), kv('Waiting', f1(c.wait) + ' s'), kv('Repair', c.repair || 'none'))), ...(c.trace && c.trace.length ? [el('h3', { style: 'margin-top:14px' }, 'Pipeline, phase by phase'), el('ol', { class: 'small', style: 'margin:0;padding-left:20px' }, ...c.trace.map(t => el('li', {}, t)))] : []));
+}
+
+function renderKeys() {
+  const root = $('#families'); root.innerHTML = '';
+  Object.entries(DATA.families).forEach(([fam, f]) => {
+    const names = KEYNAMES(fam, f.keys);
+    root.append(el('div', { class: 'key' }, el('div', { class: 'name' }, fam), el('div', { class: 'small' }, f.role), el('div', { class: 'kv' }, el('span', {}, 'Model'), el('span', { class: 'mono' }, f.model || 'story model')),
+      el('div', { class: 'kv' }, el('span', {}, 'Keys loaded'), el('span', { class: 'mono' }, String(f.keys))),
+      f.keys === 1 ? el('div', { class: 'small' }, 'One key: a refusal here cannot switch, so the run waits or stops.') : el('div', { class: 'small' }, names.join(', '))));
+  });
+  const t = $('#keyTable'); t.innerHTML = '<thead><tr><th>Key</th><th class="num">Refused</th><th>Waits named</th><th>Switched to</th><th>Read as</th></tr></thead>';
+  const b = el('tbody'), ev = DATA.keyEvidence;
+  Object.entries(DATA.families).forEach(([fam, f]) => KEYNAMES(fam, f.keys).forEach(k => {
+    const e = ev[k];
+    if (!e) { b.append(el('tr', {}, el('td', { class: 'mono' }, k), el('td', { class: 'num mono' }, '0'), el('td', {}, '–'), el('td', {}, '–'), el('td', { class: 'small' }, f.keys === 1 ? 'One key: refusals show as waits, not switches' : 'Not refused in the runs'))); return; }
+    const kinds = [...new Set(e.kinds)];
+    const read = kinds.length ? kinds.map(x => ({ TPM: 'per-minute tokens', TPD: 'per-day tokens', RPM: 'per-minute requests', RPD: 'per-day requests' }[x] || x)).join(', ') : (e.hints.some(h => h > 60) ? 'Minute limit, and at least once most likely the day limit' : 'Per-minute token limit');
+    b.append(el('tr', {}, el('td', { class: 'mono' }, k), el('td', { class: 'num mono' }, String(e.limited)), el('td', { class: 'mono' }, e.hints.map(h => h == null ? '?' : h + ' s').join(', ')), el('td', { class: 'mono' }, e.switchedTo.join(', ') || '–'), el('td', { class: 'small' }, read)));
+  }));
+  t.append(b);
+  const anyKind = Object.values(ev).some(e => e.kinds.length);
+  $('#keyNote').textContent = anyKind ? 'The kind of limit comes from Groq’s own message.' : 'A wait of a few seconds is the per-minute token limit. A wait of several minutes is most likely the day’s token limit. These runs did not record which limit it was; runs after patch 0075 do.';
+  $('#checkKeys').hidden = !DATA.live; $('#drop').hidden = DATA.live;
+  $('#liveHelp').textContent = DATA.live ? 'Asks each key for one token and reads Groq’s own counters. It uses one request per key and takes a few seconds.' : 'Runs cannot see how much is left on a key. Run key_status.py on your machine, then load its file here.';
+  if (DATA.keyStatus) showLive(DATA.keyStatus); else { try { const s = !DATA.live && localStorage.getItem('std-live'); if (s) showLive(JSON.parse(s)); } catch (e) { } }
+}
+
+function showLive(json) {
+  const root = $('#live'); root.innerHTML = '';
+  const when = new Date(json.checked_at);
+  $('#dropMsg').textContent = `Loaded. Checked ${isNaN(when) ? json.checked_at : when.toLocaleString()}.`;
+  if (DATA.live) root.append(el('p', { class: 'small', style: 'grid-column:1/-1;margin:0' }, `Checked ${isNaN(when) ? json.checked_at : when.toLocaleString()}.`));
+  json.keys.forEach(k => {
+    const tok = k.limit_tokens ? Math.max(0, Math.min(100, 100 * k.remaining_tokens / k.limit_tokens)) : null, req = k.limit_requests ? Math.max(0, Math.min(100, 100 * k.remaining_requests / k.limit_requests)) : null;
+    const cls = p => p == null ? '' : p < 5 ? 'out' : p < 25 ? 'low' : '';
+    const status = k.ok ? ['good', 'answering'] : k.http === 429 ? ['bad', 'at a limit'] : ['unk', k.error === 'not set' ? 'not set' : 'error'];
+    const node = el('div', { class: 'key' }, el('div', { class: 'name' }, k.var), el('div', { class: 'small' }, `${k.role} · ${k.model}`), el('div', {}, el('span', { class: 'pill ' + status[0] }, status[1])));
+    if (tok != null) node.append(el('div', { class: 'small' }, `Tokens this minute: ${k.remaining_tokens} of ${k.limit_tokens}`), el('div', { class: 'meter ' + cls(tok) }, el('div', { style: `width:${tok}%` })));
+    if (req != null) node.append(el('div', { class: 'small' }, `Requests today: ${k.remaining_requests} of ${k.limit_requests}${k.reset_requests ? ' · resets in ' + k.reset_requests : ''}`), el('div', { class: 'meter ' + cls(req) }, el('div', { style: `width:${req}%` })));
+    if (k.refused && k.refused.kind) node.append(el('div', { class: 'small' }, `Refused on ${k.refused.kind === 'TPD' ? 'the day’s tokens' : k.refused.kind === 'TPM' ? 'the minute’s tokens' : k.refused.kind}${k.refused.limit ? `: used ${k.refused.used} of ${k.refused.limit}` : ''}${k.refused.try_again_in ? ', try again in ' + k.refused.try_again_in : ''}`));
+    else if (!k.ok && k.error) node.append(el('div', { class: 'small' }, String(k.error).slice(0, 140)));
+    root.append(node);
+  });
+  if (!DATA.live) try { localStorage.setItem('std-live', JSON.stringify(json)); } catch (e) { }
+}
+
+function renderMissing() {
+  const r = DATA.runs, items = [];
+  const noJson = r.filter(x => x.entries.length >= (x.total || 1) && !x.json);
+  if (noJson.length) items.push(`${noJson.length} finished run(s) have no results JSON in the report folder or scripts\\: ${noJson.map(runLabel).join(', ')}.`);
+  if (DATA.results && DATA.results.stories.length <= 6) items.push(`Only ${DATA.results.stories.length} stories in the shown run, so scores are noisy.`);
+  if (!Object.values(DATA.keyEvidence).some(e => e.kinds.length)) items.push('No run has recorded which limit a refusal hit (minute or day). Runs after patch 0075 do.');
+  if (!DATA.keyStatus && DATA.live) items.push('No live key reading yet. Press Check keys now.');
+  if (!items.length) items.push('Nothing flagged.');
+  $('#missing').innerHTML = ''; $('#missing').append(...items.map(t => el('li', {}, t)));
+}
+
+/* ---------- live updates and file drop ---------- */
+async function poll() {
+  try {
+    const res = await fetch(LIVE_URL + (chosenRun ? `?run=${encodeURIComponent(chosenRun)}` : ''), { cache: 'no-store' });
+    if (!res.ok) throw 0;
+    const j = await res.json(), h = JSON.stringify({ ...j, now: 0, runs: j.runs.map(r => ({ ...r, ageSeconds: 0 })) });
+    DATA = j;
+    if (h !== lastHash) { lastHash = h; render(); } else renderStatus();
+  } catch (e) { if (!DATA) $('#sub').textContent = 'Could not read the test folders. Is test_desk.py still running?'; }
+}
+function schedule() { clearInterval(timer); if (DATA && DATA.live && !paused) timer = setInterval(poll, 10000); }
+$('#checkKeys').onclick = async () => {
+  const b = $('#checkKeys'), m = $('#checkMsg'); b.disabled = true; m.textContent = 'Asking each key. This takes a few seconds.';
+  try { const r = await (await fetch('api/key-status', { method: 'POST' })).json(); m.textContent = r.ok ? 'Done.' : 'Could not check: ' + (r.error || r.output || 'unknown error'); } catch (e) { m.textContent = 'Could not reach the local server.'; }
+  b.disabled = false; poll();
+};
+function readFile(f) { f.text().then(t => { try { const j = JSON.parse(t); if (!Array.isArray(j.keys)) throw 0; showLive(j); } catch (e) { $('#dropMsg').textContent = 'That file is not a key_status.json.'; } }); }
+$('#file').onchange = e => e.target.files[0] && readFile(e.target.files[0]);
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(n => drop.addEventListener(n, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => e.dataTransfer.files[0] && readFile(e.dataTransfer.files[0]));
+if (DATA) render(); else poll().then(schedule);
+</script>

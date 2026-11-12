@@ -92,3 +92,7 @@ Add `--variants baseline,refine` to see the same ten requests written by the pla
 ## What is left on each key (patch 0075)
 
 `scripts/key_status.py` makes one 1-token call per key and model and prints and saves Groq's counters (`key_status.json`, names only). Each call uses one request of the day. A key that is already refused reports which limit it hit (per-minute or per-day tokens) and how much it used. The run JSON's `meta["key events"]` lists every refusal a story test saw, with the same fields.
+
+## Story Test Desk (patch 0076)
+
+A local page for watching tests while they run. Start it with `test-desk.bat` (port 8090; `--port` to change). It reads `test-reports\overnight-*\SUMMARY.txt`, the step logs, and `scripts\overnight_*.json` / `refine_*.json`, and refreshes every 10 seconds. A run counts as running when it has no Finished line, no exit code, and a log written within 15 minutes. `run-overnight.bat` starts the desk itself. The refine step is shown as its own run with the phase-by-phase trace for each story. "Check keys now" runs `key_status.py` inside the Langflow container.
