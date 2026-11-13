@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parent.parent
 CARDS = ROOT / "docs" / "kanban" / "cards.json"
 BOARD = ROOT / "docs" / "kanban" / "BOARD.md"
 HEAD = ("# Kanban board\n\nGenerated from `cards.json` (the same file `scripts/create_kanban_cards.py` uploads). "
-        "Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.\n\n")
+        "Needs your decision = waiting for your choice; Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.\n\n")
 
 
 def render(cards) -> str:
     out = [HEAD]
-    for status in ("Backlog", "In review", "Done"):
+    for status in ("Needs your decision", "Backlog", "In review", "Done"):
         mine = [c for c in cards if c["status"] == status]
         out.append(f"\n## {status} ({len(mine)})\n\n")
         out.extend(f"- **{c['title']}** ({c.get('date') or 'no date'}) — {c['summary']}\n" for c in mine)

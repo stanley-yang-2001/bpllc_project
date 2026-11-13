@@ -1,5 +1,5 @@
 @echo off
-rem Runs, one after the other with nobody watching (version 2.3, 12 Nov 2026):
+rem Runs, one after the other with nobody watching (version 2.4, 13 Nov 2026):
 rem   1. the story test: cascade, 4 requests, reviewers gpt and qwen
 rem   2. the refine test: baseline and refine on 10 English stories (key switching on)
 rem   3. run-checks.bat --round
@@ -51,11 +51,18 @@ echo Docker did not start. Is Docker Desktop running? >> "%SUMMARY%"
 goto finish
 
 :story
+call :waitstack
 echo Step 1 story test started %TIME% >> "%SUMMARY%"
 echo [1/3] story test: cascade, 4 requests, reviewers gpt and qwen. Slow: it waits out Groq rate limits.
 docker compose exec -T langflow python /app/scripts/run_story_methods.py --variants cascade --limit 4 --audit-models gpt,qwen --key-budget 90000 --out /app/scripts/overnight_%STAMP%.html > "%OUT%\01-story-test.log" 2>&1
 set STORY=%errorlevel%
 echo Step 1 story test: exit code %STORY% at %TIME%. 0 means it finished. >> "%SUMMARY%"
+if "%STORY%"=="0" goto storyok
+echo     retrying once with --resume after waiting for the containers >> "%SUMMARY%"
+call :waitstack
+docker compose exec -T langflow python /app/scripts/run_story_methods.py --resume /app/scripts/overnight_%STAMP%.json --variants cascade --limit 4 --audit-models gpt,qwen --key-budget 90000 --out /app/scripts/overnight_%STAMP%.html >> "%OUT%\01-story-test.log" 2>&1
+echo Step 1 retry: exit code %errorlevel% at %TIME%. >> "%SUMMARY%"
+:storyok
 if not exist "scripts\overnight_%STAMP%.json" goto nostory
 copy /y "scripts\overnight_%STAMP%.json" "%OUT%\" >nul
 copy /y "scripts\overnight_%STAMP%.html" "%OUT%\" >nul 2>nul
@@ -70,6 +77,13 @@ echo [2/3] refine test: baseline and refine, 10 English stories.
 docker compose exec -T langflow python /app/scripts/run_story_methods.py --variants baseline,refine --languages en --count 10 --no-translate --audit-models gpt,qwen --key-budget 90000 --out /app/scripts/refine_%STAMP%.html > "%OUT%\02-refine-test.log" 2>&1
 set REFINE=%errorlevel%
 echo Step 2 refine test: exit code %REFINE% at %TIME%. 0 means it finished. >> "%SUMMARY%"
+if "%REFINE%"=="0" goto refineok
+if not exist "scripts\refine_%STAMP%.json" goto refineok
+echo     retrying once with --resume after waiting for the containers >> "%SUMMARY%"
+call :waitstack
+docker compose exec -T langflow python /app/scripts/run_story_methods.py --resume /app/scripts/refine_%STAMP%.json --variants baseline,refine --languages en --count 10 --no-translate --audit-models gpt,qwen --key-budget 90000 --out /app/scripts/refine_%STAMP%.html >> "%OUT%\02-refine-test.log" 2>&1
+echo Step 2 retry: exit code %errorlevel% at %TIME%. >> "%SUMMARY%"
+:refineok
 if not exist "scripts\refine_%STAMP%.json" goto norefine
 copy /y "scripts\refine_%STAMP%.json" "%OUT%\" >nul
 copy /y "scripts\refine_%STAMP%.html" "%OUT%\" >nul 2>nul
@@ -103,6 +117,22 @@ pause >nul
 :done
 endlocal
 goto :eof
+
+:waitstack
+rem Waits up to 10 minutes until Langflow answers (docker compose up -d returns before it is ready).
+set /a TRIES=0
+:waitloop
+docker compose up -d >nul 2>&1
+powershell -nologo -command "try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 http://127.0.0.1:7860/health).StatusCode } catch { exit 1 }" >nul 2>&1
+if not errorlevel 1 goto waitdone
+set /a TRIES+=1
+if %TRIES% geq 40 goto waitgiveup
+timeout /t 15 /nobreak >nul
+goto waitloop
+:waitgiveup
+echo     Langflow did not answer within 10 minutes. Is Docker Desktop out of memory? >> "%SUMMARY%"
+:waitdone
+exit /b 0
 
 :locked
 echo Another overnight run is already going: test-reports\overnight.lock exists.

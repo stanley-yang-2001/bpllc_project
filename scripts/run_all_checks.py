@@ -261,7 +261,7 @@ def stage_kanban(r: Runner) -> Result:
     """cards.json parses, every card has the fields the board script needs, and BOARD.md has the same number of cards."""
     cards = json.loads((ROOT / "docs" / "kanban" / "cards.json").read_text(encoding="utf-8"))
     need = {"title", "status", "summary", "labels"}
-    bad = [c.get("title", "?") for c in cards if not need <= set(c) or c["status"] not in ("Done", "In review", "Backlog")]
+    bad = [c.get("title", "?") for c in cards if not need <= set(c) or c["status"] not in ("Done", "In review", "Backlog", "Needs your decision")]
     board = (ROOT / "docs" / "kanban" / "BOARD.md").read_text(encoding="utf-8")
     listed = sum(1 for line in board.splitlines() if line.startswith("- **"))
     if bad:

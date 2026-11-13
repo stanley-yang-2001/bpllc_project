@@ -1,7 +1,11 @@
 # Kanban board
 
-Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uploads). Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.
+Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uploads). Needs your decision = waiting for your choice; Done = built and run or verified; In review = built, waiting for your run; Backlog = not built.
 
+
+## Needs your decision (1)
+
+- **Privacy policy wording options** (2026-11-05) — Six places where the approved policy no longer matches the code (practice progress, more AI features, own model and chat, deletion list, voice kept in browser, browser voices). Options per topic, with a recommended one. Nothing is live; the approved text and POLICY_VERSION are untouched.
 
 ## Backlog (3)
 
