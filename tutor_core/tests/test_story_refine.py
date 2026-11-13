@@ -4,7 +4,7 @@ import json
 from tutor_core import difficulty as d
 from tutor_core.story import story_from_words
 from tutor_core.story_options import StoryOptions
-from tutor_core.story_refine import flagged_sentences, refine_story, unchanged_share
+from tutor_core.story_refine import finding_still_in_text, flagged_sentences, refine_story, splice_flagged, unchanged_share
 from tutor_core.quality.grammar import Hit
 
 WORDS = ["casa", "mar", "amigo", "jardín", "pan"]
@@ -108,3 +108,22 @@ def test_the_report_shows_every_phase():
     for word in ("Observe (start)", "Plan, round 1", "Repair, round 1", "Verify, round 1", "KEPT", "sentence 4"):
         assert word in page
     assert report._trace({}) == ""
+
+
+def test_splice_keeps_every_sentence_except_the_flagged_one():
+    other = GOOD.replace("María vive", "Ana vive").replace("Pedro llega", "Luis llega")          # the model also rewrote sentences 1 and 3
+    spliced = splice_flagged(FLAW, other, [4])
+    assert spliced == GOOD and unchanged_share(FLAW, spliced, [4]) == 1.0
+    assert splice_flagged(FLAW, "Solo una frase.", [4]) == "Solo una frase."          # a different sentence count is returned as it is
+
+
+def test_a_model_that_rewrites_other_sentences_still_gets_its_fix_kept():
+    fake = Fake(fixed=GOOD.replace("María vive", "Ana vive"))
+    result = run(FLAW, fake)
+    assert result.text == GOOD and any("refine 1 kept" in n for n in result.notes)
+
+
+def test_a_fix_that_only_adds_words_is_not_still_in_the_text():
+    hit = Hit("audit", "audit.x", "Monday morning I woke", "On Monday morning I woke", "grammar", -1, -1, False, "")
+    assert finding_still_in_text(hit, "Monday morning I woke late.") is True
+    assert finding_still_in_text(hit, "On Monday morning I woke late.") is False

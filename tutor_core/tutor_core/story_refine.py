@@ -66,6 +66,28 @@ def unchanged_share(before: str, after: str, flagged_numbers: Sequence[int]) -> 
     return 1.0 if not keep else sum(1 for s in keep if s in new) / len(keep)
 
 
+def splice_flagged(before: str, after: str, flagged_numbers: Sequence[int]) -> str:
+    """Keep every sentence of `before` word for word except the flagged ones, which are taken from `after` (13 Nov 2026: on the 12 Nov test the model
+    rewrote the whole text in 3 of 9 stories even though only some sentences were named). Needs the same number of sentences; otherwise `after` is returned."""
+    old, new = sentence_spans(before), sentence_spans(after)
+    if len(old) != len(new) or not flagged_numbers:
+        return after
+    out, last = [], 0
+    for k, (a, b) in enumerate(old, 1):
+        out.append(before[last:a])
+        out.append(after[new[k - 1][0]:new[k - 1][1]] if k in set(flagged_numbers) else before[a:b])
+        last = b
+    out.append(before[last:])
+    return "".join(out)
+
+
+def finding_still_in_text(hit: Hit, text: str) -> bool:
+    """A finding is still there when its wrong wording is in the text and its fix is not (a fix that only adds a word, such as "On Monday" for
+    "Monday", contains the wrong wording and must not count as still there)."""
+    wrong, fix = (hit.wrong or "").casefold(), (hit.fix or "").casefold()
+    return bool(wrong) and wrong in text.casefold() and not (fix and fix in text.casefold())
+
+
 def refine_tools() -> list:
     """The free external checkers that are set up: LanguageTool when LANGUAGETOOL_URL is set."""
     from .quality.grammar import languagetool
@@ -146,9 +168,15 @@ def refine_story(text: str, language: str, words, difficulty: Optional[dict], ki
             out.trace.append({"phase": "verify", "round": number, "kept": False, "reason": "the model returned the text unchanged"})
             out.notes.append(f"refine {number} rejected: text unchanged")
             break
+        if flagged and not needs:
+            new = splice_flagged(current, new, [n for n, _, _ in flagged])          # only the named sentences may change, whatever the model returned
+            if new.strip() == current.strip():
+                out.trace.append({"phase": "verify", "round": number, "kept": False, "reason": "the named sentences came back unchanged"})
+                out.notes.append(f"refine {number} rejected: text unchanged")
+                break
         after = score_story(new, language, words, difficulty, kind)          # the free checks first: do not pay for a review of a bad rewrite
         share = unchanged_share(current, new, [n for n, _, _ in flagged])
-        still = [h.wrong for h in hits if h.kind != "style" and h.wrong and h.wrong.casefold() in new.casefold()]
+        still = [h.wrong for h in hits if h.kind != "style" and finding_still_in_text(h, new)]
         verdict = {"phase": "verify", "round": number, "unchanged_share": round(share, 2), "findings_still_in_text": still, "gated": after["gated"], "free_score": after["score"]}
         if after["gated"] or share < KEEP_SHARE:
             verdict.update(kept=False, reason=f"gated ({after['gated']})" if after["gated"] else f"rewrote too much: {round(share * 100)}% of the other sentences kept")
