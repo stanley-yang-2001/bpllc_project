@@ -234,11 +234,36 @@ class BadgeOut(BaseModel):
     target: int
 
 
+class ComebackOut(BaseModel):
+    days_away: int              # days since the practice before this one
+    returned: bool              # has practised today
+
+
+class BestDayOut(BaseModel):
+    value: int
+    day: date
+
+
+class RecordsOut(BaseModel):
+    best_day: BestDayOut | None = None     # most answers in one day
+    longest_run: int                       # most right answers in a row (anything but Again)
+    fastest_ms: int | None = None          # best day's average think time, days with 10+ answers
+    best_week_learned: int                 # most words that reached Known in one calendar week
+
+
+class StoryWordsOut(BaseModel):
+    used: int                   # words of this language that appear in a saved story
+    total: int
+
+
 class RewardsOut(BaseModel):
     show_rewards: bool
     streak: StreakOut
     goal: GoalOut
     week: WeekOut
     known_words: int
+    comeback: ComebackOut | None = None
+    records: RecordsOut
+    story_words: StoryWordsOut
     badges: list[BadgeOut]
     next_badge: BadgeOut | None = None

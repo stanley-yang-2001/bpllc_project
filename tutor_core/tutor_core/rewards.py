@@ -94,3 +94,48 @@ def next_badge(items: list[dict]) -> dict | None:
     """The unearned badge that is closest to done (largest share), so the learner always sees one thing to aim at."""
     todo = [b for b in items if not b["earned"]]
     return max(todo, key=lambda b: (b["have"] / b["target"], -b["target"])) if todo else None
+
+
+COMEBACK_GAP_DAYS = 3
+
+
+def comeback(days: Iterable[date], today: date) -> dict | None:
+    """A learner coming back after a break of at least COMEBACK_GAP_DAYS days: {"days_away": n, "returned": bool}.
+    `returned` is true once they have practised today. Nothing for a new learner or one who never left."""
+    have = sorted({d for d in days if d <= today}, reverse=True)
+    if not have:
+        return None
+    if have[0] == today:
+        away = (today - have[1]).days if len(have) > 1 else 0
+        return {"days_away": away, "returned": True} if away >= COMEBACK_GAP_DAYS else None
+    away = (today - have[0]).days
+    return {"days_away": away, "returned": False} if away >= COMEBACK_GAP_DAYS else None
+
+
+def longest_run(grades: Iterable[int]) -> int:
+    """The longest run of answers in a row that were not "Again" (grade 1), in the order given."""
+    best = run = 0
+    for g in grades:
+        run = run + 1 if g >= 2 else 0
+        best = max(best, run)
+    return best
+
+
+def _has_cjk(text: str) -> bool:
+    return any(0x2E80 <= ord(c) <= 0x9FFF or 0xAC00 <= ord(c) <= 0xD7AF for c in text)
+
+
+def words_in_stories(words: Iterable[str], stories: Iterable[str]) -> int:
+    """How many of the words appear in at least one of the stories. Whole words, ignoring case; for Chinese, Japanese and Korean (no
+    spaces between words) a plain substring match."""
+    import re
+    texts = [s.casefold() for s in stories]
+    joined = "\n".join(texts)
+    found = 0
+    for w in {x.strip().casefold() for x in words if x and x.strip()}:
+        if _has_cjk(w):
+            hit = w in joined
+        else:
+            hit = re.search(rf"(?<!\w){re.escape(w)}(?!\w)", joined) is not None
+        found += hit
+    return found

@@ -95,6 +95,25 @@
         "title": "BadgeOut",
         "type": "object"
       },
+      "BestDayOut": {
+        "properties": {
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "value",
+          "day"
+        ],
+        "title": "BestDayOut",
+        "type": "object"
+      },
       "Body_upload_api_words_upload_post": {
         "properties": {
           "file": {
@@ -351,6 +370,24 @@
           "accent"
         ],
         "title": "ColorsIn",
+        "type": "object"
+      },
+      "ComebackOut": {
+        "properties": {
+          "days_away": {
+            "title": "Days Away",
+            "type": "integer"
+          },
+          "returned": {
+            "title": "Returned",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "days_away",
+          "returned"
+        ],
+        "title": "ComebackOut",
         "type": "object"
       },
       "CustomColors": {
@@ -1793,6 +1830,45 @@
         "title": "ReadingItem",
         "type": "object"
       },
+      "RecordsOut": {
+        "properties": {
+          "best_day": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BestDayOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "best_week_learned": {
+            "title": "Best Week Learned",
+            "type": "integer"
+          },
+          "fastest_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastest Ms"
+          },
+          "longest_run": {
+            "title": "Longest Run",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "longest_run",
+          "best_week_learned"
+        ],
+        "title": "RecordsOut",
+        "type": "object"
+      },
       "RegisterBody": {
         "properties": {
           "accept_privacy": {
@@ -1989,6 +2065,16 @@
             "title": "Badges",
             "type": "array"
           },
+          "comeback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComebackOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "goal": {
             "$ref": "#/components/schemas/GoalOut"
           },
@@ -2006,9 +2092,15 @@
               }
             ]
           },
+          "records": {
+            "$ref": "#/components/schemas/RecordsOut"
+          },
           "show_rewards": {
             "title": "Show Rewards",
             "type": "boolean"
+          },
+          "story_words": {
+            "$ref": "#/components/schemas/StoryWordsOut"
           },
           "streak": {
             "$ref": "#/components/schemas/StreakOut"
@@ -2023,6 +2115,8 @@
           "goal",
           "week",
           "known_words",
+          "records",
+          "story_words",
           "badges"
         ],
         "title": "RewardsOut",
@@ -2585,6 +2679,24 @@
           "offset"
         ],
         "title": "StoryPage",
+        "type": "object"
+      },
+      "StoryWordsOut": {
+        "properties": {
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "used",
+          "total"
+        ],
+        "title": "StoryWordsOut",
         "type": "object"
       },
       "StreakOut": {

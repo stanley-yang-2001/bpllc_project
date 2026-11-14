@@ -934,6 +934,16 @@ export interface components {
             /** Target */
             target: number;
         };
+        /** BestDayOut */
+        BestDayOut: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Value */
+            value: number;
+        };
         /** Body_upload_api_words_upload_post */
         Body_upload_api_words_upload_post: {
             /** File */
@@ -1019,6 +1029,13 @@ export interface components {
             page: string;
             /** Text */
             text: string;
+        };
+        /** ComebackOut */
+        ComebackOut: {
+            /** Days Away */
+            days_away: number;
+            /** Returned */
+            returned: boolean;
         };
         /**
          * CustomColors
@@ -1481,6 +1498,16 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** RecordsOut */
+        RecordsOut: {
+            best_day?: components["schemas"]["BestDayOut"] | null;
+            /** Best Week Learned */
+            best_week_learned: number;
+            /** Fastest Ms */
+            fastest_ms?: number | null;
+            /** Longest Run */
+            longest_run: number;
+        };
         /** RegisterBody */
         RegisterBody: {
             /** Accept Privacy */
@@ -1551,12 +1578,15 @@ export interface components {
         RewardsOut: {
             /** Badges */
             badges: components["schemas"]["BadgeOut"][];
+            comeback?: components["schemas"]["ComebackOut"] | null;
             goal: components["schemas"]["GoalOut"];
             /** Known Words */
             known_words: number;
             next_badge?: components["schemas"]["BadgeOut"] | null;
+            records: components["schemas"]["RecordsOut"];
             /** Show Rewards */
             show_rewards: boolean;
+            story_words: components["schemas"]["StoryWordsOut"];
             streak: components["schemas"]["StreakOut"];
             week: components["schemas"]["WeekOut"];
         };
@@ -1739,6 +1769,13 @@ export interface components {
             offset: number;
             /** Total */
             total: number;
+        };
+        /** StoryWordsOut */
+        StoryWordsOut: {
+            /** Total */
+            total: number;
+            /** Used */
+            used: number;
         };
         /** StreakOut */
         StreakOut: {

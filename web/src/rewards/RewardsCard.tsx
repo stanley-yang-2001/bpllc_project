@@ -1,4 +1,4 @@
-import { Award, ArrowRight, Flame } from "lucide-react";
+import { Award, ArrowRight, Flame, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nProvider";
 import { Card, Skeleton } from "../components/ui";
@@ -12,12 +12,18 @@ export function RewardsCard() {
   const q = useRewards();
   if (q.isError || (q.data && !q.data.show_rewards)) return null;
   if (!q.data) return <Card className="mb-8"><Skeleton className="h-20 w-full" /></Card>;
-  const { streak, goal, week, next_badge: next } = q.data;
+  const { streak, goal, week, next_badge: next, comeback } = q.data;
   const message = streak.practised_today ? t("rewards.streak.done") : streak.alive ? t("rewards.streak.keep") : t("rewards.streak.start");
   const nextText = next ? badgeText(next.id, next.target, t) : null;
   return (
     <Card className="mb-8">
       <section data-testid="rewards-card" aria-label={t("rewards.title")}>
+        {comeback && !comeback.returned && (
+          <div data-testid="comeback" role="note" className="mb-4 flex items-start gap-3 rounded-lg bg-brand-50 p-3 text-sm text-slate-800 dark:bg-brand-100/40">
+            <Sparkles aria-hidden className="mt-0.5 size-5 shrink-0 text-brand-600" />
+            <div><p className="font-semibold text-slate-900">{t("rewards.back.title")}</p><p>{t("rewards.back.body", { n: comeback.days_away, due: week.due_now })}</p></div>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           <div className="flex items-center gap-4">
             <GoalRing done={goal.done} target={goal.target} label={t("rewards.goal.title")} valueText={t("rewards.goal.progress", { done: goal.done, target: goal.target })} />

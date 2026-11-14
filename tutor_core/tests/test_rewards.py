@@ -58,3 +58,27 @@ def test_badges_and_the_next_one():
     nxt = r.next_badge(items)
     assert nxt["id"] == "streak_3"                                          # 2 of 3 days is further along than 30 of 50 words
     assert r.next_badge([b | {"earned": True} for b in items]) is None
+
+
+def test_comeback_needs_a_break_of_three_days():
+    from datetime import date
+    from tutor_core.rewards import comeback
+    t = date(2026, 11, 14)
+    assert comeback([], t) is None
+    assert comeback([date(2026, 11, 13)], t) is None
+    assert comeback([date(2026, 11, 11)], t) == {"days_away": 3, "returned": False}
+    assert comeback([t, date(2026, 11, 8)], t) == {"days_away": 6, "returned": True}
+    assert comeback([t, date(2026, 11, 13)], t) is None
+    assert comeback([t], t) is None
+
+
+def test_longest_run_ends_at_again():
+    from tutor_core.rewards import longest_run
+    assert longest_run([3, 4, 1, 2, 2, 2, 1]) == 3 and longest_run([]) == 0 and longest_run([1, 1]) == 0
+
+
+def test_words_in_stories_matches_whole_words_and_cjk_substrings():
+    from tutor_core.rewards import words_in_stories
+    assert words_in_stories(["Cat", "dog", "catalog", ""], ["The cat sat.", "A catalogue."]) == 1
+    assert words_in_stories(["猫", "犬"], ["私は猫が好きです。"]) == 1
+    assert words_in_stories(["a b"], ["x a b y"]) == 1

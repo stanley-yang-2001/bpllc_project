@@ -27,6 +27,13 @@ Effects get fancier with the size of the milestone (`web/src/rewards/effects.ts`
 - Off when "Show my streak, goal and badges" is off. With "reduce motion" only the label shows.
 - Flashcards fire the run and card-count effects; goal and badge effects fire from any practice mode (the rewards data is refreshed after every answer). Not yet in Choices, Blanks, Dictation or PosPractice.
 
+## Records, words in stories, comeback (patch 0081)
+No migration; all worked out from stored data and returned by `GET /practice/rewards` (`records`, `story_words`, `comeback`).
+- **Personal records** (Progress page): most answers in a day (`practice_days`), longest run of answers that were not Again (last 5000 `review_log` rows, any language), fastest average answer (best day with 10+ timed answers), most words that reached Known in one calendar week (`known_at`). A new record plays a level 3 effect and a toast. The browser remembers what it last saw (`tutor:records-seen:<id>`); the first-ever value is silent, and each kind is announced at most once per day, because a record day would otherwise beat itself on every answer.
+- **Words in your stories** (Progress page): how many of the active language's words appear in one of the last 200 saved stories (whole words, ignoring case; substring match for Chinese, Japanese and Korean). Hidden until the learner has words.
+- **Comeback bonus:** after a break of 3+ days, Home shows "Welcome back!" with how many words are ready; the first answers of that day play a level 2 "Welcome back!" effect. No streak penalty is added.
+- Not built: a per-word story count on the Vocabulary page.
+
 ## Rules
 - **Streak:** consecutive practice days. One missed day ("rest day") per rolling 7 days does not break it (`REST_GAP_DAYS = 7`). A streak is alive if today or yesterday (or the rest-day gap) is covered.
 - **Goal:** answers in Practice today, 5 to 100, default 10.

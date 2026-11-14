@@ -124,3 +124,44 @@ def test_the_download_includes_the_new_fields(client, make_user):
     assert r.status_code == 200
     data = r.json()
     assert data["user_preferences"]["daily_goal"] == 15 and data["user_preferences"]["show_rewards"] is True and "known_at" in data["word_progress"][0]
+
+
+def test_records_start_empty_and_grow_with_practice(client, make_user):
+    c = make_user("rita")
+    r = rewards(c)["records"]
+    assert r == {"best_day": None, "longest_run": 0, "fastest_ms": None, "best_week_learned": 0}
+    add_words(c, 3)
+    ids = word_ids(c)
+    answer(c, ids[:2], grade=3)
+    answer(c, ids[2:3], grade=1)
+    answer(c, ids[:3], grade=4)
+    r = rewards(c)["records"]
+    assert r["best_day"]["value"] == 6 and r["longest_run"] == 3          # good, good, again, then easy x3: the longest run is the last three
+
+
+def test_a_slow_day_does_not_count_as_fastest_without_ten_answers(client, make_user):
+    c = make_user("rita")
+    add_words(c, 4)
+    ids = word_ids(c)
+    c.post("/api/practice/reviews", json={"reviews": [{"word_id": i, "grade": 3, "mode": "flashcards", "think_ms": 1500} for i in ids]})
+    assert rewards(c)["records"]["fastest_ms"] is None
+    for _ in range(2):
+        c.post("/api/practice/reviews", json={"reviews": [{"word_id": i, "grade": 3, "mode": "flashcards", "think_ms": 1500} for i in ids]})
+    assert rewards(c)["records"]["fastest_ms"] == 1500
+
+
+def test_words_that_appear_in_a_saved_story_are_counted(client, make_user):
+    c = make_user("rita")
+    add_words(c, 3)                      # palabraa, palabrab, palabrac
+    sql("INSERT INTO tutor.stories (user_id, language, story_type, topic, body, passed, report) SELECT id, 'es', 'story', 'x', 'Hoy Palabraa y palabrac; no palabrabb.', true, '{}'::jsonb FROM tutor.users LIMIT 1")
+    assert rewards(c)["story_words"] == {"used": 2, "total": 3}
+
+
+def test_a_learner_back_after_a_break_is_told_and_then_marked_returned(client, make_user):
+    c = make_user("rita")
+    add_words(c, 1)
+    assert rewards(c)["comeback"] is None
+    sql("INSERT INTO tutor.practice_days (user_id, day, answers) SELECT id, (now() AT TIME ZONE 'UTC')::date - 5, 5 FROM tutor.users")
+    assert rewards(c)["comeback"] == {"days_away": 5, "returned": False}
+    answer(c, word_ids(c)[:1])
+    assert rewards(c)["comeback"] == {"days_away": 5, "returned": True}

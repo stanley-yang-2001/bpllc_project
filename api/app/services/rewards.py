@@ -29,6 +29,21 @@ def overview(conn, user_id: int, language: str) -> dict:
         dictations = cur.fetchone()["n"]
         cur.execute("SELECT count(DISTINCT language) AS n FROM tutor.words WHERE user_id = %s", (user_id,))
         languages = cur.fetchone()["n"]
+        # personal records (only against the learner's own past)
+        cur.execute("SELECT grade FROM (SELECT grade, reviewed_at FROM tutor.review_log WHERE user_id = %s ORDER BY reviewed_at DESC LIMIT 5000) x "
+                    "ORDER BY reviewed_at", (user_id,))
+        run = rewards.longest_run(r["grade"] for r in cur.fetchall())
+        cur.execute("SELECT min(a) AS ms FROM (SELECT avg(think_ms) AS a FROM tutor.review_log WHERE user_id = %s AND think_ms IS NOT NULL "
+                    "GROUP BY (reviewed_at AT TIME ZONE 'UTC')::date HAVING count(think_ms) >= 10) d", (user_id,))
+        fastest = cur.fetchone()["ms"]
+        cur.execute("SELECT max(c) AS n FROM (SELECT count(*) AS c FROM tutor.word_progress WHERE user_id = %s AND known_at IS NOT NULL "
+                    "GROUP BY date_trunc('week', known_at)) w", (user_id,))
+        best_week = cur.fetchone()["n"] or 0
+        # how many of this language's words appear in a saved story
+        cur.execute("SELECT word FROM tutor.words WHERE user_id = %s AND language = %s", (user_id, language))
+        vocab = [r["word"] for r in cur.fetchall()]
+        cur.execute("SELECT body FROM tutor.stories WHERE user_id = %s AND language = %s ORDER BY created_at DESC LIMIT 200", (user_id, language))
+        bodies = [r["body"] for r in cur.fetchall()]
     days = [r["day"] for r in rows]
     streak = rewards.streak_of(days, today)
     best = max(rewards.best_streak(days), streak["days"])
@@ -37,6 +52,7 @@ def overview(conn, user_id: int, language: str) -> dict:
     items = rewards.badges({"answers": sum(answers.values()), "known_words": words["known"], "best_streak": best,
                             "stories": stories["total"], "dictations": dictations, "languages": languages})
     summary = progress.summary(conn, user_id, language)
+    best_day = max(((n, d) for d, n in answers.items()), default=None)
     return {
         "show_rewards": bool(prefs.get("show_rewards", True)),
         "streak": {**streak, "best": best},
@@ -44,6 +60,10 @@ def overview(conn, user_id: int, language: str) -> dict:
         "week": {"days_practised": len(week_days), "answers": sum(answers[d] for d in week_days), "words_learned": words["learned_week"],
                  "stories_saved": stories["week"], "due_now": summary["due"], "new_words": summary["new"]},
         "known_words": words["known"],
+        "comeback": rewards.comeback(days, today),
+        "records": {"best_day": {"value": best_day[0], "day": best_day[1]} if best_day else None, "longest_run": run,
+                    "fastest_ms": int(fastest) if fastest is not None else None, "best_week_learned": int(best_week)},
+        "story_words": {"used": rewards.words_in_stories(vocab, bodies), "total": len(set(w.strip().casefold() for w in vocab if w.strip()))},
         "badges": items,
         "next_badge": rewards.next_badge(items),
     }
