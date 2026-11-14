@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
 import { CelebrationProvider } from "../rewards/Celebration";
+import { Quiet } from "./Quiet";
 import { NewBadgeToasts } from "../rewards/NewBadgeToasts";
 import { StreakChip } from "../rewards/StreakChip";
 
@@ -58,7 +59,7 @@ export function Layout() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
-            <StreakChip />
+            <Quiet><StreakChip /></Quiet>
             <label className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-surface py-1 pl-2.5 pr-1 text-sm shadow-xs">
               <span className="hidden text-slate-500 sm:inline">{t("layout.studying")}</span>
               <select
@@ -90,7 +91,7 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <NewBadgeToasts />
+      <Quiet><NewBadgeToasts /></Quiet>
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Outlet />
       </main>

@@ -1,17 +1,16 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Layers, RotateCcw, TriangleAlert } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Layers, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type SetFilter } from "../api/client";
 import type { Flashcard, FlashcardScope, Grade } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { useCelebrate } from "../rewards/Celebration";
-import { milestoneFor } from "../rewards/effects";
-import { rewardsKey } from "../api/keys";
 import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
-import { answered, delayParts, formatMs, remaining, startSession, summarize, take, type Session } from "./session";
+import { FlashcardSummary } from "./FlashcardSummary";
+import { delayParts, remaining } from "./session";
+import { useFlashcardRound } from "./useFlashcardRound";
 
 /** Spaced-repetition flashcards. `scope` "due" is what the schedule asks for now (words in learning first, then reviews that are due,
  * then new words), "all" is every word of the chosen sets (practising ahead), "ids" is exactly those words. There is no card limit.
@@ -46,76 +45,9 @@ export function Flashcards({ language, set, scope, ids, seconds, onDone, onPract
 function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractise }: {
   language: string; set: SetFilter; scope: FlashcardScope; seconds: number | null; cards: Flashcard[]; onDone: () => void; onMore: () => void; onPractise: (ids: number[]) => void;
 }) {
-  const { user } = useAuth();
   const { t } = useI18n();
-  const qc = useQueryClient();
-  const celebrate = useCelebrate();
-  const [start] = useState(() => take(startSession(cards), Date.now()));
-  const [session, setSession] = useState<Session>(start.session);
-  const [card, setCard] = useState<Flashcard | null>(start.card);
-  const [deadline] = useState(() => (seconds ? Date.now() + seconds * 1000 : null));
-  const [now, setNow] = useState(() => Date.now());
-  const [timeUp, setTimeUp] = useState(false);
-  const [revealed, setRevealed] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const shownAt = useRef(performance.now());              // the card appeared
-  const revealedAt = useRef<number | null>(null);          // the learner checked the answer
-
-  const reveal = useCallback(() => {
-    if (revealed || !card) return;
-    revealedAt.current = performance.now();
-    setRevealed(true);
-  }, [revealed, card]);
-
-  const grade = useCallback((g: Grade) => {
-    if (!card || !revealed || saving || revealedAt.current === null) return;
-    const now = performance.now();
-    const think = Math.round(revealedAt.current - shownAt.current);
-    const rate = Math.round(now - revealedAt.current);
-    setSaving(true);
-    const finish = (result: Awaited<ReturnType<typeof api.recordReviews>>[number] | null) => {
-      const moved = answered(session, card, g, result, Date.now(), think, rate);
-      const next = take(moved, Date.now());
-      const hit = milestoneFor(moved.log);                    // a run of answers or a card count worth a celebration
-      if (hit) celebrate(hit.level, t(hit.kind === "combo" ? "rewards.fx.combo" : "rewards.fx.cards", { n: hit.n }));
-      setSession(next.session);
-      setCard(deadline !== null && Date.now() >= deadline ? null : next.card);
-      setRevealed(false);
-      revealedAt.current = null;
-      shownAt.current = performance.now();
-      setSaving(false);
-      void qc.invalidateQueries({ queryKey: ["practice", user!.id, "progress"] });
-      void qc.invalidateQueries({ queryKey: ["practice", user!.id, "stats"] });
-      void qc.invalidateQueries({ queryKey: ["practice", user!.id, "hardest"] });
-      void qc.invalidateQueries({ queryKey: rewardsKey(user!.id, language) });
-    };
-    api.recordReviews([{ word_id: card.id, grade: g, think_ms: think, rate_ms: rate, mode: "flashcards", direction: "word" }])
-      .then((r) => finish(r[0]))
-      .catch(() => { setFailed(true); finish(null); });
-  }, [card, revealed, saving, session, qc, user, celebrate, t, language, deadline]);
-
-  useEffect(() => {                                           // keys 1 to 4 grade the answer, same as the buttons
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) return;
-      if (revealed && ["1", "2", "3", "4"].includes(e.key)) grade(Number(e.key) as Grade);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [revealed, grade]);
-
-  useEffect(() => {
-    if (deadline === null) return;
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [deadline]);
-  // when the time is up the card on screen is finished (so the answer being given is not lost), then the summary comes
-  const over = deadline !== null && now >= deadline;
-  useEffect(() => { if (over && !revealed && !saving) setTimeUp(true); }, [over, revealed, saving]);
-
-  if (card === null || timeUp || (over && !revealed)) return <Done language={language} set={set} session={session} failed={failed} timeUp={over} onMore={onMore} onDone={onDone} onPractise={onPractise} />;
+  const { session, card, revealed, saving, failed, deadline, now, over, finished, reveal, grade } = useFlashcardRound({ language, cards, seconds });
+  if (card === null || finished) return <FlashcardSummary language={language} set={set} session={session} failed={failed} timeUp={over} onMore={onMore} onDone={onDone} onPractise={onPractise} />;
 
   const delay = (seconds: number) => { const { n, unit } = delayParts(seconds); return t(`practice.cards.in.${unit}`, { n }); };
   const grades: [Grade, string, number][] = [
@@ -164,54 +96,3 @@ function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractis
 
 /** Time left as m:ss (never below 0:00). */
 const clock = (ms: number) => { const total = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`; };
-
-function Done({ language, set, session, failed, timeUp, onMore, onDone, onPractise }: {
-  language: string; set: SetFilter; session: Session; failed: boolean; timeUp: boolean; onMore: () => void; onDone: () => void; onPractise: (ids: number[]) => void;
-}) {
-  const { t } = useI18n();
-  const { user } = useAuth();
-  const s = summarize(session.log);
-  const c = s.counts;
-  const total = useQuery({ queryKey: ["practice", user!.id, "stats", language, String(set)], queryFn: () => api.studyStats(language, set) }).data;
-  return (
-    <div className="space-y-4" role="status">
-      <div className="text-center">
-        <p className="text-lg font-semibold text-slate-900">{t(timeUp ? "practice.cards.timeUpTitle" : "practice.cards.doneTitle")}</p>
-        <p className="text-sm text-slate-700">{t("practice.cards.summary", { answers: s.answers, words: s.words })}</p>
-      </div>
-      <dl className="grid grid-cols-2 gap-3 text-center">
-        <div><dd className="text-2xl font-semibold text-slate-900">{Math.round(s.accuracy * 100)}%</dd><dt className="text-xs text-slate-600">{t("practice.stats.accuracy")}</dt></div>
-        <div><dd className="text-2xl font-semibold text-slate-900">{formatMs(s.avgThinkMs)}</dd><dt className="text-xs text-slate-600">{t("practice.stats.avgTime")}</dt></div>
-      </dl>
-      <p className="text-center text-sm text-slate-700">{t("practice.cards.grades", { a: c[1], h: c[2], g: c[3], e: c[4] })}</p>
-      {s.slowest.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-slate-700">{t("practice.cards.slowest")}</h3>
-          <ul className="mt-1 text-sm text-slate-800">{s.slowest.map((w) => <li key={w.id}><span lang={language} className="font-medium">{w.word}</span> · {formatMs(w.ms)}</li>)}</ul>
-        </div>
-      )}
-      {s.missed.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-slate-700">{t("practice.cards.missed")}</h3>
-          <p lang={language} className="text-sm text-slate-800">{s.missed.map((w) => w.word).join(", ")}</p>
-        </div>
-      )}
-      {total && total.total_reviews > 0 && (
-        <div className="rounded-lg border border-slate-200 p-3">
-          <h3 className="text-sm font-medium text-slate-700">{t("practice.cards.allTime")}</h3>
-          <p className="mt-1 text-sm text-slate-800">{t("practice.cards.allTimeLine", { answers: total.total_reviews, words: total.total_words_practised, days: total.total_days })}</p>
-          <p className="text-sm text-slate-800">
-            {t("practice.cards.allTimeRates", { pct: Math.round((total.total_accuracy ?? 0) * 100), time: total.total_avg_think_ms == null ? "–" : formatMs(total.total_avg_think_ms), studied: t("practice.stats.minutes", { n: Math.max(1, Math.round(total.total_studied_seconds / 60)) }) })}
-            {total.total_retention != null && <> · {t("practice.cards.allTimeRetention", { pct: Math.round(total.total_retention * 100) })}</>}
-          </p>
-        </div>
-      )}
-      {failed && <ErrorText>{t("practice.cards.saveFailed")}</ErrorText>}
-      <div className="flex flex-wrap justify-center gap-2">
-        <Button onClick={onMore} icon={<RotateCcw aria-hidden className="size-4" />}>{t("practice.cards.studyMore")}</Button>
-        {s.missed.length > 0 && <Button variant="secondary" onClick={() => onPractise(s.missed.map((w) => w.id))}>{t("practice.cards.practiseMissed", { n: s.missed.length })}</Button>}
-        <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
-      </div>
-    </div>
-  );
-}

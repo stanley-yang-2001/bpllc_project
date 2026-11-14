@@ -1,45 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
-import { RotateCcw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { api, type ClozeItem } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import { Button, ErrorText, Skeleton } from "../components/ui";
-import { useAnswerRecorder, useThinkTimer } from "./useRecorder";
+import { QuizFeedback, QuizScore, useQuizRound } from "./quiz";
 
 /** Fill in the blank in a saved story, one word at a time. Each answer is remembered against the learner's word. */
 export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => void }) {
   const { user } = useAuth();
   const { t, err } = useI18n();
   const set = useQuery({ queryKey: ["practice", user!.id, "cloze", storyId], queryFn: () => api.cloze(storyId), gcTime: 0, staleTime: Infinity });
-  const [index, setIndex] = useState(0);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [right, setRight] = useState(0);
-  const { record, failed } = useAnswerRecorder(set.data?.language ?? "");
-  const elapsed = useThinkTimer(index, set.isSuccess);
-  useEffect(() => { setIndex(0); setPicked(null); setRight(0); }, [storyId]);
+  const { index, picked, right, failed, choose: pick, next, restart } = useQuizRound(set.data?.language ?? "", set.isSuccess);
+  useEffect(() => { restart(); }, [storyId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (set.isPending) return <Skeleton className="h-40 w-full" />;
   if (set.isError) return <ErrorText>{err(set.error)}</ErrorText>;
   const items: ClozeItem[] = set.data.items;
   if (index >= items.length)
-    return (
-      <div className="space-y-3 text-center" role="status">
-        <p className="text-lg font-semibold text-slate-900">{t("practice.cloze.score", { right, total: items.length })}</p>
-        {failed && <ErrorText>{t("practice.saveFailed")}</ErrorText>}
-        <div className="flex justify-center gap-2">
-          <Button onClick={() => { setIndex(0); setPicked(null); setRight(0); }} icon={<RotateCcw aria-hidden className="size-4" />}>{t("common.tryAgain")}</Button>
-          <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
-        </div>
-      </div>
-    );
+    return <QuizScore title={t("practice.cloze.score", { right, total: items.length })} againLabel={t("common.tryAgain")} failed={failed} onAgain={restart} onDone={onDone} />;
   const item = items[index];
-  const choose = (choice: string) => {
-    if (picked !== null) return;
-    setPicked(choice);
-    record(item.word_id, choice === item.answer, { think_ms: elapsed(), mode: "cloze" });
-    if (choice === item.answer) setRight(right + 1);
-  };
+  const choose = (choice: string) => pick(choice, item.word_id, choice === item.answer, { mode: "cloze" });
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">{t("practice.cloze.sentenceOf", { n: index + 1, total: items.length })}</p>
@@ -53,12 +34,8 @@ export function Blanks({ storyId, onDone }: { storyId: number; onDone: () => voi
         ))}
       </div>
       {picked !== null && (
-        <div className="space-y-2" role="status">
-          <p className={picked === item.answer ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-red-700 dark:text-red-400"}>
-            {picked === item.answer ? t("practice.cloze.correct") : t("practice.cloze.wrong", { answer: item.answer })}
-          </p>
-          <Button onClick={() => { setPicked(null); setIndex(index + 1); }}>{index + 1 === items.length ? t("practice.cloze.seeResult") : t("common.next")}</Button>
-        </div>
+        <QuizFeedback correct={picked === item.answer} last={index + 1 === items.length} onNext={next}
+          message={picked === item.answer ? t("practice.cloze.correct") : t("practice.cloze.wrong", { answer: item.answer })} />
       )}
     </div>
   );

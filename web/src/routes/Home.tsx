@@ -10,6 +10,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
 import { Card, PageHeader, Skeleton } from "../components/ui";
 import { FirstRunGuide } from "../vocab/FirstRunGuide";
+import { Quiet } from "../components/Quiet";
 import { RewardsCard } from "../rewards/RewardsCard";
 
 const actions = [
@@ -34,7 +35,7 @@ export default function Home() {
 
       {showGuide && <FirstRunGuide language={active} onAdded={() => setJustStarted(active)} />}
 
-      {!showGuide && <RewardsCard />}
+      {!showGuide && <Quiet><RewardsCard /></Quiet>}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Headphones, RotateCcw } from "lucide-react";
+import { Headphones } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, type SetFilter } from "../api/client";
@@ -9,7 +9,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { Button, EmptyState, ErrorText, inputCls, Skeleton } from "../components/ui";
 import { CARDS } from "./constants";
 import { checkTyped, type TypedResult } from "./typed";
-import { useAnswerRecorder, useThinkTimer } from "./useRecorder";
+import { PromptPanel, QuizFeedback, QuizScore, useQuizRound } from "./quiz";
 
 /** Hear a word read aloud by the browser, type it, and be told. Each answer is remembered like any other practice. */
 export function Dictation({ language, set, due = false, onDone }: { language: string; set: SetFilter; due?: boolean; onDone: () => void }) {
@@ -17,14 +17,11 @@ export function Dictation({ language, set, due = false, onDone }: { language: st
   const { t, err } = useI18n();
   const [round, setRound] = useState(0);
   const words = useQuery({ queryKey: ["practice", user!.id, "dictation", language, String(set), due, round], queryFn: () => api.dictation({ language, limit: CARDS, set, due }), gcTime: 0, staleTime: Infinity });
-  const [index, setIndex] = useState(0);
+  const { index, right, failed, grade, next, restart } = useQuizRound(language, words.isSuccess);
   const [typed, setTyped] = useState("");
   const [result, setResult] = useState<TypedResult | null>(null);
-  const [right, setRight] = useState(0);
-  const { record, failed } = useAnswerRecorder(language);
-  const elapsed = useThinkTimer(index, words.isSuccess);
   useEffect(() => { setTyped(""); setResult(null); }, [index]);
-  const again = () => { setRound((r) => r + 1); setIndex(0); setRight(0); };
+  const again = () => { setRound((r) => r + 1); restart(); };
 
   if (words.isPending) return <Skeleton className="h-40 w-full" />;
   if (words.isError) return <ErrorText>{err(words.error)}</ErrorText>;
@@ -38,32 +35,22 @@ export function Dictation({ language, set, due = false, onDone }: { language: st
       </EmptyState>
     );
   if (index >= items.length)
-    return (
-      <div className="space-y-3 text-center" role="status">
-        <p className="text-lg font-semibold text-slate-900">{t("practice.choice.score", { right, total: items.length })}</p>
-        {failed && <ErrorText>{t("practice.saveFailed")}</ErrorText>}
-        <div className="flex justify-center gap-2">
-          <Button onClick={again} icon={<RotateCcw aria-hidden className="size-4" />}>{t("practice.again")}</Button>
-          <Button variant="secondary" onClick={onDone}>{t("common.back")}</Button>
-        </div>
-      </div>
-    );
+    return <QuizScore title={t("practice.choice.score", { right, total: items.length })} againLabel={t("practice.again")} failed={failed} onAgain={again} onDone={onDone} />;
   const item = items[index];
   const check = (e: FormEvent) => {
     e.preventDefault();
     if (result !== null || typed.trim() === "") return;
     const r = checkTyped(typed, item.word);
     setResult(r);
-    record(item.id, r === "right", { think_ms: elapsed(), mode: "dictation" });
-    if (r === "right") setRight(right + 1);
+    grade(item.id, r === "right", { mode: "dictation" });
   };
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-600">{t("practice.cardOf", { n: index + 1, total: items.length })}</p>
-      <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-8 text-center dark:bg-slate-100/40">
+      <PromptPanel>
         <p className="mb-2 text-sm text-slate-600">{t("practice.dictation.prompt")}</p>
         <SpeakButton text={item.word} language={language} label={t("speech.listen")} slow />
-      </div>
+      </PromptPanel>
       <form onSubmit={check} className="space-y-3">
         <div>
           <label htmlFor="dictation-answer" className="mb-1 block text-sm font-medium text-slate-700">{t("practice.dictation.input")}</label>
@@ -73,13 +60,10 @@ export function Dictation({ language, set, due = false, onDone }: { language: st
         {result === null && <Button type="submit" disabled={typed.trim() === ""}>{t("practice.dictation.check")}</Button>}
       </form>
       {result !== null && (
-        <div className="space-y-2" role="status">
-          <p className={result === "right" ? "font-medium text-emerald-700 dark:text-emerald-400" : "font-medium text-red-700 dark:text-red-400"}>
-            {result === "right" ? t("practice.cloze.correct") : result === "accents" ? t("practice.dictation.accents", { answer: item.word }) : t("practice.dictation.wrong", { answer: item.word })}
-          </p>
+        <QuizFeedback correct={result === "right"} last={index + 1 === items.length} onNext={next}
+          message={result === "right" ? t("practice.cloze.correct") : result === "accents" ? t("practice.dictation.accents", { answer: item.word }) : t("practice.dictation.wrong", { answer: item.word })}>
           {item.meaning && <p className="text-sm text-slate-600">{item.meaning}</p>}
-          <Button onClick={() => setIndex(index + 1)}>{index + 1 === items.length ? t("practice.cloze.seeResult") : t("common.next")}</Button>
-        </div>
+        </QuizFeedback>
       )}
     </div>
   );
