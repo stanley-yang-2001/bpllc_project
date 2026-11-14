@@ -31,7 +31,8 @@ Read-only review of `api/app`, `tutor_core`, `web/src` and `scripts`. Nothing wa
 ## Status
 - **Items 1, 2, 3 done (patch 0083).** Practice page 144 to 57 lines: modes are a registry in `web/src/practice/modes/` (a new mode = one file and one line in `index.tsx`); the four quiz modes share `practice/quiz.tsx` (`useQuizRound`, `PromptPanel`, `QuizFeedback`, `QuizScore`), taking 233 lines from about 330; `Flashcards.tsx` 217 lines became `Flashcards.tsx` (view, 98), `useFlashcardRound.ts` (logic, 86) and `FlashcardSummary.tsx` (60). All 397 existing web tests pass unchanged; new tests only add.
 - **Added while there:** the app had no error boundary, so one failing widget blanked the whole page (I hit this with a stale mock). `components/Quiet.tsx` now wraps the streak chip, the badge toasts and the Home rewards card, so a failure hides only that widget. Page-level boundaries are still not in place.
-- Items 4 to 9: not started (API items 7 and 8 next; `tutor_core` items after the Kaggle comparison).
+- **Items 7 and 8 done (patch 0084).** `rewards.overview` went from 65 lines of queries to an assembler over six small functions (`_activity`, `_totals`, `_records`, `_challenge`, `_story_words`, `_utc_today`); `study_stats.stats` likewise (`_standing`, `_recent`, `_all_time`, `_daily`, `_forecast`). `GroqHealth` no longer imports or reads the environment itself: its key, transport and clock are required arguments, wired in one place by `make_groq_health` (next to `make_story_llm`). API: 1076 tests pass, none changed except two new ones; the one failure is the local-database password test, unrelated.
+- Items 4, 5, 6, 9 (`tutor_core`): not started, on purpose until the Kaggle comparison is measured.
 
 ## Suggested order
 1. Web: items 1, 2, 3 (visible, safest, most duplication removed).

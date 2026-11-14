@@ -95,3 +95,16 @@ def test_the_health_route_reports_groq_and_still_needs_login(app, client):
         assert client.get("/api/health").json()["groq"] == {"ok": True, "status": "up", "detail": None}
     finally:
         app.state.groq_health = saved
+
+
+def test_the_real_wiring_reports_a_stub_without_touching_the_network():
+    from app.config import Settings
+    from app.services.story_llm import make_groq_health
+    health = make_groq_health(Settings(ai_mode="stub", database_url="postgresql://x", jwt_secret="x" * 40))
+    assert health.check() == {"ok": None, "status": "stub", "detail": None}
+
+
+def test_the_check_has_no_hidden_defaults_for_its_collaborators():
+    import pytest
+    with pytest.raises(TypeError):
+        GroqHealth(False)

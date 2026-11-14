@@ -53,67 +53,88 @@ def hardest(conn, user_id: int, language: str, set_filter=None, limit: int = 10)
     return {"items": items[:limit], "typical_think_ms": typical}
 
 
+def _standing(cur, base: list, extra: str) -> dict:
+    """How the words stand now: new, learning, young, mature, due, leeches."""
+    cur.execute(
+        "SELECT count(*) AS words, count(*) FILTER (WHERE p.word_id IS NULL) AS new, "
+        "count(*) FILTER (WHERE p.phase = 'learning') AS learning, count(*) FILTER (WHERE p.phase = 'relearning') AS relearning, "
+        "count(*) FILTER (WHERE p.phase = 'review' AND p.interval_days < 21) AS young, "
+        "count(*) FILTER (WHERE p.phase = 'review' AND p.interval_days >= 21) AS mature, "
+        "count(*) FILTER (WHERE p.due_at <= now() OR (p.phase <> 'review' AND p.due_at <= now() + make_interval(secs => %s))) AS due_now, "
+        "count(*) FILTER (WHERE p.lapses >= %s) AS leeches "
+        f"FROM tutor.words w LEFT JOIN tutor.word_progress p ON p.word_id = w.id WHERE w.user_id = %s AND w.language = %s AND {_HAS_MEANING}{extra}",
+        [srs.LEARN_AHEAD_SECONDS, srs.LEECH_LAPSES, *base])
+    return dict(cur.fetchone())
+
+
+def _recent(cur, base: list, extra: str):
+    """The last WINDOW_DAYS days of answers (only answers that counted toward the schedule are retention; all answers are accuracy)."""
+    cur.execute(
+        "SELECT count(*) AS n, count(*) FILTER (WHERE l.grade >= 2) AS ok, "
+        "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review') AS due_reviews, "
+        "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review' AND l.grade >= 2) AS due_ok, "
+        "avg(l.think_ms) AS think, percentile_cont(0.5) WITHIN GROUP (ORDER BY l.think_ms) AS think_med, avg(l.rate_ms) AS rate, "
+        "COALESCE(sum(COALESCE(l.think_ms, 0) + COALESCE(l.rate_ms, 0)), 0) AS ms, "
+        "count(*) FILTER (WHERE (l.reviewed_at AT TIME ZONE 'UTC')::date = " + _UTC_DAY + ") AS today "
+        f"FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id WHERE w.user_id = %s AND w.language = %s{extra} "
+        "AND l.reviewed_at > now() - make_interval(days => %s)", [*base, WINDOW_DAYS])
+    return cur.fetchone()
+
+
+def _all_time(cur, base: list, extra: str):
+    """Everything ever answered in the chosen sets (the running total shown under each session summary)."""
+    cur.execute(
+        "SELECT count(*) AS n, count(*) FILTER (WHERE l.grade >= 2) AS ok, count(DISTINCT l.word_id) AS words, "
+        "count(DISTINCT (l.reviewed_at AT TIME ZONE 'UTC')::date) AS days, avg(l.think_ms) AS think, "
+        "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review') AS due_reviews, "
+        "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review' AND l.grade >= 2) AS due_ok, "
+        "COALESCE(sum(COALESCE(l.think_ms, 0) + COALESCE(l.rate_ms, 0)), 0) AS ms "
+        f"FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id WHERE w.user_id = %s AND w.language = %s{extra}", base)
+    return cur.fetchone()
+
+
+def _daily(cur, base: list, extra: str) -> list:
+    """Reviews, correct answers and average think time for each of the last 14 days that had any."""
+    cur.execute(
+        f"SELECT (l.reviewed_at AT TIME ZONE 'UTC')::date AS day, count(*) AS reviews, count(*) FILTER (WHERE l.grade >= 2) AS correct, "
+        "avg(l.think_ms) AS think FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id "
+        f"WHERE w.user_id = %s AND w.language = %s{extra} AND l.reviewed_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1", base)
+    return [{"day": r["day"], "reviews": r["reviews"], "correct": r["correct"],
+             "avg_think_ms": None if r["think"] is None else int(round(r["think"]))} for r in cur.fetchall()]
+
+
+def _forecast(cur, base: list, extra: str) -> list:
+    """What is coming: due now (overdue ones count as today), then each of the next six days."""
+    cur.execute(
+        f"SELECT GREATEST((p.due_at AT TIME ZONE 'UTC')::date, {_UTC_DAY}) AS day, count(*) AS due FROM tutor.word_progress p "
+        f"JOIN tutor.words w ON w.id = p.word_id WHERE w.user_id = %s AND w.language = %s AND {_HAS_MEANING}{extra} "
+        f"AND (p.due_at AT TIME ZONE 'UTC')::date < {_UTC_DAY} + 7 GROUP BY 1 ORDER BY 1", base)
+    due = {r["day"]: r["due"] for r in cur.fetchall()}
+    cur.execute(f"SELECT {_UTC_DAY} AS today")
+    today = cur.fetchone()["today"]
+    return [{"day": today + timedelta(days=i), "due": due.get(today + timedelta(days=i), 0)} for i in range(7)]
+
+
+def _ms(value):
+    return None if value is None else int(round(value))
+
+
+def _rate(part, whole):
+    return round(part / whole, 3) if whole else None
+
+
 def stats(conn, user_id: int, language: str, set_filter=None) -> dict:
     extra, params = word_sets.filter_clause(set_filter, "w.set_id")
     base = [user_id, language, *params]
     with cursor(conn) as cur:
-        # how the words stand
-        cur.execute(
-            "SELECT count(*) AS words, count(*) FILTER (WHERE p.word_id IS NULL) AS new, "
-            "count(*) FILTER (WHERE p.phase = 'learning') AS learning, count(*) FILTER (WHERE p.phase = 'relearning') AS relearning, "
-            "count(*) FILTER (WHERE p.phase = 'review' AND p.interval_days < 21) AS young, "
-            "count(*) FILTER (WHERE p.phase = 'review' AND p.interval_days >= 21) AS mature, "
-            "count(*) FILTER (WHERE p.due_at <= now() OR (p.phase <> 'review' AND p.due_at <= now() + make_interval(secs => %s))) AS due_now, "
-            "count(*) FILTER (WHERE p.lapses >= %s) AS leeches "
-            f"FROM tutor.words w LEFT JOIN tutor.word_progress p ON p.word_id = w.id WHERE w.user_id = %s AND w.language = %s AND {_HAS_MEANING}{extra}",
-            [srs.LEARN_AHEAD_SECONDS, srs.LEECH_LAPSES, *base])
-        out = dict(cur.fetchone())
-        # the last 30 days of answers (only answers that counted toward the schedule are retention; all answers are accuracy)
-        cur.execute(
-            "SELECT count(*) AS n, count(*) FILTER (WHERE l.grade >= 2) AS ok, "
-            "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review') AS due_reviews, "
-            "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review' AND l.grade >= 2) AS due_ok, "
-            "avg(l.think_ms) AS think, percentile_cont(0.5) WITHIN GROUP (ORDER BY l.think_ms) AS think_med, avg(l.rate_ms) AS rate, "
-            "COALESCE(sum(COALESCE(l.think_ms, 0) + COALESCE(l.rate_ms, 0)), 0) AS ms, "
-            "count(*) FILTER (WHERE (l.reviewed_at AT TIME ZONE 'UTC')::date = " + _UTC_DAY + ") AS today "
-            f"FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id WHERE w.user_id = %s AND w.language = %s{extra} "
-            "AND l.reviewed_at > now() - make_interval(days => %s)", [*base, WINDOW_DAYS])
-        a = cur.fetchone()
-        # everything ever answered in the chosen sets (the running total shown under each session summary)
-        cur.execute(
-            "SELECT count(*) AS n, count(*) FILTER (WHERE l.grade >= 2) AS ok, count(DISTINCT l.word_id) AS words, "
-            "count(DISTINCT (l.reviewed_at AT TIME ZONE 'UTC')::date) AS days, avg(l.think_ms) AS think, "
-            "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review') AS due_reviews, "
-            "count(*) FILTER (WHERE l.was_due AND l.phase_before = 'review' AND l.grade >= 2) AS due_ok, "
-            "COALESCE(sum(COALESCE(l.think_ms, 0) + COALESCE(l.rate_ms, 0)), 0) AS ms "
-            f"FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id WHERE w.user_id = %s AND w.language = %s{extra}", base)
-        t = cur.fetchone()
-        cur.execute(
-            f"SELECT (l.reviewed_at AT TIME ZONE 'UTC')::date AS day, count(*) AS reviews, count(*) FILTER (WHERE l.grade >= 2) AS correct, "
-            "avg(l.think_ms) AS think FROM tutor.review_log l JOIN tutor.words w ON w.id = l.word_id "
-            f"WHERE w.user_id = %s AND w.language = %s{extra} AND l.reviewed_at > now() - interval '14 days' GROUP BY 1 ORDER BY 1", base)
-        days = [{"day": r["day"], "reviews": r["reviews"], "correct": r["correct"],
-                 "avg_think_ms": None if r["think"] is None else int(round(r["think"]))} for r in cur.fetchall()]
-        # what is coming: due now (overdue ones count as today), then each of the next six days
-        cur.execute(
-            f"SELECT GREATEST((p.due_at AT TIME ZONE 'UTC')::date, {_UTC_DAY}) AS day, count(*) AS due FROM tutor.word_progress p "
-            f"JOIN tutor.words w ON w.id = p.word_id WHERE w.user_id = %s AND w.language = %s AND {_HAS_MEANING}{extra} "
-            f"AND (p.due_at AT TIME ZONE 'UTC')::date < {_UTC_DAY} + 7 GROUP BY 1 ORDER BY 1", base)
-        forecast_rows = {r["day"]: r["due"] for r in cur.fetchall()}
-        cur.execute(f"SELECT {_UTC_DAY} AS today")
-        today = cur.fetchone()["today"]
-    forecast = [{"day": today + timedelta(days=i), "due": forecast_rows.get(today + timedelta(days=i), 0)} for i in range(7)]
-    n = a["n"]
+        out = _standing(cur, base, extra)
+        a, t = _recent(cur, base, extra), _all_time(cur, base, extra)
+        days, forecast = _daily(cur, base, extra), _forecast(cur, base, extra)
     out.update({
-        "language": language, "reviews_30d": n,
-        "accuracy_30d": round(a["ok"] / n, 3) if n else None,
-        "retention_30d": round(a["due_ok"] / a["due_reviews"], 3) if a["due_reviews"] else None,
-        "avg_think_ms": None if a["think"] is None else int(round(a["think"])),
-        "median_think_ms": None if a["think_med"] is None else int(round(a["think_med"])),
-        "avg_rate_ms": None if a["rate"] is None else int(round(a["rate"])),
+        "language": language, "reviews_30d": a["n"], "accuracy_30d": _rate(a["ok"], a["n"]), "retention_30d": _rate(a["due_ok"], a["due_reviews"]),
+        "avg_think_ms": _ms(a["think"]), "median_think_ms": _ms(a["think_med"]), "avg_rate_ms": _ms(a["rate"]),
         "studied_seconds_30d": int(a["ms"] // 1000), "today_reviews": a["today"], "days": days, "forecast": forecast,
         "total_reviews": t["n"], "total_words_practised": t["words"], "total_days": t["days"],
-        "total_accuracy": round(t["ok"] / t["n"], 3) if t["n"] else None,
-        "total_retention": round(t["due_ok"] / t["due_reviews"], 3) if t["due_reviews"] else None,
-        "total_avg_think_ms": None if t["think"] is None else int(round(t["think"])), "total_studied_seconds": int(t["ms"] // 1000)})
+        "total_accuracy": _rate(t["ok"], t["n"]), "total_retention": _rate(t["due_ok"], t["due_reviews"]),
+        "total_avg_think_ms": _ms(t["think"]), "total_studied_seconds": int(t["ms"] // 1000)})
     return out

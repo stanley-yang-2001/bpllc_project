@@ -17,7 +17,7 @@ from .services.ai_gate import AiGate
 from .services.chat import make_chat_client
 from .services.user_model import RequestLimiter
 from .services.turn_tokens import TurnTokens
-from .services.story_llm import GroqHealth, make_story_llm
+from .services.story_llm import make_groq_health, make_story_llm
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 PRIVATE_HEADERS = {
@@ -55,7 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.model_test_limiter = RequestLimiter(limit=5, window=60.0)
     app.state.chat_model_limiter = RequestLimiter(limit=settings.chat_model_requests_per_minute, window=60.0)     # chat on a learner's own model: calls per minute
     app.state.turn_tokens = TurnTokens()
-    app.state.groq_health = GroqHealth(stub=settings.ai_mode == "stub")
+    app.state.groq_health = make_groq_health(settings)
     install_error_handlers(app)
 
     @app.middleware("http")

@@ -5,10 +5,13 @@ token budget (the stand-in makes no model call)."""
 from __future__ import annotations
 
 import logging
+import os
+import time
 
 from tutor_core import groq as groq_module
 
 from ..config import Settings
+from .langflow_client import TransportError, urllib_transport
 
 log = logging.getLogger("tutor.story")
 
@@ -33,14 +36,13 @@ class GroqHealth:
     """Is Groq answering with our key? One light call to its models list, remembered for `ttl` seconds so the Settings page
     (or a person pressing Re-check) cannot use up the shared rate limit. Only the kind of failure is reported."""
 
-    def __init__(self, stub: bool, api_key_fn=None, transport=None, clock=None, ttl: float = 60.0, timeout: float = 3.0):
-        import os
-        import time
-        from .langflow_client import urllib_transport
+    def __init__(self, stub: bool, api_key_fn, transport, clock, ttl: float = 60.0, timeout: float = 3.0):
+        """`api_key_fn() -> str`, `transport(method, url, payload, headers, timeout)` and `clock() -> seconds` are given, not looked up, so the
+        check can be tested without a network, a key or a wait. `make_groq_health` wires the real ones."""
         self.stub, self.ttl, self.timeout = stub, ttl, timeout
-        self._key = api_key_fn or (lambda: os.environ.get("GROQ_API_KEY", ""))
-        self._transport = transport or urllib_transport
-        self._clock = clock or time.monotonic
+        self._key = api_key_fn
+        self._transport = transport
+        self._clock = clock
         self._cached: tuple[float, dict] | None = None
 
     def check(self) -> dict:
@@ -54,7 +56,6 @@ class GroqHealth:
         return result
 
     def _probe(self) -> dict:
-        from .langflow_client import TransportError
         key = (self._key() or "").strip()
         if not key:
             return {"ok": False, "status": "off", "detail": "no key"}
@@ -65,3 +66,8 @@ class GroqHealth:
             log.warning("groq health check failed: %s", e.kind if e.kind != "http" else f"http {e.status}")
             return {"ok": False, "status": "down", "detail": "rejected" if e.status in (401, 403) else e.kind}
         return {"ok": True, "status": "up", "detail": None}
+
+
+def make_groq_health(settings: Settings) -> GroqHealth:
+    """The real wiring: the key from the environment, the standard-library HTTP transport, the monotonic clock."""
+    return GroqHealth(stub=settings.ai_mode == "stub", api_key_fn=lambda: os.environ.get("GROQ_API_KEY", ""), transport=urllib_transport, clock=time.monotonic)
