@@ -111,16 +111,20 @@ def trace_lines(trace) -> list[str]:
         ph = t.get("phase")
         if ph == "observe":
             seen = ", ".join(f"{x['tool']} {x['found']}" for x in t.get("tools", []))
-            out.append(f"Observe ({t.get('label')}): score {t['score']['score']:g}; findings: {seen}" + (f"; free checks failed: {', '.join(t['gates'])}" if t.get("gates") else ""))
+            rated = t.get("naturalness") or {}
+            out.append(f"Observe ({t.get('label')}): score {t['score']['score']:g}; findings: {seen}" + (f"; naturalness {rated['score']:g}/5" if rated.get("ok") else "")
+                       + (f"; free checks failed: {', '.join(t['gates'])}" if t.get("gates") else ""))
         elif ph == "code fix":
             out.append(f"Code fix: {len(t.get('changes', []))} certain mistake(s), no model call")
         elif ph == "plan":
-            out.append(f"Plan, round {t['round']}: {len(t.get('flagged', []))} sentence(s) flagged, {len(t.get('whole_text', []))} whole-text need(s)")
+            out.append(f"Plan, round {t['round']}: {len(t.get('flagged', []))} sentence(s) flagged, {len(t.get('whole_text', []))} whole-text need(s)" + (" (measured, left alone)" if t.get("whole_text_repaired") is False else ""))
         elif ph == "repair":
             out.append(f"Repair, round {t['round']}: " + (t["error"] if t.get("error") else f"one model call, {len(t.get('reply') or '')} characters back"))
         elif ph == "verify":
             verdict = "kept" if t.get("kept") else "thrown away"
             nums = f", score {t['before']:g} to {t['after']:g}" if "after" in t else ""
+            if t.get("naturalness_before") is not None and t.get("naturalness_after") is not None:
+                nums += f", naturalness {t['naturalness_before']:g} to {t['naturalness_after']:g}"
             out.append(f"Verify, round {t['round']}: {verdict}" + (f" ({t['reason']})" if t.get("reason") else "") + nums)
     return out
 

@@ -1,5 +1,11 @@
 """Check, then fix only what was found, and keep the fix only if the score rises (10 Nov 2026). OFF unless StoryOptions.refine > 0.
 
+14 Nov 2026 (after the 13 Nov Kaggle run, which gave 5 of 6 failed reviews on hard stories against 1 of 6 without refine, and 0 of 6 against 5 of 6 on medium ones):
+the loop now also RATES NATURALNESS at every observe (the score weights it 35, and a rating of 2 fails the story, but the loop's own score used to leave it out, so
+it could report 83 -> 96 for a text the same reviewer then rated 2 of 5), a repair is thrown away when the rating drops, and the whole-text needs (length, uncommon
+words, how many of the learner's words) are no longer sent to the model: they made it pad the text with filler ("today", "now", "indeed") or rewrite everything, which
+was then rejected. They stay in the plan record, as measured and left alone.
+
 A bounded loop, not a free-form agent. Each round has the phases below, and every phase writes a record to `trace`, so a run can show exactly
 what each step saw and did:
 
@@ -20,7 +26,9 @@ from typing import Callable, Optional, Sequence
 from .languages import LANGUAGES
 from .prompts import extract_final_passage
 from .prompts.repair import build_sentence_repair_prompt
+from .naturalness import rate as rate_naturalness
 from .quality import score_story
+from .quality.score import GATE_NATURALNESS
 from .quality.grammar import Hit, apply_certain, locate, merge, sentence_spans
 from .quality.grammar.audit import AuditChecker
 from .story_gates import check as run_gates
@@ -36,6 +44,7 @@ class RefineResult:
     text: str
     trace: list = field(default_factory=list)
     notes: list = field(default_factory=list)
+    draft: str = ""                 # the text as it came in, so a test can review the draft and the result with the same reviewers
 
 
 def _sentences(text: str) -> list[str]:
@@ -99,19 +108,20 @@ def _hit_dict(hit: Hit) -> dict:
     return {"source": hit.source, "wrong": hit.wrong, "fix": hit.fix, "note": hit.note, "certain": hit.certain}
 
 
-def _brief(score: dict) -> dict:
-    return {"score": score["score"], "parts": score["parts"], "gated": score["gated"], "findings": len(score.get("grammar_hits", []))}
+def _brief(score: dict, naturalness: Optional[float] = None) -> dict:
+    return {"score": score["score"], "parts": score["parts"], "gated": score["gated"], "findings": len(score.get("grammar_hits", [])), "naturalness": naturalness}
 
 
 def refine_story(text: str, language: str, words, difficulty: Optional[dict], kind: Optional[str], call: Callable[[str], str], *,
-                 tools: Sequence = (), review_call: Optional[Callable[[str], str]] = None, rounds: int = 2) -> RefineResult:
-    """`tools` are grammar checkers (`check(text, language, words) -> [Hit]`), for example LanguageTool. `review_call` adds a model review.
-    Never raises; a failed call is recorded in the trace and the text stays as it is."""
+                 tools: Sequence = (), review_call: Optional[Callable[[str], str]] = None, rate_call: Optional[Callable[[str], str]] = None,
+                 rounds: int = 2) -> RefineResult:
+    """`tools` are grammar checkers (`check(text, language, words) -> [Hit]`), for example LanguageTool. `review_call` adds a model review and `rate_call`
+    a 1 to 5 naturalness rating (one more call per observe). Never raises; a failed call is recorded in the trace and the text stays as it is."""
     name = LANGUAGES[language].name if language in LANGUAGES else language
     words = list(words)
-    out = RefineResult(text)
+    out = RefineResult(text, draft=text)
 
-    def observe(t: str, label: str) -> tuple[dict, list[Hit]]:
+    def observe(t: str, label: str) -> tuple[dict, list[Hit], Optional[float]]:
         groups, seen = [], []
         base = score_story(t, language, words, difficulty, kind)
         groups.append([Hit(**h) for h in base["grammar_hits"]])
@@ -126,13 +136,15 @@ def refine_story(text: str, language: str, words, difficulty: Optional[dict], ki
             groups.append(found)
             seen.append({"tool": "model review", "found": len(found), "error": checker.last.error or None})
         hits = merge(*groups)
-        scored = score_story(t, language, words, difficulty, kind, hits=hits)
+        rating = rate_naturalness(rate_call, t, name) if rate_call is not None else None
+        nat = rating.score if rating is not None and rating.ok else None
+        scored = score_story(t, language, words, difficulty, kind, hits=hits, naturalness=nat)
         out.trace.append({"phase": "observe", "label": label, "tools": seen, "hits": [_hit_dict(h) for h in hits], "gates": run_gates(t, language, words, difficulty, kind, scored)["failed"],
-                          "score": _brief(scored)})
-        return scored, hits
+                          "naturalness": rating.as_dict() if rating is not None else None, "score": _brief(scored, nat)})
+        return scored, hits, nat
 
     current = text
-    score, hits = observe(current, "start")
+    score, hits, nat = observe(current, "start")
     if score["gated"]:
         out.notes.append(f"refine skipped: story is gated ({score['gated']})")
         return out
@@ -143,16 +155,17 @@ def refine_story(text: str, language: str, words, difficulty: Optional[dict], ki
             out.trace.append({"phase": "code fix", "changes": [_hit_dict(h) for h in certain]})
             out.notes.append(f"code fixed {len(certain)} certain mistake(s) with no model call")
             current = fixed
-            score, hits = observe(current, "after code fix")
+            score, hits, nat = observe(current, "after code fix")
 
     for number in range(1, max(0, rounds) + 1):
         flagged = flagged_sentences(current, hits)
-        needs = [r for r in whole_text_requirements(score, current, language, words, difficulty, kind) if not r.startswith("Fix these grammar")]
-        out.trace.append({"phase": "plan", "round": number, "flagged": [{"sentence": n, "text": s, "problems": p} for n, s, p in flagged], "whole_text": needs})
-        if not flagged and not needs:
+        left = [r for r in whole_text_requirements(score, current, language, words, difficulty, kind) if not r.startswith("Fix these grammar")]
+        out.trace.append({"phase": "plan", "round": number, "flagged": [{"sentence": n, "text": s, "problems": p} for n, s, p in flagged], "whole_text": left,
+                          "whole_text_repaired": False})
+        if not flagged:
             out.notes.append("refine: nothing left to fix" if number == 1 else "refine: done")
             break
-        prompt = build_sentence_repair_prompt(name, current, flagged, needs, ", ".join(words))
+        prompt = build_sentence_repair_prompt(name, current, flagged, [], ", ".join(words))          # sentences only: a whole-text request made the model pad or rewrite everything
         try:
             raw = call(prompt)
         except Exception as exc:        # noqa: BLE001 - a failed repair keeps the text as it is
@@ -168,12 +181,11 @@ def refine_story(text: str, language: str, words, difficulty: Optional[dict], ki
             out.trace.append({"phase": "verify", "round": number, "kept": False, "reason": "the model returned the text unchanged"})
             out.notes.append(f"refine {number} rejected: text unchanged")
             break
-        if flagged and not needs:
-            new = splice_flagged(current, new, [n for n, _, _ in flagged])          # only the named sentences may change, whatever the model returned
-            if new.strip() == current.strip():
-                out.trace.append({"phase": "verify", "round": number, "kept": False, "reason": "the named sentences came back unchanged"})
-                out.notes.append(f"refine {number} rejected: text unchanged")
-                break
+        new = splice_flagged(current, new, [n for n, _, _ in flagged])          # only the named sentences may change, whatever the model returned
+        if new.strip() == current.strip():
+            out.trace.append({"phase": "verify", "round": number, "kept": False, "reason": "the named sentences came back unchanged"})
+            out.notes.append(f"refine {number} rejected: text unchanged")
+            break
         after = score_story(new, language, words, difficulty, kind)          # the free checks first: do not pay for a review of a bad rewrite
         share = unchanged_share(current, new, [n for n, _, _ in flagged])
         still = [h.wrong for h in hits if h.kind != "style" and finding_still_in_text(h, new)]
@@ -183,15 +195,19 @@ def refine_story(text: str, language: str, words, difficulty: Optional[dict], ki
             out.trace.append(verdict)
             out.notes.append(f"refine {number} rejected: {verdict['reason']}")
             break
-        new_score, new_hits = observe(new, f"after repair {number}")
+        new_score, new_hits, new_nat = observe(new, f"after repair {number}")
         gain = new_score["score"] - score["score"]
-        verdict.update(before=score["score"], after=new_score["score"], kept=gain >= MIN_GAIN,
-                       reason=None if gain >= MIN_GAIN else f"score {score['score']} -> {new_score['score']}")
+        lower = nat is not None and new_nat is not None and new_nat < nat          # a fix that makes the text read worse is not a fix, whatever the findings say
+        kept = gain >= MIN_GAIN and not lower
+        reason = None if kept else (f"naturalness {nat:g} -> {new_nat:g}" if lower else f"score {score['score']} -> {new_score['score']}")
+        verdict.update(before=score["score"], after=new_score["score"], naturalness_before=nat, naturalness_after=new_nat, kept=kept, reason=reason)
         out.trace.append(verdict)
-        if gain < MIN_GAIN:
-            out.notes.append(f"refine {number} rejected: {score['score']} -> {new_score['score']}")
+        if not kept:
+            out.notes.append(f"refine {number} rejected: {reason}")
             break
         out.notes.append(f"refine {number} kept: {score['score']} -> {new_score['score']} ({len(flagged)} sentence(s))")
-        current, score, hits = new, new_score, new_hits
+        current, score, hits, nat = new, new_score, new_hits, new_nat
+    if nat is not None and nat <= GATE_NATURALNESS:
+        out.notes.append(f"refine: still reads unnatural ({nat:g}/5); fixing single sentences cannot change that")
     out.text = current
     return out

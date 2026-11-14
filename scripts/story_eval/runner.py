@@ -9,6 +9,11 @@ Time, per story (all in seconds):
     seconds        wall time from request to finished story, including waiting for the rate limit
     wait_seconds   seconds minus model_seconds: waiting for the limit plus the code's own time (tiny)
 The review of grammar (--audit) and the translation are measured separately and never counted in the story's calls or seconds.
+
+14 Nov 2026: a method that rewrites its own draft (refine) also has its FIRST DRAFT reviewed by the same reviewers (`entry["draft"]`), so "did refine help" compares a
+text with its own repair instead of with another sample of the model (two drafts of the same request differ by far more than any repair did). A draft that refine left
+unchanged is not reviewed again: it is the result, and a second review of the same text would only add the reviewer's noise. And a run that ends early says why in
+`data["meta"]["stopped"]`: before, the JSON of a run that stopped on a daily limit looked the same as one that was cut by a crash.
 """
 from __future__ import annotations
 
@@ -28,6 +33,7 @@ from tutor_core.quality import score_story
 from tutor_core.quality.grammar import Hit
 from tutor_core.naturalness import combine as combine_ratings, rate as rate_naturalness
 from tutor_core.quality.grammar.audit import run_audit
+from tutor_core.quality.score import merge_reviews
 from tutor_core.story import story_from_words
 
 FORMAT = "story-methods-1"
@@ -99,6 +105,35 @@ def _score(text, ok, request, hits=None, naturalness=None):
     return score_story(text, request["code"], request["words"], _d.resolve(request["tier"]), request.get("story_type"), hits=hits, naturalness=naturalness)
 
 
+def review_text(text: str, request: dict, reviewers: dict, rate: bool = True):
+    """Every reviewer's findings and 1 to 5 rating of `text`, and the score each gives it: (audits, audit_scores, audit_union). The union is the findings of all
+    reviewers together with their mean rating, None with fewer than two."""
+    code = request["code"]
+    audits, scores, union = {}, {}, None
+    for label, channel in reviewers.items():
+        channel.reset()
+        review = run_audit(channel.call, text, LANGUAGES[code].name)
+        rating = rate_naturalness(channel.call, text, LANGUAGES[code].name) if rate else None
+        audits[label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1), naturalness=rating.as_dict() if rating is not None else None)
+        if review.ok or (rating is not None and rating.ok):
+            scores[label] = _score(text, True, request, review.hits if review.ok else None, rating.score if rating is not None and rating.ok else None)
+    if len(scores) > 1:
+        union = _score(text, True, request, merge_reviews(*([Hit(**h) for h in r["hits"]] for r in audits.values() if r.get("ok"))),
+                       combine_ratings([(r.get("naturalness") or {}).get("score") for r in audits.values()]))
+    return audits, scores, union
+
+
+def draft_entry(draft: str, final: str, request: dict, reviewers: dict, rate: bool = True) -> dict:
+    """The refine loop's first draft next to its result. Reviewed only when the loop changed it and there are reviewers; an unchanged draft IS the result."""
+    changed = draft.strip() != final.strip()
+    out = {"text": draft, "changed": changed}
+    if changed:
+        out["score"] = _score(draft, True, request)
+        if reviewers:
+            out["audits"], out["audit_scores"], out["audit_union"] = review_text(draft, request, reviewers, rate)
+    return out
+
+
 def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
     """One story by one method: the entry saved in the results. Raises StopRun when the limit cannot be waited out."""
     code, difficulty = request["code"], _d.resolve(request["tier"])
@@ -133,24 +168,14 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
         entry["gate"] = run_gates(result.text, code, request["words"], difficulty, request.get("story_type"))
     reviewers = calls.audits or ({"review": calls.audit} if calls.audit else {})
     if result.ok:
-        for label, channel in reviewers.items():
-            channel.reset()
-            review = run_audit(channel.call, result.text, LANGUAGES[code].name)
-            rating = rate_naturalness(channel.call, result.text, LANGUAGES[code].name) if calls.rate else None
-            entry["audits"][label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1),
-                                          naturalness=rating.as_dict() if rating is not None else None)
-            if review.ok or (rating is not None and rating.ok):
-                entry["audit_scores"][label] = _score(result.text, True, request, review.hits if review.ok else None,
-                                                      rating.score if rating is not None and rating.ok else None)
-        if len(entry["audit_scores"]) > 1:
-            from tutor_core.quality.score import merge_reviews
-            entry["audit_union"] = _score(result.text, True, request, merge_reviews(*(
-                [Hit(**h) for h in r["hits"]] for r in entry["audits"].values() if r.get("ok"))),
-                combine_ratings([(r.get("naturalness") or {}).get("score") for r in entry["audits"].values()]))
+        entry["audits"], entry["audit_scores"], entry["audit_union"] = review_text(result.text, request, reviewers, calls.rate)
         if entry["audits"]:
             first = next(iter(entry["audits"]))
             entry["audit"], entry["audit_seconds"] = entry["audits"][first], entry["audits"][first]["seconds"]
             entry["audit_score"] = entry["audit_scores"].get(first)
+        draft = (getattr(result, "draft", "") or "").strip()
+        if draft:
+            entry["draft"] = draft_entry(draft, result.text, request, reviewers, calls.rate)
     if result.ok and calls.translate:
         entry["translation"] = calls.translate(result.text, code)
     return entry
@@ -181,6 +206,12 @@ def run(data: dict, variants: list, calls: Calls, *, conn=None, on_saved: Callab
     todo = [r for r in data["requests"]]
     if limit is not None:
         todo = todo[:limit]
+    meta = data.setdefault("meta", {})
+    meta.pop("stopped", None)                   # a resumed run starts clean: the reason below belongs to the run that wrote it
+
+    def stopped(why: str, request: dict, variant) -> None:
+        meta["stopped"] = f"{why} (at {request['id']}, {variant.name})"
+        on_saved(data)
     skipped = [v.name for v in variants if v.examples and conn is None]
     if skipped:
         say(f"Skipping {', '.join(skipped)}: it needs the example bank (--db).")
@@ -193,11 +224,16 @@ def run(data: dict, variants: list, calls: Calls, *, conn=None, on_saved: Callab
             try:
                 entry = run_one(request, variant, calls, conn)
             except StopRun as stop:
+                stopped(f"rate limit too long to wait for: {str(stop)[:160]}", request, variant)
                 say(f"\nStopped: the rate limit is too long to wait for ({str(stop)[:160]}). Run again with --resume to continue.")
                 return False
             except KeyboardInterrupt:
+                stopped("interrupted", request, variant)
                 say("\nInterrupted: what is done is saved. Run again with --resume to continue.")
                 return False
+            except Exception as exc:                # noqa: BLE001 - not caught: written down first, so the JSON says where and why it ended, then raised again
+                stopped(f"crashed: {type(exc).__name__}: {str(exc)[:160]}", request, variant)
+                raise
             row[variant.name] = entry
             on_saved(data)
             sc = (entry["score"] or {}).get("score")

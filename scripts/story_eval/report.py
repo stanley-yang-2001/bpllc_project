@@ -35,6 +35,15 @@ def entries(data: dict, variant: str, code: str = None):
             yield by_id[rid], row[variant]
 
 
+def review_counts(stories) -> dict:
+    """Over every story and every reviewer: how many reviews there were, how many FAILED the story (a naturalness rating of 2 or less, too many mistakes, stuffing,
+    anything the score fails a story for) and the mean 1 to 5 rating. The mean score alone misleads: a failed review roughly halves the score, so the mean mostly counts
+    how many ratings fell on 2 instead of 3 (13 Nov Kaggle run: means 63.0 and 66.5, failed reviews 8 and 8)."""
+    scores = [sc for e in stories if e.get("ok") for sc in (e.get("audit_scores") or {}).values()]
+    ratings = [(r.get("naturalness") or {}).get("score") for e in stories if e.get("ok") for r in (e.get("audits") or {}).values()]
+    return {"reviews": len(scores), "failed_reviews": sum(1 for sc in scores if sc.get("failed")), "naturalness": _mean(ratings)}
+
+
 def stats(data: dict, variant: str, code: str = None) -> dict:
     """Averages for one method (over one language, or all): score, pass rate, each part, calls and seconds, grammar mistakes found."""
     items = [e for _, e in entries(data, variant, code)]
@@ -47,7 +56,21 @@ def stats(data: dict, variant: str, code: str = None) -> dict:
             "parts": {k: _mean([s["parts"].get(k) for s in scored]) for k in PART_LABELS},
             "calls": _mean([e["calls"] for e in items]), "model_seconds": _mean([e["model_seconds"] for e in items]),
             "seconds": _mean([e["seconds"] for e in items]),
-            "mistakes_found": _mean([len(e["audit"]["hits"]) for e in audited]) if audited else None}
+            "mistakes_found": _mean([len(e["audit"]["hits"]) for e in audited]) if audited else None, **review_counts(made)}
+
+
+def _rescore_reviews(args, audits: dict):
+    """(score by reviewer, score with every reviewer's findings together) for one text, from the saved reviews."""
+    scores = {}
+    for label, review in audits.items():
+        nat = (review.get("naturalness") or {}).get("score")
+        if review.get("ok") or nat is not None:
+            scores[label] = score_story(*args, hits=[Hit(**h) for h in review.get("hits", [])] if review.get("ok") else None, naturalness=nat)
+    union = None
+    if len(scores) > 1:       # the findings of every reviewer together: each misses things the others find
+        joined = merge_reviews(*([Hit(**h) for h in r.get("hits", [])] for r in audits.values() if r.get("ok")))
+        union = score_story(*args, hits=joined, naturalness=combine_ratings([(r.get("naturalness") or {}).get("score") for r in audits.values()]))
+    return scores, union
 
 
 def rescore(data: dict) -> dict:
@@ -63,16 +86,13 @@ def rescore(data: dict) -> dict:
             entry["score"] = score_story(*args)
             hits = [Hit(**h) for h in (entry.get("audit") or {}).get("hits", [])]
             entry["audit_score"] = score_story(*args, hits=hits) if entry.get("audit", {}) and entry["audit"].get("ok") else None
-            entry["audit_scores"] = {}
-            for label, review in (entry.get("audits") or {}).items():
-                nat = (review.get("naturalness") or {}).get("score")
-                if review.get("ok") or nat is not None:
-                    entry["audit_scores"][label] = score_story(*args, hits=[Hit(**h) for h in review.get("hits", [])] if review.get("ok") else None, naturalness=nat)
-            entry["audit_union"] = None
-            if len(entry["audit_scores"]) > 1:       # the findings of every reviewer together: each misses things the others find
-                joined = merge_reviews(*([Hit(**h) for h in r.get("hits", [])] for r in entry["audits"].values() if r.get("ok")))
-                entry["audit_union"] = score_story(*args, hits=joined, naturalness=combine_ratings(
-                    [(r.get("naturalness") or {}).get("score") for r in entry["audits"].values()]))
+            entry["audit_scores"], entry["audit_union"] = _rescore_reviews(args, entry.get("audits") or {})
+            draft = entry.get("draft")
+            if draft and draft.get("changed") and draft.get("text"):          # the refine loop's first draft, scored and reviewed the same way
+                draft_args = (draft["text"],) + args[1:]
+                draft["score"] = score_story(*draft_args)
+                if draft.get("audits"):
+                    draft["audit_scores"], draft["audit_union"] = _rescore_reviews(draft_args, draft["audits"])
     return data
 
 
@@ -94,13 +114,15 @@ def _trace(e) -> str:
             tools = "; ".join(f"{html.escape(x['tool'])}: {x['found']}" + (f" (error: {html.escape(str(x['error'])[:60])})" if x.get("error") else "") for x in t["tools"])
             hits = "".join(f"<li>“{html.escape(h['wrong'])}” → “{html.escape(h['fix'])}” <i>{html.escape(h['note'])}</i></li>" for h in t["hits"])
             gates = f" · free checks failed: {html.escape(', '.join(t['gates']))}" if t["gates"] else ""
-            out.append(f"<li><b>Observe ({html.escape(t['label'])})</b>: score {t['score']['score']:g}; {tools}{gates}" + (f"<ul>{hits}</ul>" if hits else "") + "</li>")
+            rated = t.get("naturalness") or {}
+            nat = f" · naturalness {rated['score']:g}/5" if rated.get("ok") else ""
+            out.append(f"<li><b>Observe ({html.escape(t['label'])})</b>: score {t['score']['score']:g}; {tools}{nat}{gates}" + (f"<ul>{hits}</ul>" if hits else "") + "</li>")
         elif ph == "code fix":
             out.append(f"<li><b>Code fix</b>: {len(t['changes'])} certain mistake(s) fixed with no model call</li>")
         elif ph == "plan":
             fl = "".join(f"<li>sentence {f['sentence']}: {html.escape(f['text'])}<br><i>{html.escape('; '.join(f['problems']))}</i></li>" for f in t["flagged"])
             wt = "".join(f"<li>{html.escape(r)}</li>" for r in t["whole_text"])
-            out.append(f"<li><b>Plan, round {t['round']}</b>: {len(t['flagged'])} sentence(s) flagged, {len(t['whole_text'])} whole-text need(s)<ul>{fl}{wt}</ul></li>")
+            out.append(f"<li><b>Plan, round {t['round']}</b>: {len(t['flagged'])} sentence(s) flagged, {len(t['whole_text'])} whole-text need(s){' (measured, left alone)' if t.get('whole_text_repaired') is False else ''}<ul>{fl}{wt}</ul></li>")
         elif ph == "repair":
             body = html.escape(t.get("error") or "") or f"<div class=text>{html.escape(t.get('reply') or '')}</div>"
             out.append(f"<li><b>Repair, round {t['round']}</b> (one model call){'' if t.get('error') else ': the model sent back'}{body}</li>")
@@ -108,6 +130,8 @@ def _trace(e) -> str:
             verdict = "KEPT" if t.get("kept") else "THROWN AWAY"
             why = f" ({html.escape(t['reason'])})" if t.get("reason") else ""
             nums = f", score {t['before']:g} → {t['after']:g}" if "after" in t else ""
+            if t.get("naturalness_before") is not None and t.get("naturalness_after") is not None:
+                nums += f", naturalness {t['naturalness_before']:g} → {t['naturalness_after']:g}"
             share = f", {round(t['unchanged_share'] * 100)}% of the other sentences untouched" if "unchanged_share" in t else ""
             still = f", still in the text: {html.escape('; '.join(t['findings_still_in_text']))}" if t.get("findings_still_in_text") else ""
             out.append(f"<li><b>Verify, round {t['round']}</b>: {verdict}{why}{nums}{share}{still}</li>")
@@ -225,17 +249,52 @@ def reviewer_table(data: dict) -> str:
     return f"<h3>Reviewers compared</h3><table class=sum>{head}{''.join(rows)}</table>{agree}{cross}"
 
 
+def _headline(x: dict):
+    """One score for a reviewed text: both reviewers together when there are two, else the only one."""
+    union = (x.get("audit_union") or {}).get("score")
+    if union is not None:
+        return union
+    return _mean([sc["score"] for sc in (x.get("audit_scores") or {}).values()])
+
+
+def refine_pairs(data: dict) -> str:
+    """For a method that rewrites its own draft (refine): the draft against its result, same story, same reviewers, by level. A draft the loop left alone is the
+    result, so it counts as equal. This replaces the comparison with another method's story, which is a different sample and mostly measures chance."""
+    by_id = {r["id"]: r for r in data["requests"]}
+    out = []
+    for v in data["variants"]:
+        pairs = [(by_id[rid], row[v["name"]]) for rid, row in data["results"].items() if rid in by_id and v["name"] in row and row[v["name"]].get("ok") and row[v["name"]].get("draft")]
+        reviewed = [(r, e) for r, e in pairs if (e["draft"].get("audits") or not e["draft"].get("changed")) and e.get("audits")]
+        if not reviewed:
+            continue
+        tiers = list(dict.fromkeys(r["tier"] for r, _ in reviewed))
+        for label, group in [("all", reviewed)] + [(t, [(r, e) for r, e in reviewed if r["tier"] == t]) for t in tiers if len(tiers) > 1]:
+            before = [dict(ok=True, **e["draft"]) if e["draft"].get("changed") else e for _, e in group]
+            after = [e for _, e in group]
+            b, a = review_counts(before), review_counts(after)
+            out.append(f"<tr><td>{html.escape(v['label'])}</td><td>{html.escape(label)}</td><td>{len(group)}</td><td>{sum(1 for _, e in group if e['draft'].get('changed'))}</td>"
+                       f"<td>{b['failed_reviews']} of {b['reviews']}</td><td>{a['failed_reviews']} of {a['reviews']}</td><td>{_fmt(b['naturalness'])}</td><td>{_fmt(a['naturalness'])}</td>"
+                       f"<td>{_fmt(_mean([_headline(x) for x in before]))}</td><td>{_fmt(_mean([_headline(x) for x in after]))}</td></tr>")
+    if not out:
+        return ""
+    head = ("<tr><th>Method</th><th>Level</th><th>Stories</th><th>Changed</th><th>Failed reviews, draft</th><th>Failed reviews, result</th><th>Naturalness, draft</th>"
+            "<th>Naturalness, result</th><th>Score with review, draft</th><th>Score with review, result</th></tr>")
+    return ("<h3>The draft against its own repair</h3><p class=num>The same story reviewed before and after the loop touched it (a draft left unchanged counts as equal). "
+            f"This is the fair test of a repair step.</p><table class=sum>{head}{''.join(out)}</table>")
+
+
 def _summary(data: dict) -> str:
     variants = data["variants"]
     base = stats(data, variants[0]["name"]) if variants else {}
-    head = ("<tr><th>Method</th><th>What it adds</th><th>Stories</th><th>Mean score</th><th>vs first</th><th>With model review</th><th>Pass rate</th>"
+    head = ("<tr><th>Method</th><th>What it adds</th><th>Stories</th><th>Mean score</th><th>vs first</th><th>With model review</th><th>Failed reviews</th><th>Naturalness (1-5)</th><th>Pass rate</th>"
             + "".join(f"<th>{l}</th>" for l in PART_LABELS.values()) + "<th>Calls</th><th>Seconds in model</th><th>Seconds in all</th><th>Mistakes found</th></tr>")
     rows = []
     for v in variants:
         s = stats(data, v["name"])
         delta = None if s["score"] is None or base.get("score") is None else round(s["score"] - base["score"], 1)
         rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{html.escape(v['note'])}</td><td>{s['stories']}/{s['requests']}</td><td>{_fmt(s['score'])}</td>"
-                    f"<td>{'–' if delta is None else f'{delta:+g}'}</td><td>{_fmt(s['audit_score'])}</td><td>{_fmt(s['pass_rate'], True)}</td>"
+                    f"<td>{'–' if delta is None else f'{delta:+g}'}</td><td>{_fmt(s['audit_score'])}</td>"
+                    f"<td>{'–' if not s['reviews'] else str(s['failed_reviews']) + ' of ' + str(s['reviews'])}</td><td>{_fmt(s['naturalness'])}</td><td>{_fmt(s['pass_rate'], True)}</td>"
                     + "".join(f"<td>{_fmt(s['parts'][k])}</td>" for k in PART_LABELS)
                     + f"<td>{_fmt(s['calls'])}</td><td>{_fmt(s['model_seconds'])}</td><td>{_fmt(s['seconds'])}</td><td>{_fmt(s['mistakes_found'])}</td></tr>")
     codes = list(dict.fromkeys(r["code"] for r in data["requests"]))
@@ -247,8 +306,10 @@ def _summary(data: dict) -> str:
             f"{meta.get('score_version', '?')}), pass rate (not gated and every part at least {PASS_PART:g}), average model calls and seconds per story. "
             "“Seconds in model” is time inside model calls; “seconds in all” also counts waiting for the free tier’s rate limit. "
             "The model review column appears only when the run used --audit: an independent model lists grammar mistakes in each final story, and the score is "
-            "computed again with them.</p>" + (f"<p class=num>{html.escape(models)}</p>" if models else "")
-            + f"<table class=sum>{head}{''.join(rows)}</table>{reviewer_table(data)}<h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>")
+            "computed again with them. A review FAILS a story when it rates it 2 of 5 or lower, finds too many mistakes or finds it stuffed; that halves the score, so "
+            "read “Failed reviews” before the mean score.</p>" + (f"<p class=num>{html.escape(models)}</p>" if models else "")
+            + (f"<p class=num><b>This run stopped early:</b> {html.escape(str(meta['stopped']))}. Run again with --resume.</p>" if meta.get("stopped") else "")
+            + f"<table class=sum>{head}{''.join(rows)}</table>{refine_pairs(data)}{reviewer_table(data)}<h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>")
 
 
 def render(data: dict) -> str:

@@ -88,6 +88,34 @@ Test on 10 English stories (a part at a time, because of the daily Groq limit):
 
 Add `--variants baseline,refine` to see the same ten requests written by the plain one-call pipeline next to the refined one. The report's "Pipeline detail" lists each phase; the JSON keeps the full `trace` for every story.
 
+### What the 13 November Kaggle run showed, and what patch 0085 changed
+
+10 English stories, baseline against refine, reviewed by gpt-oss-120b and qwen3.8 (20 reviews per method):
+
+| | baseline | refine |
+|---|---|---|
+| mean score with review | 63.0 | 66.5 |
+| **failed reviews** (naturalness 2 or less, too many mistakes, stuffing) | **8 of 20** | **8 of 20** |
+| medium stories (3), failed reviews of 6 | 5 | 0 |
+| hard stories (3), failed reviews of 6 | 1 | 5 |
+| easy stories (3), failed reviews of 6 | 0 | 1 |
+| model calls / seconds per story | 1.8 / 3.1 | 4.9 / 49.8 |
+
+- **The mean score misleads.** A naturalness rating of 2 fails the story and roughly halves its score, so scores sit in two groups (75 to 92, or 23 to 45) and the mean mostly counts how many ratings landed on 2 instead of 3. The two reviewers agree on the exact rating for 10 of 20 texts (within one point for 19 of 20); qwen rates about half a point lower (mean 2.7 against 3.15), and that is enough to decide pass or fail. The report now shows failed reviews and the mean rating next to the mean score.
+- **Refine fixes grammar and breaks naturalness.** On medium stories the loop fixed real mistakes (missing articles, "wake" for "wake up"): 5 failed reviews became 0. On hard stories it made the text read worse in all three (rating 4, 3, 4 became 2, 2, 2), with filler such as "this bright morning today" and "happy today indeed", and 14 to 34 words longer than the baseline story.
+- **Why.** (1) The loop's own score left naturalness out, so it recorded 83.2 to 96.2 for a text the same reviewer then rated 2 of 5. (2) The whole-text needs (reach 180 to 220 words, use fewer of the learner's words, simpler words) were sent to the model together with the flagged sentences: it padded the text, or rewrote all of it and was rejected (3 of 10: "rewrote too much"). (3) The comparison itself was unpaired: refine writes its own first draft, so the difference to the baseline story is mostly the difference between two drafts.
+
+Patch 0085 changes: the loop rates naturalness at every observe (one more call each) and throws a repair away when the rating drops; only the flagged sentences are sent to the model and the whole-text needs are recorded as "measured, left alone"; the first draft travels with the result (`StoryResult.draft`), and the runner reviews it with the same reviewers (`entry["draft"]`, only when the loop changed it) so the report can show **the draft against its own repair**; a run that stops says why in `meta["stopped"]` (rate limit, interrupt or crash, with the story and method).
+
+### Ideas not built yet, with the evidence
+
+1. **Tell the writer what the reviewers punish.** Of 25 findings on the ten refine first drafts, 10 were a missing article or possessive ("to kitchen", "in house", "opened drawer", "friend on the phone"), 4 an unneeded word or phrase ("please", "thank you", "goodbye today", "to me"), 4 an adverb in the wrong form or place ("bright", "gone still", "tired slowly"); my grouping, by the wording of each finding. The classic writer prompt asks for short sentences (5 to 10 words) and only says articles "may" be added; it never asks to keep them or not to pad (the story-type prompts were not re-read for this). One added rule per language family (keep every article, possessive and particle even in short sentences; leave a learner word out rather than tack it on; no "today", "now", "still" at the end of lines) targets 18 of the 25 findings at no extra call. Measure with `--variants baseline` before and after.
+2. **Write again instead of repairing when the draft reads unnatural.** Sentence repair cannot fix a rating of 2. About one baseline review in three (6 of 18, leaving out the stuffed story) rates the draft 2 or less. Whether a second draft of the same request would pass is not measured yet: write each of the ten requests three times with the plain pipeline and rate each draft (30 stories) before building this. One new draft chosen by the same rating, only when the rating of the first is 2 or less or a free gate fails, costs 3 calls on a third of the stories.
+3. **Fit the word target to the list.** Hard asks for at least 8 of the learner's words in 200 words. With a list of 12 greetings and interjections ("please", "yes", "no", "sorry", "excuse me") the hard stories used 10 to 12 of them, and in each of the three pairs the version that used more words was rated lower. Try a hard minimum of 6, or a minimum that scales with how many of the words are nouns and verbs.
+4. **A softer cliff.** Today a single 2 fails the story and halves the score. With one reviewer that is a coin flip near the boundary. Options: rate twice and take the mean; count 2 as a warning and fail only at 1.5 or below; or ask for a 1 to 10 scale.
+5. **Free gates cannot see naturalness.** On the 20 texts a reviewer failed 10; the free gates failed 3 of those (the "stuffed" ones). Simple offline detectors (share of lines ending in "today", "now", "again") did not separate failed from passed texts on this sample, so the model rating stays the judge; a better offline signal is a question for `eval_signals.py` with LanguageTool and perplexity on the hand grades.
+6. **Cost.** Refine is 5 calls and about 50 seconds per story on the free tier; the rating adds up to 3 calls. Worth it only if the paired table shows a gain on every level, otherwise use it on medium and hard only after fixing idea 1.
+
 
 ## What is left on each key (patch 0075)
 

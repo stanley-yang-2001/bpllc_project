@@ -57,6 +57,7 @@ class StoryResult:
     difficulty: Optional[dict] = None   # the targets asked for (tutor_core.difficulty.resolve), or None
     notes: tuple = ()               # what the optional steps did (candidates, judge, repair), for the comparison report
     trace: tuple = ()               # the refine loop's phase records (story_refine.py), for the comparison report
+    draft: str = ""                 # the text before the refine loop touched it ("" when refine is off), so a test can review the draft too
 
 
 @dataclass(frozen=True)
@@ -214,8 +215,10 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
         passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge)
         notes += more
     trace: list = []
+    draft = ""
     if opts.refine:
-        done = refine_story(passage, language, words, request.difficulty, picked_type, call, tools=refine_tools(), review_call=judge_call or call, rounds=opts.refine)
-        passage, trace = done.text, done.trace
+        done = refine_story(passage, language, words, request.difficulty, picked_type, call, tools=refine_tools(), review_call=judge_call or call,
+                            rate_call=judge_call or call, rounds=opts.refine)
+        draft, passage, trace = done.draft, done.text, done.trace
         notes += done.notes
-    return StoryResult(passage, True, None, notes=tuple(notes), trace=tuple(trace), **base)
+    return StoryResult(passage, True, None, notes=tuple(notes), trace=tuple(trace), draft=draft, **base)

@@ -194,3 +194,93 @@ def test_the_command_line_rescores_a_saved_run_without_a_key(tmp_path, monkeypat
     assert (tmp_path / "m_rescored.html").exists() and (tmp_path / "m_rescored.json").exists()
     assert run_story_methods.main(["--dry-run", "--variants", "nope"]) == 2
     assert run_story_methods.main(["--dry-run", "--languages", "es"]) == 0
+
+
+# --- 14 Nov 2026: the draft against its own repair, failed reviews, and why a run stopped -------------------------------------------------------------------------
+
+FLAW = GOOD.replace("Los dos desayunan juntos", "Los dos desayunan juntos todos")
+GOOD_ANSWER = "===STORY===\n" + GOOD
+
+
+def refine_model(prompt):
+    """The writer gives a draft with one mistake, the review finds it where it is, the repair fixes it, the rating is 4."""
+    if "Rate how NATURAL" in prompt:
+        return json.dumps({"score": 4, "reason": "fine"})
+    if "Find the mistakes that a careful native speaker" in prompt:
+        wrong = "juntos todos" in prompt
+        return json.dumps({"errors": [{"wrong": "juntos todos", "right": "juntos", "type": "extra_word", "why": "extra word"}] if wrong else []})
+    if "correcting a short reading text" in prompt:
+        return "===STORY===\n" + GOOD
+    if "Translate this" in prompt:
+        return "Mary lives in a big house."
+    return "===STORY===\n" + FLAW
+
+
+def refine_calls(model=refine_model):
+    chans = {a: runner.Channel(model) for a in ("gpt", "qwen")}
+    return runner.Calls(runner.Channel(model), models=lambda a: chans[a], audits={"gpt": runner.Channel(model), "qwen": runner.Channel(model)})
+
+
+def test_a_changed_draft_is_reviewed_by_the_same_reviewers_as_its_result():
+    data, chosen = make("refine")
+    runner.run(data, chosen, refine_calls(), say=lambda *_: None, limit=1)
+    e = next(iter(data["results"].values()))["refine"]
+    assert e["ok"] and e["text"] == GOOD and e["draft"]["changed"] and e["draft"]["text"] == FLAW
+    assert set(e["draft"]["audits"]) == {"gpt", "qwen"} and set(e["draft"]["audit_scores"]) == {"gpt", "qwen"} and e["draft"]["audit_union"] is not None
+    assert e["draft"]["audits"]["gpt"]["hits"] and not e["audits"]["gpt"]["hits"]          # the reviewers find the mistake in the draft and not in the result
+    assert e["draft"]["audit_union"]["score"] < e["audit_union"]["score"]
+
+
+def test_a_draft_the_loop_left_alone_is_not_reviewed_again():
+    def clean(prompt):
+        if "Find the mistakes that a careful native speaker" in prompt:
+            return json.dumps({"errors": []})
+        return GOOD_ANSWER if "Rate how NATURAL" not in prompt else json.dumps({"score": 4})
+    data, chosen = make("refine")
+    runner.run(data, chosen, refine_calls(clean), say=lambda *_: None, limit=1)
+    e = next(iter(data["results"].values()))["refine"]
+    assert e["draft"] == {"text": GOOD, "changed": False}
+
+
+def test_the_report_counts_failed_reviews_and_compares_the_draft_with_its_repair():
+    data, chosen = make("baseline,refine")
+    c = refine_calls()
+    c.story = runner.Channel(refine_model)
+    runner.run(data, chosen, c, say=lambda *_: None, limit=1)
+    s = report.stats(data, "refine")
+    assert s["reviews"] == 2 and s["failed_reviews"] == 0 and s["naturalness"] == 4
+    page = report.render(data)
+    assert "The draft against its own repair" in page and "Failed reviews" in page and "Failed reviews, draft" in page
+    assert "naturalness 4" in page and "measured, left alone" in page
+    # a failed review: a rating of 2 fails the story
+    entry = next(iter(data["results"].values()))["refine"]
+    for r in entry["audits"].values():
+        r["naturalness"]["score"] = 2
+    again = report.rescore(data)
+    assert report.stats(again, "refine")["failed_reviews"] == 2
+    fresh = next(iter(again["results"].values()))["refine"]
+    assert fresh["draft"]["changed"] and fresh["draft"]["audit_scores"] and fresh["draft"]["score"]["score"] > 0      # the draft block is scored again too
+
+
+def test_a_run_that_stops_says_why_in_the_json_and_a_resume_clears_it(tmp_path):
+    def limited(prompt):
+        raise RuntimeError("Groq API error 429: Rate limit reached ... Please try again in 7h12m. ")
+    data, chosen = make("baseline")
+    path = str(tmp_path / "run.json")
+    assert runner.run(data, chosen, calls(limited), on_saved=lambda d: runner.save(d, path), say=lambda *_: None) is False
+    stopped = runner.load(path)["meta"]["stopped"]
+    assert "rate limit too long to wait for" in stopped and "(at es-0, baseline)" in stopped
+    again = runner.load(path)
+    assert runner.run(again, chosen, calls(), say=lambda *_: None) is True and "stopped" not in again["meta"]
+
+
+def test_a_crash_is_written_down_before_it_is_raised(monkeypatch, tmp_path):
+    def boom(*a, **k):
+        raise ValueError("bad row")
+    monkeypatch.setattr(runner, "run_one", boom)
+    data, chosen = make("baseline")
+    path = str(tmp_path / "run.json")
+    with pytest.raises(ValueError):
+        runner.run(data, chosen, calls(), on_saved=lambda d: runner.save(d, path), say=lambda *_: None)
+    assert runner.load(path)["meta"]["stopped"].startswith("crashed: ValueError: bad row (at es-0")
+    assert "This run stopped early" in report.render(runner.load(path))
