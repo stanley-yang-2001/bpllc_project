@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from ..db import connection
 from ..deps import current_user, require_language
 from ..errors import AppError, not_found
-from ..schemas import AnswersIn, ChoiceSet, ClozeSet, DictationSet, FlashcardSet, HardWords, PosSet, ProgressOut, ReviewResults, ReviewsIn, StudyStats
-from ..services import practice, progress, stories, study_stats
+from ..schemas import AnswersIn, ChoiceSet, ClozeSet, DictationSet, FlashcardSet, HardWords, PosSet, ProgressOut, ReviewResults, RewardsOut, ReviewsIn, StudyStats
+from ..services import practice, progress, rewards, stories, study_stats
 from tutor_core.languages import LANGUAGES
 
 router = APIRouter(prefix="/practice", tags=["practice"])
@@ -96,6 +96,14 @@ def get_progress(request: Request, language: str, set: str | None = SET_QUERY, u
     require_language(language)
     with connection(request.app.state.pool) as conn:
         return progress.summary(conn, user["id"], language, set)
+
+
+@router.get("/rewards", response_model=RewardsOut)
+def get_rewards(request: Request, language: str, user: dict = Depends(current_user)):
+    """The streak (a missed day a week is forgiven), the daily goal, the week so far and the badges, all from the learner's own records."""
+    require_language(language)
+    with connection(request.app.state.pool) as conn:
+        return rewards.overview(conn, user["id"], language)
 
 
 @router.get("/cloze", response_model=ClozeSet)

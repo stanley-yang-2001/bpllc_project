@@ -233,7 +233,7 @@ def test_export_includes_progress_and_days(make_user):
     data = c.get("/api/me/export").json()
     assert {(p["word"], p["box"], p["phase"], p["right_count"], p["wrong_count"]) for p in data["word_progress"]} == {("hello", 2, "review", 2, 0), ("water", 1, "learning", 0, 1)}
     assert set(data["word_progress"][0]) == {"language", "word", "box", "phase", "ease", "interval_days", "lapses", "last_grade", "due_at", "right_count",
-                                             "wrong_count", "last_answered_at"}
+                                             "wrong_count", "last_answered_at", "known_at"}
     assert len(data["practice_days"]) == 1 and data["practice_days"][0]["answers"] == 3
     log = [l for l in data["review_log"] if l["word"] == "water"]
     assert len(log) == 1 and (log[0]["grade"], log[0]["think_ms"], log[0]["rate_ms"], log[0]["mode"]) == (1, 4200, 900, "flashcards")

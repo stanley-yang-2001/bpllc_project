@@ -539,6 +539,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice/rewards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rewards
+         * @description The streak (a missed day a week is forgiven), the daily goal, the week so far and the badges, all from the learner's own records.
+         */
+        get: operations["get_rewards_api_practice_rewards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practice/stats": {
         parameters: {
             query?: never;
@@ -903,6 +923,17 @@ export interface components {
             /** Answers */
             answers: components["schemas"]["AnswerIn"][];
         };
+        /** BadgeOut */
+        BadgeOut: {
+            /** Earned */
+            earned: boolean;
+            /** Have */
+            have: number;
+            /** Id */
+            id: string;
+            /** Target */
+            target: number;
+        };
         /** Body_upload_api_words_upload_post */
         Body_upload_api_words_upload_post: {
             /** File */
@@ -1165,6 +1196,17 @@ export interface components {
             /** Words Used */
             words_used: number;
         };
+        /** GoalOut */
+        GoalOut: {
+            /** Done */
+            done: number;
+            /** Left */
+            left: number;
+            /** Reached */
+            reached: boolean;
+            /** Target */
+            target: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1342,11 +1384,15 @@ export interface components {
             /** Chat In Study Language */
             chat_in_study_language: boolean;
             custom_colors: components["schemas"]["CustomColors"] | null;
+            /** Daily Goal */
+            daily_goal: number;
             /**
              * Meaning Mode
              * @enum {string}
              */
             meaning_mode: "native" | "study" | "both";
+            /** Show Rewards */
+            show_rewards: boolean;
             /** Theme */
             theme: string;
             /** Ui Follows Study Language */
@@ -1363,8 +1409,12 @@ export interface components {
             /** Chat In Study Language */
             chat_in_study_language?: boolean | null;
             custom_colors?: components["schemas"]["ColorsIn"] | null;
+            /** Daily Goal */
+            daily_goal?: number | null;
             /** Meaning Mode */
             meaning_mode?: ("native" | "study" | "both") | null;
+            /** Show Rewards */
+            show_rewards?: boolean | null;
             /** Theme */
             theme?: string | null;
             /** Ui Follows Study Language */
@@ -1496,6 +1546,19 @@ export interface components {
         ReviewsIn: {
             /** Reviews */
             reviews: components["schemas"]["ReviewIn"][];
+        };
+        /** RewardsOut */
+        RewardsOut: {
+            /** Badges */
+            badges: components["schemas"]["BadgeOut"][];
+            goal: components["schemas"]["GoalOut"];
+            /** Known Words */
+            known_words: number;
+            next_badge?: components["schemas"]["BadgeOut"] | null;
+            /** Show Rewards */
+            show_rewards: boolean;
+            streak: components["schemas"]["StreakOut"];
+            week: components["schemas"]["WeekOut"];
         };
         /** SaveIn */
         SaveIn: {
@@ -1677,6 +1740,21 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** StreakOut */
+        StreakOut: {
+            /** Alive */
+            alive: boolean;
+            /** Best */
+            best: number;
+            /** Days */
+            days: number;
+            /** Practised Today */
+            practised_today: boolean;
+            /** Rest Available */
+            rest_available: boolean;
+            /** Rest Used On */
+            rest_used_on?: string | null;
+        };
         /** StudyStats */
         StudyStats: {
             /** Accuracy 30D */
@@ -1813,6 +1891,21 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WeekOut */
+        WeekOut: {
+            /** Answers */
+            answers: number;
+            /** Days Practised */
+            days_practised: number;
+            /** Due Now */
+            due_now: number;
+            /** New Words */
+            new_words: number;
+            /** Stories Saved */
+            stories_saved: number;
+            /** Words Learned */
+            words_learned: number;
         };
         /** WordIn */
         WordIn: {
@@ -2752,6 +2845,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_rewards_api_practice_rewards_get: {
+        parameters: {
+            query: {
+                language: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RewardsOut"];
                 };
             };
             /** @description Validation Error */

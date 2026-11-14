@@ -1,5 +1,5 @@
 import { qs, request } from "./http";
-import type { FlashcardSet, ClozeSet, ChoiceSet, PosSet, DictationSet, PracticeProgress, Answer, SetFilter, FlashcardScope, Review, ReviewResult, StudyStats, HardWords } from "./types";
+import type { FlashcardSet, ClozeSet, ChoiceSet, PosSet, DictationSet, PracticeProgress, Rewards, Answer, SetFilter, FlashcardScope, Review, ReviewResult, StudyStats, HardWords } from "./types";
 
 const setParam = (set?: SetFilter) => (set === "all" ? undefined : set);
 
@@ -19,5 +19,6 @@ export const practiceApi = {
     request<PosSet>("GET", `/practice/pos?${qs({ ...p, set: p.set === "all" ? undefined : p.set, due: p.due ? "true" : undefined })}`),
   recordAnswers: (answers: Answer[]) => request<void>("POST", "/practice/answers", { json: { answers } }),
   practiceProgress: (language: string, set?: SetFilter) => request<PracticeProgress>("GET", `/practice/progress?${qs({ language, set: setParam(set) })}`),
+  rewards: (language: string) => request<Rewards>("GET", `/practice/rewards?${qs({ language })}`),
   cloze: (storyId: number) => request<ClozeSet>("GET", `/practice/cloze?story_id=${storyId}`),
 };

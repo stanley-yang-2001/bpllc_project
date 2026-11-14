@@ -46,6 +46,8 @@ export type DictationSet = Schemas["DictationSet"];
 export type StarterPackList = Schemas["StarterPackList"];
 export type StarterAdded = Schemas["StarterAdded"];
 export type PracticeProgress = Schemas["ProgressOut"];
+export type Rewards = Schemas["RewardsOut"];
+export type Badge = Schemas["BadgeOut"];
 export interface Answer { word_id: number; correct: boolean; think_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" }
 export type ChoiceCard = Schemas["ChoiceOut"];
 /** Which words to show or practise: every word, the General set, one set by id, or several at once as a comma list ("3,7,general"). */

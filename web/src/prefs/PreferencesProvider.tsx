@@ -5,7 +5,7 @@ import { useFollowOtherTabs, useWriteDeviceCopy } from "./deviceSync";
 import { useLegacyAdoption } from "./legacyAdoption";
 import { useSavedPreferences } from "./useSavedPreferences";
 
-export const DEFAULT_PREFS: Prefs = { active_language: null, ui_follows_study_language: false, chat_in_study_language: false, meaning_mode: "native", theme: "system", custom_colors: null };
+export const DEFAULT_PREFS: Prefs = { active_language: null, ui_follows_study_language: false, chat_in_study_language: false, meaning_mode: "native", theme: "system", custom_colors: null, daily_goal: 10, show_rewards: true };
 
 interface Value {
   /** What to show now: the account's values with this person's unsaved changes on top; defaults when nobody is signed in. */

@@ -5,7 +5,7 @@ import re
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from tutor_core.languages import LANGUAGES
 
 from ..db import connection
@@ -70,6 +70,8 @@ class PreferencesPatch(BaseModel):
     meaning_mode: Literal["native", "study", "both"] | None = None
     theme: str | None = None
     custom_colors: ColorsIn | None = None
+    daily_goal: int | None = Field(None, ge=5, le=100)
+    show_rewards: bool | None = None
 
     @field_validator("theme")
     @classmethod

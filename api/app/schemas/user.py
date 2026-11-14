@@ -22,6 +22,8 @@ class PreferencesOut(BaseModel):
     meaning_mode: Literal["native", "study", "both"]
     theme: str
     custom_colors: CustomColors | None
+    daily_goal: int
+    show_rewards: bool
 
 
 class UserOut(BaseModel):

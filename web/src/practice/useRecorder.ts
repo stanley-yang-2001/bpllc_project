@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import type { Answer } from "../api/types";
-import { progressKey } from "../api/keys";
+import { progressKey, rewardsKey } from "../api/keys";
 import { useAuth } from "../auth/AuthContext";
 
 /** Remember each answer as it is given, so a round left half-way still counts. A failure never stops the round: it is shown
@@ -14,7 +14,7 @@ export function useAnswerRecorder(language: string) {
   const record = useCallback((wordId: number | null | undefined, correct: boolean, extra: Pick<Answer, "think_ms" | "mode" | "direction"> = {}) => {
     if (!wordId) return;
     api.recordAnswers([{ word_id: wordId, correct, ...extra }])
-      .then(() => qc.invalidateQueries({ queryKey: progressKey(user!.id, language) }))
+      .then(() => Promise.all([qc.invalidateQueries({ queryKey: progressKey(user!.id, language) }), qc.invalidateQueries({ queryKey: rewardsKey(user!.id, language) })]))
       .catch(() => setFailed(true));
   }, [qc, user, language]);
   return { record, failed };

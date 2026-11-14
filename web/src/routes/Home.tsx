@@ -10,6 +10,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
 import { Card, PageHeader, Skeleton } from "../components/ui";
 import { FirstRunGuide } from "../vocab/FirstRunGuide";
+import { RewardsCard } from "../rewards/RewardsCard";
 
 const actions = [
   { to: "/vocabulary", title: "nav.vocabulary", text: "home.vocabulary.text", icon: BookOpen },
@@ -32,6 +33,8 @@ export default function Home() {
       <PageHeader title={t("home.welcome", { name: user?.display_name ?? "" })} description={t("home.studying", { language: name })} />
 
       {showGuide && <FirstRunGuide language={active} onAdded={() => setJustStarted(active)} />}
+
+      {!showGuide && <RewardsCard />}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>

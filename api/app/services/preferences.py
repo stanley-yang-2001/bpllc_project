@@ -6,8 +6,8 @@ from psycopg2.extras import Json
 
 from ..db import cursor
 
-COLUMNS = "active_language, ui_follows_study_language, chat_in_study_language, meaning_mode, theme, custom_colors"
-_WRITABLE = ("active_language", "ui_follows_study_language", "chat_in_study_language", "meaning_mode", "theme", "custom_colors")
+COLUMNS = "active_language, ui_follows_study_language, chat_in_study_language, meaning_mode, theme, custom_colors, daily_goal, show_rewards"
+_WRITABLE = ("active_language", "ui_follows_study_language", "chat_in_study_language", "meaning_mode", "theme", "custom_colors", "daily_goal", "show_rewards")
 
 
 def get(conn, user_id: int) -> dict | None:
@@ -34,7 +34,8 @@ def save(conn, user_id: int, changes: dict) -> dict:
 
 _NOT_NULLABLE = {"theme": "theme: cannot be empty", "ui_follows_study_language": "ui_follows_study_language: must be true or false",
                  "chat_in_study_language": "chat_in_study_language: must be true or false",
-                 "meaning_mode": "meaning_mode: must be native, study or both"}
+                 "meaning_mode": "meaning_mode: must be native, study or both", "daily_goal": "daily_goal: cannot be empty",
+                 "show_rewards": "show_rewards: must be true or false"}
 
 
 def changes_from(sent: dict) -> dict:

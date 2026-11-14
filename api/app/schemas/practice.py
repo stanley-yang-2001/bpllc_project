@@ -200,3 +200,45 @@ class ClozeSet(BaseModel):
     story_id: int
     language: str
     items: list[ClozeItem]
+
+
+class StreakOut(BaseModel):
+    days: int                   # practised days in a row; one missed day a week is forgiven
+    alive: bool
+    practised_today: bool
+    rest_available: bool        # a missed day would be forgiven right now
+    rest_used_on: date | None = None
+    best: int
+
+
+class GoalOut(BaseModel):
+    target: int
+    done: int
+    reached: bool
+    left: int
+
+
+class WeekOut(BaseModel):
+    days_practised: int         # of the last 7 days
+    answers: int
+    words_learned: int          # words that reached "known" in the last 7 days
+    stories_saved: int
+    due_now: int
+    new_words: int
+
+
+class BadgeOut(BaseModel):
+    id: str
+    earned: bool
+    have: int
+    target: int
+
+
+class RewardsOut(BaseModel):
+    show_rewards: bool
+    streak: StreakOut
+    goal: GoalOut
+    week: WeekOut
+    known_words: int
+    badges: list[BadgeOut]
+    next_badge: BadgeOut | None = None

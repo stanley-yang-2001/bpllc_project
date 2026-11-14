@@ -5,6 +5,8 @@ import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
+import { NewBadgeToasts } from "../rewards/NewBadgeToasts";
+import { StreakChip } from "../rewards/StreakChip";
 
 const links = [
   ["/", "nav.home", House],
@@ -54,6 +56,7 @@ export function Layout() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <StreakChip />
             <label className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-surface py-1 pl-2.5 pr-1 text-sm shadow-xs">
               <span className="hidden text-slate-500 sm:inline">{t("layout.studying")}</span>
               <select
@@ -85,6 +88,7 @@ export function Layout() {
           </div>
         </div>
       </header>
+      <NewBadgeToasts />
       <main className="mx-auto max-w-5xl px-4 py-8">
         <Outlet />
       </main>

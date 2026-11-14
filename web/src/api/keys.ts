@@ -8,3 +8,5 @@ export const setsKey = (userId: number, language: string) => ["sets", userId, la
 export const progressKey = (userId: number, language: string) => ["practice", userId, "progress", language] as const;
 export const starterKey = (userId: number, language: string) => ["starter", userId, language] as const;
 export const posKey = (language: string) => ["pos-categories", language] as const;          // the same for everyone, so not per learner
+/** Streak, daily goal, the week and badges. Dropped whenever an answer is recorded. */
+export const rewardsKey = (userId: number, language: string) => ["practice", userId, "rewards", language] as const;

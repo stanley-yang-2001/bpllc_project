@@ -6,6 +6,7 @@ import Library from "./routes/Library";
 import Login from "./routes/Login";
 import Practice from "./routes/Practice";
 import Privacy from "./routes/Privacy";
+import Progress from "./routes/Progress";
 import { NotFound } from "./routes/Placeholder";
 import Studio from "./routes/Studio";
 import Settings from "./routes/Settings";
@@ -24,6 +25,7 @@ export default function App() {
         <Route path="studio" element={<Studio />} />
         <Route path="library" element={<Library />} />
         <Route path="practice" element={<Practice />} />
+        <Route path="progress" element={<Progress />} />
         <Route path="home" element={<Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Route>

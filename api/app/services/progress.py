@@ -89,15 +89,16 @@ def record_reviews(conn, user_id: int, reviews: list[Review]) -> list[dict]:
             new = out.card
             cur.execute(
                 "INSERT INTO tutor.word_progress (word_id, user_id, box, due_at, right_count, wrong_count, last_answered_at, "
-                "phase, step, ease, interval_days, lapses, last_grade) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+                "phase, step, ease, interval_days, lapses, last_grade, known_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (word_id) DO UPDATE SET box = EXCLUDED.box, due_at = EXCLUDED.due_at, "
                 "right_count = tutor.word_progress.right_count + EXCLUDED.right_count, "
                 "wrong_count = tutor.word_progress.wrong_count + EXCLUDED.wrong_count, last_answered_at = EXCLUDED.last_answered_at, "
                 "phase = EXCLUDED.phase, step = EXCLUDED.step, ease = EXCLUDED.ease, interval_days = EXCLUDED.interval_days, "
-                "lapses = EXCLUDED.lapses, last_grade = EXCLUDED.last_grade",
+                "lapses = EXCLUDED.lapses, last_grade = EXCLUDED.last_grade, "
+                "known_at = CASE WHEN EXCLUDED.box >= %s THEN COALESCE(tutor.word_progress.known_at, EXCLUDED.known_at) ELSE NULL END",
                 (r.word_id, user_id, srs.box_of(new), new.due_at, int(out.correct), int(not out.correct), now,
-                 new.phase, new.step, new.ease, new.interval_days, new.lapses, r.grade))
+                 new.phase, new.step, new.ease, new.interval_days, new.lapses, r.grade, now if srs.box_of(new) >= KNOWN_BOX else None, KNOWN_BOX))
             cur.execute(
                 "INSERT INTO tutor.review_log (user_id, word_id, reviewed_at, mode, direction, grade, think_ms, rate_ms, phase_before, "
                 "was_due, counted, ease_after, delay_seconds) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",

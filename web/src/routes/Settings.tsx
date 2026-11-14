@@ -8,6 +8,7 @@ import { AppearanceSection } from "../settings/AppearanceSection";
 import { EmailSection, PasswordSection, ProfileSection } from "../settings/AccountSections";
 import { DataSection } from "../settings/DataSection";
 import { MyModelSection } from "../settings/MyModelSection";
+import { RewardsSection } from "../settings/RewardsSection";
 import { Section } from "../settings/Section";
 import { ServiceRow } from "../settings/ServiceRow";
 import { SiteLanguageSection } from "../settings/SiteLanguageSection";
@@ -37,6 +38,7 @@ export default function Settings() {
         <EmailSection />
         <PasswordSection />
         <AppearanceSection />
+        <RewardsSection />
         <SiteLanguageSection />
         <VoiceSection />
         <MyModelSection />

@@ -28,6 +28,7 @@ export function useFollowOtherTabs(userId: number | null) {
         preferences: {
           chat_in_study_language: me.preferences?.chat_in_study_language ?? false,
           meaning_mode: me.preferences?.meaning_mode ?? "native",
+          daily_goal: me.preferences?.daily_goal ?? 10, show_rewards: me.preferences?.show_rewards ?? true,
           theme: copy.theme, custom_colors: copy.custom_colors,
           active_language: copy.active_language, ui_follows_study_language: copy.ui_follows_study_language,
         },

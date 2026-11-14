@@ -67,6 +67,34 @@
         "title": "AnswersIn",
         "type": "object"
       },
+      "BadgeOut": {
+        "properties": {
+          "earned": {
+            "title": "Earned",
+            "type": "boolean"
+          },
+          "have": {
+            "title": "Have",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "earned",
+          "have",
+          "target"
+        ],
+        "title": "BadgeOut",
+        "type": "object"
+      },
       "Body_upload_api_words_upload_post": {
         "properties": {
           "file": {
@@ -878,6 +906,34 @@
         "title": "GeneratedStoryOut",
         "type": "object"
       },
+      "GoalOut": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "left": {
+            "title": "Left",
+            "type": "integer"
+          },
+          "reached": {
+            "title": "Reached",
+            "type": "boolean"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "target",
+          "done",
+          "reached",
+          "left"
+        ],
+        "title": "GoalOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1422,6 +1478,10 @@
               }
             ]
           },
+          "daily_goal": {
+            "title": "Daily Goal",
+            "type": "integer"
+          },
           "meaning_mode": {
             "enum": [
               "native",
@@ -1430,6 +1490,10 @@
             ],
             "title": "Meaning Mode",
             "type": "string"
+          },
+          "show_rewards": {
+            "title": "Show Rewards",
+            "type": "boolean"
           },
           "theme": {
             "title": "Theme",
@@ -1446,7 +1510,9 @@
           "chat_in_study_language",
           "meaning_mode",
           "theme",
-          "custom_colors"
+          "custom_colors",
+          "daily_goal",
+          "show_rewards"
         ],
         "title": "PreferencesOut",
         "type": "object"
@@ -1487,6 +1553,19 @@
               }
             ]
           },
+          "daily_goal": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 5.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Goal"
+          },
           "meaning_mode": {
             "anyOf": [
               {
@@ -1502,6 +1581,17 @@
               }
             ],
             "title": "Meaning Mode"
+          },
+          "show_rewards": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Rewards"
           },
           "theme": {
             "anyOf": [
@@ -1888,6 +1978,54 @@
           "reviews"
         ],
         "title": "ReviewsIn",
+        "type": "object"
+      },
+      "RewardsOut": {
+        "properties": {
+          "badges": {
+            "items": {
+              "$ref": "#/components/schemas/BadgeOut"
+            },
+            "title": "Badges",
+            "type": "array"
+          },
+          "goal": {
+            "$ref": "#/components/schemas/GoalOut"
+          },
+          "known_words": {
+            "title": "Known Words",
+            "type": "integer"
+          },
+          "next_badge": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BadgeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "show_rewards": {
+            "title": "Show Rewards",
+            "type": "boolean"
+          },
+          "streak": {
+            "$ref": "#/components/schemas/StreakOut"
+          },
+          "week": {
+            "$ref": "#/components/schemas/WeekOut"
+          }
+        },
+        "required": [
+          "show_rewards",
+          "streak",
+          "goal",
+          "week",
+          "known_words",
+          "badges"
+        ],
+        "title": "RewardsOut",
         "type": "object"
       },
       "SaveIn": {
@@ -2449,6 +2587,51 @@
         "title": "StoryPage",
         "type": "object"
       },
+      "StreakOut": {
+        "properties": {
+          "alive": {
+            "title": "Alive",
+            "type": "boolean"
+          },
+          "best": {
+            "title": "Best",
+            "type": "integer"
+          },
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "practised_today": {
+            "title": "Practised Today",
+            "type": "boolean"
+          },
+          "rest_available": {
+            "title": "Rest Available",
+            "type": "boolean"
+          },
+          "rest_used_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rest Used On"
+          }
+        },
+        "required": [
+          "days",
+          "alive",
+          "practised_today",
+          "rest_available",
+          "best"
+        ],
+        "title": "StreakOut",
+        "type": "object"
+      },
       "StudyStats": {
         "properties": {
           "accuracy_30d": {
@@ -2864,6 +3047,44 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WeekOut": {
+        "properties": {
+          "answers": {
+            "title": "Answers",
+            "type": "integer"
+          },
+          "days_practised": {
+            "title": "Days Practised",
+            "type": "integer"
+          },
+          "due_now": {
+            "title": "Due Now",
+            "type": "integer"
+          },
+          "new_words": {
+            "title": "New Words",
+            "type": "integer"
+          },
+          "stories_saved": {
+            "title": "Stories Saved",
+            "type": "integer"
+          },
+          "words_learned": {
+            "title": "Words Learned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "days_practised",
+          "answers",
+          "words_learned",
+          "stories_saved",
+          "due_now",
+          "new_words"
+        ],
+        "title": "WeekOut",
         "type": "object"
       },
       "WordIn": {
@@ -4370,6 +4591,49 @@
           }
         },
         "summary": "Record Reviews",
+        "tags": [
+          "practice"
+        ]
+      }
+    },
+    "/api/practice/rewards": {
+      "get": {
+        "description": "The streak (a missed day a week is forgiven), the daily goal, the week so far and the badges, all from the learner's own records.",
+        "operationId": "get_rewards_api_practice_rewards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RewardsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Rewards",
         "tags": [
           "practice"
         ]
