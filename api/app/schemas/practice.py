@@ -256,6 +256,20 @@ class StoryWordsOut(BaseModel):
     total: int
 
 
+class ChallengeOut(BaseModel):
+    id: str                     # learn_words, practise_days, answer_cards or save_stories
+    have: int
+    target: int
+    done: bool
+    ends_on: date               # the Sunday this week's challenge ends
+
+
+class GardenOut(BaseModel):
+    seeds: int                  # words not practised yet
+    sprouts: int                # words being learned
+    trees: int                  # words that are Known
+
+
 class RewardsOut(BaseModel):
     show_rewards: bool
     streak: StreakOut
@@ -263,6 +277,8 @@ class RewardsOut(BaseModel):
     week: WeekOut
     known_words: int
     comeback: ComebackOut | None = None
+    challenge: ChallengeOut
+    garden: GardenOut
     records: RecordsOut
     story_words: StoryWordsOut
     badges: list[BadgeOut]

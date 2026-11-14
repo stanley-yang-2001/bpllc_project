@@ -23,6 +23,7 @@ export function NewBadgeToasts() {
   const celebrate = useCelebrate();
   const wasReached = useRef<boolean | null>(null);
   const wasBack = useRef<boolean | null>(null);
+  const challengeDone = useRef<{ id: string; done: boolean } | null>(null);
   useEffect(() => {
     if (!data || !data.show_rewards || !user) return;
     const earned = data.badges.filter((b) => b.earned);
@@ -35,6 +36,13 @@ export function NewBadgeToasts() {
     // the daily goal: only on the step from "not yet" to "reached" while this page is open (never when the page loads already reached)
     if (wasReached.current === false && data.goal.reached) celebrate(GOAL_LEVEL, t("rewards.fx.goal"));
     wasReached.current = data.goal.reached;
+    // the weekly challenge: only on the step from "not yet" to "done" for the same challenge while this page is open
+    const ch = data.challenge, last = challengeDone.current;
+    if (last && last.id === ch.id && !last.done && ch.done) {
+      toast(t("rewards.fx.challenge"));
+      celebrate(4, t("rewards.fx.challenge"));
+    }
+    challengeDone.current = { id: ch.id, done: ch.done };
     // coming back after a break: the first answers of the day get a welcome
     const back = data.comeback ? data.comeback.returned : null;
     if (wasBack.current === false && back === true) celebrate(2, t("rewards.fx.back"));

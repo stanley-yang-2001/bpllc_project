@@ -20,6 +20,8 @@ const REWARDS = {
   week: { days_practised: 4, answers: 40, words_learned: 7, stories_saved: 2, due_now: 12, new_words: 3 },
   known_words: 30,
   comeback: null,
+  challenge: { id: "learn_words", have: 4, target: 10, done: false, ends_on: "2026-11-15" },
+  garden: { seeds: 10, sprouts: 8, trees: 12 },
   records: { best_day: { value: 34, day: "2026-11-10" }, longest_run: 18, fastest_ms: 2400, best_week_learned: 9 },
   story_words: { used: 12, total: 30 },
   badges: BADGES,

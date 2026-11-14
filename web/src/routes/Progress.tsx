@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nProvider";
 import { Card, ErrorText, PageHeader, Skeleton } from "../components/ui";
 import { BadgeGrid } from "../rewards/BadgeGrid";
+import { GardenCard } from "../rewards/GardenCard";
 import { RecordsCard } from "../rewards/RecordsCard";
 import { RewardsCard } from "../rewards/RewardsCard";
 import { StoryWordsCard } from "../rewards/StoryWordsCard";
@@ -20,6 +21,7 @@ export default function Progress() {
         : (
           <>
             <RewardsCard />
+            <GardenCard garden={q.data.garden} />
             <RecordsCard records={q.data.records} />
             <StoryWordsCard used={q.data.story_words.used} total={q.data.story_words.total} />
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t("rewards.badges.title")}</h2>

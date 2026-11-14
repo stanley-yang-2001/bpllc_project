@@ -8,7 +8,7 @@ afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.cl
 const R = (over: Record<string, unknown> = {}) => ({
   show_rewards: true, streak: { days: 5, alive: true, practised_today: false, rest_available: true, rest_used_on: null, best: 8 },
   goal: { target: 10, done: 4, reached: false, left: 6 }, week: { days_practised: 4, answers: 40, words_learned: 7, stories_saved: 2, due_now: 12, new_words: 3 },
-  known_words: 30, comeback: null, records: { best_day: { value: 34, day: "2026-11-10" }, longest_run: 18, fastest_ms: 2400, best_week_learned: 9 },
+  known_words: 30, comeback: null, challenge: { id: "learn_words", have: 4, target: 10, done: false, ends_on: "2026-11-15" }, garden: { seeds: 10, sprouts: 8, trees: 12 }, records: { best_day: { value: 34, day: "2026-11-10" }, longest_run: 18, fastest_ms: 2400, best_week_learned: 9 },
   story_words: { used: 12, total: 30 }, badges: [{ id: "first_answer", earned: true, have: 1, target: 1 }], next_badge: null, ...over });
 const base = (rewards: unknown) => ({ "GET /me": ALICE, "GET /languages": LANGS, "GET /words": { items: [{ id: 1 }], total: 1, limit: 1, offset: 0 }, "GET /practice/rewards": rewards });
 const REC = { best_day: { value: 34, day: "2026-11-10" }, longest_run: 18, fastest_ms: 2400, best_week_learned: 9 };

@@ -165,3 +165,27 @@ def test_a_learner_back_after_a_break_is_told_and_then_marked_returned(client, m
     assert rewards(c)["comeback"] == {"days_away": 5, "returned": False}
     answer(c, word_ids(c)[:1])
     assert rewards(c)["comeback"] == {"days_away": 5, "returned": True}
+
+
+def test_the_weekly_challenge_counts_this_weeks_progress(client, make_user):
+    from datetime import date
+    c = make_user("rita")
+    add_words(c, 4)
+    ch = rewards(c)["challenge"]
+    assert ch["id"] in {"learn_words", "practise_days", "answer_cards", "save_stories"} and ch["have"] == 0 and ch["done"] is False
+    assert date.fromisoformat(ch["ends_on"]).weekday() == 6                      # a Sunday
+    answer(c, word_ids(c))
+    sql("INSERT INTO tutor.stories (user_id, language, story_type, topic, body, passed, report) SELECT id, 'es', 'story', 'x', 'Hola.', true, '{}'::jsonb FROM tutor.users LIMIT 1")
+    ch = rewards(c)["challenge"]
+    expected = {"learn_words": 0, "practise_days": 1, "answer_cards": 4, "save_stories": 1}[ch["id"]]
+    assert ch["have"] == expected and ch["target"] > ch["have"]
+
+
+def test_the_garden_grows_as_words_are_learned(client, make_user):
+    c = make_user("rita")
+    add_words(c, 3)
+    assert rewards(c)["garden"] == {"seeds": 3, "sprouts": 0, "trees": 0}
+    answer(c, word_ids(c)[:2])
+    assert rewards(c)["garden"] == {"seeds": 1, "sprouts": 2, "trees": 0}
+    sql("UPDATE tutor.word_progress SET box = 5 WHERE word_id = (SELECT min(word_id) FROM tutor.word_progress)")
+    assert rewards(c)["garden"] == {"seeds": 1, "sprouts": 1, "trees": 1}

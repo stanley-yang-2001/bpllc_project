@@ -139,3 +139,22 @@ def words_in_stories(words: Iterable[str], stories: Iterable[str]) -> int:
             hit = re.search(rf"(?<!\w){re.escape(w)}(?!\w)", joined) is not None
         found += hit
     return found
+
+
+# One challenge per calendar week (Monday to Sunday, UTC), rotating so a learner meets a different kind of goal each week.
+# (id, what is counted, target). The counts cover every language, like the badges.
+CHALLENGES: Sequence[tuple[str, str, int]] = (
+    ("learn_words", "words_learned", 10),
+    ("practise_days", "days", 5),
+    ("answer_cards", "answers", 100),
+    ("save_stories", "stories", 2),
+)
+
+
+def weekly_challenge(today: date, week: dict) -> dict:
+    """This week's challenge: {"id", "have", "target", "done", "ends_on"}. `week` holds words_learned, days, answers and stories for the
+    calendar week so far (missing ones count as 0). The kind rotates with the ISO week number."""
+    start = today - timedelta(days=today.weekday())
+    challenge_id, what, target = CHALLENGES[start.isocalendar()[1] % len(CHALLENGES)]
+    have = int(week.get(what, 0))
+    return {"id": challenge_id, "have": min(have, target), "target": target, "done": have >= target, "ends_on": start + timedelta(days=6)}

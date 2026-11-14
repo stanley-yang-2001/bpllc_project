@@ -133,6 +133,40 @@
         "title": "Body_upload_api_words_upload_post",
         "type": "object"
       },
+      "ChallengeOut": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "ends_on": {
+            "format": "date",
+            "title": "Ends On",
+            "type": "string"
+          },
+          "have": {
+            "title": "Have",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "have",
+          "target",
+          "done",
+          "ends_on"
+        ],
+        "title": "ChallengeOut",
+        "type": "object"
+      },
       "ChatIn": {
         "properties": {
           "language": {
@@ -789,6 +823,29 @@
           "due"
         ],
         "title": "ForecastDay",
+        "type": "object"
+      },
+      "GardenOut": {
+        "properties": {
+          "seeds": {
+            "title": "Seeds",
+            "type": "integer"
+          },
+          "sprouts": {
+            "title": "Sprouts",
+            "type": "integer"
+          },
+          "trees": {
+            "title": "Trees",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seeds",
+          "sprouts",
+          "trees"
+        ],
+        "title": "GardenOut",
         "type": "object"
       },
       "GenerateIn": {
@@ -2065,6 +2122,9 @@
             "title": "Badges",
             "type": "array"
           },
+          "challenge": {
+            "$ref": "#/components/schemas/ChallengeOut"
+          },
           "comeback": {
             "anyOf": [
               {
@@ -2074,6 +2134,9 @@
                 "type": "null"
               }
             ]
+          },
+          "garden": {
+            "$ref": "#/components/schemas/GardenOut"
           },
           "goal": {
             "$ref": "#/components/schemas/GoalOut"
@@ -2115,6 +2178,8 @@
           "goal",
           "week",
           "known_words",
+          "challenge",
+          "garden",
           "records",
           "story_words",
           "badges"

@@ -42,7 +42,7 @@ const card = (id: number) => ({ id, word: `word${String.fromCharCode(97 + id)}`,
 const CARDS = (n: number) => ({ items: Array.from({ length: n }, (_, i) => card(i + 1)), total: n, selection: n, due: 0, new: n });
 const RESULT = (word_id: number) => ({ word_id, delay_seconds: 86400, status: "young", counted: true, correct: true, box: 2, ease: 2.5, interval_days: 1, lapses: 0, preview: PREVIEW });
 const REWARDS = (show: boolean) => ({ show_rewards: show, streak: { days: 0, alive: false, practised_today: false, rest_available: false, rest_used_on: null, best: 0 },
-  goal: { target: 10, done: 0, reached: false, left: 10 }, week: { days_practised: 0, answers: 0, words_learned: 0, stories_saved: 0, due_now: 0, new_words: 0 }, known_words: 0, comeback: null, records: { best_day: null, longest_run: 0, fastest_ms: null, best_week_learned: 0 }, story_words: { used: 0, total: 0 }, badges: [], next_badge: null });
+  goal: { target: 10, done: 0, reached: false, left: 10 }, week: { days_practised: 0, answers: 0, words_learned: 0, stories_saved: 0, due_now: 0, new_words: 0 }, known_words: 0, comeback: null, challenge: { id: "answer_cards", have: 0, target: 100, done: false, ends_on: "2026-11-15" }, garden: { seeds: 0, sprouts: 0, trees: 0 }, records: { best_day: null, longest_run: 0, fastest_ms: null, best_week_learned: 0 }, story_words: { used: 0, total: 0 }, badges: [], next_badge: null });
 const routes = (n: number, show = true) => ({ "GET /me": ALICE, "GET /languages": LANGS, "GET /stories": { items: [], total: 0, limit: 100, offset: 0 }, "GET /practice/rewards": REWARDS(show),
   "GET /practice/flashcards": CARDS(n), "POST /practice/reviews": (c: any) => ({ json: { results: c.body.reviews.map((r: any) => RESULT(r.word_id)) } }) });
 

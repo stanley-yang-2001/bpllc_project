@@ -951,6 +951,22 @@ export interface components {
             /** Language */
             language: string;
         };
+        /** ChallengeOut */
+        ChallengeOut: {
+            /** Done */
+            done: boolean;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Have */
+            have: number;
+            /** Id */
+            id: string;
+            /** Target */
+            target: number;
+        };
         /** ChatIn */
         ChatIn: {
             /** Language */
@@ -1174,6 +1190,15 @@ export interface components {
             day: string;
             /** Due */
             due: number;
+        };
+        /** GardenOut */
+        GardenOut: {
+            /** Seeds */
+            seeds: number;
+            /** Sprouts */
+            sprouts: number;
+            /** Trees */
+            trees: number;
         };
         /** GenerateIn */
         GenerateIn: {
@@ -1578,7 +1603,9 @@ export interface components {
         RewardsOut: {
             /** Badges */
             badges: components["schemas"]["BadgeOut"][];
+            challenge: components["schemas"]["ChallengeOut"];
             comeback?: components["schemas"]["ComebackOut"] | null;
+            garden: components["schemas"]["GardenOut"];
             goal: components["schemas"]["GoalOut"];
             /** Known Words */
             known_words: number;

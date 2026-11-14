@@ -1,4 +1,4 @@
-import { Award, ArrowRight, Flame, Sparkles } from "lucide-react";
+import { Award, ArrowRight, CircleCheck, Flame, Sparkles, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useI18n } from "../i18n/I18nProvider";
 import { Card, Skeleton } from "../components/ui";
@@ -12,7 +12,7 @@ export function RewardsCard() {
   const q = useRewards();
   if (q.isError || (q.data && !q.data.show_rewards)) return null;
   if (!q.data) return <Card className="mb-8"><Skeleton className="h-20 w-full" /></Card>;
-  const { streak, goal, week, next_badge: next, comeback } = q.data;
+  const { streak, goal, week, next_badge: next, comeback, challenge } = q.data;
   const message = streak.practised_today ? t("rewards.streak.done") : streak.alive ? t("rewards.streak.keep") : t("rewards.streak.start");
   const nextText = next ? badgeText(next.id, next.target, t) : null;
   return (
@@ -61,6 +61,18 @@ export function RewardsCard() {
             </div>
           ))}
         </dl>
+
+        <div data-testid="challenge" className="mt-4 rounded-lg border border-slate-200 p-3 text-sm">
+          <p className="flex flex-wrap items-center gap-x-2 text-slate-700">
+            {challenge.done ? <CircleCheck aria-hidden className="size-4 text-emerald-600" /> : <Target aria-hidden className="size-4 text-brand-600" />}
+            <span className="font-medium">{t("rewards.challenge.title")}:</span> {t(`rewards.challenge.${challenge.id as "learn_words"}`, { n: challenge.target })}
+            <span className="text-slate-500">({t("rewards.challenge.progress", { have: challenge.have, target: challenge.target })})</span>
+          </p>
+          <div role="progressbar" aria-label={t("rewards.challenge.title")} aria-valuemin={0} aria-valuemax={challenge.target} aria-valuenow={challenge.have} className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200">
+            <div className={`h-full rounded-full ${challenge.done ? "bg-emerald-600" : "bg-brand-600"}`} style={{ width: `${Math.round((challenge.have / challenge.target) * 100)}%` }} />
+          </div>
+          <p className="mt-1 text-xs text-slate-600">{challenge.done ? t("rewards.challenge.done") : t("rewards.challenge.ends")}</p>
+        </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
           {next && nextText ? (

@@ -82,3 +82,18 @@ def test_words_in_stories_matches_whole_words_and_cjk_substrings():
     assert words_in_stories(["Cat", "dog", "catalog", ""], ["The cat sat.", "A catalogue."]) == 1
     assert words_in_stories(["猫", "犬"], ["私は猫が好きです。"]) == 1
     assert words_in_stories(["a b"], ["x a b y"]) == 1
+
+
+def test_the_weekly_challenge_rotates_and_reports_progress():
+    from datetime import date
+    from tutor_core.rewards import CHALLENGES, weekly_challenge
+    seen = set()
+    for w in range(4):
+        monday = date(2026, 11, 2).replace(day=2 + 7 * w) if w < 4 else None
+        seen.add(weekly_challenge(monday, {})["id"])
+    assert seen == {c[0] for c in CHALLENGES}
+    t = date(2026, 11, 14)                                  # a Saturday; the week ran Monday 9 to Sunday 15 November
+    c = weekly_challenge(t, {"words_learned": 4, "days": 2, "answers": 40, "stories": 1})
+    assert c["ends_on"] == date(2026, 11, 15) and c["done"] is False and c["have"] < c["target"]
+    done = weekly_challenge(t, {"words_learned": 99, "days": 7, "answers": 999, "stories": 9})
+    assert done["done"] is True and done["have"] == done["target"]

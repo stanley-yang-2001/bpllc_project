@@ -4,6 +4,8 @@ Everything is worked out from what is already stored (practice days, word progre
 (the daily goal and whether to show rewards). The rules are in tutor_core.rewards. Days are UTC days, like the rest of practice."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 from tutor_core import rewards
 
 from ..db import cursor
@@ -39,6 +41,12 @@ def overview(conn, user_id: int, language: str) -> dict:
         cur.execute("SELECT max(c) AS n FROM (SELECT count(*) AS c FROM tutor.word_progress WHERE user_id = %s AND known_at IS NOT NULL "
                     "GROUP BY date_trunc('week', known_at)) w", (user_id,))
         best_week = cur.fetchone()["n"] or 0
+        # this calendar week (Monday to Sunday, UTC), for the weekly challenge
+        monday = today - timedelta(days=today.weekday())
+        cur.execute("SELECT count(*) AS n FROM tutor.word_progress WHERE user_id = %s AND (known_at AT TIME ZONE 'UTC')::date >= %s", (user_id, monday))
+        cal_learned = cur.fetchone()["n"]
+        cur.execute("SELECT count(*) AS n FROM tutor.stories WHERE user_id = %s AND (created_at AT TIME ZONE 'UTC')::date >= %s", (user_id, monday))
+        cal_stories = cur.fetchone()["n"]
         # how many of this language's words appear in a saved story
         cur.execute("SELECT word FROM tutor.words WHERE user_id = %s AND language = %s", (user_id, language))
         vocab = [r["word"] for r in cur.fetchall()]
@@ -52,6 +60,8 @@ def overview(conn, user_id: int, language: str) -> dict:
     items = rewards.badges({"answers": sum(answers.values()), "known_words": words["known"], "best_streak": best,
                             "stories": stories["total"], "dictations": dictations, "languages": languages})
     summary = progress.summary(conn, user_id, language)
+    cal = [d for d in answers if d >= monday]
+    challenge = rewards.weekly_challenge(today, {"words_learned": cal_learned, "days": len(cal), "answers": sum(answers[d] for d in cal), "stories": cal_stories})
     best_day = max(((n, d) for d, n in answers.items()), default=None)
     return {
         "show_rewards": bool(prefs.get("show_rewards", True)),
@@ -61,6 +71,8 @@ def overview(conn, user_id: int, language: str) -> dict:
                  "stories_saved": stories["week"], "due_now": summary["due"], "new_words": summary["new"]},
         "known_words": words["known"],
         "comeback": rewards.comeback(days, today),
+        "challenge": challenge,
+        "garden": {"seeds": summary["new"], "sprouts": summary["learning"], "trees": summary["known"]},
         "records": {"best_day": {"value": best_day[0], "day": best_day[1]} if best_day else None, "longest_run": run,
                     "fastest_ms": int(fastest) if fastest is not None else None, "best_week_learned": int(best_week)},
         "story_words": {"used": rewards.words_in_stories(vocab, bodies), "total": len(set(w.strip().casefold() for w in vocab if w.strip()))},

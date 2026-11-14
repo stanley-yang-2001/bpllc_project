@@ -34,6 +34,11 @@ No migration; all worked out from stored data and returned by `GET /practice/rew
 - **Comeback bonus:** after a break of 3+ days, Home shows "Welcome back!" with how many words are ready; the first answers of that day play a level 2 "Welcome back!" effect. No streak penalty is added.
 - Not built: a per-word story count on the Vocabulary page.
 
+## Weekly challenge and word garden (patch 0082)
+No migration; both come from `GET /practice/rewards` (`challenge`, `garden`).
+- **Weekly challenge:** one per calendar week (Monday to Sunday, UTC), rotating by ISO week number: learn 10 new words (reach Known), practise on 5 different days, answer 100 cards, save 2 stories. Counts cover every language, like the badges. Shown on the Home and Progress card with a bar and "Ends Sunday"; finishing it while the page is open plays a level 4 effect and a toast. Past weeks are not stored, so there is no "challenges completed" count yet.
+- **Word garden** (Progress page): a seed for each word not practised yet, a sprout for each word being learned, a tree for each Known word, for the active language. Up to 120 pictures are drawn (shrunk in proportion for big vocabularies); the numbers always show the full count.
+
 ## Rules
 - **Streak:** consecutive practice days. One missed day ("rest day") per rolling 7 days does not break it (`REST_GAP_DAYS = 7`). A streak is alive if today or yesterday (or the rest-day gap) is covered.
 - **Goal:** answers in Practice today, 5 to 100, default 10.
