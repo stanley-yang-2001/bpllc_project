@@ -12,6 +12,21 @@ Give a learner a visible reason to come back tomorrow, without comparing them wi
 - **Toast:** "New badge: ..." once per new badge. The first visit on a device is silent, so existing learners are not flooded.
 - **Settings:** daily goal (5, 10, 15, 20, 30, 50, 100) and "Show my streak, goal and badges". Off hides everything above.
 
+## Milestone effects (patch 0080)
+Effects get fancier with the size of the milestone (`web/src/rewards/effects.ts`, `Celebration.tsx`, CSS in `index.css`; no libraries, nothing runs when idle).
+| Level | Look | Triggers |
+|---|---|---|
+| 1 | a label | 3 answers in a row; badge "first answer" |
+| 2 | label and sparkles (12 pieces) | 5 in a row; 10 cards in a session; small badges |
+| 3 | confetti (40) | 10 in a row; 25 cards; 50 words, 7-day streak |
+| 4 | big confetti (90) and a glow | 25 in a row; 50 cards; daily goal reached; 100 words |
+| 5 | the full show (150 pieces, flash, gradient label) | 50 in a row; 100 cards; 250 words; 30-day streak |
+- A "run" is answers that were not Again. The bigger of a run and a card count wins when both hit together.
+- A smaller celebration never cuts off a bigger one that is still playing.
+- The daily-goal effect only fires when the goal goes from not reached to reached while the page is open.
+- Off when "Show my streak, goal and badges" is off. With "reduce motion" only the label shows.
+- Flashcards fire the run and card-count effects; goal and badge effects fire from any practice mode (the rewards data is refreshed after every answer). Not yet in Choices, Blanks, Dictation or PosPractice.
+
 ## Rules
 - **Streak:** consecutive practice days. One missed day ("rest day") per rolling 7 days does not break it (`REST_GAP_DAYS = 7`). A streak is alive if today or yesterday (or the rest-day gap) is covered.
 - **Goal:** answers in Practice today, 5 to 100, default 10.

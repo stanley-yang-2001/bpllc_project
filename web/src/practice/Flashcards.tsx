@@ -5,6 +5,9 @@ import { Link } from "react-router-dom";
 import { api, type SetFilter } from "../api/client";
 import type { Flashcard, FlashcardScope, Grade } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { useCelebrate } from "../rewards/Celebration";
+import { milestoneFor } from "../rewards/effects";
+import { rewardsKey } from "../api/keys";
 import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
@@ -46,6 +49,7 @@ function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractis
   const { user } = useAuth();
   const { t } = useI18n();
   const qc = useQueryClient();
+  const celebrate = useCelebrate();
   const [start] = useState(() => take(startSession(cards), Date.now()));
   const [session, setSession] = useState<Session>(start.session);
   const [card, setCard] = useState<Flashcard | null>(start.card);
@@ -73,6 +77,8 @@ function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractis
     const finish = (result: Awaited<ReturnType<typeof api.recordReviews>>[number] | null) => {
       const moved = answered(session, card, g, result, Date.now(), think, rate);
       const next = take(moved, Date.now());
+      const hit = milestoneFor(moved.log);                    // a run of answers or a card count worth a celebration
+      if (hit) celebrate(hit.level, t(hit.kind === "combo" ? "rewards.fx.combo" : "rewards.fx.cards", { n: hit.n }));
       setSession(next.session);
       setCard(deadline !== null && Date.now() >= deadline ? null : next.card);
       setRevealed(false);
@@ -82,11 +88,12 @@ function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractis
       void qc.invalidateQueries({ queryKey: ["practice", user!.id, "progress"] });
       void qc.invalidateQueries({ queryKey: ["practice", user!.id, "stats"] });
       void qc.invalidateQueries({ queryKey: ["practice", user!.id, "hardest"] });
+      void qc.invalidateQueries({ queryKey: rewardsKey(user!.id, language) });
     };
     api.recordReviews([{ word_id: card.id, grade: g, think_ms: think, rate_ms: rate, mode: "flashcards", direction: "word" }])
       .then((r) => finish(r[0]))
       .catch(() => { setFailed(true); finish(null); });
-  }, [card, revealed, saving, session, qc, user]);
+  }, [card, revealed, saving, session, qc, user, celebrate, t, language, deadline]);
 
   useEffect(() => {                                           // keys 1 to 4 grade the answer, same as the buttons
     const onKey = (e: KeyboardEvent) => {

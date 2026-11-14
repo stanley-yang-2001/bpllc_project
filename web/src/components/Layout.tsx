@@ -5,6 +5,7 @@ import { useActiveLanguage } from "../auth/ActiveLanguage";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
 import type { MessageKey } from "../i18n/messages";
+import { CelebrationProvider } from "../rewards/Celebration";
 import { NewBadgeToasts } from "../rewards/NewBadgeToasts";
 import { StreakChip } from "../rewards/StreakChip";
 
@@ -26,6 +27,7 @@ export function Layout() {
   const { active, setActive, studying } = useActiveLanguage();
   const { t } = useI18n();
   return (
+    <CelebrationProvider>
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-surface/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 px-4">
@@ -96,5 +98,6 @@ export function Layout() {
         <Link to="/privacy" className="underline-offset-2 hover:text-slate-900 hover:underline">{t("layout.privacy")}</Link>
       </footer>
     </div>
+    </CelebrationProvider>
   );
 }

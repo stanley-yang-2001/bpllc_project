@@ -64,3 +64,22 @@
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* Celebrations (rewards/Celebration.tsx): pieces fly out from a point, fall and fade; the label pops in. */
+.fx-piece { position: absolute; left: 0; top: 0; opacity: 0; animation: fx-fly 1.6s cubic-bezier(.15,.7,.3,1) forwards; }
+@keyframes fx-fly {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 260px)) rotate(var(--r)); }
+}
+.fx-pill { animation: fx-pop .45s cubic-bezier(.2,1.4,.4,1) both; }
+.fx-pill-1 { font-size: .95rem; }
+.fx-pill-2 { font-size: 1.05rem; }
+.fx-pill-3 { font-size: 1.2rem; }
+.fx-pill-4 { font-size: 1.4rem; padding: .6rem 1.5rem; }
+.fx-pill-5 { font-size: 1.6rem; padding: .75rem 1.75rem; background: linear-gradient(90deg, #6366f1, #ec4899, #f59e0b); }
+@keyframes fx-pop { 0% { opacity: 0; transform: scale(.5) translateY(12px); } 100% { opacity: 1; transform: none; } }
+.fx-glow { position: absolute; inset: 0; background: radial-gradient(circle at 50% 33%, rgb(99 102 241 / .28), transparent 60%); animation: fx-fade 1.6s ease-out forwards; }
+.fx-flash { background: radial-gradient(circle at 50% 33%, rgb(250 204 21 / .45), rgb(236 72 153 / .2) 45%, transparent 70%); animation-duration: 2.4s; }
+@keyframes fx-fade { 0% { opacity: 0; } 20% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fx-piece, .fx-glow { display: none; } }
