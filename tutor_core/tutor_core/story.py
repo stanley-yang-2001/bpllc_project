@@ -165,7 +165,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
     prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), request.story_type, request.topic, rng, vocab_in_target=True,
-                                difficulty=request.difficulty)
+                                difficulty=request.difficulty, rules=request.options.rules)
     if plan_note:
         prompt = prompt.rstrip() + "\n" + plan_note
     if example_conn is not None:                        # an example from the bank, for the quality of the language only (prompts/example.py)
@@ -180,7 +180,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     n = opts.candidates
     one_pass = n if not opts.mixed else (n + 1) // 2 if n > 1 else 1        # mixed: about half the candidates are one-pass, half two-pass
     two = 0 if opts.mixed and n <= 1 else (n - one_pass if opts.mixed else (n if request.two_pass else 0))
-    texts = two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, two) if two else []
+    texts = two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, two, request.options.rules) if two else []
     if opts.mixed:
         notes.append(f"mixed strategies: {one_pass} one-pass, {len(texts)} two-pass")
     want_one = one_pass if (opts.mixed or not texts) else 0

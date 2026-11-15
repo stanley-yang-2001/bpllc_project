@@ -14,6 +14,14 @@ _FINISH_RULE = ("The passage ends with the story itself: no thanks, goodbye, not
                 "Before you answer, re-read it once for grammar: articles, verb endings, and gender and number agreement.")
 _NATURAL_RULE = ("Write complete, natural sentences: every sentence has a subject and a verb, with correct grammar. Do not just list words. "
                  "The text has a beginning, a middle and an end.")
+# 14 Nov 2026 (writer rules, OFF unless StoryOptions.rules): the 13 Nov Kaggle run's ten English first drafts had 25 reviewer findings; 10 were a missing article or
+# possessive ("to kitchen", "in house"), 4 an unneeded word or phrase stuck on ("please", "goodbye today") and 4 an adverb in the wrong form or place. The prompts ask for
+# "short sentences" and "no rare words" and never say that short is not telegraphic. The text is what the reviewers' naturalness rating punishes, said to the writer.
+_WRITER_RULES = ("Small words stay: a short sentence is still a complete one, so never drop an article, possessive, preposition, particle or verb ending that the language needs{example}. "
+                 "Use a listed word only where it belongs: if it does not fit a sentence, leave it out instead of attaching it after a comma or adding a sentence just to use it. "
+                 "Do not end sentences with filler such as {filler} to make the text longer.")
+_WRITER_EXAMPLE = {True: " (\"the drawer\", not \"drawer\"; \"to the park\", not \"to park\")", False: ""}
+_WRITER_FILLER = {True: "\"today\", \"now\", \"still\" or \"indeed\"", False: "the words for \"today\", \"now\", \"still\" or \"indeed\""}
 _BEGIN = "Begin:"          # every template ends with a line that starts like this (the rest of the line differs)
 
 
@@ -30,21 +38,36 @@ def _with_natural_rule(prompt: str) -> str:
     return prompt if i < 0 else prompt[:i] + _NATURAL_RULE + "\n\n" + prompt[i:]
 
 
+def writer_rules(english: bool) -> str:
+    """The text of the writer rules; the example is English only, because an English example in a French prompt would be copied."""
+    return _WRITER_RULES.format(example=_WRITER_EXAMPLE[english], filler=_WRITER_FILLER[english])
+
+
+def _with_writer_rules(prompt: str, english: bool) -> str:
+    """Before the final instruction like the other rules; appended when the prompt has none, so the option never silently does nothing."""
+    rules = writer_rules(english)
+    i = prompt.rfind(_BEGIN)
+    return prompt.rstrip() + "\n\n" + rules if i < 0 else prompt[:i] + rules + "\n\n" + prompt[i:]
+
+
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
                        topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
-                       difficulty: Optional[dict] = None) -> str:
+                       difficulty: Optional[dict] = None, rules: bool = False) -> str:
     """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
     applies to the new story types; when omitted it is chosen at random, avoiding recent topics.
     vocab_in_target: the word list is already written in `language` (a learner's per-language list),
     so the prompt says to use the words as written instead of translating English meanings. It has
     no effect for English, whose prompts are unchanged.
     A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured.
-    difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt."""
+    difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt.
+    rules: add the writer rules (small words stay, no tacked-on words, no filler) before the final instruction; off, the prompt is exactly what it was."""
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
     if not is_english(normalize_language(language)):       # the English prompts stay exactly as they were (pinned by tests); English grammar is handled by the repair and proofreading calls
         prompt = _with_natural_rule(prompt)
     if vocab_in_target and not is_english(normalize_language(language)):
         prompt = _with_finish_rule(prompt)
+    if rules:
+        prompt = _with_writer_rules(prompt, is_english(normalize_language(language)))
     if difficulty:
         # The built-in templates ask for 5 to 9 sentences; with a tier that sentence count is replaced by the tier's own.
         from ..difficulty import CHARS_PER_WORD, ask_size, prompt_note

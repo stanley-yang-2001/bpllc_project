@@ -9,6 +9,7 @@ The methods (scripts/story_eval/variants.py), each adding one idea to the one be
     repair      + names every missed requirement and rewrites (up to 2 calls)
     proofread   (two passes + one grammar-fixing call on every story)       only with --variants all or by name
     examples    (everything + a saved example from the bank)                needs --db
+    rules       (baseline + writer rules in the prompt)                     --variants writer = baseline and rules; rules_refine adds the refine loop
 
 The requests are fixed (scripts/story_eval/fixed_set.py: 2 per language + 2 extra = 20, from the starter packs, so no learner and no
 database), so a later run compares with this one. Per story it records the score, the calls, the seconds inside the model, the seconds in all
