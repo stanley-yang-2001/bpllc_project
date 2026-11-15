@@ -139,6 +139,23 @@ def test_another_failure_is_saved_as_a_failed_story():
     assert not e["ok"] and e["reason"] == "failed" and e["score"] is None and "500" in e["error"]
 
 
+def test_a_judging_method_runs_when_no_judge_model_is_set_and_the_story_model_judges():
+    """Kaggle has no GROQ_JUDGE_MODEL, so `Calls.judge` is None. The cascade crashed on that eight times in a row ('NoneType' has no attribute 'meter')."""
+    def story_model(prompt):
+        return fake_model(prompt)
+
+    story_model.model = "the-story-model"
+    data, chosen = make("cascade")
+    assert any(v.name == "cascade" and v.judge for v in chosen)
+    c = runner.Calls(runner.Channel(story_model))
+    assert c.judge is None
+    assert runner.run(data, chosen, c, say=lambda *_: None) is True
+    for row in data["results"].values():
+        e = row["cascade"]
+        assert e["ok"] and e["models"] == {"story": "the-story-model", "judge": "the-story-model"}
+        assert e["calls"] >= 2                          # the judge's calls went through the one channel there is
+
+
 def test_a_method_that_needs_the_database_is_skipped_without_it():
     data, chosen = make("baseline,examples")
     said = []

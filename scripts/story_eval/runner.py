@@ -156,12 +156,13 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
         raise StopRun(error)
     model = sum(c.meter.seconds for c in used)
     n_calls = sum(c.meter.calls for c in used)
+    judged_by = judge_ch if judge_ch is not None else story_ch      # no judge model set (GROQ_JUDGE_MODEL): the story's own model judges
     entry = {"text": result.text, "ok": result.ok, "reason": result.reason, "story_type": result.story_type, "topic": result.topic,
              "calls": n_calls, "seconds": round(wall, 1), "model_seconds": round(model, 1),
              "wait_seconds": round(max(0.0, wall - model), 1), "error": error, "notes": list(result.notes), "translation": "",
              "audit": None, "audit_seconds": None, "audit_score": None, "audits": {}, "audit_scores": {}, "audit_union": None, "models": {
                  "story": getattr(story_ch.meter.call, "model", None) or variant.story_model or "default",
-                 "judge": (getattr(judge_ch.meter.call, "model", None) or variant.judge_model or "default") if variant.judge else None}}
+                 "judge": (getattr(judged_by.meter.call, "model", None) or variant.judge_model or "default") if variant.judge else None}}
     entry["gate"] = None
     entry["trace"] = list(getattr(result, "trace", ()) or [])
     entry["score"] = _score(result.text, result.ok, request)
