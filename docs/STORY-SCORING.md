@@ -107,6 +107,36 @@ Add `--variants baseline,refine` to see the same ten requests written by the pla
 
 Patch 0085 changes: the loop rates naturalness at every observe (one more call each) and throws a repair away when the rating drops; only the flagged sentences are sent to the model and the whole-text needs are recorded as "measured, left alone"; the first draft travels with the result (`StoryResult.draft`), and the runner reviews it with the same reviewers (`entry["draft"]`, only when the loop changed it) so the report can show **the draft against its own repair**; a run that stops says why in `meta["stopped"]` (rate limit, interrupt or crash, with the story and method).
 
+### When a run is cut: what the files say (patch 0087)
+
+The 13 and 14 November Kaggle runs of the overnight set ended after one story and the JSON could not say why. A run now leaves three files next to each other, and each one is enough on its own:
+
+- **`.status.txt`** (read this first, rewritten on every save): `FINISHED`, `STOPPED` (with the reason) or `INCOMPLETE (no stop reason: the process was probably killed)`; stories done per method; the next one to make; how many reviews and ratings each reviewer answered and why the others did not; preflight problems; the command.
+- **`.json`**: the numbers, plus `meta.stopped`, `meta.preflight`, `meta.run` (start, last save, command, commit, Python, platform, the STORY_* and model settings, never a key, and the earlier runs of the same file after a `--resume`) and `meta.log` (the last 400 lines the run printed, with times, without the organisation id or any key).
+- **`.html`**: the same at the top of the Summary tab, in red when the file is not whole, and the log at the bottom.
+
+A stop reason now reads like `limit too long to wait for: daily limit on openai/gpt-oss-120b (tokens per day: used 199,264 of 200,000, this call needs 3,118), retry in 8m26s (at en-0, cascade)`, or `interrupted (signal 15: the host or the notebook stopped the process)`, or `crashed: ValueError: ...`, or `the time budget (--max-minutes) ran out`, or `--limit 5 reached (planned ...)`.
+
+New in the command:
+
+- **Preflight** (on; `--no-preflight` skips it): one tiny call on each model the run will use, before anything is made. A wrong model id (404), a refused key (401), a bad request or a daily limit that will not lift for hours stops the run in the first minute and says why in all three files; a server blip only warns. It costs about 100 to 300 tokens per model.
+- **`--max-minutes N`**: stops cleanly between two stories after N minutes, so a host that kills long jobs (Kaggle: 12 hours) never gets to kill it without a reason. Use 660 on Kaggle.
+- A **kill signal** (SIGTERM, SIGHUP) is caught, written down and saved. SIGKILL cannot be caught: the file is then as the last save left it, and the `INCOMPLETE` line with "next to make" shows where it was.
+- **`--limit N` now keeps all requests in the file** and only makes the first N in this run, so `--resume` makes the rest ("run it in parts" did not work before: the file held only the N requests).
+
+#### Running on Kaggle
+
+1. Apply patches 0085, 0086, 0087 to your checkout and push (`git am --3way`, then `git push`). Kaggle does not see local changes.
+2. In the notebook, get the new code: if the notebook clones the repo, restart the session (or run `git -C <repo> pull`); if the repo is an attached dataset, create a new dataset version from the new checkout and attach that version. Check with `git -C <repo> log --oneline -1` (or open `scripts/story_eval/health.py`: it must exist).
+3. Keep the keys in Kaggle secrets as before (Add-ons, Secrets), exported into the environment before the command; nothing about them changes.
+4. Run the step with `--out` in `/kaggle/working` (only that folder is kept) and a time budget, for example:
+
+       python scripts/run_story_methods.py --variants writer --languages en --count 10 --no-translate --audit-models gpt,qwen --max-minutes 660 --out /kaggle/working/writer_kaggle.html
+
+5. Run the cell that checks the result even when the step failed (put it in its own cell, or end the step line with `; true`): `!cat /kaggle/working/writer_kaggle.status.txt`.
+6. If it says `STOPPED` or `INCOMPLETE`, run the same command again with `--resume /kaggle/working/writer_kaggle.json` (the resume reads the earlier reason and keeps the log), after the limit has lifted (the status file says when) or with another key in `GROQ_API_KEY_2`.
+7. Send back `writer_kaggle.status.txt` and `writer_kaggle.json` (the `.html` is optional: it is made from the JSON).
+
 ### Writer rules (patch 0086, idea 1 built, off by default)
 
 Three sentences added to the story prompt before its last line, for every language (the example is English only): *small words stay* (never drop an article, possessive, preposition, particle or verb ending that the language needs, with "the drawer, not drawer" for English); *use a listed word only where it belongs* (leave it out instead of attaching it after a comma or adding a sentence just to use it); *no filler* ("today", "now", "still", "indeed") at the end of sentences. The text is in `prompts/builder.py` (`_WRITER_RULES`). The two-pass route puts the same rules in its adapt prompt, the step that writes the final text.

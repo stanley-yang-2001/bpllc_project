@@ -12,6 +12,8 @@ from tutor_core.naturalness import combine as combine_ratings
 from tutor_core.quality.score import merge_reviews
 from tutor_core.quality.grammar import Hit
 
+from . import health
+
 PART_LABELS = {"length": "Length", "own_words": "Your words", "uncommon": "Uncommon words", "sentence_length": "Sentence length",
                "grammar": "Grammar, fluency", "language_format": "Language, format"}
 PASS_PART = 80.0        # a story passes when it is not gated and every measured part is at least this
@@ -283,6 +285,45 @@ def refine_pairs(data: dict) -> str:
             f"This is the fair test of a repair step.</p><table class=sum>{head}{''.join(out)}</table>")
 
 
+def _completeness(data: dict) -> str:
+    """First thing on the page: finished or not, why it stopped, what is missing, and whether every reviewer answered. A partial file must not look like a whole one."""
+    c = health.completeness(data)
+    state = health.state(data)
+    colour = "#1a7f37" if c["complete"] else "#b42318"
+    per = ", ".join(f"{html.escape(p['label'])} {p['done']}/{p['total']}" for p in c["variants"])
+    out = [f"<div style='border:2px solid {colour};padding:.6rem 1rem;margin:1rem 0'><b style='color:{colour}'>{html.escape(state)}</b>: {c['done']} of {c['total']} stories made ({per}).<br>"]
+    if c["stopped"]:
+        out.append(f"<b>Why it stopped:</b> {html.escape(str(c['stopped']))}<br>")
+    if c["next"]:
+        out.append(f"Next to make: {html.escape(c['next'][0])} with {html.escape(c['next'][1])}. Run the same command again with --resume and this file's .json.<br>")
+    bad = [f"{p['label']}: {', '.join(p['failed'])}" for p in c["variants"] if p["failed"]]
+    if bad:
+        out.append(f"Stories that could not be written: {html.escape('; '.join(bad))}<br>")
+    for label, slot in c["reviews"].items():
+        why = ("; " + "; ".join(f"{k} ×{n}" for k, n in slot["why"].items())) if slot["why"] else ""
+        short = slot["audit_ok"] < slot["asked"] or slot["rating_ok"] < slot["asked"]
+        out.append(f"Reviewer <b>{html.escape(label)}</b>: {slot['audit_ok']} of {slot['asked']} reviews and {slot['rating_ok']} ratings worked"
+                   + (f" <b style='color:#b42318'>(some are missing{html.escape(why)})</b>" if short else "") + "<br>")
+    for p in (data.get("meta") or {}).get("preflight") or []:
+        if not p.get("ok"):
+            out.append(f"<b style='color:#b42318'>Preflight problem:</b> {html.escape(str(p['channel']))}: {html.escape(str(p['why']))}<br>")
+    out.append("</div>")
+    return "".join(out)
+
+
+def _run_record(data: dict) -> str:
+    meta = data.get("meta") or {}
+    run, log = meta.get("run") or {}, meta.get("log") or []
+    if not run and not log:
+        return ""
+    facts = "".join(f"<li>{html.escape(k)}: {html.escape(str(run.get(k)))}</li>" for k in ("started", "last_save", "command", "commit", "python", "platform", "kaggle") if run.get(k))
+    settings = ", ".join(f"{k}={v}" for k, v in (run.get("settings") or {}).items())
+    earlier = "".join(f"<li>{html.escape(str(e.get('started')))} to {html.escape(str(e.get('last_save')))}: {html.escape(str(e.get('stopped') or 'no reason recorded'))}</li>" for e in run.get("earlier") or [])
+    return ("<h3>This run</h3><ul class=num>" + facts + (f"<li>settings: {html.escape(settings)}</li>" if settings else "") + "</ul>"
+            + (f"<p class=num>Earlier runs of this file:</p><ul class=num>{earlier}</ul>" if earlier else "")
+            + (f"<details><summary>Run log (last {len(log)} lines)</summary><pre>{html.escape(chr(10).join(log))}</pre></details>" if log else ""))
+
+
 def _summary(data: dict) -> str:
     variants = data["variants"]
     base = stats(data, variants[0]["name"]) if variants else {}
@@ -301,15 +342,14 @@ def _summary(data: dict) -> str:
     lang_head = "<tr><th>Language</th>" + "".join(f"<th>{html.escape(v['label'])}</th>" for v in variants) + "</tr>"
     lang_rows = "".join(f"<tr><td>{html.escape(LANGUAGES[c].name)}</td>" + "".join(f"<td>{_fmt(stats(data, v['name'], c)['score'])}</td>" for v in variants) + "</tr>" for c in codes)
     meta = data.get("meta") or {}
-    models = ", ".join(f"{k}: {v}" for k, v in meta.items() if v)
+    models = ", ".join(f"{k}: {v}" for k, v in meta.items() if v and k != "stopped" and isinstance(v, (str, int, float)))
     return ("<h2>Summary</h2><p>Mean story score 0 to 100 (score version "
             f"{meta.get('score_version', '?')}), pass rate (not gated and every part at least {PASS_PART:g}), average model calls and seconds per story. "
             "“Seconds in model” is time inside model calls; “seconds in all” also counts waiting for the free tier’s rate limit. "
             "The model review column appears only when the run used --audit: an independent model lists grammar mistakes in each final story, and the score is "
             "computed again with them. A review FAILS a story when it rates it 2 of 5 or lower, finds too many mistakes or finds it stuffed; that halves the score, so "
             "read “Failed reviews” before the mean score.</p>" + (f"<p class=num>{html.escape(models)}</p>" if models else "")
-            + (f"<p class=num><b>This run stopped early:</b> {html.escape(str(meta['stopped']))}. Run again with --resume.</p>" if meta.get("stopped") else "")
-            + f"<table class=sum>{head}{''.join(rows)}</table>{refine_pairs(data)}{reviewer_table(data)}<h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>")
+            + f"{_completeness(data)}<table class=sum>{head}{''.join(rows)}</table>{refine_pairs(data)}{reviewer_table(data)}<h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>{_run_record(data)}")
 
 
 def render(data: dict) -> str:

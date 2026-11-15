@@ -29,6 +29,7 @@ other than the story's: a model marks its own writing leniently, and the free ti
 """
 import argparse
 import os
+import signal
 import sys
 import time
 from pathlib import Path
@@ -36,7 +37,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE.parent / "tutor_core"), "/app/custom_components", "/app/scripts"]
 
-from story_eval import fixed_set, report, runner, variants as variant_set  # noqa: E402
+from story_eval import fixed_set, health, report, runner, variants as variant_set  # noqa: E402
 
 
 def _out_path(args) -> str:
@@ -48,9 +49,17 @@ def _out_path(args) -> str:
     return f"{HERE}/methods_{time.strftime('%Y%m%d_%H%M%S')}.html"
 
 
-def write_outputs(data: dict, html_path: str) -> None:
-    runner.save(data, html_path.rsplit(".", 1)[0] + ".json")
+def write_outputs(data: dict, html_path: str, log=None) -> None:
+    """The .json (the numbers), the .html (the report) and the .status.txt (what a person reads first: finished or stopped, why, what is next) on every save.
+    The last lines of the run's log and the time of the save go into the .json, so that file alone says what happened."""
+    meta = data.setdefault("meta", {})
+    if log is not None:
+        meta["log"] = log.tail()
+    meta.setdefault("run", {})["last_save"] = health.now_iso()
+    stem = html_path.rsplit(".", 1)[0]
+    runner.save(data, stem + ".json")
     Path(html_path).write_text(report.render(data), encoding="utf-8")
+    Path(stem + ".status.txt").write_text(health.status_text(data), encoding="utf-8")
 
 
 def pick_requests(args) -> list:
@@ -81,50 +90,55 @@ def main(argv=None) -> int:
     ap.add_argument("--tpm", type=int, default=7000, help="tokens per minute to stay under (free tier: 8000)")
     ap.add_argument("--resume", default=None, metavar="FILE.json", help="continue an earlier run: only missing stories are made")
     ap.add_argument("--rescore", default=None, metavar="FILE.json", help="no model calls: score the saved stories again with the current score")
+    ap.add_argument("--max-minutes", type=float, default=None, metavar="N", help="stop cleanly between two stories after N minutes (a notebook or a host that kills the process "
+                    "loses the reason; this way the file says why it ended). Kaggle: 11 hours is 660")
+    ap.add_argument("--no-preflight", action="store_true", help="do not make one tiny call per model before the run (it finds a wrong model id, a refused key or a used-up daily limit in the first minute)")
     ap.add_argument("--dry-run", action="store_true", help="print the size of the run and stop")
     ap.add_argument("--out", default=None, help="the .html file (the .json is written next to it)")
     args = ap.parse_args(argv)
+    log = health.RunLog()
 
     if args.rescore:
         data = report.rescore(runner.load(args.rescore))
         out = _out_path(args)
         write_outputs(data, out)
-        print(f"Scored again with the current score: {out}")
+        log(f"Scored again with the current score: {out}")
         return 0
 
     try:
         chosen = variant_set.resolve(args.variants)
     except ValueError as exc:
-        print(exc)
+        log(exc)
         return 2
     requests = pick_requests(args)
+    every = requests          # the file keeps ALL requests; --limit only says how many this run makes, so a later --resume can make the rest ("run it in parts")
     if args.limit is not None:
         requests = requests[:args.limit]
     if not requests:
-        print("No requests: check --languages.")
+        log("No requests: check --languages.")
         return 2
     reviewers = [x.strip() for x in (args.audit_models or "").split(",") if x.strip()]
     if any(x not in ("gpt", "qwen") for x in reviewers):
-        print("--audit-models takes gpt and/or qwen.")
+        log("--audit-models takes gpt and/or qwen.")
         return 2
     args.audit = args.audit or bool(reviewers)
     size = runner.estimate(requests, chosen, args.audit, not args.no_translate, args.tpm)
-    print(f"{size['requests']} requests x {size['variants']} methods: about {size['calls']} model calls, {size['tokens']:,} tokens, "
+    log(f"{size['requests']} requests x {size['variants']} methods: about {size['calls']} model calls, {size['tokens']:,} tokens, "
           f"at least {size['minutes']} minutes at {args.tpm} tokens a minute.")
     if size["tokens"] > 150_000:
-        print("That is more than the free tier's daily token allowance for one model may cover. Run it in parts with --limit N, then --resume; "
+        log("That is more than the free tier's daily token allowance for one model may cover. Run it in parts with --limit N, then --resume; "
               "a second model for the judge and the review (GROQ_JUDGE_MODEL, GROQ_AUDIT_MODEL) has its own allowance.")
     from tutor_core import groq as _g
-    print("Keys: story/gpt = " + _g.key_label() + "; qwen = " + _g.key_label("GROQ_QWEN_API_KEY") + "; judge = " + _g.key_label("GROQ_JUDGE_API_KEY")
+    log("Keys: story/gpt = " + _g.key_label() + "; qwen = " + _g.key_label("GROQ_QWEN_API_KEY") + "; judge = " + _g.key_label("GROQ_JUDGE_API_KEY")
           + "; review = " + _g.key_label("GROQ_AUDIT_API_KEY"))
     from tutor_core import key_pool as _kp
     extra = {base or "GROQ_API_KEY": len(_kp.key_vars(base)) for base in (None, "GROQ_QWEN_API_KEY", "GROQ_JUDGE_API_KEY", "GROQ_AUDIT_API_KEY")}
-    print("Keys per family (the next one is used when a key hits its limit): " + ", ".join(f"{k} x{n}" for k, n in extra.items()) +
+    log("Keys per family (the next one is used when a key hits its limit): " + ", ".join(f"{k} x{n}" for k, n in extra.items()) +
           (f"; switching early at {args.key_budget:,} tokens a key" if args.key_budget else "; switching only when Groq refuses"))
     if args.dry_run:
         return 0
     if not os.environ.get("GROQ_API_KEY"):
-        print("GROQ_API_KEY is not set.")
+        log("GROQ_API_KEY is not set.")
         return 2
 
     from tutor_core import groq
@@ -133,7 +147,7 @@ def main(argv=None) -> int:
     os.environ.setdefault("STORY_ALLOW_UNMEASURED", "1")
 
     def wrap(call):
-        return patient(call, tpm=args.tpm, say=print)
+        return patient(call, tpm=args.tpm, say=log)
 
     from tutor_core import key_pool
     pools = {}
@@ -142,7 +156,7 @@ def main(argv=None) -> int:
         """One pool per key family AND model (Groq counts the limit per model), so channels that share both share their blocks and their spend."""
         tag = (base, model or os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL)
         if tag not in pools:
-            pools[tag] = key_pool.KeyPool(key_pool.key_vars(base), args.key_budget, say=print)
+            pools[tag] = key_pool.KeyPool(key_pool.key_vars(base), args.key_budget, say=log)
         return pools[tag]
 
     def rotating_default(base=None, **kw):
@@ -176,6 +190,7 @@ def main(argv=None) -> int:
     from tutor_core.quality.score import SCORE_VERSION
     meta["score_version"] = SCORE_VERSION
 
+    info = health.run_info(argv if argv is not None else sys.argv[1:])
     if args.resume:
         data = runner.load(args.resume)
         have = {v["name"] for v in data["variants"]}
@@ -183,25 +198,70 @@ def main(argv=None) -> int:
         data["meta"].update({k: v for k, v in meta.items() if v})
         out = args.out or args.resume.rsplit(".", 1)[0] + ".html"
         chosen = [variant_set.BY_NAME[v["name"]] for v in data["variants"] if v["name"] in variant_set.BY_NAME]
+        before = data["meta"].get("run") or {}
+        info["earlier"] = (before.get("earlier") or []) + [{"started": before.get("started"), "last_save": before.get("last_save"), "command": before.get("command"),
+                                                            "stopped": data["meta"].get("stopped")}]
+        log.lines.extend(data["meta"].get("log") or [])                     # the earlier runs' lines stay in front of this one's
     else:
-        data = runner.new_data(requests, chosen, meta)
+        data = runner.new_data(every, chosen, meta)
         out = _out_path(args)
+    data["meta"]["run"] = info
+
+    def sync_pools(d: dict) -> None:
+        switches = [e for pool in pools.values() for e in pool.events]
+        if switches:
+            d["meta"]["key switches"] = "; ".join(switches)
+            d["meta"]["key events"] = [dict(r, model=tag[1]) for tag, pool in pools.items() for r in pool.records]
+
+    def saved(d: dict) -> None:
+        sync_pools(d)
+        write_outputs(d, out, log)
+
+    if not args.no_preflight:
+        log("Preflight: one tiny call per model.")
+        pings = {}
+        if any(not v.story_model for v in chosen):
+            pings["story"] = story
+        for alias in sorted({x for v in chosen for x in (v.story_model, v.judge_model) if x}):
+            pings[f"{alias} model"] = model_channel(alias)
+        if calls.judge is not None and any(v.judge and not v.judge_model for v in chosen):
+            pings["judge"] = calls.judge
+        for alias, channel in (audits or {}).items():
+            pings[f"review {alias}"] = channel
+        if calls.audit is not None:
+            pings["review"] = calls.audit
+        rows = health.preflight(pings, say=log)
+        data["meta"]["preflight"] = rows
+        bad = health.fatal(rows)
+        if bad:
+            data["meta"]["stopped"] = "preflight failed, nothing was made: " + "; ".join(f"{r['channel']}: {r['why']}" for r in bad)
+            saved(data)
+            log("\nNot starting: " + data["meta"]["stopped"] + "\nFix that (the model id, the key, or wait for the limit to lift) and run again; --no-preflight skips this check.")
+            return 1
+
+    deadline = time.monotonic() + args.max_minutes * 60 if args.max_minutes else None
+
+    def on_signal(number, _frame):
+        raise KeyboardInterrupt(f"signal {number}: the host or the notebook stopped the process")
+
+    for name in ("SIGTERM", "SIGHUP"):         # a kill that can be caught is written down and saved; one that cannot (SIGKILL) leaves the file as the last save made it
+        try:
+            signal.signal(getattr(signal, name), on_signal)
+        except (AttributeError, ValueError, OSError):          # not on Windows, not outside the main thread
+            pass
 
     conn = None
     if args.db:
         from tutor_core import db
         conn = db.connect()
     try:
-        done = runner.run(data, chosen, calls, conn=conn, on_saved=lambda d: write_outputs(d, out), limit=args.limit)
+        done = runner.run(data, chosen, calls, conn=conn, on_saved=saved, limit=args.limit, say=log, deadline=deadline)
     finally:
         if conn:
             conn.close()
-    switches = [e for pool in pools.values() for e in pool.events]
-    if switches:
-        data["meta"]["key switches"] = "; ".join(switches)
-        data["meta"]["key events"] = [dict(r, model=tag[1]) for tag, pool in pools.items() for r in pool.records]
-    write_outputs(data, out)
-    print(f"\n{'Finished' if done else 'Saved so far'}: {out}  (the numbers are in the .json next to it)")
+    saved(data)
+    log(f"\n{'Finished' if done else 'Saved so far'}: {out}  (the numbers are in the .json next to it)")
+    log("\n" + health.status_text(data))
     return 0 if done else 1
 
 

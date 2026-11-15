@@ -106,7 +106,7 @@ def test_saved_after_every_story_and_resume_makes_only_what_is_missing(tmp_path)
     saved = []
     c = calls()
     runner.run(data, chosen, c, on_saved=lambda d: (runner.save(d, path), saved.append(1)), say=lambda *_: None, limit=1)
-    assert len(saved) == 2 and len(runner.load(path)["results"]) == 1
+    assert len(saved) == 3 and len(runner.load(path)["results"]) == 1          # one per story, and one for the planned stop at --limit
     again = runner.load(path)
     first = json.dumps(again["results"]["es-0"], sort_keys=True)
     seen = []
@@ -269,7 +269,7 @@ def test_a_run_that_stops_says_why_in_the_json_and_a_resume_clears_it(tmp_path):
     path = str(tmp_path / "run.json")
     assert runner.run(data, chosen, calls(limited), on_saved=lambda d: runner.save(d, path), say=lambda *_: None) is False
     stopped = runner.load(path)["meta"]["stopped"]
-    assert "rate limit too long to wait for" in stopped and "(at es-0, baseline)" in stopped
+    assert "limit too long to wait for: daily limit, retry in 7h12m" in stopped and "(at es-0, baseline)" in stopped
     again = runner.load(path)
     assert runner.run(again, chosen, calls(), say=lambda *_: None) is True and "stopped" not in again["meta"]
 
@@ -283,4 +283,5 @@ def test_a_crash_is_written_down_before_it_is_raised(monkeypatch, tmp_path):
     with pytest.raises(ValueError):
         runner.run(data, chosen, calls(), on_saved=lambda d: runner.save(d, path), say=lambda *_: None)
     assert runner.load(path)["meta"]["stopped"].startswith("crashed: ValueError: bad row (at es-0")
-    assert "This run stopped early" in report.render(runner.load(path))
+    page = report.render(runner.load(path))
+    assert "STOPPED" in page and "crashed: ValueError: bad row" in page

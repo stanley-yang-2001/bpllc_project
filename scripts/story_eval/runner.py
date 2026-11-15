@@ -36,6 +36,8 @@ from tutor_core.quality.grammar.audit import run_audit
 from tutor_core.quality.score import merge_reviews
 from tutor_core.story import story_from_words
 
+from .health import describe_error, scrub
+
 FORMAT = "story-methods-1"
 
 
@@ -200,9 +202,9 @@ def load(path: str) -> dict:
 
 
 def run(data: dict, variants: list, calls: Calls, *, conn=None, on_saved: Callable = lambda d: None,
-        say: Callable = print, limit: Optional[int] = None) -> bool:
+        say: Callable = print, limit: Optional[int] = None, deadline: Optional[float] = None) -> bool:
     """Fill `data["results"]` for every request and variant that has no entry yet. True when everything was done, False when stopped
-    (limit, Ctrl-C or `limit` requests reached). `on_saved(data)` is called after every story."""
+    (limit, Ctrl-C, a kill signal, the time budget `deadline` (time.monotonic) or `limit` requests reached). `on_saved(data)` is called after every story."""
     todo = [r for r in data["requests"]]
     if limit is not None:
         todo = todo[:limit]
@@ -221,25 +223,35 @@ def run(data: dict, variants: list, calls: Calls, *, conn=None, on_saved: Callab
         for variant in active:
             if variant.name in row:
                 continue
+            if deadline is not None and time.monotonic() >= deadline:
+                stopped("the time budget (--max-minutes) ran out; stopped cleanly between two stories", request, variant)
+                say("\nStopped: the time budget ran out. What is done is saved. Run again with --resume to continue.")
+                return False
             try:
                 entry = run_one(request, variant, calls, conn)
             except StopRun as stop:
-                stopped(f"rate limit too long to wait for: {str(stop)[:160]}", request, variant)
-                say(f"\nStopped: the rate limit is too long to wait for ({str(stop)[:160]}). Run again with --resume to continue.")
+                why = describe_error(stop)
+                stopped(f"limit too long to wait for: {why}", request, variant)
+                say(f"\nStopped: the limit is too long to wait for ({why}). Run again with --resume to continue.")
                 return False
-            except KeyboardInterrupt:
-                stopped("interrupted", request, variant)
-                say("\nInterrupted: what is done is saved. Run again with --resume to continue.")
+            except KeyboardInterrupt as stop:
+                note = f" ({stop})" if str(stop) else ""
+                stopped("interrupted" + note, request, variant)
+                say(f"\nInterrupted{note}: what is done is saved. Run again with --resume to continue.")
                 return False
             except Exception as exc:                # noqa: BLE001 - not caught: written down first, so the JSON says where and why it ended, then raised again
-                stopped(f"crashed: {type(exc).__name__}: {str(exc)[:160]}", request, variant)
+                stopped(f"crashed: {type(exc).__name__}: {scrub(exc)[:160]}", request, variant)
                 raise
             row[variant.name] = entry
             on_saved(data)
             sc = (entry["score"] or {}).get("score")
             say(f"[{n}/{len(todo)}] {request['id']} {request['tier']:<6} {variant.name:<10} score {sc if sc is not None else '-':<5} "
                 f"calls {entry['calls']:<2} {entry['seconds']:>6}s (model {entry['model_seconds']}s)" + ("" if entry["ok"] else f"  FAILED {entry['reason']}"))
-    return not (limit is not None and limit < len(data["requests"]))
+    if limit is not None and limit < len(data["requests"]):
+        meta["stopped"] = f"--limit {limit} reached (planned: {len(data['requests']) - limit} requests are left for --resume)"
+        on_saved(data)
+        return False
+    return True
 
 
 def estimate(requests: list, variants: list, audit: bool, translate: bool, tpm: int = 7000) -> dict:
