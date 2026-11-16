@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
-from .prompts import build_naturalness_prompt
+from .prompts import build_naturalness_prompt, build_naturalness_prompt_v2
 
 _NUMBER = re.compile(r"\b([1-5])(?:[.,]\d)?\b")
 
@@ -21,9 +21,20 @@ class Naturalness:
     score: Optional[float] = None
     reason: str = ""
     error: str = ""
+    sense: Optional[int] = None          # only with the v2 prompt: the two 1 to 3 answers the rating was made from
+    wording: Optional[int] = None
 
     def as_dict(self) -> dict:
-        return {"ok": self.ok, "score": self.score, "reason": self.reason, "error": self.error}
+        out = {"ok": self.ok, "score": self.score, "reason": self.reason, "error": self.error}
+        if self.sense is not None:
+            out.update(sense=self.sense, wording=self.wording)
+        return out
+
+
+def from_parts(sense: float, wording: float) -> float:
+    """1 to 5 from the v2 answers: sense + wording - 1, and 2 at most when either part is 1 (nonsense, or often unnatural, fails the text whatever the other says)."""
+    rating = round(sense) + round(wording) - 1
+    return float(min(rating, 2) if round(sense) == 1 or round(wording) == 1 else rating)
 
 
 def parse(raw: str) -> Naturalness:
@@ -33,6 +44,10 @@ def parse(raw: str) -> Naturalness:
     if match:
         try:
             obj = json.loads(match.group(0))
+            if "sense" in obj and "wording" in obj:
+                sense, wording = float(obj["sense"]), float(obj["wording"])
+                if 1 <= sense <= 3 and 1 <= wording <= 3:
+                    return Naturalness(True, from_parts(sense, wording), str(obj.get("reason", ""))[:120], sense=round(sense), wording=round(wording))
             value = float(obj.get("score"))
             if 1 <= value <= 5:
                 return Naturalness(True, round(value * 2) / 2, str(obj.get("reason", ""))[:120])
@@ -44,9 +59,11 @@ def parse(raw: str) -> Naturalness:
     return Naturalness(False, error="no rating in the answer")
 
 
-def rate(call: Callable[[str], str], text: str, language_name: str) -> Naturalness:
+def rate(call: Callable[[str], str], text: str, language_name: str, prompt: str = "v1", level: str = "") -> Naturalness:
+    """prompt 'v1' (the default, what every score so far used) or 'v2' (sense and wording apart, level named: opt-in, measured by scripts/rate_texts.py)."""
     try:
-        return parse(call(build_naturalness_prompt(language_name, text)))
+        asked = build_naturalness_prompt_v2(language_name, text, level) if prompt == "v2" else build_naturalness_prompt(language_name, text)
+        return parse(call(asked))
     except Exception as exc:        # noqa: BLE001 - a failed rating must not fail the story
         return Naturalness(False, error=f"{type(exc).__name__}: {exc}")
 

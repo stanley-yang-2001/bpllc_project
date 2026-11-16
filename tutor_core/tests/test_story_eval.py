@@ -302,3 +302,63 @@ def test_a_crash_is_written_down_before_it_is_raised(monkeypatch, tmp_path):
     assert runner.load(path)["meta"]["stopped"].startswith("crashed: ValueError: bad row (at es-0")
     page = report.render(runner.load(path))
     assert "STOPPED" in page and "crashed: ValueError: bad row" in page
+
+
+# --- 16 Nov 2026: the report leads with what the reviewers decided ---------------------------------------------------------------------------------------------
+
+def _scored(failed=False, free=100.0, gated=None):
+    return {"score": 40.0 if failed else 90.0, "failed": ["unnatural"] if failed else [], "gated": gated}
+
+
+def _entry(ratings, failed_labels=(), free=100.0, ok=True):
+    return {"ok": ok, "score": {"score": free, "gated": None, "parts": {}},
+            "audits": {l: {"ok": True, "hits": [], "naturalness": {"ok": True, "score": v}} for l, v in ratings.items()},
+            "audit_scores": {l: _scored(l in failed_labels) for l in ratings}, "audit_union": _scored(bool(failed_labels))}
+
+
+def test_a_story_is_passed_split_or_failed_and_one_nobody_reviewed_is_never_a_pass():
+    from story_eval import verdicts as vd
+    assert vd.verdict(_entry({"gpt": 4, "qwen": 3}))["kind"] == "pass"
+    assert vd.verdict(_entry({"gpt": 2, "qwen": 3}, ["gpt"]))["kind"] == "split"
+    assert vd.verdict(_entry({"gpt": 2, "qwen": 2}, ["gpt", "qwen"]))["kind"] == "fail"
+    assert vd.verdict({"ok": True, "audit_scores": {}}) is None and vd.verdict(_entry({"gpt": 4}, ok=False)) is None
+    assert vd.failed({"failed": [], "gated": "wrong language"}) and not vd.failed({"failed": [], "gated": None})
+
+
+def test_two_methods_are_compared_on_the_same_requests_and_a_small_gap_is_called_noise():
+    from story_eval import verdicts as vd
+    req = [{"id": f"r{i}"} for i in range(8)]
+    base = [(r, _entry({"gpt": 3, "qwen": 3})) for r in req]
+    gain = [(r, _entry({"gpt": 4, "qwen": 4})) for r in req]
+    c = vd.paired(base, gain)
+    assert c["requests"] == 8 and c["up"] == 8 and c["reading"] == "clear gain" and c["p"] < 0.05
+    mixed = [(r, _entry({"gpt": 4 if i % 2 else 3, "qwen": 3})) for i, r in enumerate(req)]
+    assert vd.paired(base, mixed)["reading"] == "within noise"
+    assert vd.paired(base[:4], gain[:4])["reading"] == "too few requests"
+    one_sided = [(r, _entry({"gpt": 4, "qwen": 2})) for r in req]          # gpt rates its own kind of writing up, qwen down
+    assert vd.paired(base, one_sided)["reading"] == "reviewers disagree"
+    assert vd.paired(base, gain[:0])["requests"] == 0
+
+
+def test_the_page_leads_with_the_verdicts_and_a_file_without_a_review_says_so():
+    data, chosen = make("baseline,refine")
+    c = refine_calls()
+    c.story = runner.Channel(refine_model)
+    runner.run(data, chosen, c, say=lambda *_: None)
+    page = report.render(data)
+    assert page.index("What the reviewers decided") < page.index("Brief fit and cost") and "Passed by every reviewer" in page and "Ratings by request" in page
+    assert "Each method against Baseline" in page and "with model review" in page and "Mean score by language (with model review)" in page
+    plain, chosen = make("baseline")
+    runner.run(plain, chosen, calls(), say=lambda *_: None)
+    page = report.render(plain)
+    assert "No model review in this file" in page and "What the reviewers decided" not in page and "free checks only, not reviewed" in page
+
+
+def test_the_log_line_says_what_each_reviewer_rated_and_the_free_score_is_labelled_free():
+    lines = []
+    data, chosen = make("baseline")
+    runner.run(data, chosen, calls(audit=True), say=lines.append, limit=1)
+    assert lines and "free " in lines[0] and "score " not in lines[0]
+    entry = _entry({"gpt": 2, "qwen": 3}, ["gpt"])
+    assert "reviewed" in runner.outcome(entry) and "gpt 2 FAIL" in runner.outcome(entry) and "qwen 3 ok" in runner.outcome(entry)
+    assert "reviewed" not in runner.outcome({"score": {"score": 97.0}})

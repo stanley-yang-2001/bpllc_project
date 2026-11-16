@@ -12,7 +12,7 @@ from tutor_core.naturalness import combine as combine_ratings
 from tutor_core.quality.score import merge_reviews
 from tutor_core.quality.grammar import Hit
 
-from . import health
+from . import health, stats as st, verdicts
 
 PART_LABELS = {"length": "Length", "own_words": "Your words", "uncommon": "Uncommon words", "sentence_length": "Sentence length",
                "grammar": "Grammar, fluency", "language_format": "Language, format"}
@@ -43,7 +43,7 @@ def review_counts(stories) -> dict:
     how many ratings fell on 2 instead of 3 (13 Nov Kaggle run: means 63.0 and 66.5, failed reviews 8 and 8)."""
     scores = [sc for e in stories if e.get("ok") for sc in (e.get("audit_scores") or {}).values()]
     ratings = [(r.get("naturalness") or {}).get("score") for e in stories if e.get("ok") for r in (e.get("audits") or {}).values()]
-    return {"reviews": len(scores), "failed_reviews": sum(1 for sc in scores if sc.get("failed")), "naturalness": _mean(ratings)}
+    return {"reviews": len(scores), "failed_reviews": sum(1 for sc in scores if verdicts.failed(sc)), "naturalness": _mean(ratings)}
 
 
 def stats(data: dict, variant: str, code: str = None) -> dict:
@@ -53,6 +53,7 @@ def stats(data: dict, variant: str, code: str = None) -> dict:
     scored = [e["score"] for e in made if e["score"]]
     audited = [e for e in made if e.get("audit") and e["audit"].get("ok")]
     return {"requests": len(items), "stories": len(made), "score": _mean([s["score"] for s in scored]),
+            "reviewed_score": _mean([verdicts.reviewed_score(e) for e in made]),
             "audit_score": _mean([(e.get("audit_union") or e["audit_score"])["score"] for e in audited if e.get("audit_union") or e.get("audit_score")]),
             "pass_rate": round(sum(1 for s in scored if passes(s)) / len(items), 3) if items else None,
             "parts": {k: _mean([s["parts"].get(k) for s in scored]) for k in PART_LABELS},
@@ -150,15 +151,28 @@ def _bars(sc):
     return f"<table class=parts>{''.join(rows)}</table>"
 
 
+def _verdict_text(v) -> str:
+    who, bad = v["reviewers"], v["failed"]
+    ok = [x for x in who if x not in bad]
+    if v["kind"] == verdicts.PASS:
+        return "passed by " + (f"all {len(who)} reviewers" if len(who) > 2 else "both reviewers" if len(who) == 2 else who[0])
+    if v["kind"] == verdicts.FAIL:
+        return "failed by " + (f"all {len(who)} reviewers" if len(who) > 2 else "both reviewers" if len(who) == 2 else who[0])
+    return f"failed by {', '.join(bad)}; passed by {', '.join(ok)}"
+
+
 def _card(variant: dict, e: dict, best: bool) -> str:
-    sc, au = e.get("score"), e.get("audit_union") or e.get("audit_score")
+    sc = e.get("score")
+    shown, v = verdicts.reviewed_score(e), verdicts.verdict(e)
     if sc is None:
         big = "<div class=score>–</div>"
     elif sc["gated"]:
         big = f"<div class='score zero'>0 <small>gate: {html.escape(sc['gated'])}</small></div>"
+    elif shown is not None and v is not None:
+        big = (f"<div class=score>{shown:g}<small> / 100 with model review</small></div>"
+               f"<p class=num><span class='chip v-{v['kind']}'>{html.escape(_verdict_text(v))}</span> free checks alone: {sc['score']:g}</p>")
     else:
-        extra = f" · with model review {au['score']:g}" if au else ""
-        big = f"<div class=score>{sc['score']:g}<small> / 100{extra}</small></div>"
+        big = f"<div class=score>{sc['score']:g}<small> / 100 · free checks only, not reviewed</small></div>"
     badge = " <span class=win>highest</span>" if best else ""
     bad = "" if e["ok"] else f"<p class=bad>No story ({html.escape(str(e['reason']))}). {html.escape(e.get('error') or '')}</p>"
     notes = "".join(f"<li>{html.escape(n)}</li>" for n in e.get("notes") or [])
@@ -207,6 +221,8 @@ CSS = ("body{font:16px/1.5 system-ui,sans-serif;max-width:1400px;margin:1.5rem a
        "table.parts{width:100%;border-collapse:collapse;font-size:.85rem}.parts td{padding:.1rem .3rem}.parts .bar{width:50%;background:#ececE6;border-radius:4px}"
        ".parts .bar i{display:block;height:.6rem;background:#2f7d4f;border-radius:4px}.parts .n{text-align:right;width:4rem}"
        "table.sum{border-collapse:collapse;width:100%;margin:.6rem 0 1.4rem}.sum th,.sum td{border:1px solid #ccc;padding:.35rem .6rem;text-align:left}"
+       ".chip{font-size:.78rem;padding:.1rem .5rem;border-radius:99px}.v-pass{background:#d9f0df;color:#145a2a}.v-split{background:#fdecc8;color:#6b4300}.v-fail{background:#fbdcdc;color:#8a1111}"
+       ".grid td{text-align:center}.warnbox{border:2px solid #b42318;padding:.6rem 1rem;margin:1rem 0}"
        ".notes,details ul{font-size:.8rem;color:#555}details summary{cursor:pointer;font-size:.85rem;color:#444}.panel[hidden]{display:none}")
 JS = ("<script>(function(){var b=document.querySelectorAll('nav button'),p=document.querySelectorAll('.panel');"
       "function show(k){b.forEach(function(x){x.setAttribute('aria-selected',x.dataset.tab===k?'true':'false')});"
@@ -248,15 +264,15 @@ def reviewer_table(data: dict) -> str:
             for l in labels) + "</tr>" for v in data["variants"] if v["name"] in names)
         cross = ("<h3>Mistakes found per story, by method and reviewer</h3><table class=sum><tr><th>Method</th>"
                  + "".join(f"<th>{html.escape(l)}</th>" for l in labels) + f"</tr>{lines}</table>")
+    if len(labels) > 1:
+        pairs = _pairs(data)
+        fl = "".join(f"<tr><td>{html.escape(v['label'])}</td>" + "".join(
+            f"<td>{verdicts.decided(pairs[v['name']])['failed_by'].get(l, (0, 0))[1]} of {verdicts.decided(pairs[v['name']])['failed_by'].get(l, (0, 0))[0]}</td>" for l in labels) + "</tr>" for v in data["variants"])
+        cross += ("<h3>Failed reviews, by method and reviewer</h3><table class=sum><tr><th>Method</th>" + "".join(f"<th>{html.escape(l)}</th>" for l in labels) + f"</tr>{fl}</table>")
     return f"<h3>Reviewers compared</h3><table class=sum>{head}{''.join(rows)}</table>{agree}{cross}"
 
 
-def _headline(x: dict):
-    """One score for a reviewed text: both reviewers together when there are two, else the only one."""
-    union = (x.get("audit_union") or {}).get("score")
-    if union is not None:
-        return union
-    return _mean([sc["score"] for sc in (x.get("audit_scores") or {}).values()])
+_headline = verdicts.reviewed_score
 
 
 def refine_pairs(data: dict) -> str:
@@ -324,32 +340,175 @@ def _run_record(data: dict) -> str:
             + (f"<details><summary>Run log (last {len(log)} lines)</summary><pre>{html.escape(chr(10).join(log))}</pre></details>" if log else ""))
 
 
-def _summary(data: dict) -> str:
+def _signed(v) -> str:
+    return "–" if v is None else f"{v:+.1f}"
+
+
+def _pairs(data: dict) -> dict:
+    return {v["name"]: list(entries(data, v["name"])) for v in data["variants"]}
+
+
+def _labels(data: dict) -> list:
+    return list(dict.fromkeys(l for row in data["results"].values() for e in row.values() for l in (e.get("audits") or {})))
+
+
+def _decided_table(data: dict, pairs: dict, labels: list) -> str:
+    head = ("<tr><th>Method</th><th>What it adds</th><th>Stories reviewed</th><th>Passed by every reviewer (95% range)</th><th>Split</th><th>Failed by every reviewer</th>"
+            "<th>Failed reviews</th>" + "".join(f"<th>Rating by {html.escape(l)} (1-5)</th>" for l in labels) + "<th>Score with review</th><th>Mistakes listed per story</th></tr>")
+    rows = []
+    for v in data["variants"]:
+        d, s = verdicts.decided(pairs[v["name"]]), stats(data, v["name"])
+        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{html.escape(v['note'])}</td><td>{d['stories']}/{s['requests']}</td>"
+                    f"<td>{st.percent_range(d[verdicts.PASS], d['stories'])}</td><td>{d[verdicts.SPLIT]}</td><td>{d[verdicts.FAIL]}</td>"
+                    f"<td>{d['failed_reviews']} of {d['reviews']}</td>" + "".join(f"<td>{_fmt(None if d['rating'].get(l) is None else round(d['rating'][l], 1))}</td>" for l in labels)
+                    + f"<td>{_fmt(s['reviewed_score'])}</td><td>{_fmt(s['mistakes_found'])}</td></tr>")
+    return (f"<h3>What the reviewers decided</h3><table class=sum>{head}{''.join(rows)}</table>"
+            "<p class=num>A reviewer fails a story when it rates it 2 of 5 or lower, finds too many mistakes or finds it stuffed. A failed review multiplies the score by 0.6, "
+            "so “Score with review” mostly follows the failed count: read the left side of this table first.</p>")
+
+
+def _notes(data: dict, pairs: dict, labels: list) -> str:
+    flat = [(r, name, e) for name, ps in pairs.items() for r, e in ps]
+    out = []
+    free = verdicts.free_score_by_verdict(flat)
+    if free.get(verdicts.FAIL):
+        f = free[verdicts.FAIL]
+        line = f"The free score of the {f['n']} stories every reviewer failed was {f['low']:.0f} to {f['high']:.0f}"
+        if free.get(verdicts.PASS):
+            g = free[verdicts.PASS]
+            line += f"; of the {g['n']} every reviewer passed, {g['low']:.0f} to {g['high']:.0f}" + (": it cannot tell them apart" if f["high"] >= g["low"] else "")
+        out.append(line + ". It checks the brief, not whether the story reads well.")
+    counts = verdicts.rating_counts(flat)
+    if counts:
+        out.append("Ratings given: " + ", ".join(f"{k:g} × {n}" for k, n in counts.items()) + ". A rating of 2 or less fails the story, so one point between two reviews of the same text can flip the verdict.")
+    moves = verdicts.what_moves(flat)
+    if moves:
+        out.append("Share of the variation in ratings that each explains (adjusted for how many groups it has): " + ", ".join(f"{k} {v * 100:.0f}%" for k, v in sorted(moves.items(), key=lambda kv: -kv[1]))
+                   + ". What the request is decides far more than which method wrote the story.")
+    same, both = verdicts.agreement(flat)
+    if both:
+        out.append(f"Two reviewers judged the same way (pass or fail) on {same} of {both} stories.")
+    meta = data.get("meta") or {}
+    writers = {(e.get("models") or {}).get("story") for _, _, e in flat}
+    own = [l for l in labels if meta.get(f"{l} model") and meta.get(f"{l} model") in writers]
+    if own and len(labels) > 1:
+        out.append(f"{', '.join(own)} reviews stories its own model wrote. A model may rate its own kind of writing higher, so trust a gain only when the other reviewer shows it too.")
+    most = max((len(ps) for ps in pairs.values()), default=0)
+    if most and most < 30:
+        out.append(f"Each method has {most} request(s). The ranges show what that many can tell; a gap inside its range is not a difference.")
+    return "<h3>How far to trust this</h3><ul class=num>" + "".join(f"<li>{html.escape(x)}</li>" for x in out) + "</ul>" if out else ""
+
+
+def _paired_table(data: dict, pairs: dict) -> str:
+    names = [v["name"] for v in data["variants"]]
+    if len(names) < 2:
+        return ""
+    rows = []
+    for v in data["variants"][1:]:
+        c = verdicts.paired(pairs[names[0]], pairs[v["name"]])
+        if not c["requests"]:
+            continue
+        rng = "–" if c["low"] is None else f" ({_signed(c['low'])} to {_signed(c['high'])})"
+        own = " · ".join(f"{html.escape(l)} {_signed(x)}" for l, x in c["by_reviewer"].items())
+        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{c['requests']}</td><td>{_signed(c['change'])}{rng}</td><td>{c['up']} / {c['same']} / {c['down']}</td>"
+                    f"<td>{c['p']:.2f}</td><td>{own}</td><td><b>{html.escape(c['reading'])}</b></td></tr>")
+    if not rows:
+        return ""
+    head = ("<tr><th>Method</th><th>Requests compared</th><th>Mean rating change (95% range)</th><th>Better / same / worse</th><th>Sign test p</th>"
+            "<th>Change by reviewer</th><th>Reading</th></tr>")
+    return (f"<h3>Each method against {html.escape(data['variants'][0]['label'])}, request by request</h3><table class=sum>{head}{''.join(rows)}</table>"
+            "<p class=num>The same request (same words and level) with both methods, rated by the same reviewers. A clear change needs the range to leave zero, the sign test to agree "
+            f"and no reviewer to go the other way; with fewer than {st.MIN_PAIRS} requests nothing can be clear.</p>")
+
+
+def _group_tables(data: dict, pairs: dict) -> str:
+    out = []
+    for key, title in (("pack", "word pack"), ("tier", "level")):
+        grid = verdicts.by_group(pairs, key)
+        if not grid:
+            continue
+        names = [v for v in data["variants"]]
+        rows = []
+        for g, row in grid.items():
+            k = sum(x[0] for x in row.values())
+            n = sum(x[1] for x in row.values())
+            rows.append(f"<tr><td><b>{html.escape(str(g))}</b></td>" + "".join(f"<td>{row[v['name']][0]} of {row[v['name']][1]}</td>" if v["name"] in row else "<td>–</td>" for v in names)
+                        + f"<td>{k} of {n} ({k * 100 // n if n else 0}%)</td></tr>")
+        out.append(f"<h3>Failed reviews by {title}</h3><table class=sum><tr><th>{title.capitalize()}</th>" + "".join(f"<th>{html.escape(v['label'])}</th>" for v in names) + f"<th>All methods</th></tr>{''.join(rows)}</table>")
+    return "".join(out)
+
+
+def _request_grid(data: dict, pairs: dict, labels: list) -> str:
+    mark = {verdicts.PASS: "✓", verdicts.SPLIT: "~", verdicts.FAIL: "✗"}
+    word = {verdicts.PASS: "passed", verdicts.SPLIT: "split", verdicts.FAIL: "failed"}
+    rows = []
+    for r in data["requests"]:
+        row = data["results"].get(r["id"]) or {}
+        cells = []
+        for v in data["variants"]:
+            e = row.get(v["name"])
+            vd = verdicts.verdict(e)
+            if vd is None:
+                cells.append("<td>–</td>")
+                continue
+            got = verdicts.ratings(e)
+            cells.append(f"<td class='v-{vd['kind']}' title='{word[vd['kind']]}'>{mark[vd['kind']]} " + " · ".join(f"{got[l]:g}" if l in got else "?" for l in labels) + "</td>")
+        if any("v-" in c for c in cells):
+            rows.append(f"<tr><td>{html.escape(r['id'])}</td><td>{html.escape(str(r.get('tier', '')))}</td><td>{html.escape(str(r.get('pack', '')))}</td>" + "".join(cells) + "</tr>")
+    if not rows:
+        return ""
+    return (f"<h3>Ratings by request</h3><p class=num>Ratings in the order {html.escape(' · '.join(labels))}; ✓ passed, ~ split, ✗ failed. A request that fails in every column is the request's doing, not the method's.</p>"
+            "<table class='sum grid'><tr><th>Request</th><th>Level</th><th>Word pack</th>" + "".join(f"<th>{html.escape(v['label'])}</th>" for v in data["variants"]) + f"</tr>{''.join(rows)}</table>")
+
+
+def _free_table(data: dict, reviewed: bool) -> str:
     variants = data["variants"]
     base = stats(data, variants[0]["name"]) if variants else {}
-    head = ("<tr><th>Method</th><th>What it adds</th><th>Stories</th><th>Mean score</th><th>vs first</th><th>With model review</th><th>Failed reviews</th><th>Naturalness (1-5)</th><th>Pass rate</th>"
-            + "".join(f"<th>{l}</th>" for l in PART_LABELS.values()) + "<th>Calls</th><th>Seconds in model</th><th>Seconds in all</th><th>Mistakes found</th></tr>")
+    head = ("<tr><th>Method</th><th>Stories</th><th>Free score</th><th>vs first</th><th>Pass rate (free checks)</th>" + "".join(f"<th>{l}</th>" for l in PART_LABELS.values())
+            + "<th>Calls</th><th>Seconds in model</th><th>Seconds in all</th></tr>")
     rows = []
     for v in variants:
         s = stats(data, v["name"])
         delta = None if s["score"] is None or base.get("score") is None else round(s["score"] - base["score"], 1)
-        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{html.escape(v['note'])}</td><td>{s['stories']}/{s['requests']}</td><td>{_fmt(s['score'])}</td>"
-                    f"<td>{'–' if delta is None else f'{delta:+g}'}</td><td>{_fmt(s['audit_score'])}</td>"
-                    f"<td>{'–' if not s['reviews'] else str(s['failed_reviews']) + ' of ' + str(s['reviews'])}</td><td>{_fmt(s['naturalness'])}</td><td>{_fmt(s['pass_rate'], True)}</td>"
-                    + "".join(f"<td>{_fmt(s['parts'][k])}</td>" for k in PART_LABELS)
-                    + f"<td>{_fmt(s['calls'])}</td><td>{_fmt(s['model_seconds'])}</td><td>{_fmt(s['seconds'])}</td><td>{_fmt(s['mistakes_found'])}</td></tr>")
+        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{s['stories']}/{s['requests']}</td><td>{_fmt(s['score'])}</td><td>{'–' if delta is None else f'{delta:+g}'}</td>"
+                    f"<td>{_fmt(s['pass_rate'], True)}</td>" + "".join(f"<td>{_fmt(s['parts'][k])}</td>" for k in PART_LABELS)
+                    + f"<td>{_fmt(s['calls'])}</td><td>{_fmt(s['model_seconds'])}</td><td>{_fmt(s['seconds'])}</td></tr>")
+    meta = data.get("meta") or {}
+    return ("<h3>Brief fit and cost (free checks)</h3>" + ("<p class=num>These need no model: words used, length, level, sentence length and the built-in grammar rules. They say nothing about whether a story reads well.</p>" if reviewed else "")
+            + f"<table class=sum>{head}{''.join(rows)}</table><p class=num>Score version {meta.get('score_version', '?')}; a story passes the free checks when it is not gated and every part is at least {PASS_PART:g}. "
+            "“Seconds in model” is time inside model calls; “seconds in all” also counts waiting for the free tier’s rate limit.</p>")
+
+
+def _language_table(data: dict, reviewed: bool) -> str:
+    variants = data["variants"]
     codes = list(dict.fromkeys(r["code"] for r in data["requests"]))
-    lang_head = "<tr><th>Language</th>" + "".join(f"<th>{html.escape(v['label'])}</th>" for v in variants) + "</tr>"
-    lang_rows = "".join(f"<tr><td>{html.escape(LANGUAGES[c].name)}</td>" + "".join(f"<td>{_fmt(stats(data, v['name'], c)['score'])}</td>" for v in variants) + "</tr>" for c in codes)
+
+    def cell(v, c):
+        s = stats(data, v["name"], c)
+        if reviewed and s["reviewed_score"] is not None:
+            return f"{_fmt(s['reviewed_score'])} ({s['failed_reviews']} of {s['reviews']} reviews failed)"
+        return _fmt(s["score"]) + (" (free checks)" if reviewed else "")
+    head = "<tr><th>Language</th>" + "".join(f"<th>{html.escape(v['label'])}</th>" for v in variants) + "</tr>"
+    rows = "".join(f"<tr><td>{html.escape(LANGUAGES[c].name)}</td>" + "".join(f"<td>{cell(v, c)}</td>" for v in variants) + "</tr>" for c in codes)
+    return f"<h3>Mean score by language{' (with model review)' if reviewed else ' (free checks only)'}</h3><table class=sum>{head}{rows}</table>"
+
+
+def _summary(data: dict) -> str:
+    pairs, labels = _pairs(data), _labels(data)
+    reviewed = any(verdicts.verdict(e) for ps in pairs.values() for _, e in ps)
     meta = data.get("meta") or {}
     models = ", ".join(f"{k}: {v}" for k, v in meta.items() if v and k != "stopped" and isinstance(v, (str, int, float)))
-    return ("<h2>Summary</h2><p>Mean story score 0 to 100 (score version "
-            f"{meta.get('score_version', '?')}), pass rate (not gated and every part at least {PASS_PART:g}), average model calls and seconds per story. "
-            "“Seconds in model” is time inside model calls; “seconds in all” also counts waiting for the free tier’s rate limit. "
-            "The model review column appears only when the run used --audit: an independent model lists grammar mistakes in each final story, and the score is "
-            "computed again with them. A review FAILS a story when it rates it 2 of 5 or lower, finds too many mistakes or finds it stuffed; that halves the score, so "
-            "read “Failed reviews” before the mean score.</p>" + (f"<p class=num>{html.escape(models)}</p>" if models else "")
-            + f"{_completeness(data)}<table class=sum>{head}{''.join(rows)}</table>{refine_pairs(data)}{reviewer_table(data)}<h3>Mean score by language</h3><table class=sum>{lang_head}{lang_rows}</table>{_run_record(data)}")
+    out = ["<h2>Summary</h2>", _completeness(data)]
+    if models:
+        out.append(f"<p class=num>{html.escape(models)}</p>")
+    if reviewed:
+        out += [_decided_table(data, pairs, labels), _notes(data, pairs, labels), _paired_table(data, pairs), _group_tables(data, pairs), _request_grid(data, pairs, labels)]
+    else:
+        out.append("<div class=warnbox><b style='color:#b42318'>No model review in this file.</b> The score below only checks the brief (the words, the length, the level and the rules "
+                   "that need no model). It cannot see unnatural writing, events that do not follow or most grammar mistakes, so it is not a measure of quality. "
+                   "Run with <code>--audit-models gpt,qwen</code> to have the stories reviewed.</div>")
+    out += [refine_pairs(data), reviewer_table(data), _free_table(data, reviewed), _language_table(data, reviewed), _run_record(data)]
+    return "".join(out)
 
 
 def render(data: dict) -> str:
@@ -362,9 +521,12 @@ def render(data: dict) -> str:
             row = data["results"].get(r["id"], {})
             if not row:
                 continue
-            top = max((((e.get("score") or {}).get("score") or -1) for e in row.values()), default=-1)
-            cards = "".join(_card(v, row[v["name"]], ((row[v["name"]].get("score") or {}).get("score") or -1) == top and top > 0)
-                            for v in variants if v["name"] in row)
+            use_review = any(verdicts.reviewed_score(e) is not None for e in row.values())
+
+            def key(e):
+                return (verdicts.reviewed_score(e) if use_review else (e.get("score") or {}).get("score")) or -1
+            top = max((key(e) for e in row.values()), default=-1)
+            cards = "".join(_card(v, row[v["name"]], key(row[v["name"]]) == top and top > 0) for v in variants if v["name"] in row)
             body.append(f"<h3>{html.escape(r['id'])}: {r['tier']} · {r['story_type']} · {html.escape(r['topic'])}</h3>"
                         f"<p class=num>Words: {html.escape(', '.join(r['words']))}</p><div class=row>{cards}</div>")
         tabs.append((code, LANGUAGES[code].name))
@@ -372,5 +534,5 @@ def render(data: dict) -> str:
     nav = "".join(f"<button role=tab aria-selected={'true' if i == 0 else 'false'} data-tab='{html.escape(c)}'>{html.escape(t)}</button>" for i, (c, t) in enumerate(tabs))
     sections = "".join(f"<section class=panel id='p-{html.escape(c)}'>{b}</section>" for c, b in panels)
     return (f"<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Story methods compared</title>"
-            f"<style>{CSS}</style><h1>Story methods compared</h1><p>The same requests (words, level, kind, topic) made with each method, scored 0 to 100. "
+            f"<style>{CSS}</style><h1>Story methods compared</h1><p>The same requests (words, level, kind, topic) made with each method. Model reviewers, not the free checks, decide whether a story reads well. "
             f"A column is one method; each adds one thing to the one before it.</p><nav role=tablist>{nav}</nav>{sections}{JS}")

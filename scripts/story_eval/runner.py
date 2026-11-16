@@ -36,6 +36,7 @@ from tutor_core.quality.grammar.audit import run_audit
 from tutor_core.quality.score import merge_reviews
 from tutor_core.story import story_from_words
 
+from . import verdicts
 from .health import describe_error, scrub
 
 FORMAT = "story-methods-1"
@@ -245,14 +246,26 @@ def run(data: dict, variants: list, calls: Calls, *, conn=None, on_saved: Callab
                 raise
             row[variant.name] = entry
             on_saved(data)
-            sc = (entry["score"] or {}).get("score")
-            say(f"[{n}/{len(todo)}] {request['id']} {request['tier']:<6} {variant.name:<10} score {sc if sc is not None else '-':<5} "
+            say(f"[{n}/{len(todo)}] {request['id']} {request['tier']:<6} {variant.name:<10} {outcome(entry)} "
                 f"calls {entry['calls']:<2} {entry['seconds']:>6}s (model {entry['model_seconds']}s)" + ("" if entry["ok"] else f"  FAILED {entry['reason']}"))
     if limit is not None and limit < len(data["requests"]):
         meta["stopped"] = f"--limit {limit} reached (planned: {len(data['requests']) - limit} requests are left for --resume)"
         on_saved(data)
         return False
     return True
+
+
+def outcome(entry: dict) -> str:
+    """The score part of a log line. The free score only checks the brief (91 to 100 on stories the reviewers failed), so with reviews the line also says what each reviewer
+    rated and whether it failed the story, and the reviewed score."""
+    sc = (entry.get("score") or {}).get("score")
+    text = f"free {sc if sc is not None else '-':<5}"
+    if verdicts.verdict(entry) is None:
+        return text
+    got = verdicts.ratings(entry)
+    who = ", ".join(f"{label} {got[label]:g}" + (" FAIL" if verdicts.failed(s) else " ok") if label in got else f"{label} ? " + ("FAIL" if verdicts.failed(s) else "ok")
+                    for label, s in entry["audit_scores"].items())
+    return f"{text} reviewed {verdicts.reviewed_score(entry):<5} ({who})"
 
 
 def estimate(requests: list, variants: list, audit: bool, translate: bool, tpm: int = 7000) -> dict:
