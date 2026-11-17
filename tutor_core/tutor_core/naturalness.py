@@ -23,12 +23,28 @@ class Naturalness:
     error: str = ""
     sense: Optional[int] = None          # only with the v2 prompt: the two 1 to 3 answers the rating was made from
     wording: Optional[int] = None
+    repeats: tuple = ()                  # only when the text was rated more than once: every rating that worked, `score` being their median
 
     def as_dict(self) -> dict:
         out = {"ok": self.ok, "score": self.score, "reason": self.reason, "error": self.error}
         if self.sense is not None:
             out.update(sense=self.sense, wording=self.wording)
+        if len(self.repeats) > 1:
+            out["repeats"] = list(self.repeats)
         return out
+
+
+def median_of(results: Sequence["Naturalness"]) -> "Naturalness":
+    """One rating from several of the same text (16 Nov 2026). The rating lab found one reviewer rating the same text again gives the same 1 to 5 only about two times in
+    three, and a pass/fail flip for 22% (gpt) and 30% (qwen) of the stories; the median of three removes most of that. The reason is the one of the rating nearest the
+    median. With none that worked the first failure is returned, so the caller still sees why."""
+    good = sorted((r for r in results if r.ok and r.score is not None), key=lambda r: r.score)
+    if not good:
+        return results[0] if results else Naturalness(False, error="no rating was asked")
+    scores = [r.score for r in good]
+    mid = scores[len(scores) // 2] if len(scores) % 2 else (scores[len(scores) // 2 - 1] + scores[len(scores) // 2]) / 2
+    nearest = min(good, key=lambda r: abs(r.score - mid))
+    return Naturalness(True, float(mid), nearest.reason, repeats=tuple(scores))
 
 
 def from_parts(sense: float, wording: float) -> float:

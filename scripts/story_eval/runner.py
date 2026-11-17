@@ -31,12 +31,12 @@ from tutor_core.languages import LANGUAGES
 from tutor_core.patient import is_rate_limit
 from tutor_core.quality import score_story
 from tutor_core.quality.grammar import Hit
-from tutor_core.naturalness import combine as combine_ratings, rate as rate_naturalness
+from tutor_core.naturalness import combine as combine_ratings, median_of, rate as rate_naturalness
 from tutor_core.quality.grammar.audit import run_audit
 from tutor_core.quality.score import merge_reviews
 from tutor_core.story import story_from_words
 
-from . import verdicts
+from . import health, verdicts
 from .health import describe_error, scrub
 
 FORMAT = "story-methods-1"
@@ -86,6 +86,7 @@ class Calls:
     models: Optional[Callable] = None           # alias ("gpt", "qwen") -> Channel, for methods that name who writes and who judges
     rate: bool = True                           # also ask every reviewer for a 1-5 naturalness rating (one more call per story and reviewer)
     audits: Optional[dict] = None               # label -> Channel: several independent reviewers of every final story (else `audit`)
+    rate_repeats: int = 1                       # each reviewer rates each story this many times and the median counts (--rating-repeats)
 
 
 @contextlib.contextmanager
@@ -108,15 +109,35 @@ def _score(text, ok, request, hits=None, naturalness=None):
     return score_story(text, request["code"], request["words"], _d.resolve(request["tier"]), request.get("story_type"), hits=hits, naturalness=naturalness)
 
 
-def review_text(text: str, request: dict, reviewers: dict, rate: bool = True):
+RETRY_KINDS = ("timeout", "server", "other")      # health.classify kinds a second try can fix; 'other' includes an answer that was not the JSON asked for
+
+
+def asked_twice(ask):
+    """Run `ask` (it returns an AuditResult or a Naturalness) and, when it failed for a reason a second try can fix (a timeout, a server error, an answer that was not the
+    JSON that was asked for), once more. 3 of the 60 qwen reviews of the 16 November writer run were lost to exactly that. A limit, a key or a model error is not asked
+    again: the second call would fail the same way and spend the budget. Returns the second answer only when it worked."""
+    first = ask()
+    if first.ok or health.classify(first.error) not in RETRY_KINDS:
+        return first
+    second = ask()
+    return second if second.ok else first
+
+
+def rating_of(channel, text: str, language_name: str, repeats: int = 1):
+    """The 1 to 5 rating of `text` by one reviewer: asked `repeats` times, and the median counts when more than once (each ask is retried once when it failed for a fixable reason)."""
+    got = [asked_twice(lambda: rate_naturalness(channel.call, text, language_name)) for _ in range(max(1, repeats))]
+    return got[0] if len(got) == 1 else median_of(got)
+
+
+def review_text(text: str, request: dict, reviewers: dict, rate: bool = True, repeats: int = 1):
     """Every reviewer's findings and 1 to 5 rating of `text`, and the score each gives it: (audits, audit_scores, audit_union). The union is the findings of all
     reviewers together with their mean rating, None with fewer than two."""
     code = request["code"]
     audits, scores, union = {}, {}, None
     for label, channel in reviewers.items():
         channel.reset()
-        review = run_audit(channel.call, text, LANGUAGES[code].name)
-        rating = rate_naturalness(channel.call, text, LANGUAGES[code].name) if rate else None
+        review = asked_twice(lambda: run_audit(channel.call, text, LANGUAGES[code].name))
+        rating = rating_of(channel, text, LANGUAGES[code].name, repeats) if rate else None
         audits[label] = dict(review.as_dict(), seconds=round(channel.meter.seconds, 1), naturalness=rating.as_dict() if rating is not None else None)
         if review.ok or (rating is not None and rating.ok):
             scores[label] = _score(text, True, request, review.hits if review.ok else None, rating.score if rating is not None and rating.ok else None)
@@ -126,14 +147,14 @@ def review_text(text: str, request: dict, reviewers: dict, rate: bool = True):
     return audits, scores, union
 
 
-def draft_entry(draft: str, final: str, request: dict, reviewers: dict, rate: bool = True) -> dict:
+def draft_entry(draft: str, final: str, request: dict, reviewers: dict, rate: bool = True, repeats: int = 1) -> dict:
     """The refine loop's first draft next to its result. Reviewed only when the loop changed it and there are reviewers; an unchanged draft IS the result."""
     changed = draft.strip() != final.strip()
     out = {"text": draft, "changed": changed}
     if changed:
         out["score"] = _score(draft, True, request)
         if reviewers:
-            out["audits"], out["audit_scores"], out["audit_union"] = review_text(draft, request, reviewers, rate)
+            out["audits"], out["audit_scores"], out["audit_union"] = review_text(draft, request, reviewers, rate, repeats)
     return out
 
 
@@ -172,14 +193,14 @@ def run_one(request: dict, variant, calls: Calls, conn=None) -> dict:
         entry["gate"] = run_gates(result.text, code, request["words"], difficulty, request.get("story_type"))
     reviewers = calls.audits or ({"review": calls.audit} if calls.audit else {})
     if result.ok:
-        entry["audits"], entry["audit_scores"], entry["audit_union"] = review_text(result.text, request, reviewers, calls.rate)
+        entry["audits"], entry["audit_scores"], entry["audit_union"] = review_text(result.text, request, reviewers, calls.rate, calls.rate_repeats)
         if entry["audits"]:
             first = next(iter(entry["audits"]))
             entry["audit"], entry["audit_seconds"] = entry["audits"][first], entry["audits"][first]["seconds"]
             entry["audit_score"] = entry["audit_scores"].get(first)
         draft = (getattr(result, "draft", "") or "").strip()
         if draft:
-            entry["draft"] = draft_entry(draft, result.text, request, reviewers, calls.rate)
+            entry["draft"] = draft_entry(draft, result.text, request, reviewers, calls.rate, calls.rate_repeats)
     if result.ok and calls.translate:
         entry["translation"] = calls.translate(result.text, code)
     return entry
@@ -268,10 +289,12 @@ def outcome(entry: dict) -> str:
     return f"{text} reviewed {verdicts.reviewed_score(entry):<5} ({who})"
 
 
-def estimate(requests: list, variants: list, audit: bool, translate: bool, tpm: int = 7000) -> dict:
-    """Rough size of a run: model calls, tokens and minutes at the pacing limit (about 1800 tokens a call, a guess)."""
+def estimate(requests: list, variants: list, audit: bool, translate: bool, tpm: int = 7000, reviewers: int = 1, ratings: int = 0) -> dict:
+    """Rough size of a run: model calls, tokens and minutes at the pacing limit (about 1800 tokens a call, a guess; a rating is a short call, about 700).
+    `reviewers` is how many models review each story and `ratings` how many 1-5 ratings each of them gives it (--rating-repeats, 0 with --no-naturalness)."""
     from .variants import CALLS
-    per = sum(CALLS.get(v.name, 3.0) + (2 if audit else 0) + (1 if translate else 0) for v in variants)
-    calls = round(per * len(requests))
-    tokens = calls * 1800
+    main = sum(CALLS.get(v.name, 3.0) + (1 if translate else 0) + (reviewers if audit else 0) for v in variants)
+    rating = len(variants) * reviewers * ratings if audit else 0
+    calls = round((main + rating) * len(requests))
+    tokens = round((main * 1800 + rating * 700) * len(requests))
     return {"requests": len(requests), "variants": len(variants), "calls": calls, "tokens": tokens, "minutes": round(tokens / tpm)}

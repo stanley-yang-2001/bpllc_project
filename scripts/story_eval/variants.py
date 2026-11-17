@@ -80,13 +80,16 @@ BY_NAME = {v.name: v for v in ALL}
 
 
 def resolve(spec: str) -> list[Variant]:
-    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'all', or names separated by commas. An unknown name is an error
-    that lists the valid ones."""
+    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'all', or names separated by commas.
+    'cascade' is both a group of five methods and the name of one method: a leading = names the method alone ('baseline,=cascade' is two methods, 'baseline,cascade' is five).
+    An unknown name is an error that lists the valid ones."""
     groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "all": [v.name for v in ALL]}
     names = []
     for part in (spec or "default").strip().lower().split(","):
         part = part.strip()
-        for n in groups.get(part, [part] if part else []):
+        one = part.startswith("=")
+        part = part.lstrip("=").strip()
+        for n in ([part] if one and part else groups.get(part, [part] if part else [])):
             if n not in names:
                 names.append(n)
     unknown = [n for n in names if n not in BY_NAME]

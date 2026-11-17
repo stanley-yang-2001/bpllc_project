@@ -200,6 +200,26 @@ def test_estimate_grows_with_methods_and_extras():
     assert small["calls"] < big["calls"] and small["minutes"] <= big["minutes"] and small["requests"] == 20
 
 
+def test_estimate_counts_reviewers_and_rating_repeats():
+    reqs = fixed_set.build()[:4]
+    base = vs.resolve("baseline")
+    once = runner.estimate(reqs, base, True, False, 7000, 2, 1)
+    thrice = runner.estimate(reqs, base, True, False, 7000, 2, 3)
+    none = runner.estimate(reqs, base, True, False, 7000, 2, 0)
+    assert none["calls"] < once["calls"] < thrice["calls"]
+    assert thrice["calls"] - once["calls"] == len(reqs) * 2 * 2          # two more ratings for each of two reviewers, per story
+    assert runner.estimate(reqs, base, False, False, 7000, 2, 3)["calls"] == runner.estimate(reqs, base, False, False)["calls"]   # no review, no ratings
+
+
+def test_a_leading_equals_names_one_method_where_a_group_has_the_same_name():
+    assert [v.name for v in vs.resolve("baseline,=cascade")] == ["baseline", "cascade"]
+    assert [v.name for v in vs.resolve("=cascade")] == ["cascade"]
+    assert len(vs.resolve("baseline,cascade")) == 5                       # without it the group wins
+    assert [v.name for v in vs.resolve("=baseline, =rules")] == ["baseline", "rules"]
+    with pytest.raises(ValueError, match="magic"):
+        vs.resolve("baseline,=magic")
+
+
 def test_the_command_line_rescores_a_saved_run_without_a_key(tmp_path, monkeypatch):
     import run_story_methods
     data, chosen = make("baseline")
@@ -362,3 +382,71 @@ def test_the_log_line_says_what_each_reviewer_rated_and_the_free_score_is_labell
     entry = _entry({"gpt": 2, "qwen": 3}, ["gpt"])
     assert "reviewed" in runner.outcome(entry) and "gpt 2 FAIL" in runner.outcome(entry) and "qwen 3 ok" in runner.outcome(entry)
     assert "reviewed" not in runner.outcome({"score": {"score": 97.0}})
+
+
+# --- 16 Nov 2026: reviews lost to a timeout or a non-JSON answer are asked once more; ratings can be repeated -----------------------------------------------------
+
+def test_a_review_is_asked_once_more_after_a_timeout_or_a_non_json_answer_but_not_after_a_limit():
+    from tutor_core.naturalness import Naturalness
+    calls = {"n": 0}
+
+    def flaky(first_error, then_ok=True):
+        calls["n"] = 0
+
+        def ask():
+            calls["n"] += 1
+            return Naturalness(True, 3.0) if calls["n"] > 1 and then_ok else Naturalness(False, error=first_error)
+        return ask
+    got = runner.asked_twice(flaky("TimeoutError: The read operation timed out"))
+    assert got.ok and calls["n"] == 2
+    got = runner.asked_twice(flaky("the answer was not the JSON list that was asked for"))
+    assert got.ok and calls["n"] == 2
+    got = runner.asked_twice(flaky("RuntimeError: Groq API error 429: Rate limit reached for model on tokens per minute (TPM): Limit 8000. Please try again in 5s."))
+    assert not got.ok and calls["n"] == 1
+    got = runner.asked_twice(flaky("RuntimeError: Groq API error 401: Invalid API Key"))
+    assert not got.ok and calls["n"] == 1
+    got = runner.asked_twice(flaky("TimeoutError: The read operation timed out", then_ok=False))
+    assert not got.ok and "timed out" in got.error and calls["n"] == 2          # both failed: the first reason is kept
+
+
+def test_the_median_of_three_ratings_counts_and_keeps_every_rating():
+    from tutor_core.naturalness import Naturalness, median_of
+    three = median_of([Naturalness(True, 2.0, "a"), Naturalness(True, 4.0, "b"), Naturalness(True, 3.0, "c")])
+    assert three.score == 3.0 and three.reason == "c" and three.as_dict()["repeats"] == [2.0, 3.0, 4.0]
+    two = median_of([Naturalness(True, 2.0), Naturalness(False, error="x"), Naturalness(True, 3.0)])
+    assert two.score == 2.5 and two.ok
+    none = median_of([Naturalness(False, error="first"), Naturalness(False, error="second")])
+    assert not none.ok and none.error == "first"
+    assert "repeats" not in Naturalness(True, 3.0).as_dict()
+
+
+def test_each_reviewer_can_rate_every_story_several_times_and_the_median_is_saved():
+    seen = {"rating": 0}
+
+    def call(prompt):
+        if "NATURAL" in prompt:
+            seen["rating"] += 1
+            return json.dumps({"score": [2, 4, 3][(seen["rating"] - 1) % 3], "reason": "r"})
+        return json.dumps({"errors": []})
+    chans = {"gpt": runner.Channel(call)}
+    audits, scores, union = runner.review_text("I am Ana. I like tea.", {"code": "en", "words": ["tea"], "tier": "easy", "story_type": "story", "topic": "", "seed": 1, "id": "en-0"},
+                                                 chans, True, 3)
+    assert seen["rating"] == 3 and audits["gpt"]["naturalness"]["score"] == 3.0 and audits["gpt"]["naturalness"]["repeats"] == [2.0, 3.0, 4.0]
+    assert not scores["gpt"]["failed"]
+    seen["rating"] = 0
+    audits, *_ = runner.review_text("I am Ana. I like tea.", {"code": "en", "words": ["tea"], "tier": "easy", "story_type": "story", "topic": "", "seed": 1, "id": "en-0"}, chans, True)
+    assert seen["rating"] == 1 and "repeats" not in audits["gpt"]["naturalness"]
+
+
+def test_the_reviewed_table_puts_cost_and_learner_words_beside_the_verdicts_and_claims_only_what_the_numbers_show():
+    data, chosen = make("baseline,refine")
+    c = refine_calls()
+    c.story = runner.Channel(refine_model)
+    runner.run(data, chosen, c, say=lambda *_: None)
+    page = report.render(data)
+    for header in ("Learner words used", "Words per story", "Model calls per story", "Seconds in model per story"):
+        assert header in page
+    assert "decides far more" not in page and "traded one for the other" in page
+    note = report._notes({"meta": {}, "requests": [], "results": {}}, {"m": [({"id": "a"}, _entry({"gpt": 2, "qwen": 2}, ["gpt", "qwen"], free=96.0)),
+                                                                          ({"id": "b"}, _entry({"gpt": 4, "qwen": 4}, free=99.0))]}, ["gpt", "qwen"])
+    assert "2 of the 2 reviewed stories scored 90 or more on the free checks; the reviewers passed 1 of those, split on 0 and failed 1" in note

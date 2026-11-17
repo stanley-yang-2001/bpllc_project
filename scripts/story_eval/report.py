@@ -59,7 +59,9 @@ def stats(data: dict, variant: str, code: str = None) -> dict:
             "parts": {k: _mean([s["parts"].get(k) for s in scored]) for k in PART_LABELS},
             "calls": _mean([e["calls"] for e in items]), "model_seconds": _mean([e["model_seconds"] for e in items]),
             "seconds": _mean([e["seconds"] for e in items]),
-            "mistakes_found": _mean([len(e["audit"]["hits"]) for e in audited]) if audited else None, **review_counts(made)}
+            "mistakes_found": _mean([len(e["audit"]["hits"]) for e in audited]) if audited else None,
+            "own_words": _mean([(s.get("measured") or {}).get("own_words") for s in scored]), "words": _mean([(s.get("measured") or {}).get("length") for s in scored]),
+            **review_counts(made)}
 
 
 def _rescore_reviews(args, audits: dict):
@@ -354,37 +356,35 @@ def _labels(data: dict) -> list:
 
 def _decided_table(data: dict, pairs: dict, labels: list) -> str:
     head = ("<tr><th>Method</th><th>What it adds</th><th>Stories reviewed</th><th>Passed by every reviewer (95% range)</th><th>Split</th><th>Failed by every reviewer</th>"
-            "<th>Failed reviews</th>" + "".join(f"<th>Rating by {html.escape(l)} (1-5)</th>" for l in labels) + "<th>Score with review</th><th>Mistakes listed per story</th></tr>")
+            "<th>Failed reviews</th>" + "".join(f"<th>Rating by {html.escape(l)} (1-5)</th>" for l in labels) + "<th>Score with review</th><th>Mistakes listed per story</th>"
+            "<th>Learner words used</th><th>Words per story</th><th>Model calls per story</th><th>Seconds in model per story</th></tr>")
     rows = []
     for v in data["variants"]:
         d, s = verdicts.decided(pairs[v["name"]]), stats(data, v["name"])
         rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{html.escape(v['note'])}</td><td>{d['stories']}/{s['requests']}</td>"
                     f"<td>{st.percent_range(d[verdicts.PASS], d['stories'])}</td><td>{d[verdicts.SPLIT]}</td><td>{d[verdicts.FAIL]}</td>"
                     f"<td>{d['failed_reviews']} of {d['reviews']}</td>" + "".join(f"<td>{_fmt(None if d['rating'].get(l) is None else round(d['rating'][l], 1))}</td>" for l in labels)
-                    + f"<td>{_fmt(s['reviewed_score'])}</td><td>{_fmt(s['mistakes_found'])}</td></tr>")
+                    + f"<td>{_fmt(s['reviewed_score'])}</td><td>{_fmt(s['mistakes_found'])}</td><td>{_fmt(s['own_words'])}</td><td>{_fmt(s['words'])}</td><td>{_fmt(s['calls'])}</td><td>{_fmt(s['model_seconds'])}</td></tr>")
     return (f"<h3>What the reviewers decided</h3><table class=sum>{head}{''.join(rows)}</table>"
             "<p class=num>A reviewer fails a story when it rates it 2 of 5 or lower, finds too many mistakes or finds it stuffed. A failed review multiplies the score by 0.6, "
-            "so “Score with review” mostly follows the failed count: read the left side of this table first.</p>")
+            "so “Score with review” mostly follows the failed count: read the left side of this table first. A method that passes more stories by using fewer of your learner words "
+            "has traded one for the other: read “Learner words used” beside the verdicts.</p>")
 
 
 def _notes(data: dict, pairs: dict, labels: list) -> str:
     flat = [(r, name, e) for name, ps in pairs.items() for r, e in ps]
     out = []
-    free = verdicts.free_score_by_verdict(flat)
-    if free.get(verdicts.FAIL):
-        f = free[verdicts.FAIL]
-        line = f"The free score of the {f['n']} stories every reviewer failed was {f['low']:.0f} to {f['high']:.0f}"
-        if free.get(verdicts.PASS):
-            g = free[verdicts.PASS]
-            line += f"; of the {g['n']} every reviewer passed, {g['low']:.0f} to {g['high']:.0f}" + (": it cannot tell them apart" if f["high"] >= g["low"] else "")
-        out.append(line + ". It checks the brief, not whether the story reads well.")
+    high = [verdicts.verdict(e)["kind"] for _, _, e in flat if verdicts.verdict(e) and (verdicts.free_score(e) or 0) >= 90]
+    if high:
+        out.append(f"{len(high)} of the {sum(1 for _, _, e in flat if verdicts.verdict(e))} reviewed stories scored 90 or more on the free checks; the reviewers passed {high.count(verdicts.PASS)} of "
+                   f"those, split on {high.count(verdicts.SPLIT)} and failed {high.count(verdicts.FAIL)}. A high free score does not mean the story reads well: it checks the brief, not the writing.")
     counts = verdicts.rating_counts(flat)
     if counts:
         out.append("Ratings given: " + ", ".join(f"{k:g} × {n}" for k, n in counts.items()) + ". A rating of 2 or less fails the story, so one point between two reviews of the same text can flip the verdict.")
     moves = verdicts.what_moves(flat)
     if moves:
         out.append("Share of the variation in ratings that each explains (adjusted for how many groups it has): " + ", ".join(f"{k} {v * 100:.0f}%" for k, v in sorted(moves.items(), key=lambda kv: -kv[1]))
-                   + ". What the request is decides far more than which method wrote the story.")
+                   + ". What is left is the reviewers' own noise and the story itself.")
     same, both = verdicts.agreement(flat)
     if both:
         out.append(f"Two reviewers judged the same way (pass or fail) on {same} of {both} stories.")

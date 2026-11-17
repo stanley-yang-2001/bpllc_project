@@ -74,7 +74,7 @@ def pick_requests(args) -> list:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--variants", default="default", help="'default' (baseline to repair), 'all', or names separated by commas")
+    ap.add_argument("--variants", default="default", help="'default' (baseline to repair), 'all', a group (cascade, mix, writer) or names separated by commas; a leading = names one method where a group has the same name (baseline,=cascade)")
     ap.add_argument("--languages", default="all", help="'all' or names or codes separated by commas")
     ap.add_argument("--count", type=int, default=2, help="requests per language (2 with all languages is the fixed set of 20)")
     ap.add_argument("--limit", type=int, default=None, help="only the first N requests")
@@ -82,6 +82,9 @@ def main(argv=None) -> int:
     ap.add_argument("--gpt-model", default=None, help="model for the 'gpt' side of the mix methods (default: GROQ_MODEL)")
     ap.add_argument("--qwen-model", default=None, help="model for the 'qwen' side (default: GROQ_QWEN_MODEL, else qwen/qwen3.6-27b: check the id in the Groq console)")
     ap.add_argument("--audit-models", default=None, help="reviewers of every story, e.g. 'gpt,qwen' (implies --audit): compares their grammar findings")
+    ap.add_argument("--rating-repeats", type=int, default=1, metavar="N",
+                    help="with --audit: every reviewer rates every story N times and the median counts (default 1). One rating repeats identically only about two times in three "
+                         "(rating lab, 16 Nov), so 3 steadies the verdicts for 2N-2 more short calls per story and reviewer")
     ap.add_argument("--no-naturalness", action="store_true", help="with --audit: skip the 1-5 naturalness rating (saves one call per story and reviewer)")
     ap.add_argument("--no-translate", action="store_true", help="no English translation under each story (saves one call per story)")
     ap.add_argument("--db", action="store_true", help="connect to the database (needed for the 'examples' method)")
@@ -122,7 +125,7 @@ def main(argv=None) -> int:
         log("--audit-models takes gpt and/or qwen.")
         return 2
     args.audit = args.audit or bool(reviewers)
-    size = runner.estimate(requests, chosen, args.audit, not args.no_translate, args.tpm)
+    size = runner.estimate(requests, chosen, args.audit, not args.no_translate, args.tpm, max(1, len(reviewers)), 0 if args.no_naturalness else max(1, args.rating_repeats))
     log(f"{size['requests']} requests x {size['variants']} methods: about {size['calls']} model calls, {size['tokens']:,} tokens, "
           f"at least {size['minutes']} minutes at {args.tpm} tokens a minute.")
     if size["tokens"] > 150_000:
@@ -183,12 +186,14 @@ def main(argv=None) -> int:
 
     audits = {a: model_channel(a) for a in reviewers} or None
     calls = runner.Calls(story, runner.Channel(judge_raw, wrap) if judge_raw else None, runner.Channel(audit_raw, wrap) if audit_raw and not audits else None,
-                         None if args.no_translate else translator(wrap(groq.call_groq)), models=model_channel, audits=audits, rate=not args.no_naturalness)
+                         None if args.no_translate else translator(wrap(groq.call_groq)), models=model_channel, audits=audits, rate=not args.no_naturalness, rate_repeats=max(1, args.rating_repeats))
     meta = {"story model": os.environ.get("GROQ_MODEL") or groq.DEFAULT_MODEL, "judge model": getattr(judge_raw, "model", None) or ("(story model)" if any(v.judge for v in chosen) else None),
             "review model": ", ".join(f"{a}={names[a]}" for a in reviewers) or ((getattr(audit_raw, "model", None) or "(story model)") if audit_raw else None),
             "gpt model": names["gpt"], "qwen model": names["qwen"]}
     from tutor_core.quality.score import SCORE_VERSION
     meta["score_version"] = SCORE_VERSION
+    if args.rating_repeats > 1:
+        meta["rating repeats"] = args.rating_repeats
 
     info = health.run_info(argv if argv is not None else sys.argv[1:])
     if args.resume:
