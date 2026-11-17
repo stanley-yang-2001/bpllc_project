@@ -190,6 +190,34 @@ Three files from one Kaggle round of about an hour: `writer_kaggle_30` (30 Engli
 
 Next round, for the decision "is the cascade worth 7 times the calls" (both are in the Kaggle cell): `--variants baseline,=cascade` on the 30 English requests with `--rating-repeats 3` (60 stories, about 830 calls), then the five cascade methods on all 20 fixed requests (100 stories, about 1,470 calls). `cascade` is both the name of a group of five methods and of one method, so `baseline,cascade` means five; a leading `=` names the single method (`baseline,=cascade`). The size estimate printed before a run now counts the reviewers and the rating repeats (it left them out before, so it said about 870 calls for a run that makes about 1,470).
 
+### Human labels, and what the first round showed (patch 0091)
+
+Everything above was measured with model reviewers, and a model reviewer had never been checked against a reader. `scripts/label_stories.py` does that, with no model calls:
+
+    python scripts/label_stories.py build --from writer_kaggle_30.json,overnight_kaggle.json --out labeling_round1 [--languages fr,de]
+    python scripts/label_stories.py analyze --key labeling_round1/label_key_PRIVATE.csv --labels returned_folder [--humans-only] [--out joined.csv]
+
+`build` takes, for each language, `--method-requests` requests (4) with every method that wrote them, so people compare the methods on the same request, and `--per-verdict` stories (6) for each model verdict (passed, split, failed by every reviewer) from other requests, one story a request, spread over levels and word packs. It writes one spreadsheet per language and a README in `story_labeling_set.zip`, and a separate `label_key_PRIVATE.csv`. The sheets are blind: no method, score or verdict, the texts shuffled, ids like EN07. Each text gets three answers: would you give it to a learner as it is (Yes / Small fix first / No: pass, split, fail), how natural it reads 1 to 5 (the reviewers' scale), and the main problem, plus a comment. People are asked to work alone and without AI tools. `analyze` reads the filled sheets (a folder is fine; a person's English and Spanish files are merged by the name in the sheet's "About you" cell, else by the file name) and prints the agreement between labelers, the reviewers and the free score against them, what labelers said where the reviewers agreed, and the methods side by side. `--humans-only` leaves out a sheet whose own cell says it is a model.
+
+**First round (16 to 17 November): 38 texts (28 English, 10 Spanish), three files back.** "SY" calls themselves a native reader of English and Spanish; nothing in the file can verify that. The other two say in their About-you cell that they are models: "AI-assisted benchmark (ChatGPT)" ("not an independent human reader") and "Claude (AI model, not a human reader)", which was run with a fresh context. So this round is one reader of unverified independence and two extra model reviewers, not three humans; every number is also given for SY alone, and `--humans-only` does the same cut.
+
+| | all three files | SY alone |
+|---|---|---|
+| labelers' own agreement (rank correlation of the 1 to 5 ratings) | 0.76 (ChatGPT, Claude), 0.87 (ChatGPT, SY), 0.81 (Claude, SY) | |
+| free score against the labelers' mean rating | -0.13 | -0.16 |
+| gpt rating (one rating per story) | 0.81 | 0.79 |
+| qwen rating | 0.72 | 0.75 |
+| reviewed score (0 to 100) | 0.74 | 0.69 |
+| same pass/fail as gpt, as qwen (rating 2 or less fails) | 82 to 84%, 81 to 89% | 84%, 89% |
+| cascade against baseline, mean rating (4 requests) | 4.33 against 2.08 | 4.50 against 2.25 |
+| "Yes" to the cascade, to the baseline | 10 of 12, 0 of 12 | 3 of 4, 0 of 4 |
+
+- **The free score says nothing about what a reader thinks**, as the rest of this document found with models. It spans 51 to 100 over these texts and does not rank them.
+- **The model reviewers do track the labelers.** A single rating correlates 0.72 to 0.81, and they agree on pass or fail on 81 to 89% of texts.
+- **A verdict every reviewer agreed on was never contradicted.** Of 15 texts both reviewers passed, no labeler said "No" (45 answers: 22 Yes, 23 Small fix first); of 13 both failed, none said "Yes" (39 answers: 32 No, 7 Small fix). The labelers differ from the reviewers only on the 10 texts the reviewers split on (30 answers: 16 Small fix, 14 No), where a single rating is the noisiest. This is why the report leads with "passed / failed by every reviewer" and treats "split" as undecided.
+- **The cascade is the method the labelers prefer on every one of the four requests**, by 1.3 to 2.7 points: the proofreading variant 3.67, the plan 2.50, the mixed candidates with free checks 2.25, the baseline 2.08. But four requests were a lucky draw for the size of the gap: rewritten on 17 November the same four baseline stories passed 2 of 4 (see the next section), and the 30-request result is the better estimate.
+- **Limits.** 38 texts, four requests for the method comparison, one reader whose independence is unknown and two declared models. Ask two or three people per language, who did it without AI tools, before using the numbers for more than a direction.
+
 ### Why the score misleads, and what patch 0089 changed in the report
 
 Looking again at the 15 November files (`--rescore` with no model calls) the headline numbers misled in four ways:

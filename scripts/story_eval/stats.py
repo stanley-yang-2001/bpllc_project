@@ -102,3 +102,30 @@ def percent_range(k: int, n: int) -> str:
     """'4 of 10 (17–69%)': a count with the range the share could really have."""
     r = wilson(k, n)
     return "–" if r is None else f"{k} of {n} ({r[0] * 100:.0f}–{r[1] * 100:.0f}%)"
+
+
+def ranks(values: Sequence[float]) -> list:
+    """Ranks from 1, ties sharing the average rank."""
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    out = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            out[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return out
+
+
+def spearman(a: Sequence[float], b: Sequence[float]) -> Optional[float]:
+    """Rank correlation of two equally long lists (-1 to 1); None for fewer than 3 pairs or when one side never changes."""
+    if len(a) != len(b) or len(a) < 3:
+        return None
+    ra, rb = ranks(a), ranks(b)
+    ma, mb = sum(ra) / len(ra), sum(rb) / len(rb)
+    va, vb = sum((x - ma) ** 2 for x in ra), sum((y - mb) ** 2 for y in rb)
+    if not va or not vb:
+        return None
+    return sum((x - ma) * (y - mb) for x, y in zip(ra, rb)) / (va * vb) ** 0.5
