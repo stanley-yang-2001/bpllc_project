@@ -26,14 +26,16 @@ class Variant:
     rules: bool = False             # writer rules in the prompt: keep every small word, no tacked-on words, no filler (prompts/builder.py)
     story_model: str = None         # alias of the model that writes: "gpt" or "qwen" (None: the default story model)
     judge_model: str = None         # alias of the model that judges (None: the default judge model, else the story model)
+    repair_naturalness: bool = False  # the repair rates naturalness and quotes the reviewer's reason to the writer
 
     def options(self) -> StoryOptions:
-        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine, self.rules)
+        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine, self.rules, self.repair_naturalness)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "label": self.label, "note": self.note, "range_prompt": self.range_prompt, "two_pass": self.two_pass,
                 "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples,
-                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "refine": self.refine, "rules": self.rules, "story_model": self.story_model, "judge_model": self.judge_model}
+                "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "refine": self.refine, "rules": self.rules, "story_model": self.story_model, "judge_model": self.judge_model,
+                "repair_naturalness": self.repair_naturalness}
 
 
 ALL = [
@@ -74,6 +76,10 @@ ALL += [
     Variant("review_repair", "Review, then repair", "one draft (with the plan), a model review for mistakes, one repair: no candidates, no choice", range_prompt=True, plan=True, judge=True,
             repair=True),
 ]
+# Repair that sees naturalness (18 Nov 2026). The ablation: review_repair passed 19 of 30 stories at 4.4 calls. The reasons the reviewers gave for the stories they still failed are
+# about sense and flow (events that do not follow, repeated time words, list-like sentences), which the repair never saw: it was told grammar mistakes and missed requirements only.
+ALL += [Variant("review_repair_nat", "Review, then repair, with naturalness", "review_repair, and the repair also rates naturalness and quotes the reviewer's reason to the writer",
+                range_prompt=True, plan=True, judge=True, repair=True, repair_naturalness=True)]
 # Check, then fix only what was found (10 Nov 2026): one-call writer, free checks + model review, sentence-level repair, kept only if the score rises.
 ALL += [Variant("refine", "Refine", "one call writes; checks + review; fixes only the flagged sentences (up to 2 rounds, kept only if the score rises)",
                 story_model="gpt", judge_model="gpt", refine=2)]
@@ -84,15 +90,16 @@ DEFAULT = ["baseline", "range", "two_pass", "candidates", "judge", "repair"]
 WRITER = ["baseline", "rules"]
 CASCADE = ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]
 ABLATION = ["baseline", "cascade", "review_repair", "cascade_pick"]
+NATURALNESS = ["baseline", "review_repair", "review_repair_nat"]
 MIX = ["baseline", "baseline_qwen", "gpt_gpt", "qwen_qwen", "gpt_qwen", "qwen_gpt"]
 BY_NAME = {v.name: v for v in ALL}
 
 
 def resolve(spec: str) -> list[Variant]:
-    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'ablation' (baseline, the cascade, the cascade without its repair, and a single draft with a review and a repair), 'all', or names separated by commas.
+    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'ablation' (baseline, the cascade, the cascade without its repair, and a single draft with a review and a repair), 'naturalness' (baseline, review_repair, and review_repair with the naturalness-aware repair), 'all', or names separated by commas.
     'cascade' is both a group of five methods and the name of one method: a leading = names the method alone ('baseline,=cascade' is two methods, 'baseline,cascade' is five).
     An unknown name is an error that lists the valid ones."""
-    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "ablation": ABLATION, "all": [v.name for v in ALL]}
+    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "ablation": ABLATION, "naturalness": NATURALNESS, "all": [v.name for v in ALL]}
     names = []
     for part in (spec or "default").strip().lower().split(","):
         part = part.strip()
@@ -109,5 +116,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

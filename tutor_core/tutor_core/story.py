@@ -212,7 +212,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     do_proofread = os.environ.get("STORY_PROOFREAD") == "1" if proofread is None else bool(proofread)
     passage = RetryPolicy(language, prompt, words, request.difficulty, call, proofread=do_proofread).improve(passage)
     if opts.repair:
-        passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge)
+        passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge, naturalness=opts.repair_naturalness)
         notes += more
     trace: list = []
     draft = ""

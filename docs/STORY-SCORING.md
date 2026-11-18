@@ -233,6 +233,27 @@ Two Kaggle runs on 17 November: `cascade_30` (baseline against the cascade, the 
 
 **What it means.** The cascade is worth having for the share of stories a reviewer will pass, and its cost is about 7 times the calls. The question for the app is which part of it pays: **`cascade_pick`** (the four candidates and the judge's choice, no repair, about 9 calls) and **`review_repair`** (one draft with the plan, a model review and one repair, about 4 calls) take the two halves apart; `--variants ablation` runs them next to the baseline and the cascade, and `kaggle_ablation.py` runs it on the 30 English requests, then the cascade against the baseline in the other languages. If `review_repair` holds most of the gain, the cascade's candidates are not needed; if `cascade_pick` does, the repair is not. No new variant is on by default.
 
+### What the 18 November ablation showed, and a repair that sees naturalness (patch 0093)
+
+The ablation ran on the same 30 English requests (120 stories; all 240 reviews and ratings worked; ratings the median of 3):
+
+| Method | Passed by both reviewers | Split / failed | Failed reviews | Rating gpt / qwen | Calls, seconds a story |
+|---|---|---|---|---|---|
+| baseline | 11 of 30 | 11 / 8 | 27 of 60 | 3.03 / 2.67 | 1.7, 4 |
+| `review_repair` | 19 of 30 | 10 / 1 | 12 of 60 | 3.30 / 2.83 | 4.4, 10 |
+| `cascade_pick` | 21 of 30 | 4 / 5 | 14 of 60 | 3.27 / 2.90 | 10.2, 52 |
+| `cascade` | 22 of 30 | 5 / 3 | 11 of 60 | 3.40 / 2.90 | 12.6, 59 |
+
+Request by request (pass 1, split 0.5, fail 0) against the baseline: `review_repair` +0.25 (+0.10 to +0.40, better 13, worse 2, sign test p 0.0074), `cascade_pick` +0.22 (+0.01 to +0.42, p 0.049), `cascade` +0.27 (+0.11 to +0.43, p 0.0075). Between the methods no difference shows: `cascade` against `review_repair` +0.02 (-0.15 to +0.18), against `cascade_pick` +0.05 (-0.13 to +0.23). On the mean rating no method is clearly above the baseline. So each half of the cascade alone gets most of the gain, and the cheapest, one draft with a model review and one repair (the repair was kept in 14 of 30, rejected in 6, not needed in 10), costs a third of the calls. The Spanish, French and German run stopped after 10 of 48 stories on the daily limit of gpt-oss-120b; all three keys hit it together, so they share one Groq account. It cannot be read.
+
+**What the reviewers still failed.** Of the ratings of 2 or less, 22 were for baseline stories, 10 for `review_repair` and 11 for the cascade, and their reasons are almost all about sense and flow: "events are nonsensical", "repetitive time words", "choppy, list-like sentences", "artificial number sequences". The repair never saw that: it was given grammar mistakes and missed requirements, and compared texts by a score that left naturalness out (only the candidate choice rated it).
+
+**Built in patch 0093, off by default:** `StoryOptions.repair_naturalness` (`STORY_REPAIR_NATURALNESS=1`). With it the judge also rates the text 1 to 5 before the repair and again after each rewrite; a rating of 3 or less becomes a requirement that quotes the reviewer's reason ("A reviewer said: ..."), replacing the generic "rewrite it so it reads naturally"; and a rewrite is kept only when the score, which now includes the rating (weight 35), rises by 0.5. Cost: two short rating calls. Test method `review_repair_nat` (about 6 calls) and the group `--variants naturalness` (baseline, `review_repair`, `review_repair_nat`). `kaggle_naturalness.py` runs it on the 30 English requests (baseline and `review_repair` come from the ablation file, so only 30 stories are new), then the three in Spanish, French and German.
+
+**Caution.** The judge that rates and gives the reason is gpt-oss-20b, the graders are gpt-oss-120b and qwen: different models, but the same kind of reader. A gain here partly means "the story pleases that kind of reviewer"; the human labels (patch 0091) are what checks that, and a second round for the other languages is still open.
+
+**The pre-run check in the cell.** `kaggle_naturalness.py` prints, before any model call, which secrets are set, whether the new code is on the branch, whether `simplemma` is installed, whether each input file was found, the size of each job (from `--dry-run`, counting only what the input file still lacks), and stops with a list if a secret, the code or a model name is missing, or if `GROQ_JUDGE_MODEL` or `GROQ_QWEN_MODEL` differs from the model recorded in the input file (the new rows would not be comparable).
+
 ### Why the score misleads, and what patch 0089 changed in the report
 
 Looking again at the 15 November files (`--rescore` with no model calls) the headline numbers misled in four ways:

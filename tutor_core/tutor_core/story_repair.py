@@ -14,6 +14,7 @@ from typing import Callable, Optional
 
 from . import difficulty as _d
 from .languages import LANGUAGES
+from .naturalness import rate as rate_naturalness
 from .prompts import build_targeted_prompt, extract_final_passage
 from .quality import score_story
 from .quality.grammar import Hit, apply_certain
@@ -25,14 +26,16 @@ GOOD = 85.0            # a part at or above this is not worth a call
 GRAMMAR_GOOD = 95.0
 MIN_GAIN = 0.5         # a rewrite must beat the text by this many points
 MAX_LISTED = 6
+NATURAL_FIX_AT = 50.0   # naturalness part (rating 3 or less) worth a rewrite when the repair rates naturalness (18 Nov 2026)
 
 _STRUCTURAL = {"placeholder": "Remove every blank or placeholder such as [Your name] or [Name]: write a real name instead.",
                "repeated_word": "Do not repeat the same word over and over; use different words.",
                "run_on": "Split long run-on sentences into short sentences."}
 
 
-def requirements(result: dict, text: str, language: str, words, difficulty: Optional[dict], kind: Optional[str]) -> list[str]:
-    """Plain sentences naming each requirement the scored story misses (empty when it misses none worth a call)."""
+def requirements(result: dict, text: str, language: str, words, difficulty: Optional[dict], kind: Optional[str], reason: str = "") -> list[str]:
+    """Plain sentences naming each requirement the scored story misses (empty when it misses none worth a call). `reason` is the reviewer's short reason for a naturalness
+    rating of 3 or less (only when the repair rates naturalness): it is quoted to the writer, so the rewrite fixes what the reviewer saw (choppy, list-like, events that do not follow)."""
     if result.get("gated"):
         return []
     parts, targets, m = result["parts"], result["targets"], result["measured"]
@@ -70,20 +73,33 @@ def requirements(result: dict, text: str, language: str, words, difficulty: Opti
         if kind == "dialogue":
             out.append("Write it as a dialogue: every line starts with a speaker name and a colon.")
         out.append("End on a finished sentence, with nothing cut off.")
+    nat = parts.get("naturalness")
+    if nat is not None and nat <= NATURAL_FIX_AT:
+        out = [r for r in out if not r.startswith("Rewrite it so it reads naturally")]
+        said = f' A reviewer said: "{reason.strip()[:120]}".' if reason and reason.strip() else ""
+        out.append("Rewrite the parts that read unnaturally so the story makes sense from start to end and flows like a good writer's: events that follow one another, "
+                   "no repeated time words or filler, no list-like sentences." + said)
     return out
 
 
 def repair_story(text: str, language: str, words, difficulty: Optional[dict], kind: Optional[str], call: Callable[[str], str], *,
-                 hits: Optional[list] = None, audit_call: Optional[Callable[[str], str]] = None, max_calls: int = MAX_CALLS) -> tuple[str, list[str]]:
-    """(the best text, notes saying what was done). Never raises and never returns a text with a lower score than it was given."""
+                 hits: Optional[list] = None, audit_call: Optional[Callable[[str], str]] = None, max_calls: int = MAX_CALLS,
+                 naturalness: bool = False) -> tuple[str, list[str]]:
+    """(the best text, notes saying what was done). Never raises and never returns a text with a lower score than it was given.
+    `naturalness=True` (with an `audit_call`): the judge also rates how natural the text reads, before and after each rewrite; a rating of 3 or less is a requirement
+    that quotes the reviewer's reason, and a rewrite is kept only when the score, which then includes the rating, rises."""
     notes: list[str] = []
     name = LANGUAGES[language].name if language in LANGUAGES else language
+    last = {"reason": "", "rating": None}          # the rating of the text graded last, which is the text the next rewrite starts from
 
     def grade(t: str, known: Optional[list] = None) -> dict:
         extra = list(known or [])
         if audit_call is not None and known is None:
             extra = run_audit(audit_call, t, name).hits
-        return score_story(t, language, words, difficulty, kind, hits=extra)
+        rating = rate_naturalness(audit_call, t, name) if naturalness and audit_call is not None else None
+        ok = rating is not None and rating.ok
+        last["reason"], last["rating"] = (rating.reason, rating.score) if ok else ("", None)
+        return score_story(t, language, words, difficulty, kind, hits=extra, naturalness=rating.score if ok else None)
 
     current = text
     score = grade(current, hits if hits is not None or audit_call is None else None)
@@ -96,8 +112,10 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
             regraded = grade(fixed)
             notes.append(f"code fixed certain mistake(s) without a model call: {score['score']} -> {regraded['score']}")
             current, score = fixed, regraded
+    if last["rating"] is not None:
+        notes.append(f"naturalness {last['rating']:g}/5 before the repair")
     for attempt in range(1, max_calls + 1):
-        reqs = requirements(score, current, language, words, difficulty, kind)
+        reqs = requirements(score, current, language, words, difficulty, kind, last["reason"])
         if not reqs:
             notes.append("repair: nothing left worth a call" if attempt == 1 else "repair: done")
             break
@@ -109,10 +127,12 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
         if not new.strip():
             notes.append(f"repair {attempt} returned nothing")
             break
+        before_rating = last["rating"]
         after = grade(new)
         if after["gated"] or after["score"] < score["score"] + MIN_GAIN:
             notes.append(f"repair {attempt} rejected: {score['score']} -> {after['score']}" + (f" ({after['gated']})" if after["gated"] else ""))
             break
-        notes.append(f"repair {attempt} kept: {score['score']} -> {after['score']} ({len(reqs)} requirement(s))")
+        notes.append(f"repair {attempt} kept: {score['score']} -> {after['score']} ({len(reqs)} requirement(s))"
+                     + (f"; naturalness {before_rating:g} -> {last['rating']:g}" if before_rating is not None and last["rating"] is not None else ""))
         current, score = new, after
     return current, notes

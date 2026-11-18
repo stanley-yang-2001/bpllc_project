@@ -43,7 +43,7 @@ def test_the_fixed_set_is_twenty_requests_and_never_changes():
 
 
 def test_variant_names_and_each_adds_one_thing():
-    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 22
+    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 23
     with pytest.raises(ValueError, match="unknown variant"):
         vs.resolve("baseline,magic")
     o = vs.BY_NAME["repair"].options()

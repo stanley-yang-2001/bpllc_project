@@ -12,6 +12,7 @@
     examples    show the model a saved good example (example bank, needs the database)    STORY_EXAMPLES=1
     proofread   one grammar-fixing call on every story                                     STORY_PROOFREAD=1
     range       ask for a word range and name the level (difficulty/note.py)               STORY_RANGE_PROMPT=1
+    repair_nat  the repair also rates naturalness and quotes the reviewer's reason          STORY_REPAIR_NATURALNESS=1
     rules       writer rules: keep every small word, no tacked-on words, no filler (prompts/builder.py)  STORY_WRITER_RULES=1
 
 A value is the same everywhere it is used: `StoryOptions.from_env()` for the app, `StoryOptions(...)` in tests and the comparison runner.
@@ -43,6 +44,7 @@ class StoryOptions:
     naturalness: bool = False
     refine: int = 0                  # rounds of check-then-fix-flagged-sentences (story_refine.py); 0 = off
     rules: bool = False              # writer rules added to the prompt (prompts/builder.py WRITER_RULES); the default prompt is unchanged
+    repair_naturalness: bool = False  # the repair also rates how natural the text reads and quotes the reviewer's reason to the writer (story_repair.py)
 
     @classmethod
     def from_env(cls, env=None) -> "StoryOptions":
@@ -54,11 +56,12 @@ class StoryOptions:
         return cls(candidates=max(1, min(MAX_CANDIDATES, n)), judge=env.get("STORY_JUDGE") == "1", repair=env.get("STORY_REPAIR") == "1",
                    mixed=env.get("STORY_MIXED") == "1", gates=env.get("STORY_GATES") == "1", plan=env.get("STORY_PLAN") == "1",
                    naturalness=env.get("STORY_NATURALNESS") == "1", refine=max(0, min(MAX_REFINE, _int(env.get("STORY_REFINE")))),
-                   rules=env.get("STORY_WRITER_RULES") == "1")
+                   rules=env.get("STORY_WRITER_RULES") == "1", repair_naturalness=env.get("STORY_REPAIR_NATURALNESS") == "1")
 
     def normalised(self) -> "StoryOptions":
         return StoryOptions(max(1, min(MAX_CANDIDATES, int(self.candidates))), bool(self.judge), bool(self.repair), bool(self.mixed),
-                            bool(self.gates), bool(self.plan), bool(self.naturalness), max(0, min(MAX_REFINE, int(self.refine))), bool(self.rules))
+                            bool(self.gates), bool(self.plan), bool(self.naturalness), max(0, min(MAX_REFINE, int(self.refine))), bool(self.rules),
+                            bool(self.repair_naturalness))
 
     def cache_parts(self) -> tuple:
         """What to add to a cache key: nothing when every option is off, so the default key is the one it always was."""
@@ -70,7 +73,7 @@ class StoryOptions:
             parts += (("judge",),)
         if o.repair:
             parts += (("repair",),)
-        for name in ("mixed", "gates", "plan", "naturalness", "rules"):
+        for name in ("mixed", "gates", "plan", "naturalness", "rules", "repair_naturalness"):
             if getattr(o, name):
                 parts += ((name,),)
         if o.refine:
