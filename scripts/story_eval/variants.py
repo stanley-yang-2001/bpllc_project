@@ -66,6 +66,14 @@ ALL += [
     Variant("cascade", "Cascade", "+ the best two reviewed (grammar and naturalness) by the judge, then one repair", judge=True, repair=True, naturalness=True, **_CASCADE),
     Variant("cascade_proofread", "Cascade, proofread", "the cascade with one proofreading call instead of the repair", judge=True, proofread=True, naturalness=True, **_CASCADE),
 ]
+# Cheaper cascades (17 Nov 2026). The 30-request run: the cascade had 22 of 30 stories passed by every reviewer against 11 of 30 for the baseline, at 12.6 calls a story
+# against 1.7. In that run its repair changed the story in 15 of 30 and found nothing to fix in 11 (all passed); the plan and the mixed candidates with free checks, without
+# a model review, stayed near the baseline. These two separate the cascade's two halves: the choice of the best candidate by a model review, and the repair.
+ALL += [
+    Variant("cascade_pick", "Cascade without repair", "the cascade's four candidates and the judge's choice of the best, no repair", judge=True, naturalness=True, **_CASCADE),
+    Variant("review_repair", "Review, then repair", "one draft (with the plan), a model review for mistakes, one repair: no candidates, no choice", range_prompt=True, plan=True, judge=True,
+            repair=True),
+]
 # Check, then fix only what was found (10 Nov 2026): one-call writer, free checks + model review, sentence-level repair, kept only if the score rises.
 ALL += [Variant("refine", "Refine", "one call writes; checks + review; fixes only the flagged sentences (up to 2 rounds, kept only if the score rises)",
                 story_model="gpt", judge_model="gpt", refine=2)]
@@ -75,15 +83,16 @@ ALL += [Variant("rules", "+ writer rules", "today's one-call pipeline, the promp
 DEFAULT = ["baseline", "range", "two_pass", "candidates", "judge", "repair"]
 WRITER = ["baseline", "rules"]
 CASCADE = ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]
+ABLATION = ["baseline", "cascade", "review_repair", "cascade_pick"]
 MIX = ["baseline", "baseline_qwen", "gpt_gpt", "qwen_qwen", "gpt_qwen", "qwen_gpt"]
 BY_NAME = {v.name: v for v in ALL}
 
 
 def resolve(spec: str) -> list[Variant]:
-    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'all', or names separated by commas.
+    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'ablation' (baseline, the cascade, the cascade without its repair, and a single draft with a review and a repair), 'all', or names separated by commas.
     'cascade' is both a group of five methods and the name of one method: a leading = names the method alone ('baseline,=cascade' is two methods, 'baseline,cascade' is five).
     An unknown name is an error that lists the valid ones."""
-    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "all": [v.name for v in ALL]}
+    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "ablation": ABLATION, "all": [v.name for v in ALL]}
     names = []
     for part in (spec or "default").strip().lower().split(","):
         part = part.strip()
@@ -100,5 +109,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

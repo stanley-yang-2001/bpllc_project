@@ -128,6 +128,16 @@ def main(argv=None) -> int:
     size = runner.estimate(requests, chosen, args.audit, not args.no_translate, args.tpm, max(1, len(reviewers)), 0 if args.no_naturalness else max(1, args.rating_repeats))
     log(f"{size['requests']} requests x {size['variants']} methods: about {size['calls']} model calls, {size['tokens']:,} tokens, "
           f"at least {size['minutes']} minutes at {args.tpm} tokens a minute.")
+    if args.resume:                      # the size above counts every story; a resumed file already holds some of them
+        try:
+            done = runner.load(args.resume).get("results", {})
+        except Exception:
+            done = {}
+        rest = [runner.estimate([r for r in requests if v.name not in done.get(r["id"], {})], [v], args.audit, not args.no_translate, args.tpm,
+                                max(1, len(reviewers)), 0 if args.no_naturalness else max(1, args.rating_repeats)) for v in chosen]
+        size["calls"], size["tokens"] = sum(x["calls"] for x in rest), sum(x["tokens"] for x in rest)
+        size["minutes"] = round(size["tokens"] / args.tpm)
+        log(f"Already in {args.resume}: what is left is about {size['calls']} model calls, {size['tokens']:,} tokens, at least {size['minutes']} minutes.")
     if size["tokens"] > 150_000:
         log("That is more than the free tier's daily token allowance for one model may cover. Run it in parts with --limit N, then --resume; "
               "a second model for the judge and the review (GROQ_JUDGE_MODEL, GROQ_AUDIT_MODEL) has its own allowance.")

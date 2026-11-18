@@ -43,7 +43,7 @@ def test_the_fixed_set_is_twenty_requests_and_never_changes():
 
 
 def test_variant_names_and_each_adds_one_thing():
-    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 20
+    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 22
     with pytest.raises(ValueError, match="unknown variant"):
         vs.resolve("baseline,magic")
     o = vs.BY_NAME["repair"].options()
@@ -52,6 +52,17 @@ def test_variant_names_and_each_adds_one_thing():
     c = vs.BY_NAME["cascade"].options()
     assert (c.mixed, c.gates, c.plan, c.repair) == (True, True, True, True)
     assert {v.story_model for v in vs.resolve("mix")} <= {None, "gpt", "qwen"} and len(vs.resolve("mix")) == 6
+
+
+def test_the_cheaper_cascades_separate_the_choice_from_the_repair():
+    assert [v.name for v in vs.resolve("ablation")] == ["baseline", "cascade", "review_repair", "cascade_pick"]
+    full, pick, lean = (vs.BY_NAME[n].options() for n in ("cascade", "cascade_pick", "review_repair"))
+    assert (full.candidates, full.repair, full.judge, full.naturalness) == (4, True, True, True)
+    assert (pick.candidates, pick.repair, pick.judge, pick.naturalness, pick.mixed, pick.gates, pick.plan) == (4, False, True, True, True, True, True)
+    assert (lean.candidates, lean.repair, lean.judge, lean.mixed, lean.gates, lean.plan) == (1, True, True, False, False, True)
+    assert vs.BY_NAME["cascade_pick"].proofread is False and vs.BY_NAME["review_repair"].proofread is False
+    assert vs.CALLS["review_repair"] < vs.CALLS["cascade_pick"] < vs.CALLS["cascade"]
+    assert [v.name for v in vs.resolve("baseline,=cascade,review_repair")] == ["baseline", "cascade", "review_repair"]
 
 
 def test_two_models_each_get_their_own_channel_and_reviewers_are_compared():
@@ -154,6 +165,19 @@ def test_a_judging_method_runs_when_no_judge_model_is_set_and_the_story_model_ju
         e = row["cascade"]
         assert e["ok"] and e["models"] == {"story": "the-story-model", "judge": "the-story-model"}
         assert e["calls"] >= 2                          # the judge's calls went through the one channel there is
+
+
+def test_the_cheaper_cascades_run_and_cost_fewer_calls_than_the_cascade():
+    data, chosen = make("=cascade,cascade_pick,review_repair")
+    c = runner.Calls(runner.Channel(fake_model))
+    assert runner.run(data, chosen, c, say=lambda *_: None, limit=1) is False                  # --limit 1: one request, every method
+    row = next(iter(data["results"].values()))
+    assert set(row) == {"cascade", "cascade_pick", "review_repair"} and all(e["ok"] for e in row.values())
+    notes = {name: " | ".join(e["notes"]) for name, e in row.items()}
+    assert "repair 1" in notes["cascade"] or "nothing left" in notes["cascade"]
+    assert "repair 1" not in notes["cascade_pick"] and "nothing left" not in notes["cascade_pick"]       # the one part this variant takes away
+    assert "candidates" not in notes["review_repair"] and ("repair 1" in notes["review_repair"] or "nothing left" in notes["review_repair"])
+    assert row["review_repair"]["calls"] < row["cascade_pick"]["calls"] < row["cascade"]["calls"]
 
 
 def test_a_method_that_needs_the_database_is_skipped_without_it():
