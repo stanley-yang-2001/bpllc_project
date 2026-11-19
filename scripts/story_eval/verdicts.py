@@ -13,7 +13,10 @@ from typing import Iterable, Optional
 from . import stats
 
 PASS, SPLIT, FAIL = "pass", "split", "fail"
-MIN_CHANGE = 0.2              # a reviewer's own mean change smaller than this does not count as a direction
+MIN_CHANGE = 0.2              # a reviewer's own mean change smaller than this does not count as a direction (ratings, 1 to 5)
+MIN_PASS_CHANGE = 0.1         # the same for a reviewer's own change in the share of stories it passes (0 to 1): 3 stories of 30
+VALUE = {PASS: 1.0, SPLIT: 0.5, FAIL: 0.0}      # what a verdict is worth in the comparison of passed stories
+WANTED_GAP = 0.15             # the gain in passed stories that "requests needed" is asked about: 4 or 5 stories more of 30
 MIN_RATINGS_FOR_FACTORS = 20
 
 
@@ -111,12 +114,13 @@ def paired(base_pairs: Iterable, other_pairs: Iterable) -> dict:
             "p": p, "by_reviewer": own, "reading": reading(n, span, p, own)}
 
 
-def reading(n: int, span: Optional[tuple], p: float, own: dict) -> str:
+def reading(n: int, span: Optional[tuple], p: float, own: dict, min_change: float = MIN_CHANGE) -> str:
     """'too few requests', 'reviewers disagree', 'clear gain', 'clear loss' or 'within noise'. A clear change needs the range to leave zero AND the sign test to
-    agree AND no reviewer to go the other way: a model may rate its own kind of writing higher, so a gain only one reviewer sees is not counted."""
+    agree AND no reviewer to go the other way: a model may rate its own kind of writing higher, so a gain only one reviewer sees is not counted.
+    `min_change` is the size of a reviewer's own change that counts as a direction (0.2 of a rating point, or 0.1 of the stories it passes)."""
     if n < stats.MIN_PAIRS or span is None:
         return "too few requests"
-    signs = {(v > 0) - (v < 0) for v in own.values() if abs(round(v, 2)) >= MIN_CHANGE}
+    signs = {(v > 0) - (v < 0) for v in own.values() if abs(round(v, 2)) >= min_change}
     if len(own) > 1 and {1, -1} <= signs:
         return "reviewers disagree"
     if span[1] > 0 and p < 0.05:
@@ -124,6 +128,35 @@ def reading(n: int, span: Optional[tuple], p: float, own: dict) -> str:
     if span[2] < 0 and p < 0.05:
         return "clear loss"
     return "within noise"
+
+
+def paired_verdicts(base_pairs: Iterable, other_pairs: Iterable, wanted: float = WANTED_GAP) -> dict:
+    """Two methods compared request by request on what the reviewers DECIDED: a story every reviewer passed is worth 1, a split 0.5, a failed one 0 (19 Nov 2026).
+    The ratings comparison (`paired`) moves by a tenth of a point and read 'within noise' where this one separates the methods: the verdict is what the app cares about
+    (is there a mistake or an unnatural passage a reader would see) and a rating of 2 or less is the line. A request counts when both methods have a verdict.
+    Returns the mean change with its 95% range, requests that went up, stayed or went down, the sign test, each reviewer ALONE (the change in the share of stories it
+    passed: the one from another model family is the one that cannot favour the writer), the spread of the changes, how many requests it would take to see a change of
+    `wanted` at that spread, and a reading."""
+    base = {r["id"]: e for r, e in base_pairs}
+    changes, per_reviewer = [], {}
+    up = down = same = 0
+    for request, entry in other_pairs:
+        after, before = verdict(entry), verdict(base.get(request["id"]))
+        if after is None or before is None:
+            continue
+        change = VALUE[after["kind"]] - VALUE[before["kind"]]
+        changes.append(change)
+        up, down, same = up + (change > 0), down + (change < 0), same + (change == 0)
+        for label in set(after["reviewers"]) & set(before["reviewers"]):
+            per_reviewer.setdefault(label, []).append((label not in after["failed"]) - (label not in before["failed"]))
+    n = len(changes)
+    span = stats.mean_range(changes)
+    spread = stats.sd(changes)
+    own = {label: stats.mean(v) for label, v in per_reviewer.items()}
+    p = stats.sign_test(up, down)
+    return {"requests": n, "change": stats.mean(changes), "low": span[1] if span else None, "high": span[2] if span else None, "up": up, "same": same, "down": down,
+            "p": p, "by_reviewer": own, "spread": spread, "needed": stats.requests_needed(spread, wanted), "wanted": wanted,
+            "reading": reading(n, span, p, own, MIN_PASS_CHANGE)}
 
 
 def by_group(pairs_by_method: dict, key: str) -> dict:

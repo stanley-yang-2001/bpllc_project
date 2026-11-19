@@ -56,6 +56,9 @@ services:
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
       - STORY_NATURALNESS=${STORY_NATURALNESS:-}      # 1: the judge also rates how natural the best candidates read (1-5)
       - STORY_PLAN=${STORY_PLAN:-}                    # 1: feature about one learner word per 17 words, the rest optional
+      - STORY_REFINE=${STORY_REFINE:-}                # 1 to 3: rounds of rate-naturalness then fix the flagged sentences (story_refine.py)
+      - STORY_WRITER_RULES=${STORY_WRITER_RULES:-}    # 1: writer rules in the prompt (keep small words, no tacked-on words, no filler)
+      - STORY_REPAIR_NATURALNESS=${STORY_REPAIR_NATURALNESS:-}  # 1: the repair also rates naturalness and quotes the reviewer (measured 19 Nov: no gain, off)
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
@@ -139,6 +142,9 @@ services:
       - STORY_GATES=${STORY_GATES:-}                  # 1: free checks drop bad candidates before any review
       - STORY_NATURALNESS=${STORY_NATURALNESS:-}      # 1: the judge also rates how natural the best candidates read (1-5)
       - STORY_PLAN=${STORY_PLAN:-}                    # 1: feature about one learner word per 17 words, the rest optional
+      - STORY_REFINE=${STORY_REFINE:-}                # 1 to 3: rounds of rate-naturalness then fix the flagged sentences (story_refine.py)
+      - STORY_WRITER_RULES=${STORY_WRITER_RULES:-}    # 1: writer rules in the prompt (keep small words, no tacked-on words, no filler)
+      - STORY_REPAIR_NATURALNESS=${STORY_REPAIR_NATURALNESS:-}  # 1: the repair also rates naturalness and quotes the reviewer (measured 19 Nov: no gain, off)
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
     depends_on:

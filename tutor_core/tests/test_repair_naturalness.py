@@ -6,10 +6,10 @@ from pathlib import Path
 
 from tutor_core.story import story_from_words
 from tutor_core.story_options import StoryOptions
-from tutor_core.story_repair import requirements
+from tutor_core.story_repair import repair_story, requirements
 from tutor_core.quality import score_story
 
-from test_story_steps import GOOD, TIER, WORDS, answer
+from test_story_steps import GOOD, SHORT, TIER, WORDS, answer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 from story_eval import variants  # noqa: E402
@@ -87,3 +87,45 @@ def test_the_option_is_in_the_environment_the_cache_key_and_the_variant():
     assert v.options().repair_naturalness and v.repair and v.judge and not variants.BY_NAME["review_repair"].options().repair_naturalness
     assert [x.name for x in variants.resolve("naturalness")] == ["baseline", "review_repair", "review_repair_nat"]
     assert variants.CALLS["review_repair_nat"] > variants.CALLS["review_repair"]
+
+
+class FlakyJudge(Judge):
+    """Rates fine until `fail_from`-th rating (1-based), after that the answer is not the JSON that was asked for (a timeout, a chatty reply)."""
+
+    def __init__(self, ratings, fail_from, rewrite=REWRITE):
+        super().__init__(ratings, rewrite)
+        self.fail_from, self.asked = fail_from, 0
+
+    def __call__(self, prompt):
+        if "Rate how NATURAL" in prompt:
+            self.asked += 1
+            self.seen.append("rate")
+            if self.asked >= self.fail_from:
+                return "I think it reads fine."
+            return json.dumps({"score": self.ratings.pop(0), "reason": REASON})
+        return super().__call__(prompt)
+
+
+def test_a_rewrite_whose_rating_cannot_be_read_is_not_kept():
+    """18 Nov 2026, found while testing: a score with no rating has no penalty for an unnatural text, so a rewrite that could not be rated went 44.9 -> 100.0 and was kept
+    on no evidence. The repair now compares like for like and rejects what it cannot compare."""
+    fake = FlakyJudge([2], fail_from=2)
+    result = run(fake, repair_naturalness=True)
+    assert result.text == GOOD and fake.seen.count("repair") == 1
+    assert any("could not be rated" in n for n in result.notes) and not any("kept" in n for n in result.notes)
+
+
+def test_when_the_first_rating_cannot_be_read_the_rewrite_is_compared_without_ratings():
+    """The old text was not rated, so the new text is not rated either (one call saved) and the usual score comparison decides."""
+    fake = FlakyJudge([], fail_from=1)
+    text, notes = repair_story(SHORT, "es", WORDS, TIER, "story", lambda prompt: answer(GOOD), audit_call=fake, naturalness=True)
+    assert text == GOOD and fake.seen.count("rate") == 1
+    assert any("kept" in n for n in notes) and not any("naturalness" in n for n in notes)
+
+
+def test_the_repair_rates_and_rewrites_a_language_without_spaces():
+    ja = "私は毎朝六時に起きます。それから窓を開けて、新しい空気を吸います。台所でパンを食べて、お茶を飲みます。友達の田中さんが家に来て、一緒に公園を歩きます。午後は本を読んで、夜は早く寝ます。"
+    better = ja.replace("それから窓を開けて、", "窓を開けて、").replace("午後は本を読んで、夜は", "午後は本を読みます。夜は")
+    fake = Judge([2, 4], rewrite=better)
+    text, notes = repair_story(ja, "ja", ["パン", "お茶", "公園", "友達"], TIER, "story", lambda prompt: answer(better), audit_call=fake, naturalness=True)
+    assert text == better and any("naturalness 2 -> 4" in n for n in notes)

@@ -92,11 +92,11 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
     name = LANGUAGES[language].name if language in LANGUAGES else language
     last = {"reason": "", "rating": None}          # the rating of the text graded last, which is the text the next rewrite starts from
 
-    def grade(t: str, known: Optional[list] = None) -> dict:
+    def grade(t: str, known: Optional[list] = None, rate: bool = True) -> dict:
         extra = list(known or [])
         if audit_call is not None and known is None:
             extra = run_audit(audit_call, t, name).hits
-        rating = rate_naturalness(audit_call, t, name) if naturalness and audit_call is not None else None
+        rating = rate_naturalness(audit_call, t, name) if naturalness and rate and audit_call is not None else None
         ok = rating is not None and rating.ok
         last["reason"], last["rating"] = (rating.reason, rating.score) if ok else ("", None)
         return score_story(t, language, words, difficulty, kind, hits=extra, naturalness=rating.score if ok else None)
@@ -109,7 +109,7 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
     if certain:
         fixed = apply_certain(current, certain)
         if fixed != current and not score_story(fixed, language, words, difficulty, kind)["gated"]:
-            regraded = grade(fixed)
+            regraded = grade(fixed, rate=last["rating"] is not None)        # like for like: rated again only when the text before it was rated
             notes.append(f"code fixed certain mistake(s) without a model call: {score['score']} -> {regraded['score']}")
             current, score = fixed, regraded
     if last["rating"] is not None:
@@ -128,7 +128,11 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
             notes.append(f"repair {attempt} returned nothing")
             break
         before_rating = last["rating"]
-        after = grade(new)
+        after = grade(new, rate=before_rating is not None)       # compared like for like: rated when the old text was, not rated when it was not
+        if before_rating is not None and last["rating"] is None and not after["gated"]:
+            # a score without a rating has no penalty for an unnatural text, so it would beat the old text's rated score for no reason (18 Nov 2026: 44.9 -> 100.0 on a failed rating)
+            notes.append(f"repair {attempt} rejected: the new text could not be rated, so it cannot be compared with the old one")
+            break
         if after["gated"] or after["score"] < score["score"] + MIN_GAIN:
             notes.append(f"repair {attempt} rejected: {score['score']} -> {after['score']}" + (f" ({after['gated']})" if after["gated"] else ""))
             break

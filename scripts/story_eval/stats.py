@@ -27,6 +27,24 @@ def mean(values: Sequence[float]) -> Optional[float]:
     return sum(values) / len(values) if values else None
 
 
+def sd(values: Sequence[float]) -> Optional[float]:
+    """The sample standard deviation (n - 1). None with fewer than two values."""
+    v = [x for x in values if x is not None]
+    if len(v) < 2:
+        return None
+    m = sum(v) / len(v)
+    return math.sqrt(sum((x - m) ** 2 for x in v) / (len(v) - 1))
+
+
+def requests_needed(spread: Optional[float], gap: float, z: float = 2.8) -> Optional[int]:
+    """About how many paired requests it takes to see a mean change of `gap` when the change of a single request spreads like `spread` (its standard deviation).
+    ((1.96 + 0.84) x spread / gap) squared, plus two for the t distribution: the usual 80% chance of a clear result at the 5% level. 30 requests with a spread of 0.5
+    resolve about 0.26, and a gap of 0.15 takes about 90. None when the spread is missing or zero or the gap is not above zero."""
+    if not spread or not gap or gap <= 0:
+        return None
+    return math.ceil((z * spread / gap) ** 2) + 2
+
+
 def wilson(k: int, n: int, z: float = 1.96) -> Optional[tuple]:
     """The 95% Wilson range of a share: k of n. 4 of 10 is 17% to 69%, which is what ten requests can tell. None when n is 0."""
     if n <= 0:

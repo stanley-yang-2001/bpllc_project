@@ -12,7 +12,7 @@ from tutor_core.naturalness import combine as combine_ratings
 from tutor_core.quality.score import merge_reviews
 from tutor_core.quality.grammar import Hit
 
-from . import health, stats as st, verdicts
+from . import fit, health, stats as st, verdicts
 
 PART_LABELS = {"length": "Length", "own_words": "Your words", "uncommon": "Uncommon words", "sentence_length": "Sentence length",
                "grammar": "Grammar, fluency", "language_format": "Language, format"}
@@ -346,6 +346,19 @@ def _signed(v) -> str:
     return "–" if v is None else f"{v:+.1f}"
 
 
+def _points(v) -> str:
+    """A change in the share of stories passed (a verdict is 1, a split 0.5, a fail 0), as percentage points: +0.25 is +25."""
+    return "–" if v is None else f"{v * 100:+.0f}"
+
+
+def _own_reviewers(data: dict, pairs: dict, labels: list) -> list:
+    """The reviewers that run on the model that wrote the stories: they may rate their own kind of writing higher."""
+    meta = data.get("meta") or {}
+    default = meta.get("story model")                 # a story written by the default model is recorded as "default": that is the run's story model
+    writers = {default if w in (None, "default") else w for ps in pairs.values() for _, e in ps for w in [(e.get("models") or {}).get("story")]}
+    return [l for l in labels if meta.get(f"{l} model") and meta.get(f"{l} model") in writers]
+
+
 def _pairs(data: dict) -> dict:
     return {v["name"]: list(entries(data, v["name"])) for v in data["variants"]}
 
@@ -388,15 +401,103 @@ def _notes(data: dict, pairs: dict, labels: list) -> str:
     same, both = verdicts.agreement(flat)
     if both:
         out.append(f"Two reviewers judged the same way (pass or fail) on {same} of {both} stories.")
-    meta = data.get("meta") or {}
-    writers = {(e.get("models") or {}).get("story") for _, _, e in flat}
-    own = [l for l in labels if meta.get(f"{l} model") and meta.get(f"{l} model") in writers]
+    own = _own_reviewers(data, pairs, labels)
     if own and len(labels) > 1:
         out.append(f"{', '.join(own)} reviews stories its own model wrote. A model may rate its own kind of writing higher, so trust a gain only when the other reviewer shows it too.")
+    out += _noise_notes(data, pairs)
     most = max((len(ps) for ps in pairs.values()), default=0)
     if most and most < 30:
         out.append(f"Each method has {most} request(s). The ranges show what that many can tell; a gap inside its range is not a difference.")
     return "<h3>How far to trust this</h3><ul class=num>" + "".join(f"<li>{html.escape(x)}</li>" for x in out) + "</ul>" if out else ""
+
+
+def _noise_notes(data: dict, pairs: dict) -> list:
+    """What running the same method twice moved, read from a method that repeats another (`replicate_of`). Without one the file cannot say how much a single run varies."""
+    variants = data.get("variants") or []
+    by_name = {v["name"]: v for v in variants}
+    out, found = [], False
+    for v in variants:
+        first = by_name.get(v.get("replicate_of") or "")
+        if first is None or first["name"] not in pairs or v["name"] not in pairs:
+            continue
+        found = True
+        c = verdicts.paired_verdicts(pairs[first["name"]], pairs[v["name"]])
+        if not c["requests"]:
+            continue
+        need = f"; to see a gain of {c['wanted'] * 100:.0f} points at this spread it takes about {c['needed']} requests" if c["needed"] else ""
+        out.append(f"{v['label']} is {first['label']} made again for the same {c['requests']} requests. The passed stories moved by {_points(c['change'])} points "
+                   f"({_points(c['low'])} to {_points(c['high'])}), {c['up']} better, {c['same']} the same, {c['down']} worse. That is the noise of one run: a gap between two methods "
+                   f"inside this range is not a difference{need}.")
+    if not found and len(variants) > 1:
+        out.append("No method is made twice in this file, so how much one run varies is not measured here. Add the baseline again (--variants baseline,baseline_b) to measure it in the same run.")
+    return out
+
+
+def _passed_table(data: dict, pairs: dict) -> str:
+    """Each method against the first on what the reviewers decided (verdict_pairs): the comparison the app cares about, with each reviewer alone and the requests it would take."""
+    names = [v["name"] for v in data["variants"]]
+    if len(names) < 2:
+        return ""
+    rows = []
+    for v in data["variants"][1:]:
+        c = verdicts.paired_verdicts(pairs[names[0]], pairs[v["name"]])
+        if not c["requests"]:
+            continue
+        rng = "" if c["low"] is None else f" ({_points(c['low'])} to {_points(c['high'])})"
+        own = " · ".join(f"{html.escape(l)} {_points(x)}" for l, x in c["by_reviewer"].items())
+        tag = " <i>(the same method again: this is noise)</i>" if v.get("replicate_of") == names[0] else ""
+        need = f"about {c['needed']}" if c["needed"] else "–"
+        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b>{tag}</td><td>{c['requests']}</td><td>{_points(c['change'])}{rng}</td><td>{c['up']} / {c['same']} / {c['down']}</td>"
+                    f"<td>{c['p']:.3f}</td><td>{own}</td><td><b>{html.escape(c['reading'])}</b></td><td>{need}</td></tr>")
+    if not rows:
+        return ""
+    head = ("<tr><th>Method</th><th>Requests compared</th><th>Change in stories passed, points (95% range)</th><th>Better / same / worse</th><th>Sign test p</th>"
+            f"<th>Each reviewer alone, points</th><th>Reading</th><th>Requests to see {verdicts.WANTED_GAP * 100:.0f} points</th></tr>")
+    return (f"<h3>Passed stories: each method against {html.escape(data['variants'][0]['label'])}, request by request</h3><table class=sum>{head}{''.join(rows)}</table>"
+            "<p class=num>The same request with both methods. A story every reviewer passes counts 1, a split 0.5 and a failed story 0; the change is that average in points "
+            "(+25 means one story in four moved from fail to pass). “Each reviewer alone” is the change in the share of stories that reviewer passed: a gain only one of them "
+            "sees is not counted as clear. The last column is how many requests it would take to see a gain of "
+            f"{verdicts.WANTED_GAP * 100:.0f} points at the spread of these changes.</p>")
+
+
+def _fit_table(data: dict, pairs: dict) -> str:
+    """Does each method write the sentence length its level asks for? From the free measurement; no model."""
+    got = [(v, fit.by_method(pairs[v["name"]])) for v in data["variants"]]
+    got = [(v, b) for v, b in got if b]
+    if not got:
+        return ""
+    tiers = [t for t in fit.SENTENCE_RANGE if any(t in b["tiers"] for _, b in got)]
+    head = ("<tr><th>Method</th><th>Stories</th><th>Mean sentence in the asked range (95% range)</th><th>Too short</th><th>Too long</th>"
+            + "".join(f"<th>{html.escape(t.capitalize())} ({fit.asked(t)} words)</th>" for t in tiers) + "</tr>")
+    rows = []
+    for v, b in got:
+        cells = "".join(f"<td>{b['tiers'][t][fit.IN]} of {sum(b['tiers'][t].values())}</td>" if t in b["tiers"] else "<td>–</td>" for t in tiers)
+        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{b['stories']}</td><td>{st.percent_range(b[fit.IN], b['stories'])}</td><td>{b[fit.SHORT]}</td><td>{b[fit.LONG]}</td>{cells}</tr>")
+    on = any(v.get("range_prompt") for v in data["variants"])
+    note = ("A method that is not told the range (the baseline: STORY_RANGE_PROMPT is off in the app) writes one sentence length at every level, so it misses on both sides. "
+            if on else "")
+    return ("<h3>Does the story fit its level?</h3><table class=sum>" + head + "".join(rows) + "</table>"
+            f"<p class=num>The mean sentence of each story against the range the level note asks the writer for. {note}Chinese and Japanese are left out (their sentences are counted in characters). "
+            "The free score has one ruler for every level, so it cannot show this.</p>")
+
+
+def _reviewer_table(data: dict, pairs: dict, labels: list) -> str:
+    """How many stories each reviewer passed on its own, per method. Two reviewers from two model families are two independent opinions; one of them may be the writer's own model."""
+    if len(labels) < 2:
+        return ""
+    own = _own_reviewers(data, pairs, labels)
+    head = "<tr><th>Method</th>" + "".join(f"<th>Passed by {html.escape(l)}{' (also the writer)' if l in own else ''}</th>" for l in labels) + "</tr>"
+    rows = []
+    for v in data["variants"]:
+        d = verdicts.decided(pairs[v["name"]])
+        cells = []
+        for l in labels:
+            reviews, bad = d["failed_by"].get(l, (0, 0))
+            cells.append(f"<td>{st.percent_range(reviews - bad, reviews)}</td>")
+        rows.append(f"<tr><td><b>{html.escape(v['label'])}</b></td>{''.join(cells)}</tr>")
+    return ("<h3>Each reviewer on its own</h3><table class=sum>" + head + "".join(rows) + "</table>"
+            "<p class=num>The share of stories each reviewer passed. A reviewer from another model family than the writer cannot favour the writer, so a gain it sees is the one to trust; "
+            "a gain only the writer's own model sees may be its taste for its own kind of writing.</p>")
 
 
 def _paired_table(data: dict, pairs: dict) -> str:
@@ -417,13 +518,14 @@ def _paired_table(data: dict, pairs: dict) -> str:
     head = ("<tr><th>Method</th><th>Requests compared</th><th>Mean rating change (95% range)</th><th>Better / same / worse</th><th>Sign test p</th>"
             "<th>Change by reviewer</th><th>Reading</th></tr>")
     return (f"<h3>Each method against {html.escape(data['variants'][0]['label'])}, request by request</h3><table class=sum>{head}{''.join(rows)}</table>"
-            "<p class=num>The same request (same words and level) with both methods, rated by the same reviewers. A clear change needs the range to leave zero, the sign test to agree "
+            "<p class=num>The same comparison on the 1 to 5 ratings. A rating moves by a fraction of a point and sees less than the passed or failed line the app works with, so read the table "
+            "of passed stories above first. A clear change needs the range to leave zero, the sign test to agree "
             f"and no reviewer to go the other way; with fewer than {st.MIN_PAIRS} requests nothing can be clear.</p>")
 
 
 def _group_tables(data: dict, pairs: dict) -> str:
     out = []
-    for key, title in (("pack", "word pack"), ("tier", "level")):
+    for key, title in (("pack", "word pack"), ("tier", "level"), ("story_type", "story type")):
         grid = verdicts.by_group(pairs, key)
         if not grid:
             continue
@@ -502,7 +604,8 @@ def _summary(data: dict) -> str:
     if models:
         out.append(f"<p class=num>{html.escape(models)}</p>")
     if reviewed:
-        out += [_decided_table(data, pairs, labels), _notes(data, pairs, labels), _paired_table(data, pairs), _group_tables(data, pairs), _request_grid(data, pairs, labels)]
+        out += [_decided_table(data, pairs, labels), _notes(data, pairs, labels), _passed_table(data, pairs), _paired_table(data, pairs), _fit_table(data, pairs),
+                _reviewer_table(data, pairs, labels), _group_tables(data, pairs), _request_grid(data, pairs, labels)]
     else:
         out.append("<div class=warnbox><b style='color:#b42318'>No model review in this file.</b> The score below only checks the brief (the words, the length, the level and the rules "
                    "that need no model). It cannot see unnatural writing, events that do not follow or most grammar mistakes, so it is not a measure of quality. "
