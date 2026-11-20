@@ -31,6 +31,9 @@ _WRITER_V2 = ("{seed} Make it read like something a native speaker would really 
               "that does not fit. Mix short sentences (3 to 5 words) with longer ones joined by words like {connectors}; never three sentences in a row of about the same length. "
               "Do not start more than two sentences in a row with the same word. Do not end a sentence on a time word such as {filler} unless the reader needs it. "
               "Keep it easy with common words and simple grammar, not with sentences that are all very short; no sentence over 20 words.{layout}")
+# 20 Nov 2026 (OFF unless StoryOptions.spread): in the 19 Nov round the learner's words sat early in the text, 41% of them in the first third in the baseline and 45% in writer v2 (an even spread is
+# 33%). One sentence asks for the rest of the text to carry its share; it is a separate option so that `v2` stays what it was and `v2_spread` differs from it by this sentence alone.
+_SPREAD = ("Spread the listed words across the whole text, not only the first sentences: some in the middle and some near the end, each where its event needs it.")
 _V2_LAYOUT = " Write one or two paragraphs, with no line break between the sentences of a paragraph."
 _BEGIN = "Begin:"          # every template ends with a line that starts like this (the rest of the line differs)
 
@@ -82,9 +85,14 @@ def _with_writer_v2(prompt: str, code: str, kind: Optional[str], rng=None) -> st
     return prompt.rstrip() + "\n\n" + block if i < 0 else prompt[:i] + block + "\n\n" + prompt[i:]
 
 
+def _with_spread(prompt: str) -> str:
+    i = prompt.rfind(_BEGIN)
+    return prompt.rstrip() + "\n\n" + _SPREAD if i < 0 else prompt[:i] + _SPREAD + "\n\n" + prompt[i:]
+
+
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
                        topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
-                       difficulty: Optional[dict] = None, rules: bool = False, writer_v2: bool = False) -> str:
+                       difficulty: Optional[dict] = None, rules: bool = False, writer_v2: bool = False, spread: bool = False) -> str:
     """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
     applies to the new story types; when omitted it is chosen at random, avoiding recent topics.
     vocab_in_target: the word list is already written in `language` (a learner's per-language list),
@@ -93,6 +101,7 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured.
     difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt.
     rules: add the writer rules (small words stay, no tacked-on words, no filler) before the final instruction; off, the prompt is exactly what it was.
+    spread: add one sentence asking for the listed words to be spread across the whole text (separate from writer_v2, so each can be measured alone).
     writer_v2: add the writer v2 block (a scene decided first, mixed sentence length, varied openers, paragraphs, a name, place and time drawn by code); off, nothing changes."""
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
     if not is_english(normalize_language(language)):       # the English prompts stay exactly as they were (pinned by tests); English grammar is handled by the repair and proofreading calls
@@ -103,6 +112,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
         prompt = _with_writer_rules(prompt, is_english(normalize_language(language)))
     if writer_v2:
         prompt = _with_writer_v2(prompt, _language_code(language), describe_prompt(prompt)[0], rng)
+    if spread:
+        prompt = _with_spread(prompt)
     if difficulty:
         # The built-in templates ask for 5 to 9 sentences; with a tier that sentence count is replaced by the tier's own.
         from ..difficulty import CHARS_PER_WORD, ask_size, prompt_note

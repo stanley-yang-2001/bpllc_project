@@ -290,3 +290,50 @@ def test_the_outline_methods_differ_from_v2_by_the_outline_alone_and_from_each_o
     skip = {"name": "", "label": "", "note": ""}
     assert {**ol.as_dict(), "outline": "", **skip} == {**v2.as_dict(), **skip} and {**bt.as_dict(), "outline": "whole", **skip} == {**ol.as_dict(), **skip}
     assert ol.options().outline == "whole" and bt.options().outline == "beats" and all(n in variants.CALLS for n in ("outline", "beats"))
+
+
+# --- spread the words (patch 0098) ---------------------------------------------------------------------------------------------------------------------------------
+
+from tutor_core.prompts.builder import _SPREAD  # noqa: E402
+
+
+def test_the_spread_sentence_is_off_by_default_and_comes_before_the_final_instruction_when_on():
+    args = ("Spanish", "casa, mar", "story", "the sea", random.Random(1))
+    off = build_story_prompt(*args, vocab_in_target=True, difficulty=TIER)
+    on = build_story_prompt(*args, vocab_in_target=True, difficulty=TIER, spread=True)
+    assert _SPREAD not in off and _SPREAD in on and on.index(_SPREAD) < on.rindex("Begin:") and on.replace(_SPREAD + "\n\n", "") == off
+
+
+def test_spread_is_separate_from_writer_v2_so_each_can_be_measured_alone():
+    def build(**kw):                       # a fresh rng each time: the name, place and time are drawn from it
+        return build_story_prompt("Spanish", "casa, mar", "story", "the sea", random.Random(1), vocab_in_target=True, difficulty=TIER, **kw)
+    v2, both, alone = build(writer_v2=True), build(writer_v2=True, spread=True), build(spread=True)
+    assert _SPREAD not in v2 and both.replace(_SPREAD + "\n\n", "") == v2 and "Setting:" not in alone and _SPREAD in alone
+
+
+def test_spread_reaches_the_prompt_through_the_options_and_the_environment():
+    seen = []
+    story_from_words("en", WORDS, lambda p: (seen.append(p), answer(MIXED))[1], story_type="story", difficulty=TIER, options=StoryOptions(spread=True), rng=random.Random(5))
+    assert _SPREAD in seen[0]
+    o = StoryOptions.from_env({"STORY_SPREAD_WORDS": "1"})
+    assert o.spread and not StoryOptions.from_env({}).spread and ("spread",) in o.cache_parts() and StoryOptions().cache_parts() == ()
+    assert StoryOptions(spread=True, outline="beats").normalised() == StoryOptions(spread=True, outline="beats")      # the last two fields keep their place
+
+
+def test_v2_spread_is_v2_plus_the_sentence_and_nothing_else():
+    v2, sp = variants.BY_NAME["v2"], variants.BY_NAME["v2_spread"]
+    skip = {"name": "", "label": "", "note": ""}
+    assert sp.spread and not v2.spread and {**sp.as_dict(), "spread": False, **skip} == {**v2.as_dict(), **skip}
+    assert sp.options().spread and sp.options().writer_v2 and sp.options().outline == "" and "v2_spread" in variants.CALLS
+
+
+def test_the_report_shows_where_the_learners_words_sit_in_the_text():
+    early = "bread shop river friend walk. " + "The day is long and the sky is grey over the town. " * 6
+    even = "The boy walks to the shop. " + "The sky is grey over the town and it is cold. " * 2 + "He eats bread. " + "The air is cold over the town. " * 2 + "His friend waits by the river."
+    assert rhythm.first_third(early, WORDS, "en") == 1.0 and 0.0 < rhythm.first_third(even, WORDS, "en") < 0.7
+    assert rhythm.first_third("The sky is grey.", WORDS, "en") is None and rhythm.first_third("今日は天気がいいです。" * 5, ["天気", "今日", "いい"], "ja") is None
+    req = {"id": "q1", "code": "en", "words": WORDS, "story_type": "story"}
+    b = rhythm.by_method([(req, {"ok": True, "text": early + FLAT})])
+    assert b["first_third"] == 1.0
+    html_ = report._rhythm_table({"variants": [{"name": "x", "label": "X"}], "requests": [req]}, {"x": [(req, {"ok": True, "text": early + FLAT})]})
+    assert "100%" in html_ and "first third" in html_

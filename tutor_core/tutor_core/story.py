@@ -166,7 +166,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
     prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), request.story_type, request.topic, rng, vocab_in_target=True,
-                                difficulty=request.difficulty, rules=request.options.rules, writer_v2=request.options.writer_v2)
+                                difficulty=request.difficulty, rules=request.options.rules, writer_v2=request.options.writer_v2, spread=request.options.spread)
     if plan_note:
         prompt = prompt.rstrip() + "\n" + plan_note
     if example_conn is not None:                        # an example from the bank, for the quality of the language only (prompts/example.py)

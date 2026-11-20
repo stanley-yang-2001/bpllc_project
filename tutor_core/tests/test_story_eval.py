@@ -43,7 +43,7 @@ def test_the_fixed_set_is_twenty_requests_and_never_changes():
 
 
 def test_variant_names_and_each_adds_one_thing():
-    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 30
+    assert [v.name for v in vs.resolve("default")] == vs.DEFAULT and len(vs.resolve("all")) == len(vs.ALL) == 31
     with pytest.raises(ValueError, match="unknown variant"):
         vs.resolve("baseline,magic")
     o = vs.BY_NAME["repair"].options()
@@ -474,3 +474,34 @@ def test_the_reviewed_table_puts_cost_and_learner_words_beside_the_verdicts_and_
     note = report._notes({"meta": {}, "requests": [], "results": {}}, {"m": [({"id": "a"}, _entry({"gpt": 2, "qwen": 2}, ["gpt", "qwen"], free=96.0)),
                                                                           ({"id": "b"}, _entry({"gpt": 4, "qwen": 4}, free=99.0))]}, ["gpt", "qwen"])
     assert "2 of the 2 reviewed stories scored 90 or more on the free checks; the reviewers passed 1 of those, split on 0 and failed 1" in note
+
+
+def test_a_resumed_dry_run_counts_every_method_the_file_has_and_skip_leaves_one_out(tmp_path, capsys):
+    """A resumed run finishes every method of the file, not only the ones named; the size has to say so, and --skip has to be able to leave a method out (20 Nov 2026)."""
+    import run_story_methods
+    data, chosen = make("baseline,rules")
+    for r in data["requests"]:
+        data["results"][r["id"]] = {"baseline": {"ok": True, "text": GOOD}}          # baseline is done, rules is not
+    path = str(tmp_path / "m.json")
+    runner.save(data, path)
+    base = ["--dry-run", "--resume", path, "--variants", "baseline", "--languages", "es", "--audit-models", "gpt"]
+    assert run_story_methods.main(base) == 0
+    assert "what is left is about 0 model calls" not in capsys.readouterr().out         # rules is in the file: it is counted
+    assert run_story_methods.main(base + ["--skip", "rules"]) == 0
+    assert "what is left is about 0 model calls" in capsys.readouterr().out
+    assert run_story_methods.main(["--dry-run", "--variants", "baseline", "--skip", "nope"]) == 2
+
+
+def test_a_skipped_method_is_not_made_again_but_stays_in_the_file(tmp_path, monkeypatch):
+    import run_story_methods
+    data, chosen = make("baseline,rules")
+    for r in data["requests"]:
+        data["results"][r["id"]] = {"baseline": {"ok": True, "text": GOOD}}
+    path = str(tmp_path / "m.json")
+    runner.save(data, path)
+    made = []
+    monkeypatch.setattr(runner, "run", lambda d, variants, *a, **k: made.append([v.name for v in variants]) or True)
+    monkeypatch.setattr(run_story_methods, "write_outputs", lambda *a, **k: None)
+    monkeypatch.setenv("GROQ_API_KEY", "x")
+    run_story_methods.main(["--resume", path, "--variants", "baseline", "--languages", "es", "--no-preflight", "--skip", "rules"])
+    assert made == [["baseline"]]

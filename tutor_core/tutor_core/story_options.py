@@ -15,6 +15,7 @@
     repair_nat  the repair also rates naturalness and quotes the reviewer's reason          STORY_REPAIR_NATURALNESS=1
     rules       writer rules: keep every small word, no tacked-on words, no filler (prompts/builder.py)  STORY_WRITER_RULES=1
     writer_v2   writer v2: scene first, mixed sentence length, varied openers, paragraphs, name/place/time by code  STORY_WRITER_V2=1
+    spread      one sentence: spread the listed words across the whole text, not only the start  STORY_SPREAD_WORDS=1
     outline     write from an outline: "whole" (outline call, then one call for the text) or "beats" (then one call per event)  STORY_OUTLINE=whole|beats
     repair_dir  the repair also gets concrete rhythm, opener and filler edits from free checks (story_diagnose.py)  STORY_REPAIR_DIRECTIVES=1
 
@@ -55,6 +56,7 @@ class StoryOptions:
     repair_naturalness: bool = False  # the repair also rates how natural the text reads and quotes the reviewer's reason to the writer (story_repair.py)
     writer_v2: bool = False          # the writer v2 block in the prompt (prompts/builder.py, story_seed.py); the default prompt is unchanged
     repair_directives: bool = False  # the repair starts from free rhythm/opener/filler findings and gives the writer concrete edits (story_diagnose.py, story_repair.py)
+    spread: bool = False             # one prompt sentence asking for the learner's words to be spread over the whole text (prompts/builder.py); the default prompt is unchanged
     outline: str = ""                # "", "whole" or "beats": an outline call first, then one call for the text or one per event (story_outline.py)
 
     @classmethod
@@ -68,12 +70,12 @@ class StoryOptions:
                    mixed=env.get("STORY_MIXED") == "1", gates=env.get("STORY_GATES") == "1", plan=env.get("STORY_PLAN") == "1",
                    naturalness=env.get("STORY_NATURALNESS") == "1", refine=max(0, min(MAX_REFINE, _int(env.get("STORY_REFINE")))),
                    rules=env.get("STORY_WRITER_RULES") == "1", repair_naturalness=env.get("STORY_REPAIR_NATURALNESS") == "1",
-                   writer_v2=env.get("STORY_WRITER_V2") == "1", repair_directives=env.get("STORY_REPAIR_DIRECTIVES") == "1", outline=_outline(env.get("STORY_OUTLINE")))
+                   writer_v2=env.get("STORY_WRITER_V2") == "1", repair_directives=env.get("STORY_REPAIR_DIRECTIVES") == "1", outline=_outline(env.get("STORY_OUTLINE")), spread=env.get("STORY_SPREAD_WORDS") == "1")
 
     def normalised(self) -> "StoryOptions":
         return StoryOptions(max(1, min(MAX_CANDIDATES, int(self.candidates))), bool(self.judge), bool(self.repair), bool(self.mixed),
                             bool(self.gates), bool(self.plan), bool(self.naturalness), max(0, min(MAX_REFINE, int(self.refine))), bool(self.rules),
-                            bool(self.repair_naturalness), bool(self.writer_v2), bool(self.repair_directives), _outline(self.outline))
+                            bool(self.repair_naturalness), bool(self.writer_v2), bool(self.repair_directives), spread=bool(self.spread), outline=_outline(self.outline))
 
     def cache_parts(self) -> tuple:
         """What to add to a cache key: nothing when every option is off, so the default key is the one it always was."""
@@ -85,7 +87,7 @@ class StoryOptions:
             parts += (("judge",),)
         if o.repair:
             parts += (("repair",),)
-        for name in ("mixed", "gates", "plan", "naturalness", "rules", "repair_naturalness", "writer_v2", "repair_directives"):
+        for name in ("mixed", "gates", "plan", "naturalness", "rules", "repair_naturalness", "writer_v2", "repair_directives", "spread"):
             if getattr(o, name):
                 parts += ((name,),)
         if o.outline:

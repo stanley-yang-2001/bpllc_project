@@ -92,6 +92,8 @@ def main(argv=None) -> int:
                     "Extra keys are GROQ_API_KEY_2, _3 ... (and GROQ_QWEN_API_KEY_2, GROQ_JUDGE_API_KEY_2, GROQ_AUDIT_API_KEY_2) in .env")
     ap.add_argument("--tpm", type=int, default=7000, help="tokens per minute to stay under (free tier: 8000)")
     ap.add_argument("--resume", default=None, metavar="FILE.json", help="continue an earlier run: only missing stories are made")
+    ap.add_argument("--skip", default="", metavar="NAMES", help="with --resume: methods of the file that are NOT made again (a resumed run finishes every method the file has, not only the ones named in --variants); "
+                    "what they already hold stays in the file and the report. For a method you have stopped measuring")
     ap.add_argument("--rescore", default=None, metavar="FILE.json", help="no model calls: score the saved stories again with the current score")
     ap.add_argument("--max-minutes", type=float, default=None, metavar="N", help="stop cleanly between two stories after N minutes (a notebook or a host that kills the process "
                     "loses the reason; this way the file says why it ended). Kaggle: 11 hours is 660")
@@ -113,6 +115,12 @@ def main(argv=None) -> int:
     except ValueError as exc:
         log(exc)
         return 2
+    skip = {x.strip() for x in args.skip.split(",") if x.strip()}
+    unknown = sorted(skip - set(variant_set.BY_NAME))
+    if unknown:
+        log(f"--skip names a method that does not exist: {', '.join(unknown)}")
+        return 2
+    chosen = [v for v in chosen if v.name not in skip]
     requests = pick_requests(args)
     every = requests          # the file keeps ALL requests; --limit only says how many this run makes, so a later --resume can make the rest ("run it in parts")
     if args.limit is not None:
@@ -130,7 +138,10 @@ def main(argv=None) -> int:
           f"at least {size['minutes']} minutes at {args.tpm} tokens a minute.")
     if args.resume:                      # the size above counts every story; a resumed file already holds some of them
         try:
-            done = runner.load(args.resume).get("results", {})
+            earlier = runner.load(args.resume)
+            done = earlier.get("results", {})
+            kept = {v.name for v in chosen}      # a resumed run also finishes every other method the file has (the run below does), unless it is skipped
+            chosen = chosen + [variant_set.BY_NAME[v["name"]] for v in earlier.get("variants", []) if v["name"] in variant_set.BY_NAME and v["name"] not in kept and v["name"] not in skip]
         except Exception:
             done = {}
         rest = [runner.estimate([r for r in requests if v.name not in done.get(r["id"], {})], [v], args.audit, not args.no_translate, args.tpm,
@@ -212,7 +223,7 @@ def main(argv=None) -> int:
         data["variants"] += [v.as_dict() for v in chosen if v.name not in have]
         data["meta"].update({k: v for k, v in meta.items() if v})
         out = args.out or args.resume.rsplit(".", 1)[0] + ".html"
-        chosen = [variant_set.BY_NAME[v["name"]] for v in data["variants"] if v["name"] in variant_set.BY_NAME]
+        chosen = [variant_set.BY_NAME[v["name"]] for v in data["variants"] if v["name"] in variant_set.BY_NAME and v["name"] not in skip]
         before = data["meta"].get("run") or {}
         info["earlier"] = (before.get("earlier") or []) + [{"started": before.get("started"), "last_save": before.get("last_save"), "command": before.get("command"),
                                                             "stopped": data["meta"].get("stopped")}]

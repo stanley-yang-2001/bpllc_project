@@ -488,9 +488,10 @@ def _rhythm_table(data: dict, pairs: dict) -> str:
     if not got:
         return ""
     head = ("<tr><th>Method</th><th>Stories</th><th>Findings a story (rhythm, opener, filler)</th><th>With 2 or more</th><th>Sentence-length SD</th>"
-            "<th>Flat rhythm</th><th>Most common opener (share of sentences)</th><th>Filler time words</th></tr>")
+            "<th>Flat rhythm</th><th>Most common opener (share of sentences)</th><th>Filler time words</th><th>Learner words first used in the first third of the text (even: 33%)</th></tr>")
     rows = [f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{b['stories']}</td><td>{b['mean_findings']:.2f}</td><td>{b['two_or_more']} of {b['stories']}</td>"
-            f"<td>{b['mean_sd']:.2f}</td><td>{b['flat']}</td><td>{b['mean_opener'] * 100:.0f}%</td><td>{b['filler']}</td></tr>" for v, b in got]
+            f"<td>{b['mean_sd']:.2f}</td><td>{b['flat']}</td><td>{b['mean_opener'] * 100:.0f}%</td><td>{b['filler']}</td>"
+            f"<td>{'' if b['first_third'] is None else format(b['first_third'] * 100, '.0f') + '%'}</td></tr>" for v, b in got]
     return ("<h3>How stiff do the stories read? (free checks)</h3><table class=sum>" + head + "".join(rows) + "</table>"
             "<p class=num>Counted by code, no model: flat rhythm is a sentence-length SD below 1.0 word, a repeated opener is one first word on 35% or more of the sentences, filler is "
             "time words such as 'today' ending 2 or more sentences. In the 19 Nov round the stories with 0 findings averaged a reviewer rating of 3.4 and those with 3 or more 2.8, "
