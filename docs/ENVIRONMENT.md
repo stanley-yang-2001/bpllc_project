@@ -67,6 +67,7 @@ TOOLS_DB_PASSWORD=       # password of the narrow database role the Langflow too
 # STORY_REPAIR_NATURALNESS=0     # 1: the repair also rates how natural the text reads and quotes the reviewer's reason to the writer. Measured on 19 Nov (30 English requests): no gain over the plain repair, so off.
 # STORY_WRITER_V2=0              # 1: add the writer v2 block to the story prompt: a scene decided first, short and long sentences mixed, varied openers, one or two paragraphs, and the name, place and time of day drawn by code (not the model). Being measured (test methods v2, v2_directive), so off.
 # STORY_REPAIR_DIRECTIVES=0      # 1: the repair also gets concrete edits (join sentences, change openers, drop filler time words) from free checks when 2 or more of them fire, and runs even when the score has nothing to fix. Being measured (test methods v2_directive, rr_directive), so off.
+# STORY_OUTLINE=                 # whole: an outline call (4 or 5 events with the learner's words), then one call writes the text from it (2 calls). beats: then one call per event writes the next sentences (about 6 calls). Being measured (test methods outline, beats), so off.
 # STORY_NATURALNESS=0            # 1: the judge also rates how natural the best candidates read, 1 to 5 (weight 35 in the score; 2 or less fails the story)
 # STORY_MIXED=0                  # 1: candidates use both strategies (one-pass and two-pass)
 # STORY_GATES=0                  # 1: free checks (length, own-word range, fragments, structure) drop bad candidates before any review

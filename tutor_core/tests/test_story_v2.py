@@ -208,3 +208,85 @@ def test_v2_rr_is_review_repair_plus_the_block_and_v2_plus_the_review_and_repair
     assert {**v2rr.as_dict(), "writer_v2": False, **skip} == {**rr.as_dict(), **skip}
     assert v2rr.writer_v2 and v2rr.judge and v2rr.repair and not v2rr.repair_directives
     assert {**v2rr.as_dict(), "judge": False, "repair": False, **skip} == {**v2.as_dict(), **skip}
+
+
+# --- outline first (patch 0097) -------------------------------------------------------------------------------------------------------------------------------------
+
+from tutor_core import story_outline  # noqa: E402
+
+OUTLINE = ("1. A boy walks to the shop | words: shop, walk\n2. He buys bread because his friend is hungry | words: bread, friend\n"
+           "3. They sit by the river and eat | words: river\n4. They walk home together")
+
+
+BEATS = ["The boy walks to the shop in the cold morning air.", "He wants fresh bread because his friend is waiting by the river.",
+         "Then the two boys sit by the water and eat the warm bread together.", "At last they walk home, talking about the long day, and the boy's mother makes soup."]
+
+
+def scripted(outline=OUTLINE, text=MIXED, beats=None, fail_beat=None):
+    calls = []
+
+    def call(prompt):
+        calls.append(prompt)
+        if prompt.startswith("Plan a short"):
+            return outline
+        if "Now write only event" in prompt:
+            k = int(prompt.split("Now write only event ")[1].split(" ")[0])
+            if k == fail_beat:
+                raise RuntimeError("limit")
+            return "===STORY===\n" + (beats or BEATS)[k - 1]
+        return answer(text)
+    return call, calls
+
+
+def test_the_outline_lines_are_read_and_a_thin_answer_is_not():
+    assert len(story_outline.parse_outline(OUTLINE)) == 4
+    assert story_outline.parse_outline("1. A boy walks to the shop\n2. He buys bread") == [] and story_outline.parse_outline("") == []
+    assert story_outline.parse_outline("Here is the outline:\n- A boy walks to the shop | words: shop\n- He buys bread | words: bread\n* They eat by the river") != []
+
+
+def test_whole_writes_the_text_from_the_outline_in_two_calls():
+    call, calls = scripted()
+    r = story_from_words("en", WORDS, call, story_type="story", difficulty=TIER, options=StoryOptions(outline="whole"), rng=random.Random(1))
+    assert r.text == MIXED and len(calls) == 2 and calls[0].startswith("Plan a short")
+    assert "Follow this outline" in calls[1] and "1. A boy walks to the shop" in calls[1] and calls[1].rstrip().endswith(story_outline._BEGIN) or "Begin:" in calls[1]
+    assert any(n.startswith("outline: 4 events, text written from it") for n in r.notes)
+
+
+def test_beats_writes_one_call_per_event_each_seeing_the_text_so_far():
+    call, calls = scripted()
+    r = story_from_words("en", WORDS, call, story_type="story", difficulty=TIER, options=StoryOptions(outline="beats"), rng=random.Random(1))
+    assert len(calls) == 5 and r.text == " ".join(BEATS)
+    assert "Nothing is written yet." in calls[1] and "Text so far:\nThe boy walks to the shop in the cold morning air." in calls[2] and "last event" in calls[4] and "last event" not in calls[3]
+    assert any("written one by one" in n for n in r.notes)
+
+
+def test_a_dialogue_is_written_beat_by_beat_one_line_each():
+    call, calls = scripted(beats=["Ana: Hello, Ben. Do you want to walk to the shop with me now?", "Ben: Yes, I do. I want fresh bread for my friend, and the river is near.",
+                          "Ana: Good. We can sit by the river and eat the warm bread there together.", "Ben: That is a good plan. Let us walk home after that, and I will make soup."])
+    r = story_from_words("en", WORDS, call, story_type="dialogue", difficulty=TIER, options=StoryOptions(outline="beats"), rng=random.Random(1))
+    assert r.text.count("\n") == 3 and "speaker's name and a colon" in calls[1]
+
+
+def test_an_outline_that_cannot_be_read_or_a_failed_step_falls_back_to_the_normal_story():
+    call, calls = scripted(outline="Sorry, I cannot.")
+    r = story_from_words("en", WORDS, call, story_type="story", difficulty=TIER, options=StoryOptions(outline="whole"), rng=random.Random(1))
+    assert r.ok and r.text == MIXED and len(calls) == 2 and any("could not be read" in n for n in r.notes)
+    call, calls = scripted(fail_beat=3)
+    r = story_from_words("en", WORDS, call, story_type="story", difficulty=TIER, options=StoryOptions(outline="beats"), rng=random.Random(1))
+    assert r.ok and r.text == MIXED and any("a step failed" in n for n in r.notes)
+
+
+def test_outline_off_makes_no_extra_call_and_the_option_is_read_and_cached():
+    call, calls = scripted()
+    story_from_words("en", WORDS, call, story_type="story", difficulty=TIER, rng=random.Random(1))
+    assert len(calls) == 1
+    assert StoryOptions.from_env({"STORY_OUTLINE": "Beats"}).outline == "beats" and StoryOptions.from_env({"STORY_OUTLINE": "x"}).outline == ""
+    assert ("outline", "whole") in StoryOptions(outline="whole").cache_parts() and StoryOptions(outline="beats").cache_parts() != StoryOptions(outline="whole").cache_parts()
+    assert StoryOptions(outline="junk").normalised().outline == ""
+
+
+def test_the_outline_methods_differ_from_v2_by_the_outline_alone_and_from_each_other_by_the_writing():
+    v2, ol, bt = (variants.BY_NAME[n] for n in ("v2", "outline", "beats"))
+    skip = {"name": "", "label": "", "note": ""}
+    assert {**ol.as_dict(), "outline": "", **skip} == {**v2.as_dict(), **skip} and {**bt.as_dict(), "outline": "whole", **skip} == {**ol.as_dict(), **skip}
+    assert ol.options().outline == "whole" and bt.options().outline == "beats" and all(n in variants.CALLS for n in ("outline", "beats"))

@@ -28,17 +28,18 @@ class Variant:
     judge_model: str = None         # alias of the model that judges (None: the default judge model, else the story model)
     repair_naturalness: bool = False  # the repair rates naturalness and quotes the reviewer's reason to the writer
     writer_v2: bool = False         # the writer v2 block in the prompt: scene first, mixed rhythm, varied openers, paragraphs, name/place/time drawn by code
+    outline: str = ""               # "whole" or "beats": an outline call first, then one call for the text or one per event (story_outline.py)
     repair_directives: bool = False  # the repair gets concrete edits from the free rhythm/opener/filler checks
     replicate_of: str = None        # the name of the method this one repeats exactly: the gap between the two is noise (the report reads it as the yardstick)
 
     def options(self) -> StoryOptions:
-        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine, self.rules, self.repair_naturalness, self.writer_v2, self.repair_directives)
+        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine, self.rules, self.repair_naturalness, self.writer_v2, self.repair_directives, self.outline)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "label": self.label, "note": self.note, "range_prompt": self.range_prompt, "two_pass": self.two_pass,
                 "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples,
                 "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "refine": self.refine, "rules": self.rules, "story_model": self.story_model, "judge_model": self.judge_model,
-                "repair_naturalness": self.repair_naturalness, "writer_v2": self.writer_v2, "repair_directives": self.repair_directives, "replicate_of": self.replicate_of}
+                "repair_naturalness": self.repair_naturalness, "writer_v2": self.writer_v2, "repair_directives": self.repair_directives, "outline": self.outline, "replicate_of": self.replicate_of}
 
 
 ALL = [
@@ -102,6 +103,12 @@ ALL += [Variant("v2", "Writer v2", "range prompt and plan, plus the writer v2 bl
 # for review_repair) and "choppy" remarks, which a review and repair fixes. `v2_rr` is that pair: gap to `review_repair` = the v2 block, gap to `v2` = the review and repair.
 ALL += [Variant("v2_rr", "Writer v2, review, repair", "review_repair with the writer v2 block in the prompt",
                 range_prompt=True, plan=True, writer_v2=True, judge=True, repair=True)]
+# Summary first (20 Nov 2026, patch 0097): `outline` is `v2` with an outline call before the text (gap to v2 = the explicit outline); `beats` writes the text one event at a time, the
+# sentence-by-sentence version of the idea, from the same outline and prompt (gap to `outline` = writing in pieces instead of in one go).
+ALL += [Variant("outline", "Outline, then the text", "writer v2, an outline call (events with the learner's words), then one call writes the text from it",
+                range_prompt=True, plan=True, writer_v2=True, outline="whole"),
+        Variant("beats", "Outline, then event by event", "writer v2 context, an outline call, then one call per event writes the next sentences",
+                range_prompt=True, plan=True, writer_v2=True, outline="beats")]
 # Check, then fix only what was found (10 Nov 2026): one-call writer, free checks + model review, sentence-level repair, kept only if the score rises.
 ALL += [Variant("refine", "Refine", "one call writes; checks + review; fixes only the flagged sentences (up to 2 rounds, kept only if the score rises)",
                 story_model="gpt", judge_model="gpt", refine=2)]
@@ -140,5 +147,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 2.1, "v2_rr": 5.0, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 2.1, "outline": 3.1, "beats": 7.0, "v2_rr": 5.0, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

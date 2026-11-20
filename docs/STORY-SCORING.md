@@ -350,3 +350,16 @@ A local page for watching tests while they run. Start it with `test-desk.bat` (p
 - **Not known.** Which part of the block does the work: the paragraph layout (a one-sentence-per-line text was the baseline's shape), the mixed rhythm, the seeded name and place, or the instruction to plan a scene. The block is one bundle, so this round cannot say. Also the noise floor: `baseline_b` made 1 of 30 stories and `range` none before the limit.
 - **Next (`kaggle_round7.py`).** `v2_rr` (the block with review and repair: the repetition fixed by the block and the grammar by the repair), after finishing the 14 missing stories; then the controls. If `v2_rr` is above `v2` by more than the noise, it is the candidate; if not, `v2` at 2.1 calls is.
 
+### Summary first, and sentence by sentence (patch 0097, 20 November 2026)
+
+**The question.** Would it help to write a summary of the story first, with the vocabulary assigned to its parts, and then write grammatical, natural sentences one at a time?
+
+**What we know before the test.**
+- The scene-first half has some support: the writer v2 block asks the model to decide a scene before writing (silently) and it raised passed stories from 8 to 19 of 27 (round 6). So an explicit outline can only add the part the model did not already do. The cascade's two-pass candidates (draft with no word list, then adapt) are a related idea and showed no clear advantage in the data we have.
+- The sentence-by-sentence half runs against the reviewers' commonest remark: "choppy" or list-like text, in 45% of the naturalness remarks for `v2` and 62% for `review_repair`. A sentence written alone, one call at a time, has no pull towards joining its neighbours and tends to start like the last one; the v2 gain came from asking for connected paragraphs. Sentence-level fixing has been tried: `refine` (rewrite only the flagged sentences) tied with the baseline (13 Nov).
+- Cost: 5 events means 6 calls before any retry, against 2.1 for `v2`, which already passes as many stories as methods of 4 to 13 calls. On the free keys (200,000 tokens a day for each) that is a real limit.
+
+**What is built (off by default).** `story_outline.py`; `StoryOptions.outline` / `STORY_OUTLINE` = `whole` or `beats`. `whole`: one outline call, then one call writes the text from the outline, as connected prose, not one sentence a line. `beats`: one call per event, each given the base prompt (level, words, rules, name and place), the outline, the text so far and the instruction to start differently from the last sentence and join with a connector where it reads better; a dialogue gets one or two lines a beat. An outline with fewer than 3 events, a failed outline call or a failed beat gives back the normal one-call story, with a note.
+
+**What is measured next.** On the same 30 English requests: `outline` and `beats` against `v2` (gap = the outline; gap between them = writing in pieces), and each against `review_repair`. The measure is the passed stories of both reviewers; the stiffness table shows rhythm, openers and filler beside it. If `outline` is level with `v2` the extra call is not worth it; if `beats` is below `outline`, writing in pieces hurts, which is the expectation.
+

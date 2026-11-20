@@ -20,6 +20,7 @@ from .story_cache import StoryCache
 from .two_pass import two_pass_passages
 from .story_options import StoryOptions
 from .story_plan import plan_words
+from .story_outline import get_outline, with_outline, write_beats
 from .story_candidates import choose as choose_candidate
 from .story_refine import refine_story, refine_tools
 from .story_repair import repair_story
@@ -177,13 +178,27 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
 
     opts = request.options
     notes: list[str] = []
+    beat_text = None
+    if opts.outline:                                    # an outline first (story_outline.py); any failure falls back to the normal one-call pipeline
+        from .two_pass import target_length
+        length = target_length(picked_type, request.difficulty)
+        beats = get_outline(call, LANGUAGES[language].name, picked_type, picked_topic, used, length)
+        if not beats:
+            notes.append("outline: could not be read; wrote without it")
+        elif opts.outline == "beats":
+            beat_text = write_beats(call, prompt, beats, picked_type == "dialogue", length)
+            notes.append(f"outline: {len(beats)} events, written one by one" if beat_text else "outline: a step failed; wrote without it")
+        else:
+            prompt = with_outline(prompt, beats)
+            notes.append(f"outline: {len(beats)} events, text written from it")
     n = opts.candidates
     one_pass = n if not opts.mixed else (n + 1) // 2 if n > 1 else 1        # mixed: about half the candidates are one-pass, half two-pass
     two = 0 if opts.mixed and n <= 1 else (n - one_pass if opts.mixed else (n if request.two_pass else 0))
-    texts = two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, two, request.options.rules) if two else []
+    texts = [beat_text] if beat_text else []
+    texts += two_pass_passages(call, language, LANGUAGES[language].name, prompt, used, request.difficulty, two, request.options.rules) if two and not beat_text else []
     if opts.mixed:
         notes.append(f"mixed strategies: {one_pass} one-pass, {len(texts)} two-pass")
-    want_one = one_pass if (opts.mixed or not texts) else 0
+    want_one = 0 if beat_text else one_pass if (opts.mixed or not texts) else 0
     first = True
     for _ in range(want_one):
         try:
