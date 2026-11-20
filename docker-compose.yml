@@ -59,6 +59,8 @@ services:
       - STORY_REFINE=${STORY_REFINE:-}                # 1 to 3: rounds of rate-naturalness then fix the flagged sentences (story_refine.py)
       - STORY_WRITER_RULES=${STORY_WRITER_RULES:-}    # 1: writer rules in the prompt (keep small words, no tacked-on words, no filler)
       - STORY_REPAIR_NATURALNESS=${STORY_REPAIR_NATURALNESS:-}  # 1: the repair also rates naturalness and quotes the reviewer (measured 19 Nov: no gain, off)
+      - STORY_WRITER_V2=${STORY_WRITER_V2:-}  # 1: writer v2 block in the prompt (scene first, mixed rhythm, name/place/time by code); being measured, off
+      - STORY_REPAIR_DIRECTIVES=${STORY_REPAIR_DIRECTIVES:-}  # 1: the repair gets concrete rhythm/opener/filler edits from free checks; being measured, off
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
       # DEVELOPMENT ONLY: a request that sends NO learner id acts as this learner (the Playground, one-off scripts).
@@ -145,6 +147,8 @@ services:
       - STORY_REFINE=${STORY_REFINE:-}                # 1 to 3: rounds of rate-naturalness then fix the flagged sentences (story_refine.py)
       - STORY_WRITER_RULES=${STORY_WRITER_RULES:-}    # 1: writer rules in the prompt (keep small words, no tacked-on words, no filler)
       - STORY_REPAIR_NATURALNESS=${STORY_REPAIR_NATURALNESS:-}  # 1: the repair also rates naturalness and quotes the reviewer (measured 19 Nov: no gain, off)
+      - STORY_WRITER_V2=${STORY_WRITER_V2:-}  # 1: writer v2 block in the prompt (scene first, mixed rhythm, name/place/time by code); being measured, off
+      - STORY_REPAIR_DIRECTIVES=${STORY_REPAIR_DIRECTIVES:-}  # 1: the repair gets concrete rhythm/opener/filler edits from free checks; being measured, off
       - GROQ_JUDGE_EFFORT=${GROQ_JUDGE_EFFORT:-}
       - LANGUAGETOOL_URL=${LANGUAGETOOL_URL:-}
     depends_on:

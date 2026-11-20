@@ -27,16 +27,18 @@ class Variant:
     story_model: str = None         # alias of the model that writes: "gpt" or "qwen" (None: the default story model)
     judge_model: str = None         # alias of the model that judges (None: the default judge model, else the story model)
     repair_naturalness: bool = False  # the repair rates naturalness and quotes the reviewer's reason to the writer
+    writer_v2: bool = False         # the writer v2 block in the prompt: scene first, mixed rhythm, varied openers, paragraphs, name/place/time drawn by code
+    repair_directives: bool = False  # the repair gets concrete edits from the free rhythm/opener/filler checks
     replicate_of: str = None        # the name of the method this one repeats exactly: the gap between the two is noise (the report reads it as the yardstick)
 
     def options(self) -> StoryOptions:
-        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine, self.rules, self.repair_naturalness)
+        return StoryOptions(self.candidates, self.judge, self.repair, self.mixed, self.gates, self.plan, self.naturalness, self.refine, self.rules, self.repair_naturalness, self.writer_v2, self.repair_directives)
 
     def as_dict(self) -> dict:
         return {"name": self.name, "label": self.label, "note": self.note, "range_prompt": self.range_prompt, "two_pass": self.two_pass,
                 "candidates": self.candidates, "judge": self.judge, "repair": self.repair, "proofread": self.proofread, "examples": self.examples,
                 "plan": self.plan, "mixed": self.mixed, "gates": self.gates, "naturalness": self.naturalness, "refine": self.refine, "rules": self.rules, "story_model": self.story_model, "judge_model": self.judge_model,
-                "repair_naturalness": self.repair_naturalness, "replicate_of": self.replicate_of}
+                "repair_naturalness": self.repair_naturalness, "writer_v2": self.writer_v2, "repair_directives": self.repair_directives, "replicate_of": self.replicate_of}
 
 
 ALL = [
@@ -87,6 +89,15 @@ ALL += [Variant("review_repair_nat", "Review, then repair, with naturalness", "r
 # cannot say (it does not keep the draft before a repair, and the stories a repair left alone are the ones with nothing found, which pass more often by selection).
 # `baseline_b` is the baseline made again for the same requests, in the same run: its gap to the baseline is the noise of a single run, which every other gap has to beat.
 ALL += [Variant("baseline_b", "Baseline, run again", "the same pipeline as the baseline, made again for the same requests: the gap between the two is noise", replicate_of="baseline")]
+# Writer v2 and the directive repair (20 Nov 2026), from the naturalness plan of 19 Nov. `v2` is `plan` (range prompt + plan, one call) with the writer v2 block added, so the gap
+# between the two is that block alone. `v2_directive` adds one repair call that gets concrete rhythm/opener/filler edits from free checks (no model review). `rr_directive` is
+# `review_repair` whose repair also gets those edits, so its gap to `review_repair` is the edits alone.
+ALL += [Variant("v2", "Writer v2", "range prompt and plan, plus the writer v2 block (scene first, mixed rhythm, varied openers, paragraphs, name/place/time by code)",
+                range_prompt=True, plan=True, writer_v2=True),
+        Variant("v2_directive", "Writer v2 + directive repair", "writer v2, then one repair with concrete rhythm/opener/filler edits (free checks, no model review)",
+                range_prompt=True, plan=True, writer_v2=True, repair=True, repair_directives=True),
+        Variant("rr_directive", "Review, then directive repair", "review_repair, and the repair also gets the concrete rhythm/opener/filler edits",
+                range_prompt=True, plan=True, judge=True, repair=True, repair_directives=True)]
 # Check, then fix only what was found (10 Nov 2026): one-call writer, free checks + model review, sentence-level repair, kept only if the score rises.
 ALL += [Variant("refine", "Refine", "one call writes; checks + review; fixes only the flagged sentences (up to 2 rounds, kept only if the score rises)",
                 story_model="gpt", judge_model="gpt", refine=2)]
@@ -98,16 +109,17 @@ WRITER = ["baseline", "rules"]
 CASCADE = ["baseline", "plan", "mixed_gates", "cascade", "cascade_proofread"]
 ABLATION = ["baseline", "cascade", "review_repair", "cascade_pick"]
 NATURALNESS = ["baseline", "review_repair", "review_repair_nat"]
+V2 = ["plan", "v2", "v2_directive", "rr_directive"]
 CONTROLS = ["baseline", "baseline_b", "range", "plan", "review_repair", "review_repair_nat"]
 MIX = ["baseline", "baseline_qwen", "gpt_gpt", "qwen_qwen", "gpt_qwen", "qwen_gpt"]
 BY_NAME = {v.name: v for v in ALL}
 
 
 def resolve(spec: str) -> list[Variant]:
-    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'ablation' (baseline, the cascade, the cascade without its repair, and a single draft with a review and a repair), 'naturalness' (baseline, review_repair, and review_repair with the naturalness-aware repair), 'controls' (baseline, the baseline made again, the range prompt alone, the range prompt with the plan, review_repair and review_repair with the naturalness-aware repair), 'all', or names separated by commas.
+    """'default' (the first six), 'cascade' (the cascade plan, step by step), 'mix' (GPT and Qwen as writer and judge), 'writer' (baseline and the writer rules), 'ablation' (baseline, the cascade, the cascade without its repair, and a single draft with a review and a repair), 'naturalness' (baseline, review_repair, and review_repair with the naturalness-aware repair), 'v2' (plan, writer v2, writer v2 with the directive repair, review_repair with the directive repair), 'controls' (baseline, the baseline made again, the range prompt alone, the range prompt with the plan, review_repair and review_repair with the naturalness-aware repair), 'all', or names separated by commas.
     'cascade' is both a group of five methods and the name of one method: a leading = names the method alone ('baseline,=cascade' is two methods, 'baseline,cascade' is five).
     An unknown name is an error that lists the valid ones."""
-    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "ablation": ABLATION, "naturalness": NATURALNESS, "controls": CONTROLS, "all": [v.name for v in ALL]}
+    groups = {"default": DEFAULT, "mix": MIX, "cascade": CASCADE, "writer": WRITER, "ablation": ABLATION, "naturalness": NATURALNESS, "controls": CONTROLS, "v2": V2, "all": [v.name for v in ALL]}
     names = []
     for part in (spec or "default").strip().lower().split(","):
         part = part.strip()
@@ -124,5 +136,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 1.3, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

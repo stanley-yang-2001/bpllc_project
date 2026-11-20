@@ -19,6 +19,7 @@ from .prompts import build_targeted_prompt, extract_final_passage
 from .quality import score_story
 from .quality.grammar import Hit, apply_certain
 from .quality.grammar.audit import run_audit
+from .story_diagnose import actionable, diagnose, directives as edit_directives, should_repair
 from .story_gates import check as run_gates, requirements as gate_requirements
 
 MAX_CALLS = 1          # repair once: a second rewrite gained about a point in the runs of 7 Nov and cost the most waiting
@@ -27,6 +28,7 @@ GRAMMAR_GOOD = 95.0
 MIN_GAIN = 0.5         # a rewrite must beat the text by this many points
 MAX_LISTED = 6
 NATURAL_FIX_AT = 50.0   # naturalness part (rating 3 or less) worth a rewrite when the repair rates naturalness (18 Nov 2026)
+DIRECTIVE_TOLERANCE = 3.0   # a directive rewrite (joined sentences, new openers) may lose this many score points: the score's one ruler (6 to 12 words a sentence) does not value rhythm
 
 _STRUCTURAL = {"placeholder": "Remove every blank or placeholder such as [Your name] or [Name]: write a real name instead.",
                "repeated_word": "Do not repeat the same word over and over; use different words.",
@@ -84,10 +86,13 @@ def requirements(result: dict, text: str, language: str, words, difficulty: Opti
 
 def repair_story(text: str, language: str, words, difficulty: Optional[dict], kind: Optional[str], call: Callable[[str], str], *,
                  hits: Optional[list] = None, audit_call: Optional[Callable[[str], str]] = None, max_calls: int = MAX_CALLS,
-                 naturalness: bool = False) -> tuple[str, list[str]]:
+                 naturalness: bool = False, directives: bool = False) -> tuple[str, list[str]]:
     """(the best text, notes saying what was done). Never raises and never returns a text with a lower score than it was given.
     `naturalness=True` (with an `audit_call`): the judge also rates how natural the text reads, before and after each rewrite; a rating of 3 or less is a requirement
-    that quotes the reviewer's reason, and a rewrite is kept only when the score, which then includes the rating, rises."""
+    that quotes the reviewer's reason, and a rewrite is kept only when the score, which then includes the rating, rises.
+    `directives=True` (20 Nov 2026): when the free checks (story_diagnose.py) find 2 or more of flat rhythm, a repeated opener and filler time words, the repair gets one concrete edit
+    for each, and the repair runs even when the score has nothing to fix. Such a rewrite is kept only if the findings went down, the learner-word part of the score did not drop,
+    nothing is gated and the score lost at most DIRECTIVE_TOLERANCE points (the score does not value rhythm, so it cannot be asked to rise)."""
     notes: list[str] = []
     name = LANGUAGES[language].name if language in LANGUAGES else language
     last = {"reason": "", "rating": None}          # the rating of the text graded last, which is the text the next rewrite starts from
@@ -116,6 +121,10 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
         notes.append(f"naturalness {last['rating']:g}/5 before the repair")
     for attempt in range(1, max_calls + 1):
         reqs = requirements(score, current, language, words, difficulty, kind, last["reason"])
+        found = diagnose(current, language, words, kind) if directives else []
+        directed = directives and should_repair(found)
+        if directed:
+            reqs = reqs + edit_directives(found, language)
         if not reqs:
             notes.append("repair: nothing left worth a call" if attempt == 1 else "repair: done")
             break
@@ -133,6 +142,17 @@ def repair_story(text: str, language: str, words, difficulty: Optional[dict], ki
             # a score without a rating has no penalty for an unnatural text, so it would beat the old text's rated score for no reason (18 Nov 2026: 44.9 -> 100.0 on a failed rating)
             notes.append(f"repair {attempt} rejected: the new text could not be rated, so it cannot be compared with the old one")
             break
+        if directed:
+            left = len(actionable(diagnose(new, language, words, kind)))
+            before_n = len(actionable(found))
+            low = after["parts"]["own_words"] is not None and score["parts"]["own_words"] is not None and after["parts"]["own_words"] < score["parts"]["own_words"]
+            if after["gated"] or left >= before_n or low or after["score"] < score["score"] - DIRECTIVE_TOLERANCE:
+                why = "gated" if after["gated"] else "findings not fewer" if left >= before_n else "learner words dropped" if low else "score fell"
+                notes.append(f"repair {attempt} rejected ({why}): findings {before_n} -> {left}, score {score['score']} -> {after['score']}")
+                break
+            notes.append(f"repair {attempt} kept (directives): findings {before_n} -> {left}, score {score['score']} -> {after['score']}")
+            current, score = new, after
+            continue
         if after["gated"] or after["score"] < score["score"] + MIN_GAIN:
             notes.append(f"repair {attempt} rejected: {score['score']} -> {after['score']}" + (f" ({after['gated']})" if after["gated"] else ""))
             break

@@ -1,0 +1,202 @@
+"""Writer v2, the code-seeded name/place/time, the free stiffness checks and the directive repair (20 Nov 2026). Everything is off unless asked for, so the default prompt and the
+default repair are what they were; the model calls here are fakes."""
+import random
+import sys
+from pathlib import Path
+
+import pytest
+
+from tutor_core import difficulty as d
+from tutor_core.prompts.builder import build_story_prompt
+from tutor_core.story import story_from_words
+from tutor_core.story_diagnose import actionable, diagnose, directives, should_repair, signal
+from tutor_core.story_options import StoryOptions
+from tutor_core.story_repair import repair_story
+from tutor_core.story_seed import NAMES, note, pick
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
+from story_eval import report, rhythm, variants  # noqa: E402
+
+WORDS = ["bread", "shop", "river", "friend", "walk"]
+TIER = d.resolve("custom", length=60)
+# eight sentences of the same length, three ending on "today"/"now", six opening with "The", one per line: flat rhythm, a repeated opener, filler and layout
+FLAT = "\n".join(["The boy walks to the shop today.", "The shop sells fresh bread to him.", "His friend waits near the river now.",
+                  "They eat the bread by the water.", "The river is cold and very clear.", "The boy walks home with his friend.",
+                  "His mother makes soup for them today.", "The day ends and everyone sleeps."])
+MIXED = ("The boy walks to the shop. He wants fresh bread because his friend is waiting by the river. A baker smiles and gives him a warm loaf. "
+         "Outside, the morning air is cold. Two boys sit by the water and eat. Then they walk home together, talking about the long day, "
+         "and the boy's mother makes soup for all of them. Everyone sleeps well that night.")
+
+
+def answer(text):
+    return "===STORY===\n" + text
+
+
+# --- the free checks ---------------------------------------------------------------------------------------------------------------------------------------------
+
+def test_a_flat_filler_story_is_flagged_and_a_varied_one_is_not():
+    codes = {f["code"] for f in diagnose(FLAT, "en", WORDS)}
+    assert {"flat_rhythm", "filler", "one_per_line"} <= codes and should_repair(diagnose(FLAT, "en", WORDS))
+    assert diagnose(MIXED, "en", WORDS) == []
+
+
+def test_the_layout_finding_alone_never_triggers_a_repair():
+    one_per_line = "\n".join(MIXED.replace("? ", ". ").split(". "))
+    found = diagnose(one_per_line, "en", WORDS)
+    assert [f["code"] for f in found] == ["one_per_line"] and actionable(found) == [] and not should_repair(found)
+
+
+def test_a_dialogue_is_not_judged_by_its_layout_a_short_text_and_an_unspaced_language_are_not_judged_at_all():
+    assert "one_per_line" not in {f["code"] for f in diagnose(FLAT, "en", WORDS, "dialogue")}
+    assert diagnose("One. Two. Three.", "en") == [] and signal("One. Two.", "en") is None
+    assert diagnose("今天天气很好。我们去公园。他们很高兴。我们吃饭。她在家。我们回家。", "zh") == [] and signal("今天天气很好。" * 8, "ja") is None
+
+
+def test_a_word_the_learner_is_studying_is_not_filler():
+    text = FLAT.replace("fresh bread", "fresh bread today")
+    with_own = {f["code"] for f in diagnose(text, "en", ["today"])}
+    assert "filler" not in with_own and "filler" in {f["code"] for f in diagnose(text, "en", WORDS)}
+
+
+def test_the_edits_use_the_languages_own_connectors_and_filler_words():
+    es = directives([{"code": "flat_rhythm", "sentences": [1, 2], "pairs": [[1, 2]], "detail": ""}, {"code": "filler", "sentences": [1, 2], "detail": ""}], "es")
+    assert any("porque" in line for line in es) and any("hoy" in line for line in es) and not any("because" in line for line in es)
+    en = directives(diagnose(FLAT, "en", WORDS), "en")
+    assert any("because" in line for line in en) and any("paragraphs" in line for line in en) and any("under 20 words" in line for line in en)
+
+
+def test_the_signal_gives_the_numbers_the_report_shows():
+    s = signal(FLAT, "en", WORDS)
+    assert s["findings"] == 3 and s["sd"] < 1.0 and s["sentences"] == 8 and 0 < s["opener_share"] <= 1 and "flat_rhythm" in s["codes"]
+
+
+# --- the seed ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+def test_names_places_and_times_are_drawn_by_code_and_repeat_for_a_seeded_run():
+    assert pick("en", "story", random.Random(1)) == pick("en", "story", random.Random(1))
+    assert len({tuple(pick("en", "story", random.Random(i))["names"]) for i in range(40)}) > 5
+    assert "Maya" not in NAMES["en"] and all(len(v) == len(set(v)) for v in NAMES.values())
+
+
+def test_a_dialogue_gets_two_names_a_diary_none_and_a_language_without_a_list_none():
+    assert len(pick("fr", "dialogue", random.Random(2))["names"]) == 2 and pick("de", "diary", random.Random(2))["names"] == []
+    assert pick("ko", "story", random.Random(2))["names"] == [] and "called" not in note("ko", "story", random.Random(2))
+    assert "first person" in note("en", "letter", random.Random(2)) and "The main character is called" in note("es", "story", random.Random(2))
+
+
+# --- the prompt ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+def test_writer_v2_is_off_by_default_so_the_prompt_is_what_it_was():
+    a = build_story_prompt("Spanish", "casa, mar", "story", "the sea", random.Random(1), vocab_in_target=True, difficulty=TIER)
+    b = build_story_prompt("Spanish", "casa, mar", "story", "the sea", random.Random(1), vocab_in_target=True, difficulty=TIER, writer_v2=False)
+    assert a == b and "Setting:" not in a
+
+
+def test_writer_v2_adds_the_block_with_the_seed_and_no_plan_tags():
+    p = build_story_prompt("Spanish", "casa, mar", "story", "the sea", random.Random(1), vocab_in_target=True, writer_v2=True)
+    assert "Setting:" in p and "The main character is called" in p and "porque" in p and "paragraphs" in p
+    assert "<plan>" not in p and p.rstrip().endswith("then the text.") or "Begin:" in p
+    other = build_story_prompt("Spanish", "casa, mar", "story", "the sea", random.Random(1), vocab_in_target=True)
+    assert p.index("Setting:") < p.rindex("Begin:") and "Setting:" not in other
+
+
+def test_a_dialogue_gets_speaker_names_and_no_paragraph_rule():
+    p = build_story_prompt("English", "bread, shop", "dialogue", None, random.Random(4), writer_v2=True)
+    assert "The two speakers are called" in p and "paragraphs" not in p
+
+
+def test_writer_v2_reaches_the_story_prompt_through_the_options():
+    seen = []
+    story_from_words("en", WORDS, lambda p: (seen.append(p), answer(MIXED))[1], story_type="story", difficulty=TIER, options=StoryOptions(writer_v2=True), rng=random.Random(5))
+    assert "Setting:" in seen[0]
+    seen.clear()
+    story_from_words("en", WORDS, lambda p: (seen.append(p), answer(MIXED))[1], story_type="story", difficulty=TIER, rng=random.Random(5))
+    assert "Setting:" not in seen[0]
+
+
+# --- the options ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+def test_the_two_options_are_read_from_the_environment_and_change_the_cache_key():
+    o = StoryOptions.from_env({"STORY_WRITER_V2": "1", "STORY_REPAIR_DIRECTIVES": "1"})
+    assert o.writer_v2 and o.repair_directives and (("writer_v2",) in o.cache_parts()) and (("repair_directives",) in o.cache_parts())
+    assert not StoryOptions.from_env({}).writer_v2 and StoryOptions().cache_parts() == () and StoryOptions(writer_v2=True).normalised().writer_v2
+
+
+# --- the directive repair ---------------------------------------------------------------------------------------------------------------------------------------
+
+def run_repair(text, rewrite, **kw):
+    calls = []
+
+    def call(prompt):
+        calls.append(prompt)
+        return answer(rewrite)
+    out, notes = repair_story(text, "en", WORDS, TIER, "story", call, **kw)
+    return out, notes, calls
+
+
+def test_the_repair_without_directives_leaves_a_story_alone_that_the_score_finds_fine():
+    out, notes, calls = run_repair(MIXED, FLAT)
+    assert out == MIXED and calls == []
+
+
+def test_a_flat_story_gets_the_concrete_edits_and_the_better_rewrite_is_kept():
+    out, notes, calls = run_repair(FLAT, MIXED, directives=True)
+    assert out == MIXED and len(calls) == 1
+    assert "Join these neighbouring sentences" in calls[0] and "filler time word" in calls[0]
+    assert any("kept (directives)" in n and "findings 3 -> 0" in n for n in notes)
+
+
+def test_a_rewrite_with_as_many_findings_is_rejected():
+    worse = FLAT.replace("fresh ", "")
+    out, notes, calls = run_repair(FLAT, worse, directives=True)
+    assert out == FLAT and any("rejected (findings not fewer)" in n for n in notes)
+
+
+def test_a_rewrite_that_drops_the_learners_words_is_rejected():
+    no_words = ("The man goes out early. He wants something to eat because he is hungry and the day is long. A woman smiles and gives him a warm cake. "
+                "Outside, the morning air is cold. The two of them sit down and eat. Then they go home together, talking about the long day, "
+                "and his mother makes soup for all of them. Everyone sleeps well that night.")
+    out, notes, calls = run_repair(FLAT, no_words, directives=True)
+    assert out == FLAT and any("learner words dropped" in n for n in notes)
+
+
+def test_a_story_with_one_finding_gets_no_directive_call():
+    one = MIXED.replace("Everyone sleeps well that night.", "Everyone sleeps well now.")
+    assert not should_repair(diagnose(one, "en", WORDS))
+    out, notes, calls = run_repair(one, FLAT, directives=True)
+    assert out == one and calls == []
+
+
+def test_the_directives_reach_the_repair_through_the_pipeline_options():
+    prompts = []
+
+    def fake(prompt):
+        prompts.append(prompt)
+        return answer(MIXED if "meets ALL of these requirements" in prompt else FLAT)
+    r = story_from_words("en", WORDS, fake, story_type="story", difficulty=TIER, options=StoryOptions(repair=True, repair_directives=True))
+    assert r.text == MIXED and any("Join these neighbouring sentences" in p for p in prompts)
+    prompts.clear()
+    r = story_from_words("en", WORDS, fake, story_type="story", difficulty=TIER, options=StoryOptions(repair=True))
+    assert not any("Join these neighbouring sentences" in p for p in prompts)
+
+
+# --- the test methods and the report ---------------------------------------------------------------------------------------------------------------------------
+
+def test_the_new_methods_differ_from_their_controls_by_one_thing():
+    plan, v2, vd, rd, rr = (variants.BY_NAME[n] for n in ("plan", "v2", "v2_directive", "rr_directive", "review_repair"))
+    assert v2.writer_v2 and not plan.writer_v2 and {**v2.as_dict(), "writer_v2": False, "name": "", "label": "", "note": ""} == {**plan.as_dict(), "name": "", "label": "", "note": ""}
+    assert rd.repair_directives and {**rd.as_dict(), "repair_directives": False, "name": "", "label": "", "note": ""} == {**rr.as_dict(), "name": "", "label": "", "note": ""}
+    assert vd.writer_v2 and vd.repair and vd.repair_directives and not vd.judge
+    assert [v.name for v in variants.resolve("v2")] == ["plan", "v2", "v2_directive", "rr_directive"]
+    assert all(n in variants.CALLS for n in ("v2", "v2_directive", "rr_directive")) and v2.options().writer_v2 and rd.options().repair_directives
+
+
+def test_the_report_counts_stiffness_per_method_with_no_model():
+    req = {"id": "q1", "code": "en", "words": WORDS, "story_type": "story"}
+    flat, mixed = {"ok": True, "text": FLAT}, {"ok": True, "text": MIXED}
+    a, b = rhythm.by_method([(req, flat)]), rhythm.by_method([(req, mixed)])
+    assert a["mean_findings"] == 3 and a["two_or_more"] == 1 and a["flat"] == 1 and a["filler"] == 1 and b["mean_findings"] == 0 and b["mean_sd"] > a["mean_sd"]
+    assert rhythm.by_method([(req, {"ok": False, "text": ""}), (req, None)]) is None
+    data = {"variants": [{"name": "x", "label": "Method X"}], "requests": [req]}
+    html_ = report._rhythm_table(data, {"x": [(req, flat)]})
+    assert "Method X" in html_ and "3.00" in html_ and report._rhythm_table(data, {"x": []}) == ""

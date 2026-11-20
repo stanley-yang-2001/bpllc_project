@@ -22,6 +22,16 @@ _WRITER_RULES = ("Small words stay: a short sentence is still a complete one, so
                  "Do not end sentences with filler such as {filler} to make the text longer.")
 _WRITER_EXAMPLE = {True: " (\"the drawer\", not \"drawer\"; \"to the park\", not \"to park\")", False: ""}
 _WRITER_FILLER = {True: "\"today\", \"now\", \"still\" or \"indeed\"", False: "the words for \"today\", \"now\", \"still\" or \"indeed\""}
+# 20 Nov 2026 (writer v2, OFF unless StoryOptions.writer_v2): after review and repair what the reviewers still fail is how the text reads: every sentence the same length, the same
+# opener, "today" on the end, one sentence per line, the same name in 22 of 150 stories. The block asks for a scene decided before writing (the model's own reasoning does it; no plan
+# is written out, so no plan can leak into the text), words placed where an event needs them, a mix of short and long sentences, and one or two paragraphs; the name, place and time come
+# from code (story_seed.py). The level stays set by the level note's sentence range (it fits 29 of 30 stories); this block adds spread around that range, never a longer average.
+_WRITER_V2 = ("{seed} Make it read like something a native speaker would really write, not like a textbook drill. Before you write, decide where and when it happens, three or "
+              "four events where each one causes the next, and one concrete detail of sight, sound, smell or touch; put each listed word where its event needs it, and leave out a word "
+              "that does not fit. Mix short sentences (3 to 5 words) with longer ones joined by words like {connectors}; never three sentences in a row of about the same length. "
+              "Do not start more than two sentences in a row with the same word. Do not end a sentence on a time word such as {filler} unless the reader needs it. "
+              "Keep it easy with common words and simple grammar, not with sentences that are all very short; no sentence over 20 words.{layout}")
+_V2_LAYOUT = " Write one or two paragraphs, with no line break between the sentences of a paragraph."
 _BEGIN = "Begin:"          # every template ends with a line that starts like this (the rest of the line differs)
 
 
@@ -50,9 +60,31 @@ def _with_writer_rules(prompt: str, english: bool) -> str:
     return prompt.rstrip() + "\n\n" + rules if i < 0 else prompt[:i] + rules + "\n\n" + prompt[i:]
 
 
+def _language_code(language: str) -> str:
+    from ..languages import LANGUAGES
+    name = (normalize_language(language) or "").casefold()
+    return next((c for c, lang in LANGUAGES.items() if lang.name.casefold() == name or c == name), "en")
+
+
+def writer_v2_block(code: str, kind: Optional[str], rng=None) -> str:
+    """The writer v2 text for a language code and a story kind, with the name, place and time drawn by code (story_seed.py)."""
+    from ..story_diagnose import CONNECTORS, FILLER
+    from ..story_seed import note
+    filler = ", ".join(f'"{w}"' for w in sorted(FILLER.get(code, FILLER["en"]))[:5])
+    return _WRITER_V2.format(seed=note(code, kind, rng), connectors=CONNECTORS.get(code, CONNECTORS["en"]), filler=filler,
+                             layout="" if kind == "dialogue" else _V2_LAYOUT)
+
+
+def _with_writer_v2(prompt: str, code: str, kind: Optional[str], rng=None) -> str:
+    """Before the final instruction like the other rules; appended when the prompt has none, so the option never silently does nothing."""
+    block = writer_v2_block(code, kind, rng)
+    i = prompt.rfind(_BEGIN)
+    return prompt.rstrip() + "\n\n" + block if i < 0 else prompt[:i] + block + "\n\n" + prompt[i:]
+
+
 def build_story_prompt(language: str, words: str, style: Optional[str] = None,
                        topic: Optional[str] = None, rng=None, *, vocab_in_target: bool = False,
-                       difficulty: Optional[dict] = None, rules: bool = False) -> str:
+                       difficulty: Optional[dict] = None, rules: bool = False, writer_v2: bool = False) -> str:
     """style: one of ALL_STORY_TYPES, or None/"random" for a weighted random choice. topic only
     applies to the new story types; when omitted it is chosen at random, avoiding recent topics.
     vocab_in_target: the word list is already written in `language` (a learner's per-language list),
@@ -60,7 +92,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
     no effect for English, whose prompts are unchanged.
     A RANDOM choice of kind is limited to the classic styles for English (see choose_story_type); a named kind is always honoured.
     difficulty: targets from tutor_core.difficulty.resolve (or None); a note stating them goes at the top of the prompt.
-    rules: add the writer rules (small words stay, no tacked-on words, no filler) before the final instruction; off, the prompt is exactly what it was."""
+    rules: add the writer rules (small words stay, no tacked-on words, no filler) before the final instruction; off, the prompt is exactly what it was.
+    writer_v2: add the writer v2 block (a scene decided first, mixed sentence length, varied openers, paragraphs, a name, place and time drawn by code); off, nothing changes."""
     prompt = _build_story_prompt(language, words, style, topic, rng, vocab_in_target)
     if not is_english(normalize_language(language)):       # the English prompts stay exactly as they were (pinned by tests); English grammar is handled by the repair and proofreading calls
         prompt = _with_natural_rule(prompt)
@@ -68,6 +101,8 @@ def build_story_prompt(language: str, words: str, style: Optional[str] = None,
         prompt = _with_finish_rule(prompt)
     if rules:
         prompt = _with_writer_rules(prompt, is_english(normalize_language(language)))
+    if writer_v2:
+        prompt = _with_writer_v2(prompt, _language_code(language), describe_prompt(prompt)[0], rng)
     if difficulty:
         # The built-in templates ask for 5 to 9 sentences; with a tier that sentence count is replaced by the tier's own.
         from ..difficulty import CHARS_PER_WORD, ask_size, prompt_note

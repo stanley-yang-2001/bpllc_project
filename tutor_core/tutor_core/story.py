@@ -165,7 +165,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     # A learner's list is stored per language, so for any language but English the words are already in the target
     # language; the prompt says so instead of asking the model to translate English meanings.
     prompt = build_story_prompt(LANGUAGES[language].name, ", ".join(used), request.story_type, request.topic, rng, vocab_in_target=True,
-                                difficulty=request.difficulty, rules=request.options.rules)
+                                difficulty=request.difficulty, rules=request.options.rules, writer_v2=request.options.writer_v2)
     if plan_note:
         prompt = prompt.rstrip() + "\n" + plan_note
     if example_conn is not None:                        # an example from the bank, for the quality of the language only (prompts/example.py)
@@ -212,7 +212,7 @@ def _write_story(request: StoryRequest, words, call, rng, example_conn=None, jud
     do_proofread = os.environ.get("STORY_PROOFREAD") == "1" if proofread is None else bool(proofread)
     passage = RetryPolicy(language, prompt, words, request.difficulty, call, proofread=do_proofread).improve(passage)
     if opts.repair:
-        passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge, naturalness=opts.repair_naturalness)
+        passage, more = repair_story(passage, language, words, request.difficulty, picked_type, call, audit_call=judge, naturalness=opts.repair_naturalness, directives=opts.repair_directives)
         notes += more
     trace: list = []
     draft = ""

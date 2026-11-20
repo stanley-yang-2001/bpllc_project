@@ -12,7 +12,7 @@ from tutor_core.naturalness import combine as combine_ratings
 from tutor_core.quality.score import merge_reviews
 from tutor_core.quality.grammar import Hit
 
-from . import fit, health, stats as st, verdicts
+from . import fit, health, rhythm, stats as st, verdicts
 
 PART_LABELS = {"length": "Length", "own_words": "Your words", "uncommon": "Uncommon words", "sentence_length": "Sentence length",
                "grammar": "Grammar, fluency", "language_format": "Language, format"}
@@ -481,6 +481,22 @@ def _fit_table(data: dict, pairs: dict) -> str:
             "The free score has one ruler for every level, so it cannot show this.</p>")
 
 
+def _rhythm_table(data: dict, pairs: dict) -> str:
+    """How stiff the stories read, from the free checks (rhythm, repeated openers, filler time words). No model."""
+    got = [(v, rhythm.by_method(pairs[v["name"]])) for v in data["variants"]]
+    got = [(v, b) for v, b in got if b]
+    if not got:
+        return ""
+    head = ("<tr><th>Method</th><th>Stories</th><th>Findings a story (rhythm, opener, filler)</th><th>With 2 or more</th><th>Sentence-length SD</th>"
+            "<th>Flat rhythm</th><th>Most common opener (share of sentences)</th><th>Filler time words</th></tr>")
+    rows = [f"<tr><td><b>{html.escape(v['label'])}</b></td><td>{b['stories']}</td><td>{b['mean_findings']:.2f}</td><td>{b['two_or_more']} of {b['stories']}</td>"
+            f"<td>{b['mean_sd']:.2f}</td><td>{b['flat']}</td><td>{b['mean_opener'] * 100:.0f}%</td><td>{b['filler']}</td></tr>" for v, b in got]
+    return ("<h3>How stiff do the stories read? (free checks)</h3><table class=sum>" + head + "".join(rows) + "</table>"
+            "<p class=num>Counted by code, no model: flat rhythm is a sentence-length SD below 1.0 word, a repeated opener is one first word on 35% or more of the sentences, filler is "
+            "time words such as 'today' ending 2 or more sentences. In the 19 Nov round the stories with 0 findings averaged a reviewer rating of 3.4 and those with 3 or more 2.8, "
+            "so fewer findings go with better ratings, but this is a signal and not a verdict: the passed stories above are the measure. Chinese and Japanese are left out.</p>")
+
+
 def _reviewer_table(data: dict, pairs: dict, labels: list) -> str:
     """How many stories each reviewer passed on its own, per method. Two reviewers from two model families are two independent opinions; one of them may be the writer's own model."""
     if len(labels) < 2:
@@ -604,7 +620,7 @@ def _summary(data: dict) -> str:
     if models:
         out.append(f"<p class=num>{html.escape(models)}</p>")
     if reviewed:
-        out += [_decided_table(data, pairs, labels), _notes(data, pairs, labels), _passed_table(data, pairs), _paired_table(data, pairs), _fit_table(data, pairs),
+        out += [_decided_table(data, pairs, labels), _notes(data, pairs, labels), _passed_table(data, pairs), _paired_table(data, pairs), _fit_table(data, pairs), _rhythm_table(data, pairs),
                 _reviewer_table(data, pairs, labels), _group_tables(data, pairs), _request_grid(data, pairs, labels)]
     else:
         out.append("<div class=warnbox><b style='color:#b42318'>No model review in this file.</b> The score below only checks the brief (the words, the length, the level and the rules "
