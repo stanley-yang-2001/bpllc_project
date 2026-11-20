@@ -98,6 +98,10 @@ ALL += [Variant("v2", "Writer v2", "range prompt and plan, plus the writer v2 bl
                 range_prompt=True, plan=True, writer_v2=True, repair=True, repair_directives=True),
         Variant("rr_directive", "Review, then directive repair", "review_repair, and the repair also gets the concrete rhythm/opener/filler edits",
                 range_prompt=True, plan=True, judge=True, repair=True, repair_directives=True)]
+# Round 6 (20 Nov) found writer v2 as good as the expensive methods at 2.1 calls (see docs/STORY-SCORING.md); what it still left was grammar slips (1.55 findings a review against 0.90
+# for review_repair) and "choppy" remarks, which a review and repair fixes. `v2_rr` is that pair: gap to `review_repair` = the v2 block, gap to `v2` = the review and repair.
+ALL += [Variant("v2_rr", "Writer v2, review, repair", "review_repair with the writer v2 block in the prompt",
+                range_prompt=True, plan=True, writer_v2=True, judge=True, repair=True)]
 # Check, then fix only what was found (10 Nov 2026): one-call writer, free checks + model review, sentence-level repair, kept only if the score rises.
 ALL += [Variant("refine", "Refine", "one call writes; checks + review; fixes only the flagged sentences (up to 2 rounds, kept only if the score rises)",
                 story_model="gpt", judge_model="gpt", refine=2)]
@@ -136,5 +140,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 1.3, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 2.1, "v2_rr": 5.0, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

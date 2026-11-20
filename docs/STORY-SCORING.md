@@ -327,3 +327,26 @@ A local page for watching tests while they run. Start it with `test-desk.bat` (p
 - `STORY_REPAIR_DIRECTIVES=1`: see the changelog for the keep rule. It is a different keep rule from the ordinary repair because the free score uses one ruler (6 to 12 words a sentence) and does not value rhythm, so a rewrite that joins sentences cannot be asked to raise it.
 
 **What is measured next (`kaggle_v2.py`, the same 30 English requests).** `v2` against `plan` (the block alone), `v2_directive` against `plan`, `rr_directive` against `review_repair` (the edits alone), and each against the baseline. The pass rate with both reviewers is the measure; the stiffness table is a signal. At 30 requests a 95% range is about 15 points wide on each side, so only a gain of that size will show. Not built until these show something: the plan call for different candidates, usage cards per word, exemplars, the richer reviewer (sub-scores plus edits), a different writer for fr and de.
+
+### What round 6 showed (20 November 2026, patch 0096)
+
+30 English requests, the 19 Nov reviewers, 256 of 270 stories before the daily limit stopped the run (`plan` 27, `v2` 27, `v2_directive` 26, `rr_directive` 26 requests; the paired numbers use only the requests a pair shares).
+
+| Method | Calls | Passed / split / failed | In the level's range |
+| --- | --- | --- | --- |
+| baseline | 1.7 | 11 / 11 / 8 | 13 of 30 |
+| plan | 1.9 | 8 / 10 / 9 (of 27) | 27 of 27 |
+| v2 | 2.1 | 19 / 7 / 1 (of 27) | 24 of 27 |
+| v2_directive | 2.5 | 13 / 9 / 4 (of 26) | 21 of 26 |
+| review_repair | 4.4 | 19 / 10 / 1 | 29 of 30 |
+| rr_directive | 4.9 | 20 / 4 / 2 (of 26) | 19 of 26 |
+| cascade | 12.6 | 22 / 5 / 3 | 26 of 30 |
+
+- **`v2` against `plan`: +35 points (+20 to +51), 16 better, 10 same, 1 worse; both reviewers agree (gpt +42, Qwen +30).** That is the block alone. Against the baseline +28 (+8 to +48, p 0.049), Qwen and gpt both about +27 to +30. Against `review_repair`, `cascade_pick` and `cascade` it is +2 points each (within noise): a one-call prompt change reaches the passed-story rate of the expensive methods, at about a third to a sixth of the calls.
+- **Careful with the +35.** `plan` passed fewer stories than the baseline this time (8 against 11, -7 points, within noise), so part of the gap to `plan` is a weak control. The gap to the baseline is the sturdier one, and it is only just clear.
+- **What the reviewers saw.** Mean naturalness `plan` 2.65, baseline 2.85, `review_repair` 3.07, `v2` 3.13. Remarks about repetition: `plan` 30%, `v2` 9%. Remarks about choppy or very short sentences: `plan` 39%, `v2` 45%, `review_repair` 62%: the block did not fix those. Grammar findings a review: `v2` 1.55, `review_repair` 0.90, `plan` 2.15. By level `v2` passed 5 of 9 easy, 9 of 9 medium, 5 of 9 hard stories.
+- **Free checks.** Findings a story (rhythm, opener, filler): baseline 1.57, `plan` 1.74, `v2` 1.00; stories with "today": baseline 21 of 30, `plan` 16 of 27, `v2` 10 of 27. No "Setting:" or plan text leaked into a story. The stories are in 4.7 lines against about 10.
+- **Directive repair: no gain.** `v2_directive` against `v2`: -15 points (-33 to +2; gpt -8, Qwen -23); `rr_directive` against `review_repair` +4 (-11 to +19). The edits make the free findings fall (0.77 and 0.81 a story) and the reviewers do not like the result. `STORY_REPAIR_DIRECTIVES` stays off.
+- **Not known.** Which part of the block does the work: the paragraph layout (a one-sentence-per-line text was the baseline's shape), the mixed rhythm, the seeded name and place, or the instruction to plan a scene. The block is one bundle, so this round cannot say. Also the noise floor: `baseline_b` made 1 of 30 stories and `range` none before the limit.
+- **Next (`kaggle_round7.py`).** `v2_rr` (the block with review and repair: the repetition fixed by the block and the grammar by the repair), after finishing the 14 missing stories; then the controls. If `v2_rr` is above `v2` by more than the noise, it is the candidate; if not, `v2` at 2.1 calls is.
+

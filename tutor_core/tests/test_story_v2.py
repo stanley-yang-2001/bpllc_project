@@ -200,3 +200,11 @@ def test_the_report_counts_stiffness_per_method_with_no_model():
     data = {"variants": [{"name": "x", "label": "Method X"}], "requests": [req]}
     html_ = report._rhythm_table(data, {"x": [(req, flat)]})
     assert "Method X" in html_ and "3.00" in html_ and report._rhythm_table(data, {"x": []}) == ""
+
+
+def test_v2_rr_is_review_repair_plus_the_block_and_v2_plus_the_review_and_repair():
+    rr, v2, v2rr = (variants.BY_NAME[n] for n in ("review_repair", "v2", "v2_rr"))
+    skip = {"name": "", "label": "", "note": ""}
+    assert {**v2rr.as_dict(), "writer_v2": False, **skip} == {**rr.as_dict(), **skip}
+    assert v2rr.writer_v2 and v2rr.judge and v2rr.repair and not v2rr.repair_directives
+    assert {**v2rr.as_dict(), "judge": False, "repair": False, **skip} == {**v2.as_dict(), **skip}
