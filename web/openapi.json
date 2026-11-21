@@ -1000,6 +1000,113 @@
         "title": "GeneratedStoryOut",
         "type": "object"
       },
+      "GlossIn": {
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 8000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language",
+          "text"
+        ],
+        "title": "GlossIn",
+        "type": "object"
+      },
+      "GlossOut": {
+        "properties": {
+          "spans": {
+            "items": {
+              "$ref": "#/components/schemas/GlossSpan"
+            },
+            "title": "Spans",
+            "type": "array"
+          },
+          "words": {
+            "items": {
+              "$ref": "#/components/schemas/GlossWord"
+            },
+            "title": "Words",
+            "type": "array"
+          }
+        },
+        "required": [
+          "spans",
+          "words"
+        ],
+        "title": "GlossOut",
+        "type": "object"
+      },
+      "GlossSpan": {
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          },
+          "word_id": {
+            "title": "Word Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "word_id"
+        ],
+        "title": "GlossSpan",
+        "type": "object"
+      },
+      "GlossWord": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "meaning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meaning"
+          },
+          "pos": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos"
+          },
+          "word": {
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "word",
+          "meaning"
+        ],
+        "title": "GlossWord",
+        "type": "object"
+      },
       "GoalOut": {
         "properties": {
           "done": {
@@ -4916,6 +5023,48 @@
         "summary": "Pronounce",
         "tags": [
           "text tools"
+        ]
+      }
+    },
+    "/api/reading/gloss": {
+      "post": {
+        "description": "Where the learner's own words of this language stand in a text, with their meanings, so the page can underline them.",
+        "operationId": "gloss_api_reading_gloss_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlossIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlossOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Gloss",
+        "tags": [
+          "reading"
         ]
       }
     },

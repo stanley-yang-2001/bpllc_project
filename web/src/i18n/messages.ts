@@ -29,11 +29,12 @@ import { pronunciation } from "./catalog/pronunciation";
 import { dialogs } from "./catalog/dialogs";
 import { study } from "./catalog/study";
 import { rewards } from "./catalog/rewards";
+import { reader } from "./catalog/reader";
 
 export { LOCALES };
 export type { Locale, Nine };
 
-export const AREAS = { shell, common, errors, home, vocabulary, settings, chat, studio, library, practice, report, setsAndMeanings, readAloud, pronunciation, dialogs, study, rewards } as const;
-export const MESSAGES = { ...shell, ...common, ...errors, ...home, ...vocabulary, ...settings, ...chat, ...studio, ...library, ...practice, ...report, ...setsAndMeanings, ...readAloud, ...pronunciation, ...dialogs, ...study, ...rewards } as const satisfies Record<string, Nine>;
+export const AREAS = { shell, common, errors, home, vocabulary, settings, chat, studio, library, practice, report, setsAndMeanings, readAloud, pronunciation, dialogs, study, rewards, reader } as const;
+export const MESSAGES = { ...shell, ...common, ...errors, ...home, ...vocabulary, ...settings, ...chat, ...studio, ...library, ...practice, ...report, ...setsAndMeanings, ...readAloud, ...pronunciation, ...dialogs, ...study, ...rewards, ...reader } as const satisfies Record<string, Nine>;
 
 export type MessageKey = keyof typeof MESSAGES;

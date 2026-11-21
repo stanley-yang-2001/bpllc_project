@@ -596,6 +596,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reading/gloss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gloss
+         * @description Where the learner's own words of this language stand in a text, with their meanings, so the page can underline them.
+         */
+        post: operations["gloss_api_reading_gloss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sets": {
         parameters: {
             query?: never;
@@ -1237,6 +1257,40 @@ export interface components {
             words_total: number;
             /** Words Used */
             words_used: number;
+        };
+        /** GlossIn */
+        GlossIn: {
+            /** Language */
+            language: string;
+            /** Text */
+            text: string;
+        };
+        /** GlossOut */
+        GlossOut: {
+            /** Spans */
+            spans: components["schemas"]["GlossSpan"][];
+            /** Words */
+            words: components["schemas"]["GlossWord"][];
+        };
+        /** GlossSpan */
+        GlossSpan: {
+            /** End */
+            end: number;
+            /** Start */
+            start: number;
+            /** Word Id */
+            word_id: number;
+        };
+        /** GlossWord */
+        GlossWord: {
+            /** Id */
+            id: number;
+            /** Meaning */
+            meaning: string | null;
+            /** Pos */
+            pos?: string | null;
+            /** Word */
+            word: string;
         };
         /** GoalOut */
         GoalOut: {
@@ -3006,6 +3060,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PronounceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gloss_api_reading_gloss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlossIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GlossOut"];
                 };
             };
             /** @description Validation Error */

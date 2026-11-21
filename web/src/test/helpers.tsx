@@ -48,17 +48,15 @@ export const ALICE = { id: 1, email: "alice@example.com", display_name: "Alice",
 export const BOB = { id: 2, email: "bob@example.com", display_name: "Bob", native_language: "en", languages: ["en"] };
 export const err = (status: number, code: string, message: string) => () => ({ status, json: { error: { code, message } } });
 
-export function renderApp(path = "/", client = new QueryClient({ defaultOptions: { queries: { retry: false } } })): { ui: ReturnType<typeof render>; client: QueryClient } {
-  const ui: ReactElement = (
+function tree(content: ReactElement, path: string, client: QueryClient): ReactElement {
+  return (
     <QueryClientProvider client={client}>
       <AuthProvider>
         <PreferencesProvider>
           <ActiveLanguageProvider>
             <I18nProvider>
               <ThemeProvider>
-                <MemoryRouter initialEntries={[path]}>
-                  <App />
-                </MemoryRouter>
+                <MemoryRouter initialEntries={[path]}>{content}</MemoryRouter>
               </ThemeProvider>
             </I18nProvider>
           </ActiveLanguageProvider>
@@ -66,5 +64,15 @@ export function renderApp(path = "/", client = new QueryClient({ defaultOptions:
       </AuthProvider>
     </QueryClientProvider>
   );
-  return { ui: render(ui), client };
+}
+
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+export function renderApp(path = "/", client = newClient()): { ui: ReturnType<typeof render>; client: QueryClient } {
+  return { ui: render(tree(<App />, path, client)), client };
+}
+
+/** One component inside the same providers as the app (signed-in user from the mocked GET /me, language, text, query cache). */
+export function renderIn(content: ReactElement, path = "/", client = newClient()): { ui: ReturnType<typeof render>; client: QueryClient } {
+  return { ui: render(tree(content, path, client)), client };
 }

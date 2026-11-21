@@ -4,6 +4,7 @@ import { StoryReport } from "../components/StoryReport";
 import { StoryMeta } from "../components/StoryMeta";
 import { Button, Card, ErrorText } from "../components/ui";
 import { useI18n } from "../i18n/I18nProvider";
+import { GlossedText } from "../reader/GlossedText";
 import { StoryTools } from "../text/StoryTools";
 import { ownModelName, requestedOf } from "./labels";
 import type { StoryGeneration } from "./useStoryGeneration";
@@ -20,7 +21,7 @@ export function GeneratedStory({ g, languageName, onAnother }: { g: StoryGenerat
         <StoryMeta kind={story.story_type ?? "story"} topic={story.topic} difficulty={requested.difficulty} />
         <span className="text-xs text-slate-600">{t("studio.builtFrom", { used: story.words_used, total: story.words_total })}</span>
       </div>
-      <p lang={story.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.story}</p>
+      <GlossedText text={story.story} language={story.language} />
       <StoryTools text={story.story} language={story.language} id="studio" />
       <StoryReport report={story.report} languageName={languageName} />
       <div className="flex flex-wrap gap-2">

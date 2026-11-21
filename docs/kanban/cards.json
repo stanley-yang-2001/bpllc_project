@@ -1796,5 +1796,29 @@
       "practice",
       "spaced repetition"
     ]
+  },
+  {
+    "title": "Reader that glosses your words (tap for meaning, listen, add)",
+    "status": "In review",
+    "area": "reading",
+    "date": "2026-11-21",
+    "summary": "A story in Studio and the Library shows your own words underlined; a tap opens a card with the saved meaning and a Listen button; a tap on any other word offers Listen and Add word (with a tutor-written meaning if ticked). The matching is the story score's own, so what is underlined is what the report counts as used.",
+    "done": [
+      "tutor_core/story_gloss.py: places of the learner's words with the score's rules, tested against the score",
+      "POST /api/reading/gloss (no model call, own words only, JavaScript-style positions)",
+      "GlossedText and WordCard in Studio and Library; plain text until the answer comes or when it fails",
+      "four new messages in nine languages",
+      "tests: 19 matcher, 8 route, 18 web"
+    ],
+    "todo": [
+      "Apply patch 0099, rebuild the API and web images, read a saved story and a new one",
+      "Native-speaker check of the four new messages",
+      "Use the reader in the chat page (not done)",
+      "Underline inflected forms outside English (the score does not count them either)"
+    ],
+    "labels": [
+      "reading",
+      "vocabulary"
+    ]
   }
 ]

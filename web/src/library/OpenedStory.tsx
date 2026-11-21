@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { StoryReport } from "../components/StoryReport";
 import { ErrorText, Skeleton } from "../components/ui";
 import { useI18n } from "../i18n/I18nProvider";
+import { GlossedText } from "../reader/GlossedText";
 import { StoryTools } from "../text/StoryTools";
 
 /** A saved story opened in the list: the whole text, its tools and its quality report, fetched when opened. */
@@ -16,7 +17,7 @@ export function OpenedStory({ id, languageName }: { id: number; languageName: st
   if (story.isError) return <ErrorText>{err(story.error)}</ErrorText>;
   return (
     <div className="mt-3 space-y-3">
-      <p lang={story.data.language} className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-900">{story.data.body}</p>
+      <GlossedText text={story.data.body} language={story.data.language} />
       <StoryTools text={story.data.body} language={story.data.language} id={`library-${id}`} />
       <StoryReport report={story.data.report} languageName={languageName} />
     </div>

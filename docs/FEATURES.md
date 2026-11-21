@@ -32,6 +32,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 6 Nov | Features document, PR description, privacy policy options (docs only); grammar checks and repair for generated stories (0055); two-pass story generation and a comparison page (0056); story score 0 to 100 and the example bank (0057); comparison page with a tab per language, scores and translations (0059) |
 | 7 Nov | Story score version 2, waiting out the Groq rate limit, re-scoring saved comparison runs (0060); word-range prompt and level wording, off by default (0061); story score version 3: grammar mistakes found by built-in rules, optional LanguageTool and a verified model review, plus a probe corpus (0062); several candidates, optional judge and a targeted repair loop, all off by default (0063); multi-method timed comparison runner (0064); cascade (planned word counts, mixed candidates, free checks, review, one repair) and a Qwen/GPT mix test (0065); score version 4 (grammar-weighted, failed stories) and a second Groq account key (0066) |
 | 9 Nov | Spaced-repetition flashcards with four answers, no card limit, several sets at once, answer timing, memory statistics and hardest words (0069, migration 0017); clicks-only answering, a chosen session length, an all-time total in the summary, answer timing in the privacy policy (0070) |
+| 21 Nov | A reader that underlines your words in a story, with a card for each word and a way to add the ones that are not yet in your list (0099) |
 
 ## 1. The foundation (September to 18 October 2026)
 
@@ -88,6 +89,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | Dictation | 29 Oct | Hear a word, type it; three kinds of feedback. | Verified; by-hand check |
 | Parts of speech | 30 Oct | A part-of-speech label for every word (per-language choices, such as i-adjective for Japanese), set by hand or by the tutor, plus a practice for them (migration 0015). | Verified |
 | Spaced-repetition flashcards | 9 Nov | SM-2 schedule with Again/Hard/Good/Easy, no card limit, several sets at once, answer timing, statistics and hardest words (migration 0017). | Built and tested here; not run on your machine |
+| Reader with word cards | 21 Nov | Your words are underlined in stories (Studio, Library); tap one for its meaning and a Listen button; tap any other word to hear it or add it to your list. Same matching as the story score. | Built and tested here; not run on your machine |
 
 ## 5. Your own AI model
 
