@@ -401,6 +401,18 @@ def _notes(data: dict, pairs: dict, labels: list) -> str:
     same, both = verdicts.agreement(flat)
     if both:
         out.append(f"Two reviewers judged the same way (pass or fail) on {same} of {both} stories.")
+    crossed = verdicts.crossing(flat)
+    if crossed:
+        out.append("A reviewer's repeated ratings of one story fell on both sides of the pass line (2 or less fails) for "
+                   + ", ".join(f"{k} {c} of {n} stories ({c / n * 100:.0f}%)" for k, (n, c) in crossed.items())
+                   + ". For those stories the verdict is the median of a coin flip.")
+    again = {name: verdicts.rerating(ps) for name, ps in pairs.items()}
+    again = {name: x for name, x in again.items() if x}
+    if again:
+        sds = [x["sd"] for x in again.values()]
+        out.append(f"Asking the reviewers again for the same stories would move a method's passed count by about {min(sds):.1f} to {max(sds):.1f} stories (one standard deviation, from the ratings "
+                   f"each gave). Two methods' counts can differ by about {2.8 * sum(sds) / len(sds):.0f} stories from that alone, before any change in the writer's own story; "
+                   "a gap that small is not a difference.")
     own = _own_reviewers(data, pairs, labels)
     if own and len(labels) > 1:
         out.append(f"{', '.join(own)} reviews stories its own model wrote. A model may rate its own kind of writing higher, so trust a gain only when the other reviewer shows it too.")

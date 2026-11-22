@@ -373,3 +373,32 @@ A local page for watching tests while they run. Start it with `test-desk.bat` (p
 
 **A fix found on the way.** `--resume` finishes every method the file has; `--dry-run` counted only the methods named in `--variants`. It now counts all of them, and `--skip` leaves methods out.
 
+### What round 8 showed, and the second v2 run (patch 0100, 21 November 2026)
+
+**What ran.** The same 30 English requests, reviewers gpt-oss-120b and qwen, three ratings each. Job 1 made `v2_rr` and `v2_spread` (30 each) and the last three `v2` stories; job 2 made `outline` (14) and `beats` (13); job 3 got one story each of `baseline_b` and `range`. The Groq daily limit (200,000 tokens a key on gpt-oss-120b; 199,446, 199,978 and 199,993 used) stopped the work after about 90 new stories, so **the controls are still not measured**.
+
+| Method | Stories | Calls a story | Passed / split / failed | That method minus `v2`, in points (range) |
+|---|---|---|---|---|
+| `baseline` | 30 | 1.7 | 11 / 11 / 8 | −28 (−46 to −10) |
+| `review_repair` | 30 | 4.4 | 19 / 10 / 1 | −3 (−14 to +8) |
+| `cascade` | 30 | 12.6 | 22 / 5 / 3 | −2 (−18 to +14) |
+| **`v2`** | 30 | 2.1 | 21 / 8 / 1 | |
+| `v2_rr` | 30 | 4.4 | 20 / 6 / 4 | −7 (−22 to +9) |
+| `v2_spread` | 30 | 2.1 | 19 / 5 / 6 | −12 (−26 to +3) |
+| `v2_directive` | 26 | 2.5 | 13 / 9 / 4 | −15 (−33 to +2) |
+| `outline` | 14 | 2.9 | 8 / 3 / 3 | −18 (−45 to +9) |
+| `beats` | 13 | 6.6 | 6 / 3 / 4 | −27 (−47 to −7), p 0.031 |
+
+**What it shows.**
+
+1. **`v2` is the one clear result.** 21 passed, 8 split, 1 failed at 2.1 calls a story. Against the baseline it is +28 points (+10 to +46, p 0.019) and both reviewers agree (gpt +31, qwen +27). It is level with `review_repair` (+3, −8 to +14) and `cascade` (+2, −14 to +18) at 48% and 17% of their calls. Round 6 had the same picture on 27 stories (19 passed).
+2. **Nothing added on top of `v2` helped.** Every method built on it is below it: review and repair on top (`v2_rr`) −7, `v2_spread` −12, `v2_directive` −15, `outline` −18, `beats` −27. Only `beats` is outside its range, and p 0.031 is the one value under 0.05 among the 19 comparisons of the round, so it reads as "probably not better", not as proven worse. `v2_spread` did what it was built for (learner words first used in the first third of the text: 45% for `v2`, 29%) and the reviewers passed fewer, so placement is not what they reward. Review and repair on top of `v2` left 23 of 30 stories in the level's sentence range against 27 (five became too short).
+3. **The free stiffness checks are diagnostics, not levers.** The methods built to lower them did (findings a story: `beats` 0.56, `v2_directive` 0.77, `rr_directive` 0.81, `outline` 0.93, `v2` 1.10, `baseline` 1.57) and passed fewer (13 of 26, 6 of 13, 8 of 14). Only `rr_directive` kept pace (20 of 26, +4 points on `review_repair`, inside noise).
+4. **The request matters more than the method.** Across the seven methods that pass about two thirds of their stories, 6 requests are passed by all seven and 5 by two or fewer; if the request did not matter (pass rate 0.68) that would be about 2 and 1. Every request was passed by at least one method, which is what seven draws at that rate give and says nothing about a ceiling.
+5. **The ruler is the limit.** A reviewer's three ratings of one story fell on both sides of the pass line (2 or less fails) for 145 of 348 qwen stories (42%) and 53 of 344 gpt stories (15%). qwen's mean rating is 2.7 to 2.9 for every method that passes about two thirds of its stories (gpt 3.3 to 3.5), so the line cuts through the middle of its ratings and a story's verdict is often the median of a coin flip. Rating the same 30 stories again would move a method's passed count by one standard deviation of 1.0 to 1.7 stories (about ±3 at 95%), before any change in the writer's own story. So 19, 20, 21 and 22 passes are one plateau, and with 30 requests a gap under about 4 stories (13 points) is not a difference. The counts of the best methods are also the high end of what their own ratings give: `v2` 21 reported, 18.8 expected on a new set of ratings; `cascade` 22 and 20.0; `v2_spread` 19 and 17.3. `verdicts.crossing` and `verdicts.rerating` compute this, and "How far to trust this" in the report now says it every round.
+
+**What it does not settle.** `v2` was picked because it did well, and all five methods built on it landing below it is also what a lucky `v2` looks like. Only a second draw of `v2` tells the two apart, and its gap to the first is the run-to-run noise of the method that matters.
+
+**What is built.** Method `v2_b` (`v2` made again, `replicate_of: v2`), and `kaggle_round9.py`: job 1 `v2_b` on the 30 requests of round 8's `v2_en.json`, job 2 the 29 missing `baseline_b` stories of `controls_en.json`; the cell stops before spending anything when the `v2_en.json` it is given is not round 8's. About 60 stories, 0.64 million tokens in all (the runner's estimate), about 0.4 million of them on gpt-oss-120b: one day on three keys. Not made again: `plan`, `v2_directive`, `rr_directive`, `range`, `outline`, `beats`, and the cell leaves `v2_rr` and `v2_spread` as they are.
+
+**How to read round 9.** If `v2_b` lands within about 4 stories of `v2` (17 to 25 passes), the add-ons of round 8 were noise and `v2` stays the candidate at 2.1 calls. If it falls to 18 or 19, `v2` is level with the repair methods, not above them, and still the cheapest. The gap between `baseline_b` and `baseline` is the same noise for the plain method. **The app default is not changed:** `STORY_WRITER_V2` stays off until `v2_b` is in (so far: +28 points over the baseline with both reviewers agreeing, +0.4 calls, English only; es, fr, de, it, pt, zh, ja and ko are not measured with it).

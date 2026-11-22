@@ -54,6 +54,54 @@ def test_the_spread_and_the_requests_needed_follow_the_usual_formula():
     assert stats.requests_needed(0, 0.15) is None and stats.requests_needed(None, 0.15) is None and stats.requests_needed(0.5, 0) is None
 
 
+# --- how noisy the ruler is ----------------------------------------------------------------------------------------------------------------------------------
+
+def _rated(repeats_by_reviewer, failed=()):
+    """A reviewed story whose reviewers rated it more than once: {reviewer: [ratings]}; the median is the rating, a rating of 2 or less fails it, `failed` adds other failures."""
+    entry = _story({l: sorted(r)[len(r) // 2] for l, r in repeats_by_reviewer.items()})
+    for label, reps in repeats_by_reviewer.items():
+        entry["audits"][label]["naturalness"]["repeats"] = sorted(reps)
+        entry["audit_scores"][label] = {"failed": (["unnatural"] if sorted(reps)[len(reps) // 2] <= vd.LINE else []) + (["too_many_errors"] if label in failed else []), "gated": None}
+    return entry
+
+
+def test_the_pass_line_is_the_one_the_score_uses():
+    from tutor_core.quality.score import GATE_NATURALNESS
+    assert vd.LINE == GATE_NATURALNESS
+
+
+def test_ratings_on_both_sides_of_the_pass_line_are_counted_per_reviewer():
+    stories = [_rated({"gpt": [3, 3, 3], "qwen": [2, 3, 3]}), _rated({"gpt": [2, 3, 3], "qwen": [2, 2, 3]}), _rated({"gpt": [2, 2, 2], "qwen": [3, 4, 4]}),
+               _rated({"gpt": [4, 4, 5], "qwen": [2, 2, 2]}), _story({"gpt": 3, "qwen": 3}), _story({"gpt": 4}, mean=7.0) | {"ok": False}]
+    assert vd.crossing([(None, "m", e) for e in stories]) == {"gpt": (4, 1), "qwen": (4, 2)}        # a story rated once, and one that failed to run, are not counted
+    assert vd.crossing([]) == {}
+
+
+def test_rating_again_would_move_the_passed_count_by_the_chance_each_story_is_on_the_line():
+    sure_pass, sure_fail = _rated({"gpt": [4, 4, 4], "qwen": [3, 4, 4]}), _rated({"gpt": [2, 2, 2], "qwen": [2, 2, 2]})
+    assert vd._fails(3, 0.0) == 0.0 and vd._fails(3, 1.0) == 1.0 and vd._fails(3, 0.5) == pytest.approx(0.5) and vd._fails(3, 1 / 3) == pytest.approx(7 / 27)
+    out = vd.rerating([(None, sure_pass), (None, sure_fail)])
+    assert out == {"stories": 2, "passed": 1, "expected": 1.0, "sd": 0.0}                           # nothing on the line: asking again changes nothing
+    edge = _rated({"gpt": [2, 3, 3], "qwen": [3, 3, 3]})                                            # one of gpt's three ratings fails it: it passes 74% of the time
+    out = vd.rerating([(None, edge)] * 4)
+    assert out["passed"] == 4 and out["expected"] == pytest.approx(4 * 20 / 27) and out["sd"] == pytest.approx(math.sqrt(4 * (20 / 27) * (7 / 27)))
+    assert vd.rerating([(None, _rated({"gpt": [4, 4, 4], "qwen": [4, 4, 4]}, failed=("qwen",)))])["expected"] == 0.0     # another rule failed it: it stays failed
+    assert vd.rerating([(None, _story({"gpt": 3, "qwen": 3}))] * 3) is None and vd.rerating([]) is None   # rated once: the ratings cannot say how they vary
+
+
+def test_the_report_says_how_noisy_the_ruler_is_when_stories_were_rated_more_than_once():
+    reqs = [_req(i) for i in range(4)]
+    mixed = [_rated({"gpt": [2, 3, 3], "qwen": [2, 2, 3]}) for _ in reqs]
+    data = _data(reqs, {"baseline": mixed, "plan": mixed})
+    notes = report._notes(data, {n: [(r, data["results"][r["id"]][n]) for r in reqs] for n in ("baseline", "plan")}, ["gpt", "qwen"])
+    assert "fell on both sides of the pass line" in notes and "gpt 8 of 8 stories (100%)" in notes and "qwen 8 of 8 stories (100%)" in notes
+    assert "Asking the reviewers again" in notes and "a gap that small is not a difference" in notes
+    once = [_story({"gpt": 3, "qwen": 3}) for _ in reqs]
+    data = _data(reqs, {"baseline": once, "plan": once})
+    notes = report._notes(data, {n: [(r, data["results"][r["id"]][n]) for r in reqs] for n in ("baseline", "plan")}, ["gpt", "qwen"])
+    assert "both sides of the pass line" not in notes and "Asking the reviewers again" not in notes
+
+
 # --- the level fit -------------------------------------------------------------------------------------------------------------------------------------------
 
 def test_the_asked_sentence_range_is_the_one_the_writer_is_told():

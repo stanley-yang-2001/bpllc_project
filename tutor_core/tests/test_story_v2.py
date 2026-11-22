@@ -327,6 +327,19 @@ def test_v2_spread_is_v2_plus_the_sentence_and_nothing_else():
     assert sp.options().spread and sp.options().writer_v2 and sp.options().outline == "" and "v2_spread" in variants.CALLS
 
 
+def test_v2_b_is_v2_made_again_and_the_report_reads_the_gap_as_noise():
+    v2, again = variants.BY_NAME["v2"], variants.BY_NAME["v2_b"]
+    skip = {"name", "label", "note", "replicate_of"}
+    assert {k: v for k, v in again.as_dict().items() if k not in skip} == {k: v for k, v in v2.as_dict().items() if k not in skip}
+    assert again.options() == v2.options() and again.replicate_of == "v2" and v2.replicate_of is None and variants.CALLS["v2_b"] == variants.CALLS["v2"]
+    assert [x.name for x in variants.resolve("=v2,v2_b")] == ["v2", "v2_b"]      # "v2" alone is a group of four methods; "=v2" is the method
+    req = {"id": "q1", "code": "en", "words": WORDS, "story_type": "story"}
+    entry = {"ok": True, "text": "x", "audit_scores": {"gpt": {"failed": [], "gated": None}, "qwen": {"failed": [], "gated": None}}}
+    data = {"variants": [{"name": "v2", "label": "V2", "replicate_of": None}, {"name": "v2_b", "label": "V2 again", "replicate_of": "v2"}], "requests": [req]}
+    notes = report._noise_notes(data, {"v2": [(req, entry)], "v2_b": [(req, entry)]})
+    assert len(notes) == 1 and "V2 again is V2 made again" in notes[0] and "noise" in notes[0]
+
+
 def test_the_report_shows_where_the_learners_words_sit_in_the_text():
     early = "bread shop river friend walk. " + "The day is long and the sky is grey over the town. " * 6
     even = "The boy walks to the shop. " + "The sky is grey over the town and it is cold. " * 2 + "He eats bread. " + "The air is cold over the town. " * 2 + "His friend waits by the river."

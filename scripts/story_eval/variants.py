@@ -107,6 +107,12 @@ ALL += [Variant("v2_rr", "Writer v2, review, repair", "review_repair with the wr
 # Spread (20 Nov 2026, patch 0098): `v2_spread` is `v2` plus one sentence asking for the listed words to be spread over the whole text; the gap between the two is that sentence.
 ALL += [Variant("v2_spread", "Writer v2, words spread out", "writer v2, plus one sentence: spread the listed words across the whole text, some in the middle and some near the end",
                 range_prompt=True, plan=True, writer_v2=True, spread=True)]
+# Writer v2 made again (21 Nov 2026, patch 0100). Round 8 (30 English requests): `v2` passed 21 of 30 at 2.1 calls and all five methods built on it scored below it (v2_rr -7 points, v2_spread
+# -12, v2_directive -15, outline -18, beats -27). That is what an add-on that hurts looks like, and also what a lucky `v2` looks like: v2 was chosen because it did well, and re-rating its
+# stories gives about 19 passes, not 21. Only a second draw of v2 tells the two apart. `v2_b` is `v2` made again for the same requests in the same run; its gap to `v2` is the noise of one
+# run of the method that matters, which the controls round could not give (`baseline_b` got one story of 30 before the daily limit).
+ALL += [Variant("v2_b", "Writer v2, run again", "the same method as v2, made again for the same requests: the gap between the two is noise",
+                range_prompt=True, plan=True, writer_v2=True, replicate_of="v2")]
 # Summary first (20 Nov 2026, patch 0097): `outline` is `v2` with an outline call before the text (gap to v2 = the explicit outline); `beats` writes the text one event at a time, the
 # sentence-by-sentence version of the idea, from the same outline and prompt (gap to `outline` = writing in pieces instead of in one go).
 ALL += [Variant("outline", "Outline, then the text", "writer v2, an outline call (events with the learner's words), then one call writes the text from it",
@@ -151,5 +157,5 @@ def resolve(spec: str) -> list[Variant]:
 
 # Rough model calls per story, for the estimate printed before a run (a retry or repair adds more).
 CALLS = {"baseline": 1.3, "range": 1.3, "two_pass": 2.3, "candidates": 4.3, "judge": 6.3, "repair": 8.3, "proofread": 3.3, "examples": 8.3,
-         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 2.1, "v2_spread": 2.1, "outline": 3.1, "beats": 7.0, "v2_rr": 5.0, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
+         "plan": 1.3, "mixed_gates": 6.3, "cascade": 10.3, "cascade_proofread": 9.3, "cascade_pick": 8.3, "review_repair": 4.3, "review_repair_nat": 6.3, "baseline_b": 1.3, "v2": 2.1, "v2_b": 2.1, "v2_spread": 2.1, "outline": 3.1, "beats": 7.0, "v2_rr": 5.0, "v2_directive": 2.3, "rr_directive": 5.3, "refine": 7.3, "rules": 1.3, "rules_refine": 7.3,
          "baseline_qwen": 1.3, "gpt_gpt": 6.3, "qwen_qwen": 6.3, "gpt_qwen": 6.3, "qwen_gpt": 6.3}

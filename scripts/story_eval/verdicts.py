@@ -8,6 +8,7 @@ Why the report leads with these and not with the free score (the 15 November run
     next to it before it can be read as a difference."""
 from __future__ import annotations
 
+import math
 from typing import Iterable, Optional
 
 from . import stats
@@ -182,6 +183,63 @@ def rating_counts(all_pairs: Iterable) -> dict:
         for value in ratings(entry).values():
             out[value] = out.get(value, 0) + 1
     return dict(sorted(out.items()))
+
+
+LINE = 2.0       # a naturalness rating of this or less fails a story (tutor_core.quality.score.GATE_NATURALNESS; a test keeps the two equal)
+
+
+def _repeats(entry, label) -> list:
+    """The ratings a reviewer gave one story when it was rated more than once (only then are they saved)."""
+    nat = (((entry or {}).get("audits") or {}).get(label) or {}).get("naturalness") or {}
+    return [x for x in (nat.get("repeats") or []) if x is not None]
+
+
+def crossing(all_pairs: Iterable) -> dict:
+    """{reviewer: (stories it rated more than once, of those the stories whose ratings fall on both sides of the pass line)} (21 Nov 2026, round 8: 42% of qwen's stories and 15% of gpt's).
+    A story rated 2, 3, 3 passes and one rated 2, 2, 3 fails, so for these stories the verdict is the median of a coin flip and a new set of ratings can turn it over."""
+    seen, crossed = {}, {}
+    for _, _, entry in all_pairs:
+        if not entry or not entry.get("ok"):
+            continue
+        for label in entry.get("audits") or {}:
+            ratings_ = _repeats(entry, label)
+            if len(ratings_) > 1:
+                seen[label] = seen.get(label, 0) + 1
+                crossed[label] = crossed.get(label, 0) + (min(ratings_) <= LINE < max(ratings_))
+    return {label: (n, crossed.get(label, 0)) for label, n in seen.items()}
+
+
+def _fails(n: int, p: float) -> float:
+    """The chance that the median of n ratings (n odd) is on the failing side when each rating is, on its own, with chance p: more than half of them are."""
+    return sum(math.comb(n, k) * p ** k * (1 - p) ** (n - k) for k in range(n // 2 + 1, n + 1))
+
+
+def rerating(pairs: Iterable) -> Optional[dict]:
+    """How far one method's passed-story count would move if the reviewers rated the same stories again (21 Nov 2026): {stories, passed, expected, sd}.
+    Each reviewer's ratings of a story are taken as its own distribution (the share at 2 or less is the chance that one rating fails; the median of three fails with
+    3p^2(1-p)+p^3), and a story another rule fails stays failed. Exact, no random draw. It is the reviewers' noise only: a new story for the same request would add the writer's.
+    None unless most stories were rated three or more times (an odd number, so the median is one of the ratings)."""
+    chances, repeated, passed = [], 0, 0
+    for _, entry in pairs:
+        if verdict(entry) is None:
+            continue
+        passed += verdict(entry)["kind"] == PASS
+        scores = entry.get("audit_scores") or {}
+        repeated += any(len(_repeats(entry, label)) >= 3 for label in scores)
+        chance = 1.0
+        for label, score in scores.items():
+            if set(score.get("failed") or []) - {"unnatural"} or score.get("gated"):
+                chance = 0.0
+                break
+            ratings_ = _repeats(entry, label)
+            if len(ratings_) >= 3 and len(ratings_) % 2:
+                chance *= 1.0 - _fails(len(ratings_), sum(x <= LINE for x in ratings_) / len(ratings_))
+            else:                                       # one rating, or an even number: the result as it was
+                chance *= 0.0 if "unnatural" in (score.get("failed") or []) else 1.0
+        chances.append(chance)
+    if not chances or repeated * 2 < len(chances):      # most stories were rated once: nothing to say about how the ratings vary
+        return None
+    return {"stories": len(chances), "passed": passed, "expected": sum(chances), "sd": math.sqrt(sum(c * (1 - c) for c in chances))}
 
 
 def what_moves(all_pairs: Iterable) -> dict:
