@@ -402,3 +402,27 @@ A local page for watching tests while they run. Start it with `test-desk.bat` (p
 **What is built.** Method `v2_b` (`v2` made again, `replicate_of: v2`), and `kaggle_round9.py`: job 1 `v2_b` on the 30 requests of round 8's `v2_en.json`, job 2 the 29 missing `baseline_b` stories of `controls_en.json`; the cell stops before spending anything when the `v2_en.json` it is given is not round 8's. About 60 stories, 0.64 million tokens in all (the runner's estimate), about 0.4 million of them on gpt-oss-120b: one day on three keys. Not made again: `plan`, `v2_directive`, `rr_directive`, `range`, `outline`, `beats`, and the cell leaves `v2_rr` and `v2_spread` as they are.
 
 **How to read round 9.** If `v2_b` lands within about 4 stories of `v2` (17 to 25 passes), the add-ons of round 8 were noise and `v2` stays the candidate at 2.1 calls. If it falls to 18 or 19, `v2` is level with the repair methods, not above them, and still the cheapest. The gap between `baseline_b` and `baseline` is the same noise for the plain method. **The app default is not changed:** `STORY_WRITER_V2` stays off until `v2_b` is in (so far: +28 points over the baseline with both reviewers agreeing, +0.4 calls, English only; es, fr, de, it, pt, zh, ja and ko are not measured with it).
+
+### What round 9 showed (patch 0101, 22 November 2026)
+
+Round 9 made `v2` again (`v2_b`) and the baseline again (`baseline_b`) for the same 30 English requests, with both reviewers and three ratings each. Both runs stopped at the Groq daily limit after their last story; nothing was left unmade, and `plan`, `v2_directive` and `rr_directive` were not made again on purpose.
+
+| Method | Stories | Calls a story | Passed / split / failed | Points of 30 |
+|---|---|---|---|---|
+| `baseline` | 30 | 1.7 | 11 / 11 / 8 | 16.5 |
+| `baseline_b` (the baseline again) | 30 | 1.7 | 10 / 9 / 11 | 14.5 |
+| `review_repair` | 30 | 4.4 | 19 / 10 / 1 | 24.0 |
+| `cascade` | 30 | 12.6 | 22 / 5 / 3 | 24.5 |
+| **`v2`** | 30 | 2.1 | 21 / 7 / 2 | 24.5 |
+| **`v2_b`** (`v2` again) | 30 | 2.1 | 19 / 7 / 4 | 22.5 |
+
+1. **The noise of one run is now measured, and it is the same size for both methods.** `v2_b` is 7 points below `v2` (−23 to +10, p 0.61) and `baseline_b` is 7 points below `baseline` (−24 to +11, p 0.63): one story fewer passed and one more failed, each. Two draws of the same method differ by about 2 stories of 30, inside the ±3 that rating the same stories again would give (`v2_b`: 19 reported, 18.4 expected; `v2`: 21 and 18.5).
+2. **`v2` beats the baseline, and the second draw confirms it.** `v2` is +27 points over `baseline` (+8 to +45, p 0.031) and `v2_b` is +27 over `baseline_b` (+7 to +47, p 0.031); crossed, +20 and +33. Pooling both draws of each (60 stories against 60): `v2` 78% of the points, baseline 52%, +27 points a request (about +12 to +41). Both reviewers agree (gpt +23 to +32, qwen +17 to +33).
+3. **`v2` is level with the repair methods, not above them, and the cheapest.** `v2_b` against `review_repair` −5 (−21 to +11), against `cascade` −7 (−26 to +13); both inside noise. At 2.1 calls it is 48% of `review_repair` and 17% of `cascade`. This is the pre-registered "18 or 19 passes" reading of round 8's write-up: level, still the cheapest.
+4. **The free stiffness checks reproduce.** Findings a story 0.97 and 0.93 for `v2` and `v2_b` against 1.57 and 1.60 for the two baselines; stories with two or more findings 6 and 6 against 13 and 16. Sentences inside the level's range: 27 and 28 of 30 against 13 and 11.
+
+**Things to know about these numbers.** The `v2_en.json` the run started from has three `v2` stories (en-27, en-28, en-29) that differ from round 8's copy (the verdicts moved from 21 / 8 / 1 to 21 / 7 / 2, en-29 from split to fail); the numbers above are the ones in the file the run produced. Two stories were reviewed by one reviewer only because gpt hit its daily limit on that call (`v2` en-26, `baseline_b` en-0), so each can only be 0.5 point off. Round 8's reading that the add-ons are noise stands, and nothing here suggests `v2` has a ceiling: with 30 requests a gap under about 4 stories is not a difference.
+
+**What it settles and what it does not.** In English `v2` is a real gain over the baseline at +0.4 calls, and as good as methods that cost 2 to 6 times as many. It was never measured outside English (es, fr, de, it, pt, zh, ja and ko), and `STORY_WRITER_V2` is still off in the app; that is your decision, and the evidence for English is now what it will be.
+
+**What is built.** `kaggle_round10.py`: `baseline` and `v2` on 30 requests in Spanish, French and German, each its own job (60 stories, about 0.65 million tokens, one day of three keys each; 1.95 million in all), starting from nothing, each continuing from its own file on the next day.
