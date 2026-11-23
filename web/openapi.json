@@ -277,6 +277,16 @@
             "title": "Id",
             "type": "integer"
           },
+          "picture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PictureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "prompt": {
             "title": "Prompt",
             "type": "string"

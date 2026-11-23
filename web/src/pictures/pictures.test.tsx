@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "../auth/AuthContext";
 import { ToastProvider } from "../components/Toast";
-import { ALICE, err, LANGS, mockApi, renderIn } from "../test/helpers";
+import { ALICE, err, LANGS, mockApi, renderApp, renderIn } from "../test/helpers";
 import EMOJI from "./emojis.json";
 import { PictureButton } from "./PictureButton";
 import { PictureThumb } from "./PictureThumb";
@@ -154,5 +154,30 @@ describe("where the picture shows", () => {
     expect(card.getByText("a food")).toBeInTheDocument();
     expect(card.getAllByText(BREAD).length).toBeGreaterThan(0);
     expect(card.getByRole("button", { name: "Change the picture of bread" })).toBeInTheDocument();
+  });
+});
+
+describe("the picture quiz", () => {
+  const PROGRESS = { language: "en", new: 2, learning: 1, known: 3, due: 4, streak: 0, practised_today: false };
+  const start = async () => {
+    renderApp("/practice");
+    await userEvent.selectOptions(await screen.findByLabelText("Question"), "picture");
+    await userEvent.click(screen.getByRole("button", { name: "Start multiple choice" }));
+  };
+  it("shows the picture, not the word, asks for the words, and records the answer as a picture answer", async () => {
+    const quiz = { items: [{ id: 7, prompt: "baked food", answer: "bread", choices: ["bread", "stone", "milk", "tree"], direction: "picture", picture: EMOJI_PIC }], total: 1 };
+    const m = mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/choices": quiz, "POST /practice/answers": () => ({ status: 204 }) });
+    await start();
+    expect(await screen.findByText(BREAD)).toBeInTheDocument();
+    expect(m.calls.find((c) => c.path.startsWith("/practice/choices"))!.path).toContain("direction=picture");
+    expect(screen.queryByText("baked food", { selector: "p" })).not.toBeInTheDocument();      // the meaning is for screen readers only
+    await userEvent.click(screen.getByRole("button", { name: "bread" }));
+    await waitFor(() => expect(m.calls.some((c) => c.path === "/practice/answers")).toBe(true));
+    expect(JSON.stringify(m.calls.find((c) => c.path === "/practice/answers")!.body)).toContain('"direction":"picture"');
+  });
+  it("explains what is needed when no word has a picture", async () => {
+    mockApi({ ...base, "GET /practice/progress": PROGRESS, "GET /practice/choices": { items: [], total: 0 } });
+    await start();
+    expect(await screen.findByText("No pictures to practise with")).toBeInTheDocument();
   });
 });

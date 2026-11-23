@@ -231,7 +231,7 @@ def test_choice_cards_show_a_word_with_four_meanings_one_of_them_right(make_user
     body = c.get("/api/practice/choices?language=en&limit=50").json()
     assert len(body["items"]) == len(WORDS) and body["total"] == len(WORDS)
     for item in body["items"]:
-        assert set(item) == {"id", "prompt", "answer", "choices", "direction"} and item["direction"] == "meaning"
+        assert set(item) == {"id", "prompt", "answer", "choices", "direction", "picture"} and item["direction"] == "meaning"
         assert WORDS[item["prompt"]] == item["answer"] and item["answer"] in item["choices"]
         assert len(item["choices"]) == 4 and len(set(item["choices"])) == 4 and set(item["choices"]) <= set(WORDS.values())
 

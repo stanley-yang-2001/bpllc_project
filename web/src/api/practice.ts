@@ -11,7 +11,7 @@ export const practiceApi = {
   recordReviews: (reviews: Review[]) => request<{ results: ReviewResult[] }>("POST", "/practice/reviews", { json: { reviews } }).then((r) => r.results),
   studyStats: (language: string, set?: SetFilter) => request<StudyStats>("GET", `/practice/stats?${qs({ language, set: setParam(set) })}`),
   hardestWords: (language: string, set?: SetFilter, limit = 10) => request<HardWords>("GET", `/practice/hardest?${qs({ language, set: setParam(set), limit })}`),
-  choices: (p: { language: string; limit?: number; direction?: "meaning" | "word"; set?: SetFilter; due?: boolean }) =>
+  choices: (p: { language: string; limit?: number; direction?: "meaning" | "word" | "picture"; set?: SetFilter; due?: boolean }) =>
     request<ChoiceSet>("GET", `/practice/choices?${qs({ ...p, set: p.set === "all" ? undefined : p.set, due: p.due ? "true" : undefined })}`),
   dictation: (p: { language: string; limit?: number; set?: SetFilter; due?: boolean }) =>
     request<DictationSet>("GET", `/practice/dictation?${qs({ ...p, set: p.set === "all" ? undefined : p.set, due: p.due ? "true" : undefined })}`),

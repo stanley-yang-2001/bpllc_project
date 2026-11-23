@@ -35,7 +35,7 @@ export type HardWords = Schemas["HardWords"];
 /** 1 again, 2 hard, 3 good, 4 easy. */
 export type Grade = 1 | 2 | 3 | 4;
 export type PracticeMode = "flashcards" | "choices" | "dictation" | "pos" | "cloze";
-export interface Review { word_id: number; grade: Grade; think_ms?: number; rate_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" }
+export interface Review { word_id: number; grade: Grade; think_ms?: number; rate_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" | "picture" }
 /** What to practise in flashcards: every word, what is due now, or exactly these words. */
 export type FlashcardScope = "all" | "due" | "ids";
 export type ClozeSet = Schemas["ClozeSet"];
@@ -55,7 +55,7 @@ export type Rewards = Schemas["RewardsOut"];
 export type Badge = Schemas["BadgeOut"];
 export type Records = Schemas["RecordsOut"];
 export type Challenge = Schemas["ChallengeOut"];
-export interface Answer { word_id: number; correct: boolean; think_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" }
+export interface Answer { word_id: number; correct: boolean; think_ms?: number; mode?: PracticeMode; direction?: "word" | "meaning" | "picture" }
 export type ChoiceCard = Schemas["ChoiceOut"];
 /** Which words to show or practise: every word, the General set, one set by id, or several at once as a comma list ("3,7,general"). */
 export type SetFilter = "all" | "general" | number | string;

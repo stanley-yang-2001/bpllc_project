@@ -17,6 +17,7 @@ export const ChoiceMode: PracticeMode<"choice"> = {
           <select id="practice-direction" className={inputCls} value={direction} onChange={(e) => setDirection(e.target.value as Direction)}>
             <option value="meaning">{t("practice.choice.dirMeaning")}</option>
             <option value="word">{t("practice.choice.dirWord")}</option>
+            <option value="picture">{t("pictures.dir")}</option>
           </select>
         </div>
         <Button onClick={() => start({ mode: "choice", direction })}>{t("practice.choice.start")}</Button>

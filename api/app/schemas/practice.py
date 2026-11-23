@@ -70,6 +70,7 @@ class ChoiceOut(BaseModel):
     answer: str
     choices: list[str]
     direction: str
+    picture: PictureOut | None = None   # direction "picture": what the learner sees (the prompt is then only the meaning, for screen readers)
 
 
 class ChoiceSet(BaseModel):

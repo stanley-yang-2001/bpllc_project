@@ -20,7 +20,7 @@ KNOWN_BOX = 4                  # box 4 and 5 (a rest of 7+ days) count as "known
 MAX_ANSWERS = 50
 MAX_MS = 120_000               # an answer left open longer than this was not a slow answer, so it is recorded as this long
 MODES = ("flashcards", "choices", "dictation", "pos", "cloze")
-DIRECTIONS = ("word", "meaning")
+DIRECTIONS = ("word", "meaning", "picture")          # what the learner saw: the word, its meaning, or its picture
 _HAS_MEANING = "w.meaning IS NOT NULL AND btrim(w.meaning) <> ''"
 _TODAY = "(now() AT TIME ZONE 'UTC')::date"
 

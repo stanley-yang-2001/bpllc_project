@@ -331,3 +331,45 @@ def test_every_emoji_in_the_pickers_grid_is_accepted_by_the_server():
     groups = json.loads(path.read_text(encoding="utf-8"))
     refused = [e for items in groups.values() for e in items if not pictures.is_emoji(e)]
     assert not refused
+
+
+# ------------------------------------------------------------------ the picture quiz
+def test_the_picture_quiz_asks_only_about_pictured_words_and_offers_words(client):
+    register(client, "alice")
+    ids = {w: add_word(client, w, m) for w, m in (("bread", "a food"), ("stone", "a rock"), ("milk", "a drink"), ("tree", None), ("door", "an entry"))}
+    put_emoji(client, ids["bread"])
+    put_photo(client, ids["tree"], image_bytes())                       # a word with no meaning can still be asked
+    body = client.get("/api/practice/choices", params={"language": "en", "direction": "picture"}).json()
+    items = {i["answer"]: i for i in body["items"]}
+    assert set(items) == {"bread", "tree"} and body["total"] == 2
+    bread = items["bread"]
+    assert bread["direction"] == "picture" and bread["prompt"] == "a food" and bread["picture"]["emoji"] == BREAD
+    assert len(bread["choices"]) == 4 and "bread" in bread["choices"] and set(bread["choices"]) <= set(ids)
+    assert items["tree"]["prompt"] == "" and items["tree"]["picture"]["kind"] == "photo"
+
+
+def test_the_picture_quiz_needs_a_picture_and_two_words(client):
+    register(client, "alice")
+    a = add_word(client, "bread", "a food")
+    assert client.get("/api/practice/choices", params={"language": "en", "direction": "picture"}).json()["items"] == []
+    put_emoji(client, a)
+    assert client.get("/api/practice/choices", params={"language": "en", "direction": "picture"}).json()["items"] == []     # one word: nothing to choose between
+    add_word(client, "stone", "a rock")
+    assert len(client.get("/api/practice/choices", params={"language": "en", "direction": "picture"}).json()["items"]) == 1
+
+
+def test_the_picture_quiz_with_due_only_and_an_unknown_direction(client):
+    register(client, "alice")
+    a, b = add_word(client, "bread", "a food"), add_word(client, "stone", "a rock")
+    put_emoji(client, a)
+    r = client.get("/api/practice/choices", params={"language": "en", "direction": "picture", "due": "true"}).json()
+    assert [i["answer"] for i in r["items"]] == ["bread"]
+    assert client.get("/api/practice/choices", params={"language": "en", "direction": "sound"}).status_code == 422
+
+
+def test_an_answer_to_a_picture_question_is_recorded_with_its_direction(client):
+    register(client, "alice")
+    a = add_word(client)
+    r = client.post("/api/practice/answers", json={"answers": [{"word_id": a, "correct": True, "mode": "choices", "direction": "picture"}]})
+    assert r.status_code == 204, r.text
+    assert db("SELECT mode, direction FROM tutor.review_log") == [("choices", "picture")]

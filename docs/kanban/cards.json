@@ -1844,5 +1844,26 @@
       "vocabulary",
       "privacy"
     ]
+  },
+  {
+    "title": "Picture quiz (picture, pick the word)",
+    "status": "In review",
+    "area": "vocabulary",
+    "date": "2026-11-23",
+    "summary": "Multiple choice gets a Picture → word question: the word's emoji or photo is shown and the learner picks the word from four of their own words. Only pictured words are asked; the meaning is hidden text for screen readers; answers are saved with direction picture.",
+    "done": [
+      "API: direction picture on /practice/choices (due-only works), PictureOut on each question",
+      "Web: third question type in multiple choice, empty-round message, nine languages",
+      "tests: 4 API, 2 web"
+    ],
+    "todo": [
+      "Apply patch 0103, rebuild API and web, add a few pictures and try it",
+      "Native-speaker check of the three new messages",
+      "Next: ready-made emoji for starter packs, free photo search"
+    ],
+    "labels": [
+      "practice",
+      "vocabulary"
+    ]
   }
 ]

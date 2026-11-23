@@ -1086,6 +1086,7 @@ export interface components {
             direction: string;
             /** Id */
             id: number;
+            picture?: components["schemas"]["PictureOut"] | null;
             /** Prompt */
             prompt: string;
         };

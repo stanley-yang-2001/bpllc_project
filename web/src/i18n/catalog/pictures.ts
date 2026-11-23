@@ -84,4 +84,17 @@ export const pictures = {
   "pictures.group.places": ["Places and travel", "Lugares y viajes", "Lieux et voyages", "Orte und Reisen", "Luoghi e viaggi", "Lugares e viagens", "場所と旅行", "地点和旅行", "장소와 여행"],
   "pictures.group.things": ["Things", "Objetos", "Objets", "Dinge", "Oggetti", "Objetos", "もの", "物品", "물건"],
   "pictures.group.signs": ["Signs, numbers and actions", "Signos, números y acciones", "Signes, nombres et actions", "Zeichen, Zahlen und Handlungen", "Segni, numeri e azioni", "Sinais, números e ações", "記号・数字・動作", "符号、数字和动作", "기호, 숫자, 동작"],
+  "pictures.dir": ["Picture → word", "Imagen → palabra", "Image → mot", "Bild → Wort", "Immagine → parola", "Imagem → palavra", "画像 → 単語", "图片 → 单词", "그림 → 단어"],
+  "pictures.quizNoneTitle": ["No pictures to practise with", "No hay imágenes para practicar", "Pas d'image pour s'entraîner", "Keine Bilder zum Üben", "Nessuna immagine per esercitarsi", "Não há imagens para praticar", "練習できる画像がありません", "没有可练习的图片", "연습할 그림이 없어요"],
+  "pictures.quizNoneBody": [
+    "Give at least one word a picture, and have at least two words in this choice of words. You add pictures on the Vocabulary page.",
+    "Da una imagen al menos a una palabra y ten al menos dos palabras en esta selección. Las imágenes se añaden en la página de Vocabulario.",
+    "Donne une image à au moins un mot et garde au moins deux mots dans cette sélection. Tu ajoutes les images sur la page Vocabulaire.",
+    "Gib mindestens einem Wort ein Bild und habe mindestens zwei Wörter in dieser Auswahl. Bilder fügst du auf der Seite Wortschatz hinzu.",
+    "Assegna un'immagine ad almeno una parola e tieni almeno due parole in questa selezione. Le immagini si aggiungono nella pagina Vocabolario.",
+    "Dê uma imagem a pelo menos uma palavra e tenha pelo menos duas palavras nesta seleção. As imagens são adicionadas na página Vocabulário.",
+    "少なくとも1つの単語に画像を付け、この選択に単語を2つ以上入れてください。画像は「単語」ページで追加できます。",
+    "请至少为一个单词添加图片，并让这组选择中至少有两个单词。图片可在“词汇”页面添加。",
+    "단어 하나 이상에 그림을 넣고, 이 선택에 단어가 두 개 이상 있어야 해요. 그림은 단어 페이지에서 추가할 수 있어요.",
+  ],
 } as const satisfies Record<string, Nine>;

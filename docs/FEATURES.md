@@ -34,6 +34,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 9 Nov | Spaced-repetition flashcards with four answers, no card limit, several sets at once, answer timing, memory statistics and hardest words (0069, migration 0017); clicks-only answering, a chosen session length, an all-time total in the summary, answer timing in the privacy policy (0070) |
 | 21 Nov | A reader that underlines your words in a story, with a card for each word and a way to add the ones that are not yet in your list (0099) |
 | 22 Nov | A picture for each word: an emoji from a grid or any emoji you type, or your own photo (shrunk in the browser, shrunk again and stripped of camera and location data on the server); shown in the word list, on the back of a flashcard and on the reader's word card; part of "Download my data" (0102, migration 0019) |
+| 23 Nov | A picture quiz: see a word's picture and pick the word (0103) |
 
 ## 1. The foundation (September to 18 October 2026)
 
