@@ -10,7 +10,7 @@ from .config import Settings, load_settings
 from .db import make_pool
 from .errors import install_error_handlers
 from .migrate import run_migrations, set_tools_password
-from .routes import account, auth, chat, definitions, health, internal_model, me, model, practice, public, reading, sets, stories, text_tools, words
+from .routes import account, auth, chat, definitions, health, internal_model, me, model, pictures, practice, public, reading, sets, stories, text_tools, words
 from .routes.internal_model import INTERNAL_PREFIX
 from .security import LoginGuard, make_dummy_credentials
 from .services.ai_gate import AiGate
@@ -75,7 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers[name] = value
         return response
 
-    for module in (auth, public, me, account, model, words, definitions, text_tools, reading, sets, chat, stories, practice, health):
+    for module in (auth, public, me, account, model, words, pictures, definitions, text_tools, reading, sets, chat, stories, practice, health):
         app.include_router(module.router, prefix="/api")
     app.include_router(internal_model.router)       # /internal/v1: not under /api, so nginx does not publish it
     return app

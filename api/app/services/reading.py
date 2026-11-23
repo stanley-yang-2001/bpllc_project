@@ -5,6 +5,7 @@ from __future__ import annotations
 from tutor_core import story_gloss
 
 from ..db import cursor
+from . import pictures
 
 
 def utf16_positions(text: str) -> list[int] | None:
@@ -21,7 +22,7 @@ def utf16_positions(text: str) -> list[int] | None:
 
 
 def gloss(conn, user_id: int, language: str, text: str) -> dict:
-    """{"spans": [{"start", "end", "word_id"}], "words": [{"id", "word", "meaning", "pos"}]} for the learner's words of this language in `text`."""
+    """{"spans": [{"start", "end", "word_id"}], "words": [{"id", "word", "meaning", "pos", "picture"}]} for the learner's words of this language in `text`."""
     with cursor(conn) as cur:
         cur.execute("SELECT id, word, meaning, pos FROM words WHERE user_id = %s AND language = %s ORDER BY id", (user_id, language))
         rows = cur.fetchall()
@@ -29,4 +30,5 @@ def gloss(conn, user_id: int, language: str, text: str) -> dict:
     at = utf16_positions(text)
     spans = [{"start": at[s.start] if at else s.start, "end": at[s.end] if at else s.end, "word_id": s.word_id} for s in found]
     used = {s.word_id for s in found}
-    return {"spans": spans, "words": [{"id": r["id"], "word": r["word"], "meaning": r["meaning"], "pos": r["pos"]} for r in rows if r["id"] in used]}
+    words = [{"id": r["id"], "word": r["word"], "meaning": r["meaning"], "pos": r["pos"]} for r in rows if r["id"] in used]
+    return {"spans": spans, "words": pictures.attach(conn, words)}

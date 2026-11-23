@@ -8,6 +8,7 @@ import { useAuth } from "../auth/AuthContext";
 import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
 import { Badge, Button, EmptyState, ErrorText, Skeleton } from "../components/ui";
+import { PictureThumb } from "../pictures/PictureThumb";
 import { FlashcardSummary } from "./FlashcardSummary";
 import { delayParts, remaining } from "./session";
 import { useFlashcardRound } from "./useFlashcardRound";
@@ -68,7 +69,8 @@ function Round({ language, set, scope, seconds, cards, onDone, onMore, onPractis
         <p lang={language} className="text-2xl font-semibold text-slate-900">{card.word}</p>
         <SpeakButton text={card.word} language={language} />
         {revealed && (
-          <div className="mt-4 border-t border-slate-200 pt-4">
+          <div className="mt-4 flex flex-col items-center gap-3 border-t border-slate-200 pt-4">
+            {card.picture && <PictureThumb picture={card.picture} size="lg" />}
             <p className="text-xl text-slate-800">{card.meaning}</p>
           </div>
         )}

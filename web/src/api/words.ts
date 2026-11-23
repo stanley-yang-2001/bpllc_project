@@ -1,5 +1,5 @@
 import { qs, request } from "./http";
-import type { Word, WordPage, UploadResult, WordSet, SetList, StarterPackList, StarterAdded, SetFilter, DefineResult } from "./types";
+import type { Picture, Word, WordPage, UploadResult, WordSet, SetList, StarterPackList, StarterAdded, SetFilter, DefineResult } from "./types";
 
 export const wordsApi = {
   words: (p: { language: string; q?: string; limit?: number; offset?: number; set?: SetFilter; missing_meaning?: boolean }) =>
@@ -23,6 +23,14 @@ export const wordsApi = {
   labelWords: (b: { language: string; ids?: number[]; set?: SetFilter }) =>
     request<DefineResult>("POST", "/words/label", { json: { ...b, set: b.set === undefined ? undefined : String(b.set) } }),
   partsOfSpeech: (language: string) => request<{ language: string; items: string[] }>("GET", `/words/parts-of-speech?${qs({ language })}`),
+  /** A word's picture is one emoji, or one photo (kept small, with its camera and location data removed by the server). Either replaces what was there. */
+  setEmoji: (id: number, emoji: string) => request<Picture>("PUT", `/words/${id}/picture/emoji`, { json: { emoji } }),
+  setPhoto: (id: number, photo: Blob) => {
+    const form = new FormData();
+    form.set("file", photo, "photo.jpg");
+    return request<Picture>("PUT", `/words/${id}/picture/photo`, { form });
+  },
+  removePicture: (id: number) => request<void>("DELETE", `/words/${id}/picture`),
   uploadWords: (language: string, file: File) => {
     const form = new FormData();
     form.set("language", language);

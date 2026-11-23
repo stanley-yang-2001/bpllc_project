@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from ..db import cursor
 from ..policy import POLICY_VERSION
+from . import pictures
 
 
 def build(conn, user_id: int) -> dict:
@@ -21,6 +22,7 @@ def build(conn, user_id: int) -> dict:
         cur.execute("SELECT w.language, w.word, w.meaning, w.pos, s.name AS set_name, w.created_at FROM words w "
                     "LEFT JOIN word_sets s ON s.id = w.set_id WHERE w.user_id = %s ORDER BY w.language, w.word", (user_id,))
         out["words"] = cur.fetchall()           # set_name null = the General set
+        out["word_pictures"] = pictures.export_rows(conn, user_id)         # the emoji, and each photo as a data address
         cur.execute("SELECT w.language, w.word, p.box, p.phase, p.ease, p.interval_days, p.lapses, p.last_grade, p.due_at, p.right_count, p.wrong_count, "
                     "p.last_answered_at, p.known_at FROM word_progress p "
                     "JOIN words w ON w.id = p.word_id WHERE p.user_id = %s ORDER BY w.language, w.word", (user_id,))

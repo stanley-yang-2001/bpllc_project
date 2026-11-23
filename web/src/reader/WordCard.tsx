@@ -5,6 +5,8 @@ import { api, type GlossResult } from "../api/client";
 import { wordsKey } from "../api/keys";
 import { useAuth } from "../auth/AuthContext";
 import { Button, ErrorText } from "../components/ui";
+import { PictureButton } from "../pictures/PictureButton";
+import { PictureThumb } from "../pictures/PictureThumb";
 import { useToast } from "../components/Toast";
 import { useI18n } from "../i18n/I18nProvider";
 import { usePreferences } from "../prefs/PreferencesProvider";
@@ -56,7 +58,12 @@ export function WordCard({ text, language, at, gloss, onClose }: {
         <Button type="button" variant="ghost" className="-mr-2 -mt-1 px-2" aria-label={t("common.close")} onClick={onClose} icon={<X aria-hidden className="size-4" />} />
       </div>
       {known ? (
-        known.meaning ? <p className="mt-1 text-base text-slate-800">{known.meaning}</p> : (
+        known.meaning ? (
+          <div className="mt-1 flex items-center gap-3">
+            {known.picture && <PictureThumb picture={known.picture} size="md" />}
+            <p className="text-base text-slate-800">{known.meaning}</p>
+          </div>
+        ) : (
           <div className="mt-1 space-y-2">
             <p className="text-sm text-slate-600">{t("reader.noMeaning")}</p>
             <Button type="button" variant="secondary" loading={define.isPending} onClick={() => define.mutate()}>{t("vocab.defineAdd")}</Button>
@@ -65,6 +72,7 @@ export function WordCard({ text, language, at, gloss, onClose }: {
       ) : <p className="mt-1 text-sm text-slate-600">{t("reader.notInList", { word: written })}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
         <SpeakButton text={shown} language={language} label={t("speech.listen")} />
+        {known && <PictureButton word={known} language={language} />}
         {!known && (
           <>
             <label className="flex items-center gap-2 text-sm text-slate-700">

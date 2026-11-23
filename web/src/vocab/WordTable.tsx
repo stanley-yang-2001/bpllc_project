@@ -1,6 +1,7 @@
 import type { Word } from "../api/client";
 import { SpeakButton } from "../speech/SpeakButton";
 import { useI18n } from "../i18n/I18nProvider";
+import { PictureButton } from "../pictures/PictureButton";
 import { MeaningCell } from "./MeaningCell";
 import { PosCell } from "./PosCell";
 
@@ -15,7 +16,7 @@ type Props = {
   setNames: Map<number, string> | null;  // null = no sets yet, so no Set column
 };
 
-/** The table of words with tick boxes, a speak button, an optional reading, an editable meaning and (when there are sets) the set. */
+/** The table of words with tick boxes, a picture, a speak button, an optional reading, an editable meaning and (when there are sets) the set. */
 export function WordTable({ words, language, selected, onToggle, onToggleAll, readings, showReadings, setNames }: Props) {
   const { t } = useI18n();
   const allOnPage = words.length > 0 && words.every((w) => selected.has(w.id));
@@ -27,6 +28,7 @@ export function WordTable({ words, language, selected, onToggle, onToggleAll, re
             <th className="w-12 py-3 pl-4">
               <input type="checkbox" className="size-4 rounded accent-brand-600" aria-label={t("vocab.selectAll")} checked={allOnPage} onChange={onToggleAll} />
             </th>
+            <th className="w-12 py-3 pr-2"><span className="sr-only">{t("pictures.column")}</span></th>
             <th className="py-3 pr-4">{t("vocab.colWord")}</th>
             <th className="py-3 pr-4">{t("vocab.colMeaning")}</th>
             <th className="py-3 pr-4">{t("vocab.colPos")}</th>
@@ -39,6 +41,7 @@ export function WordTable({ words, language, selected, onToggle, onToggleAll, re
               <td className="py-2.5 pl-4">
                 <input type="checkbox" className="size-4 rounded accent-brand-600" aria-label={t("vocab.select", { word: w.word })} checked={selected.has(w.id)} onChange={() => onToggle(w.id)} />
               </td>
+              <td className="py-2 pr-2"><PictureButton word={w} language={language} /></td>
               <td className="py-2.5 pr-4 font-medium text-slate-900"><span lang={language}>{w.word}</span> <SpeakButton text={w.word} language={language} />{showReadings && readings.get(w.word) && <span className="block text-xs font-normal text-slate-600">{readings.get(w.word)}</span>}</td>
               <td className="py-2.5 pr-4"><MeaningCell word={w} language={language} /></td>
               <td className="py-2.5 pr-4"><PosCell word={w} language={language} /></td>

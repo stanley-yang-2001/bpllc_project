@@ -8,3 +8,4 @@ pyjwt>=2.7
 python-multipart>=0.0.9
 pydantic>=2.6
 cryptography>=42
+pillow>=10.3

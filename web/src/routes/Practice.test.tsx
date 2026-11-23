@@ -24,6 +24,17 @@ describe("practice page", () => {
     expect(screen.getByText(/costs nothing from the shared limit/)).toBeInTheDocument();
   });
 
+  it("shows the card's picture only when the answer is turned over", async () => {
+    const withPicture = { ...CARDS, items: [card(1, "bread", "baked food", { picture: { kind: "emoji", emoji: "\u{1F35E}", url: null, thumb_url: null } })], total: 1, selection: 1 };
+    mockApi({ ...base, "GET /practice/flashcards": withPicture });
+    renderApp("/practice");
+    await userEvent.click(await screen.findByRole("button", { name: "Study what's due" }));
+    expect(await screen.findByText("bread")).toBeInTheDocument();
+    expect(screen.queryByText("\u{1F35E}")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Show answer" }));
+    expect(screen.getByText("\u{1F35E}")).toBeInTheDocument();
+  });
+
   it("asks for the due flashcards with no limit and shows the word, then the meaning", async () => {
     const { calls } = mockApi({ ...base, "GET /practice/flashcards": CARDS });
     renderApp("/practice");

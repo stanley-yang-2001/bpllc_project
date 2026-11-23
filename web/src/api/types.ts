@@ -3,6 +3,8 @@ import type { components } from "./schema";
 export type Schemas = components["schemas"];
 export type User = Schemas["UserOut"];
 export type Word = Schemas["WordOut"];
+/** The picture of a word: an emoji, or the learner's own photo (with the address of the full picture and of a small copy). */
+export type Picture = Schemas["PictureOut"];
 export type WordPage = Schemas["WordPage"];
 export type UploadResult = Schemas["UploadResult"];
 export type GlossResult = Schemas["GlossOut"];

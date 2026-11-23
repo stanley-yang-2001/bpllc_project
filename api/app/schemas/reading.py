@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from .words import PictureOut
+
 MAX_TEXT = 8000           # characters: the same limit as a saved story (schemas.stories.MAX_STORY_BODY)
 
 
@@ -22,6 +24,7 @@ class GlossWord(BaseModel):
     word: str
     meaning: str | None
     pos: str | None = None
+    picture: PictureOut | None = None
 
 
 class GlossOut(BaseModel):

@@ -114,6 +114,20 @@
         "title": "BestDayOut",
         "type": "object"
       },
+      "Body_put_photo_api_words__word_id__picture_photo_put": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_put_photo_api_words__word_id__picture_photo_put",
+        "type": "object"
+      },
       "Body_upload_api_words_upload_post": {
         "properties": {
           "file": {
@@ -700,6 +714,20 @@
         "title": "EmailChange",
         "type": "object"
       },
+      "EmojiIn": {
+        "properties": {
+          "emoji": {
+            "maxLength": 64,
+            "title": "Emoji",
+            "type": "string"
+          }
+        },
+        "required": [
+          "emoji"
+        ],
+        "title": "EmojiIn",
+        "type": "object"
+      },
       "FlashcardOut": {
         "properties": {
           "due_at": {
@@ -737,6 +765,16 @@
           "meaning": {
             "title": "Meaning",
             "type": "string"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PictureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "preview": {
             "$ref": "#/components/schemas/Preview"
@@ -1082,6 +1120,16 @@
               }
             ],
             "title": "Meaning"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PictureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pos": {
             "anyOf": [
@@ -1537,6 +1585,57 @@
           "password"
         ],
         "title": "PasswordOnly",
+        "type": "object"
+      },
+      "PictureOut": {
+        "description": "The picture of a word: an emoji, or the learner's own photo (kept as a JPEG of at most 512 pixels, and a small copy of at most 96).",
+        "properties": {
+          "emoji": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emoji"
+          },
+          "kind": {
+            "enum": [
+              "emoji",
+              "photo"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "thumb_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Url"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "PictureOut",
         "type": "object"
       },
       "PolicyOut": {
@@ -3447,6 +3546,16 @@
               }
             ],
             "title": "Meaning"
+          },
+          "picture": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PictureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "pos": {
             "anyOf": [
@@ -6054,6 +6163,219 @@
         "summary": "Patch Word",
         "tags": [
           "words"
+        ]
+      }
+    },
+    "/api/words/{word_id}/picture": {
+      "delete": {
+        "operationId": "delete_picture_api_words__word_id__picture_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "word_id",
+            "required": true,
+            "schema": {
+              "title": "Word Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Picture",
+        "tags": [
+          "pictures"
+        ]
+      },
+      "get": {
+        "description": "The word's photo as a JPEG (`size=thumb`: the small copy). `v` only makes the address change when the photo does.",
+        "operationId": "get_photo_api_words__word_id__picture_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "word_id",
+            "required": true,
+            "schema": {
+              "title": "Word Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": "full",
+              "pattern": "^(full|thumb)$",
+              "title": "Size",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "v",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "V"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Photo",
+        "tags": [
+          "pictures"
+        ]
+      }
+    },
+    "/api/words/{word_id}/picture/emoji": {
+      "put": {
+        "description": "Gives the word an emoji as its picture (replacing any picture it had).",
+        "operationId": "put_emoji_api_words__word_id__picture_emoji_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "word_id",
+            "required": true,
+            "schema": {
+              "title": "Word Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmojiIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Emoji",
+        "tags": [
+          "pictures"
+        ]
+      }
+    },
+    "/api/words/{word_id}/picture/photo": {
+      "put": {
+        "description": "Gives the word the learner's own photo (replacing any picture it had). The photo is checked, made smaller and stripped of its\ncamera and location data before it is kept, so what is stored is not the file that was sent.",
+        "operationId": "put_photo_api_words__word_id__picture_photo_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "word_id",
+            "required": true,
+            "schema": {
+              "title": "Word Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_put_photo_api_words__word_id__picture_photo_put"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PictureOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Photo",
+        "tags": [
+          "pictures"
         ]
       }
     }

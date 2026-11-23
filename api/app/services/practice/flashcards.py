@@ -8,7 +8,7 @@ from tutor_core import srs
 
 from ...db import cursor
 from ...errors import validation_error
-from .. import progress, word_sets
+from .. import pictures, progress, word_sets
 
 
 SCOPES = ("all", "due", "ids")
@@ -52,7 +52,7 @@ def flashcards(conn, user_id: int, language: str, limit: int | None = None, set_
     total = len(picked)
     if limit:
         picked = picked[:limit]
-    return {"items": [_out(r, c, now) for r, c in picked], "total": total, **counts}
+    return {"items": pictures.attach(conn, [_out(r, c, now) for r, c in picked]), "total": total, **counts}
 
 
 def _card(row: dict) -> srs.Card:

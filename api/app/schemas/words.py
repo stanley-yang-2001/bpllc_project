@@ -2,8 +2,21 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class PictureOut(BaseModel):
+    """The picture of a word: an emoji, or the learner's own photo (kept as a JPEG of at most 512 pixels, and a small copy of at most 96)."""
+    kind: Literal["emoji", "photo"]
+    emoji: str | None = None           # the emoji itself, when the kind is "emoji"
+    url: str | None = None             # the photo, when the kind is "photo"; the address changes when the photo does
+    thumb_url: str | None = None       # the small copy, for lists
+
+
+class EmojiIn(BaseModel):
+    emoji: str = Field(max_length=64)
 
 
 class WordOut(BaseModel):
@@ -14,6 +27,7 @@ class WordOut(BaseModel):
     pos: str | None = None             # part of speech: a code from the language's own list (tutor_core.pos), or none
     set_id: int | None = None          # null: the General set
     created_at: datetime
+    picture: PictureOut | None = None  # null: no picture
 
 
 class SetOut(BaseModel):

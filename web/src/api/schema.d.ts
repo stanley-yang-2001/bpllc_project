@@ -918,6 +918,68 @@ export interface paths {
         patch: operations["patch_word_api_words__word_id__patch"];
         trace?: never;
     };
+    "/api/words/{word_id}/picture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Photo
+         * @description The word's photo as a JPEG (`size=thumb`: the small copy). `v` only makes the address change when the photo does.
+         */
+        get: operations["get_photo_api_words__word_id__picture_get"];
+        put?: never;
+        post?: never;
+        /** Delete Picture */
+        delete: operations["delete_picture_api_words__word_id__picture_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/words/{word_id}/picture/emoji": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Emoji
+         * @description Gives the word an emoji as its picture (replacing any picture it had).
+         */
+        put: operations["put_emoji_api_words__word_id__picture_emoji_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/words/{word_id}/picture/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Photo
+         * @description Gives the word the learner's own photo (replacing any picture it had). The photo is checked, made smaller and stripped of its
+         *     camera and location data before it is kept, so what is stored is not the file that was sent.
+         */
+        put: operations["put_photo_api_words__word_id__picture_photo_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -963,6 +1025,11 @@ export interface components {
             day: string;
             /** Value */
             value: number;
+        };
+        /** Body_put_photo_api_words__word_id__picture_photo_put */
+        Body_put_photo_api_words__word_id__picture_photo_put: {
+            /** File */
+            file: string;
         };
         /** Body_upload_api_words_upload_post */
         Body_upload_api_words_upload_post: {
@@ -1164,6 +1231,11 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** EmojiIn */
+        EmojiIn: {
+            /** Emoji */
+            emoji: string;
+        };
         /** FlashcardOut */
         FlashcardOut: {
             /** Due At */
@@ -1180,6 +1252,7 @@ export interface components {
             leech: boolean;
             /** Meaning */
             meaning: string;
+            picture?: components["schemas"]["PictureOut"] | null;
             preview: components["schemas"]["Preview"];
             /** Reps */
             reps: number;
@@ -1287,6 +1360,7 @@ export interface components {
             id: number;
             /** Meaning */
             meaning: string | null;
+            picture?: components["schemas"]["PictureOut"] | null;
             /** Pos */
             pos?: string | null;
             /** Word */
@@ -1432,6 +1506,23 @@ export interface components {
         PasswordOnly: {
             /** Password */
             password: string;
+        };
+        /**
+         * PictureOut
+         * @description The picture of a word: an emoji, or the learner's own photo (kept as a JPEG of at most 512 pixels, and a small copy of at most 96).
+         */
+        PictureOut: {
+            /** Emoji */
+            emoji?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "emoji" | "photo";
+            /** Thumb Url */
+            thumb_url?: string | null;
+            /** Url */
+            url?: string | null;
         };
         /** PolicyOut */
         PolicyOut: {
@@ -2051,6 +2142,7 @@ export interface components {
             language: string;
             /** Meaning */
             meaning: string | null;
+            picture?: components["schemas"]["PictureOut"] | null;
             /** Pos */
             pos?: string | null;
             /** Set Id */
@@ -3799,6 +3891,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WordOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_photo_api_words__word_id__picture_get: {
+        parameters: {
+            query?: {
+                size?: string;
+                v?: number | null;
+            };
+            header?: never;
+            path: {
+                word_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "image/jpeg": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_picture_api_words__word_id__picture_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                word_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_emoji_api_words__word_id__picture_emoji_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                word_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmojiIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PictureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_photo_api_words__word_id__picture_photo_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                word_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_put_photo_api_words__word_id__picture_photo_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PictureOut"];
                 };
             };
             /** @description Validation Error */

@@ -67,6 +67,15 @@ The box has three items. A fourth would put the biggest change where people actu
 
 Leave the box alone if you prefer it short; the sections already say it.
 
+### Topic 8: pictures on words (section 2 table, one new row; section 6 and section 7 one phrase each)
+
+New since patch 0102 (22 November 2026). A learner can give a word an emoji or one of their own photos. The photo is the first thing the app stores that comes from the learner's device rather than being typed. What the code does (`api/app/services/pictures.py`): the photo is re-drawn on the server as a JPEG of at most 512 pixels (the page shrinks it first), which drops everything the camera wrote into the file, the place it was taken included; a 96-pixel copy is kept for lists; at most 200 photos a learner; only that learner's own session can fetch it; it is in "Download my data" (as a data address) and goes with the word or the account. Nothing is sent to anyone else.
+- **8A (recommended).** New row, after "Words, meanings and stories you add":
+  > **Pictures you add to words** | An emoji, or a photo you choose from your device. A photo is made smaller and its camera and location details are removed before it is saved. Only you can see it. You can remove it at any time.
+  and in section 6 add "pictures" to the list deleting an account removes, and in section 7 "words, pictures" in the download bullet.
+- **8B (shorter).** The row without the sentence about camera and location details. Not recommended: that sentence is the one a cautious learner looks for.
+- **8C.** Say nothing: "Words, meanings and stories you add" already covers study material. A photo is not typed study material, so I would not.
+
 ## 3. Decisions that are yours, not wording
 
 1. **The version.** Any change that matters bumps `POLICY_VERSION` (today `2026-10-24`). The rule in `api/app/policy/__init__.py`: a copy is shown only if it is approved **and** its version equals `POLICY_VERSION`. So the moment the version moves, every other-language copy is withdrawn (English is shown, with a notice) until it is updated and approved again. Today only English is approved, so nothing visible is lost.
@@ -82,4 +91,4 @@ Leave the box alone if you prefer it short; the sections already say it.
 4. For 5B only: change the sign-out code and its test.
 5. Deliver it as one patch, with the board and the "To do task" doc updated.
 
-Reply with something like "1A, 2A, 3A, 4A, 5A, 6A, yes to the box, version 2026-11-xx", or tell me what to change.
+Reply with something like "1A, 2A, 3A, 4A, 5A, 6A, 8A, yes to the box, version 2026-11-xx", or tell me what to change.

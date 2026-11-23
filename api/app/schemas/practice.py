@@ -6,6 +6,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
+from .words import PictureOut
+
 
 class Preview(BaseModel):
     """Seconds until the word comes back for each answer, so the buttons can say "10m" or "3d"."""
@@ -27,6 +29,7 @@ class FlashcardOut(BaseModel):
     leech: bool                         # forgotten many times: worth a better way to remember it
     due_at: datetime | None             # null: never practised
     preview: Preview
+    picture: PictureOut | None = None   # shown with the meaning when the card is turned over
 
 
 class FlashcardSet(BaseModel):

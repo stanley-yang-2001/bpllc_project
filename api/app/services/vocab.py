@@ -6,7 +6,7 @@ from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
 from ..errors import conflict, not_found, validation_error
-from . import word_sets
+from . import pictures, word_sets
 from .csv_import import bulk_add, parse_csv                                       # noqa: F401  (old import path)
 from .word_fill import fill_meanings, fill_pos, words_without_meaning, words_without_pos      # noqa: F401  (old import path)
 
@@ -33,7 +33,8 @@ def list_words(conn, user_id: int, language: str, q: str | None, limit: int, off
         cur.execute(f"SELECT count(*) AS n FROM words WHERE {where}", params)
         total = cur.fetchone()["n"]
         cur.execute(f"SELECT {WORD_COLS} FROM words WHERE {where} ORDER BY id DESC LIMIT %s OFFSET %s", params + [limit, offset])
-        return {"items": cur.fetchall(), "total": total, "limit": limit, "offset": offset}
+        items = cur.fetchall()
+    return {"items": pictures.attach(conn, items), "total": total, "limit": limit, "offset": offset}
 
 
 def _clean(word, meaning, language):
@@ -85,7 +86,8 @@ def update_word(conn, user_id: int, word_id: int, fields: dict) -> dict:
         except psycopg2.errors.UniqueViolation:
             conn.rollback()
             raise conflict(f"'{new_word}' is already in your list.")
-        return cur.fetchone()
+        row = cur.fetchone()
+    return pictures.attach(conn, [row])[0]
 
 
 def delete_words(conn, user_id: int, ids: list[int]) -> int:

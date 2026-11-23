@@ -33,6 +33,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 7 Nov | Story score version 2, waiting out the Groq rate limit, re-scoring saved comparison runs (0060); word-range prompt and level wording, off by default (0061); story score version 3: grammar mistakes found by built-in rules, optional LanguageTool and a verified model review, plus a probe corpus (0062); several candidates, optional judge and a targeted repair loop, all off by default (0063); multi-method timed comparison runner (0064); cascade (planned word counts, mixed candidates, free checks, review, one repair) and a Qwen/GPT mix test (0065); score version 4 (grammar-weighted, failed stories) and a second Groq account key (0066) |
 | 9 Nov | Spaced-repetition flashcards with four answers, no card limit, several sets at once, answer timing, memory statistics and hardest words (0069, migration 0017); clicks-only answering, a chosen session length, an all-time total in the summary, answer timing in the privacy policy (0070) |
 | 21 Nov | A reader that underlines your words in a story, with a card for each word and a way to add the ones that are not yet in your list (0099) |
+| 22 Nov | A picture for each word: an emoji from a grid or any emoji you type, or your own photo (shrunk in the browser, shrunk again and stripped of camera and location data on the server); shown in the word list, on the back of a flashcard and on the reader's word card; part of "Download my data" (0102, migration 0019) |
 
 ## 1. The foundation (September to 18 October 2026)
 

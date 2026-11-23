@@ -1820,5 +1820,29 @@
       "reading",
       "vocabulary"
     ]
+  },
+  {
+    "title": "Pictures for words (emoji or your own photo)",
+    "status": "In review",
+    "area": "vocabulary",
+    "date": "2026-11-22",
+    "summary": "A word can have one picture: an emoji from a grid or typed, or the learner's own photo (shrunk in the browser and again on the server, camera and location data removed). Shown in the word list, on the flashcard back and on the reader's card; in Download my data; deleted with the word or account. Migration 0019, Pillow added. Privacy wording is Topic 8 in PRIVACY-POLICY-OPTIONS.md, for the owner to approve.",
+    "done": [
+      "Table tutor.word_pictures (migration 0019), one picture per word, deleted with the word or the account",
+      "Photo checked, turned upright, scaled to 512 px and re-written as a JPEG with no camera or location data; 96 px copy; 200 photos a learner",
+      "Routes to set an emoji, set a photo, fetch it and remove it; picture on word list, flashcards and the reader's gloss; in Download my data",
+      "Picker dialog (211 emoji in six groups, any typed emoji, own photo shrunk in the browser) in nine languages",
+      "tests: 72 API, 13 web, 1 flashcard"
+    ],
+    "todo": [
+      "Apply patch 0102, rebuild the API (Pillow) and web images, try an emoji and a phone photo",
+      "Approve or change the privacy wording, Topic 8 in docs/PRIVACY-POLICY-OPTIONS.md",
+      "Native-speaker check of the new messages",
+      "Next: picture quiz, free photo search, starter-pack emoji"
+    ],
+    "labels": [
+      "vocabulary",
+      "privacy"
+    ]
   }
 ]

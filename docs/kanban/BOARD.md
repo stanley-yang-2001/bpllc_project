@@ -13,7 +13,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Push the branch and open the pull request** (no date) — The author pushes to the remote; the branch has 30+ local commits.
 - **Streaming chat reply in the browser** (2026-11-03) — Parked. Built behind CHAT_STREAM=1 (API reads Langflow's stream, the page shows a live draft), but your probe of 4 Nov showed Langflow's Agent sends no word events and a plain answer finishes in about 1.5 s, so nothing visible changes. Code stays, off by default.
 
-## In review (59)
+## In review (60)
 
 - **Known gaps pass: heading above a narration, closing line, grammar rule** (2026-10-25) — 'Montag Morgen:' is no longer read as a speaker; target-language stories get a rule to end with the story and re-check articles, verb endings and agreement (patch 0024).
 - **Your own AI model for stories (phase 1)** (2026-10-24) — Per-account switch, encrypted key (MODEL_KEY_SECRET), address guard, My model card, report names the model. Built and tested here, applied; not yet run with a real key.
@@ -74,6 +74,7 @@ Generated from `cards.json` (the same file `scripts/create_kanban_cards.py` uplo
 - **Score v2 and rate-limit-proof testing** (2026-11-07) — Calibrated score (stuffing, blanks, repeated words, run-ons, softer length), a Groq wait-and-retry wrapper, and offline re-scoring of saved comparison runs.
 - **Spaced-repetition flashcards** (2026-11-09) — SM-2 schedule (Again/Hard/Good/Easy) answered by clicks only, session length you choose, no card limit, several sets at once, review log with answer timing, statistics, hardest words, all-time totals, privacy policy updated.
 - **Reader that glosses your words (tap for meaning, listen, add)** (2026-11-21) — A story in Studio and the Library shows your own words underlined; a tap opens a card with the saved meaning and a Listen button; a tap on any other word offers Listen and Add word (with a tutor-written meaning if ticked). The matching is the story score's own, so what is underlined is what the report counts as used.
+- **Pictures for words (emoji or your own photo)** (2026-11-22) — A word can have one picture: an emoji from a grid or typed, or the learner's own photo (shrunk in the browser and again on the server, camera and location data removed). Shown in the word list, on the flashcard back and on the reader's card; in Download my data; deleted with the word or account. Migration 0019, Pillow added. Privacy wording is Topic 8 in PRIVACY-POLICY-OPTIONS.md, for the owner to approve.
 
 ## Done (34)
 

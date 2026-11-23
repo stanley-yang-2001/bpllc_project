@@ -49,7 +49,7 @@ def test_flashcards_are_this_learners_words_with_meanings_in_this_language(make_
     body = alice.get("/api/practice/flashcards?language=en&limit=50").json()
     assert sorted(c["word"] for c in body["items"]) == sorted(WORDS) and body["total"] == len(WORDS)
     assert {c["word"]: c["meaning"] for c in body["items"]} == WORDS
-    assert set(body["items"][0]) == {"id", "word", "meaning", "status", "ease", "interval_days", "lapses", "reps", "leech", "due_at", "preview"}
+    assert set(body["items"][0]) == {"id", "word", "meaning", "status", "ease", "interval_days", "lapses", "reps", "leech", "due_at", "preview", "picture"}
     assert (body["selection"], body["new"], body["due"]) == (len(WORDS), len(WORDS), 0)
 
 

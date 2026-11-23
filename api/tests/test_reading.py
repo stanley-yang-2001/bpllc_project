@@ -42,7 +42,8 @@ def test_spans_slice_the_text_and_words_come_with_their_meanings(make_user):
     text = "The dogs were running.\nBen: A dog!"
     body = gloss(c, text).json()
     assert [(text[s["start"]:s["end"]], s["word_id"]) for s in body["spans"]] == [("dogs", dog), ("running", run), ("dog", dog)]
-    assert body["words"] == [{"id": dog, "word": "dog", "meaning": "a pet", "pos": None}, {"id": run, "word": "run", "meaning": None, "pos": None}]
+    assert body["words"] == [{"id": dog, "word": "dog", "meaning": "a pet", "pos": None, "picture": None},
+                             {"id": run, "word": "run", "meaning": None, "pos": None, "picture": None}]
 
 
 def test_no_words_no_spans(make_user):

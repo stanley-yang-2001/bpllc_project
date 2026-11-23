@@ -5,9 +5,11 @@ from .reading import GlossIn, GlossOut, GlossSpan, GlossWord
 from .stories import DifficultyLimits, DifficultyOptions, DifficultyTargets, StoryOptionsOut, GeneratedStoryOut, StoryCard, StoryFull, StoryPage, MAX_STORY_BODY, DifficultyIn, GenerateIn, SaveIn
 from .system import LanguageOut, MetaOut, PolicyOut, StatusOut, ServiceCheck, HealthOut, ToolCallOut, ChatOut
 from .user import CustomColors, PreferencesOut, UserOut
-from .words import WordOut, SetOut, SetList, WordPage, DeleteResult, InvalidRow, UploadResult, PosCategories, StarterPackOut, StarterPackList, StarterAdded
+from .words import EmojiIn, PictureOut, WordOut, SetOut, SetList, WordPage, DeleteResult, InvalidRow, UploadResult, PosCategories, StarterPackOut, StarterPackList, StarterAdded
 
 __all__ = [
+    "EmojiIn",
+    "PictureOut",
     "GlossIn",
     "GlossOut",
     "GlossSpan",
