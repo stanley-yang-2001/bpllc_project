@@ -505,3 +505,79 @@ def test_a_skipped_method_is_not_made_again_but_stays_in_the_file(tmp_path, monk
     monkeypatch.setenv("GROQ_API_KEY", "x")
     run_story_methods.main(["--resume", path, "--variants", "baseline", "--languages", "es", "--no-preflight", "--skip", "rules"])
     assert made == [["baseline"]]
+
+
+# --- 24 Nov 2026: a resumed run asks again the reviewers that have no working review of a saved story (--fill-reviews) ---------------------------------------------
+
+DAILY = ("RuntimeError: Groq API error 429: Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_x` service tier `on_demand` on tokens per day (TPD): "
+         "Limit 200000, Used 199993, Requested 836. Please try again in 4m26s.")
+
+
+def _reviewed_run(qwen_down):
+    """One baseline story reviewed by gpt and qwen, with qwen answering only when `qwen_down` is empty."""
+    seen = {"gpt": 0, "qwen": 0}
+
+    def model_for(alias):
+        def call(prompt):
+            if "Find the mistakes that a careful native speaker" in prompt or "Rate how NATURAL" in prompt:
+                seen[alias] += 1
+                if alias == "qwen" and qwen_down:
+                    raise RuntimeError(qwen_down[0])
+            return fake_model(prompt) if "Rate how NATURAL" not in prompt else json.dumps({"score": 4, "reason": "fine"})
+        return call
+    chans = {a: runner.Channel(model_for(a)) for a in seen}
+    c = runner.Calls(runner.Channel(fake_model), models=lambda a: chans[a], audits={"gpt": chans["gpt"], "qwen": chans["qwen"]})
+    return c, seen
+
+
+def test_a_saved_story_with_a_reviewer_that_failed_is_found_and_filled_in_without_writing_it_again():
+    down = [DAILY]
+    c, seen = _reviewed_run(down)
+    data, chosen = make("baseline")
+    runner.run(data, chosen, c, say=lambda *_: None, limit=1)
+    entry = next(iter(data["results"].values()))["baseline"]
+    assert set(entry["audit_scores"]) == {"gpt"} and entry["audit_union"] is None
+    assert runner.missing_reviewers(entry, ["gpt", "qwen"]) == ["qwen"] and runner.missing_reviewers(entry, ["gpt"]) == []
+    text, gpt_before = entry["text"], seen["gpt"]
+    down.clear()                                           # the limit has reset
+    c, seen = _reviewed_run(down)
+    assert runner.fill_reviews(data, chosen, c, say=lambda *_: None) is True
+    assert entry["text"] == text and set(entry["audit_scores"]) == {"gpt", "qwen"} and entry["audit_union"] is not None
+    assert seen["gpt"] == 0 and seen["qwen"] > 0           # only the missing reviewer was asked
+    assert runner.missing_reviewers(entry, ["gpt", "qwen"]) == [] and entry["audit"] == entry["audits"]["gpt"]
+    assert gpt_before > 0
+
+
+def test_filling_in_stops_at_a_daily_limit_and_a_worse_answer_never_replaces_a_better_one(tmp_path):
+    down = [DAILY]
+    c, _ = _reviewed_run(down)
+    data, chosen = make("baseline")
+    runner.run(data, chosen, c, say=lambda *_: None)
+    assert len(data["results"]) == 2
+    saved = []
+    c, seen = _reviewed_run(down)                          # still limited
+    assert runner.fill_reviews(data, chosen, c, on_saved=lambda d: saved.append(1), say=lambda *_: None) is False
+    assert "limit too long to wait for" in data["meta"]["stopped"] and "while filling in reviews" in data["meta"]["stopped"]
+    assert seen["qwen"] <= 4 and all(not e["baseline"]["audits"]["qwen"]["ok"] for e in data["results"].values())   # stopped after the first story, the second was not tried
+    one = next(iter(data["results"].values()))["baseline"]
+    one["audits"]["qwen"] = dict(one["audits"]["gpt"])     # a qwen review that half worked: the review did, the rating did not
+    one["audits"]["qwen"]["naturalness"] = {"ok": False, "score": None, "reason": "", "error": "x"}
+    assert runner.missing_reviewers(one, ["gpt", "qwen"]) == ["qwen"]
+    c, _ = _reviewed_run(down)
+    runner.fill_reviews(data, chosen, c, say=lambda *_: None)
+    assert one["audits"]["qwen"]["ok"] is True             # kept: the new answer failed outright and "worked" less
+
+
+def test_the_command_line_fills_reviews_before_it_makes_missing_stories(tmp_path, monkeypatch):
+    import run_story_methods
+    data, chosen = make("baseline")
+    path = str(tmp_path / "file.json")
+    runner.save(data, path)
+    order = []
+    monkeypatch.setattr(runner, "fill_reviews", lambda *a, **k: order.append("fill") or True)
+    monkeypatch.setattr(runner, "run", lambda *a, **k: order.append("run") or True)
+    monkeypatch.setattr(run_story_methods, "write_outputs", lambda *a, **k: None)
+    monkeypatch.setenv("GROQ_API_KEY", "x")
+    assert run_story_methods.main(["--resume", path, "--variants", "baseline", "--languages", "es", "--no-preflight", "--fill-reviews", "--audit-models", "gpt,qwen"]) == 0
+    assert order == ["fill", "run"]
+    assert run_story_methods.main(["--variants", "baseline", "--languages", "es", "--fill-reviews", "--dry-run"]) == 2      # it needs --resume

@@ -1865,5 +1865,27 @@
       "practice",
       "vocabulary"
     ]
+  },
+  {
+    "title": "Story tests: rounds 10 and 11 written up, fill missing reviews, round 12",
+    "status": "In review",
+    "area": "story tests",
+    "date": "2026-11-24",
+    "summary": "Writer v2 outside English: Spanish +27 points (p 0.041), French no difference, German and Italian +20 inside noise, pooled +14 over 76 requests; German and Italian are half single-reviewer and four languages did not run (Groq daily limit). New --fill-reviews asks missing reviewers again on a resumed run; round 12 cell runs three days of two languages.",
+    "done": [
+      "Rounds 10 and 11 read and written up in docs/STORY-SCORING.md",
+      "--fill-reviews in the runner (3 tests)",
+      "kaggle_round12.py: DAY 1 de+it, DAY 2 pt+zh, DAY 3 ja+ko"
+    ],
+    "todo": [
+      "Apply patch 0104 and push (the Kaggle cell clones the repo)",
+      "Run round 12 day 1 after 10:30 Tuesday (Chicago), with v2_de.json and v2_it.json as input",
+      "Days 2 and 3 at least 24 hours apart",
+      "Decision on STORY_WRITER_V2 once de, it and the others are in"
+    ],
+    "labels": [
+      "story-tests",
+      "kaggle"
+    ]
   }
 ]

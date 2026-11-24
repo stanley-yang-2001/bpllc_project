@@ -92,6 +92,8 @@ def main(argv=None) -> int:
                     "Extra keys are GROQ_API_KEY_2, _3 ... (and GROQ_QWEN_API_KEY_2, GROQ_JUDGE_API_KEY_2, GROQ_AUDIT_API_KEY_2) in .env")
     ap.add_argument("--tpm", type=int, default=7000, help="tokens per minute to stay under (free tier: 8000)")
     ap.add_argument("--resume", default=None, metavar="FILE.json", help="continue an earlier run: only missing stories are made")
+    ap.add_argument("--fill-reviews", action="store_true", help="with --resume: first ask again the reviewers that have no working review of a SAVED story (a daily limit can stop one reviewer "
+                    "halfway through a run while the other goes on), then make the missing stories. No story is written again; a reviewer's new answer replaces the old one only when more of it worked")
     ap.add_argument("--skip", default="", metavar="NAMES", help="with --resume: methods of the file that are NOT made again (a resumed run finishes every method the file has, not only the ones named in --variants); "
                     "what they already hold stays in the file and the report. For a method you have stopped measuring")
     ap.add_argument("--rescore", default=None, metavar="FILE.json", help="no model calls: score the saved stories again with the current score")
@@ -133,6 +135,9 @@ def main(argv=None) -> int:
         log("--audit-models takes gpt and/or qwen.")
         return 2
     args.audit = args.audit or bool(reviewers)
+    if args.fill_reviews and not args.resume:
+        log("--fill-reviews continues an earlier file: add --resume FILE.json.")
+        return 2
     size = runner.estimate(requests, chosen, args.audit, not args.no_translate, args.tpm, max(1, len(reviewers)), 0 if args.no_naturalness else max(1, args.rating_repeats))
     log(f"{size['requests']} requests x {size['variants']} methods: about {size['calls']} model calls, {size['tokens']:,} tokens, "
           f"at least {size['minutes']} minutes at {args.tpm} tokens a minute.")
@@ -148,6 +153,14 @@ def main(argv=None) -> int:
                                 max(1, len(reviewers)), 0 if args.no_naturalness else max(1, args.rating_repeats)) for v in chosen]
         size["calls"], size["tokens"] = sum(x["calls"] for x in rest), sum(x["tokens"] for x in rest)
         size["minutes"] = round(size["tokens"] / args.tpm)
+        if args.fill_reviews:                # each gap costs one review and the rating repeats of one reviewer; the story itself is not made again
+            gaps = sum(len(runner.missing_reviewers(entry, reviewers, not args.no_naturalness)) for row in done.values() for name, entry in row.items()
+                       if name in {v.name for v in chosen} and entry.get("ok") and entry.get("text"))
+            ratings = 0 if args.no_naturalness else max(1, args.rating_repeats)
+            size["calls"] += gaps * (1 + ratings)
+            size["tokens"] += gaps * (1 + ratings) * 1500
+            size["minutes"] = round(size["tokens"] / args.tpm)
+            log(f"--fill-reviews: {gaps} reviewer verdicts are missing from the stories already saved; asking them again is included in the size below.")
         log(f"Already in {args.resume}: what is left is about {size['calls']} model calls, {size['tokens']:,} tokens, at least {size['minutes']} minutes.")
     if size["tokens"] > 150_000:
         log("That is more than the free tier's daily token allowance for one model may cover. Run it in parts with --limit N, then --resume; "
@@ -281,7 +294,8 @@ def main(argv=None) -> int:
         from tutor_core import db
         conn = db.connect()
     try:
-        done = runner.run(data, chosen, calls, conn=conn, on_saved=saved, limit=args.limit, say=log, deadline=deadline)
+        filled = runner.fill_reviews(data, chosen, calls, on_saved=saved, say=log, deadline=deadline) if args.fill_reviews else True
+        done = runner.run(data, chosen, calls, conn=conn, on_saved=saved, limit=args.limit, say=log, deadline=deadline) if filled else False
     finally:
         if conn:
             conn.close()

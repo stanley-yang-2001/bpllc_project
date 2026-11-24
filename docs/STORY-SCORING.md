@@ -426,3 +426,25 @@ Round 9 made `v2` again (`v2_b`) and the baseline again (`baseline_b`) for the s
 **What it settles and what it does not.** In English `v2` is a real gain over the baseline at +0.4 calls, and as good as methods that cost 2 to 6 times as many. It was never measured outside English (es, fr, de, it, pt, zh, ja and ko), and `STORY_WRITER_V2` is still off in the app; that is your decision, and the evidence for English is now what it will be.
 
 **What is built.** `kaggle_round10.py`: `baseline` and `v2` on 30 requests in Spanish, French and German, each its own job (60 stories, about 0.65 million tokens, one day of three keys each; 1.95 million in all), starting from nothing, each continuing from its own file on the next day.
+
+### What rounds 10 and 11 showed (patch 0104, 23 November 2026)
+
+Round 10 was baseline against `v2` on 30 requests each in Spanish, French and German; round 11 the same in Italian, Portuguese, Chinese, Japanese and Korean. Only part of it ran, and the reason is the daily limit, not a fault.
+
+| Language | Stories made (of 60) | Stories judged by both reviewers | Passed / split / failed, baseline | the same, `v2` | `v2` against baseline |
+|---|---|---|---|---|---|
+| Spanish | 60 | 60 | 11 / 2 / 17 | 15 / 10 / 5 | **+27 (+4 to +49), p 0.041** |
+| French | 60 | 58 | 13 / 6 / 11 | 11 / 9 / 10 | −2 (−23 to +20), p 0.82 |
+| German | 30 | 6 | 4 / 1 / 10 (15 requests) | 6 / 3 / 6 | +20 (−17 to +57), p 0.75, mostly gpt alone |
+| Italian | 41 | 34 | 6 / 5 / 10 (21 stories) | 9 / 5 / 6 (20) | +20 (−1 to +41), p 0.18 |
+| Portuguese, Chinese, Japanese, Korean | 0 (Chinese 1) | | | | not measured |
+
+1. **Why most of round 11 did not run.** Groq allows 200,000 tokens a day for gpt-oss-120b and for qwen, counted over a rolling 24 hours. One language is about 0.65 million tokens (about 0.4 million of them on gpt-oss-120b), so a day holds about two languages. Round 10 spent the limit between 06:10 and 08:29 UTC; round 11 started at 15:08 UTC the same day, so Italian got 41 stories and the other four got 0 or 1.
+2. **A gap in the test code, found here.** When qwen reached its daily limit the story was still saved, with gpt's verdict only (German 24 of 30 stories, Italian 7 of 41), and a plain `--resume` makes only the stories that are missing, so those stayed one-reviewer verdicts. Patch 0104 adds `--fill-reviews`: on a resumed run it first asks again the reviewers that have no working review of a saved story (no story is written again, and a new answer replaces an old one only when more of it worked), then makes the missing stories. The round 12 cell uses it.
+3. **`v2` does what it was built to do in every language measured.** Findings a story fell from 3.4 to 2.6 (Spanish), 3.2 to 2.3 (French), 3.4 to 2.7 (German) and 3.4 to 2.8 (Italian); sentences inside the level's range went from 10, 10, 5 and 7 stories to 29, 30, 14 and 20 (of 30, 30, 15 and 20 to 21). Agreement slips fell in Spanish, French and Italian (30 to 10, 24 to 4, 29 to 16 findings).
+4. **Passes: a gain in three languages, none in French, and the pooled figure is smaller than English.** Counting only the 76 requests where both reviewers judged both stories (Spanish 30, French 29, Italian 17): +14 points a request (about +1 to +26), 30 requests better and 14 worse. English was +27. Spanish alone reaches significance; Italian and German point the same way; French is flat (its baseline already passes 13 of 30, against 11 in Spanish and 4 of 15 in German).
+5. **What French showed.** The free checks fit (30 of 30 in the level's range) but the reviewers' remarks moved: fewer agreement and preposition findings, but adjective and adverb placement stayed or grew (French 14 findings for the baseline, 18 for `v2`; German 12 and 17): "quatre arbres grands", "le jardin petit", "J'écoute la radio souvent", "gesungen leise", "fiel ein roter Apfel vom Baum plötzlich". These are a few remarks in 30 stories, so a language-specific word-order sentence for the writer is a hypothesis, not a result; it is not built, and the next round does not test it.
+
+**What it settles and what it does not.** `v2` is not worse in any language measured, costs the same one call as the baseline, and is clearly better on the free checks everywhere; on the reviewers' pass rate it is clearly better in English and Spanish and not distinguishable from the baseline in French. German and Italian need their remaining stories and the missing qwen verdicts before they can be read. Portuguese, Chinese, Japanese and Korean are unmeasured. `STORY_WRITER_V2` stays off in the app; the evidence is now English plus three languages, and the decision is yours.
+
+**What is built.** `kaggle_round12.py`: three days, each a `DAY` number in the cell: day 1 continues German (28 reviews to fill, 30 stories to make) and Italian (7 reviews, 19 stories); day 2 Portuguese and Chinese; day 3 Japanese and Korean. Each starts at least 24 hours after the last stop of the day before.

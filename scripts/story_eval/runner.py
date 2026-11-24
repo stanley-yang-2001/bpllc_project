@@ -147,6 +147,83 @@ def review_text(text: str, request: dict, reviewers: dict, rate: bool = True, re
     return audits, scores, union
 
 
+def missing_reviewers(entry: dict, reviewers, rate: bool = True) -> list:
+    """The reviewers (labels) whose review, or whose rating when ratings are asked for, did not work for this saved story: it was never asked, or the answer was a limit, a timeout
+    or not the JSON asked for. A story with such a gap is judged by fewer reviewers than the others, so a comparison between methods would mix one-reviewer and two-reviewer verdicts."""
+    got = entry.get("audits") or {}
+    gaps = []
+    for label in reviewers:
+        review = got.get(label)
+        if not review or not review.get("ok") or (rate and not (review.get("naturalness") or {}).get("ok")):
+            gaps.append(label)
+    return gaps
+
+
+def _scores_of(text: str, request: dict, audits: dict):
+    """(audit_scores, audit_union) from saved reviews, the way review_text makes them from fresh ones."""
+    scores, union = {}, None
+    for label, review in audits.items():
+        rating = review.get("naturalness") or {}
+        has_review, has_rating = bool(review.get("ok")), bool(rating.get("ok")) and rating.get("score") is not None
+        if has_review or has_rating:
+            hits = [Hit(**h) for h in review["hits"]] if has_review else None
+            scores[label] = _score(text, True, request, hits, rating["score"] if has_rating else None)
+    if len(scores) > 1:
+        good = [r for r in audits.values() if r.get("ok")]
+        union = _score(text, True, request, merge_reviews(*([Hit(**h) for h in r["hits"]] for r in good)),
+                       combine_ratings([(r.get("naturalness") or {}).get("score") for r in audits.values()]))
+    return scores, union
+
+
+def _worked(review: dict) -> int:
+    return int(bool(review.get("ok"))) + int(bool((review.get("naturalness") or {}).get("ok")))
+
+
+def fill_reviews(data: dict, variants: list, calls: Calls, *, on_saved: Callable = lambda d: None, say: Callable = print, deadline: Optional[float] = None) -> bool:
+    """Ask again, for every saved story of `variants`, the reviewers that have no working review of it (a daily limit stopped qwen halfway through the 23 November German
+    run: 24 of 30 stories had only gpt's verdict, and a plain --resume makes only the stories that are missing, so they stayed that way). No story is written again.
+    A reviewer's new answer replaces the old one only when more of it worked. Stops, saving, at the first limit that cannot be waited out. True when no gap is left."""
+    reviewers = calls.audits or ({"review": calls.audit} if calls.audit else {})
+    if not reviewers:
+        return True
+    wanted = {v.name for v in variants}
+    requests = {r["id"]: r for r in data["requests"]}
+    meta = data.setdefault("meta", {})
+    todo = [(rid, name) for rid, row in data["results"].items() for name, entry in row.items()
+            if rid in requests and name in wanted and entry.get("ok") and entry.get("text") and missing_reviewers(entry, reviewers, calls.rate)]
+    if todo:
+        say(f"\nFilling in missing reviews: {len(todo)} saved stories lack at least one reviewer's verdict.")
+    for n, (rid, name) in enumerate(todo, 1):
+        entry, request = data["results"][rid][name], requests[rid]
+        lacking = missing_reviewers(entry, reviewers, calls.rate)
+        if deadline is not None and time.monotonic() >= deadline:
+            meta["stopped"] = f"the time budget (--max-minutes) ran out while filling in reviews (at {rid}, {name})"
+            on_saved(data)
+            say("\nStopped: the time budget ran out. What is done is saved. Run again with --resume --fill-reviews to continue.")
+            return False
+        audits, _, _ = review_text(entry["text"], request, {label: reviewers[label] for label in lacking}, calls.rate, calls.rate_repeats)
+        merged = dict(entry.get("audits") or {})
+        for label, fresh in audits.items():
+            if label not in merged or _worked(fresh) >= _worked(merged[label]):
+                merged[label] = fresh
+        entry["audits"] = merged
+        entry["audit_scores"], entry["audit_union"] = _scores_of(entry["text"], request, merged)
+        first = next(iter(merged), None)
+        if first:
+            entry["audit"], entry["audit_seconds"], entry["audit_score"] = merged[first], merged[first].get("seconds"), entry["audit_scores"].get(first)
+        on_saved(data)
+        limit = next((fresh for fresh in ([a.get("error") for a in audits.values()] + [(a.get("naturalness") or {}).get("error") for a in audits.values()])
+                      if fresh and health.classify(fresh) == "rate_limit_long"), None)
+        say(f"[fill {n}/{len(todo)}] {rid} {name:<10} asked {', '.join(lacking)}; now " + ", ".join(f"{label} {'ok' if _worked(r) == 1 + int(calls.rate) else 'GAP'}" for label, r in merged.items()))
+        if limit:
+            why = describe_error(limit)
+            meta["stopped"] = f"limit too long to wait for: {why} (while filling in reviews, at {rid}, {name})"
+            on_saved(data)
+            say(f"\nStopped: the limit is too long to wait for ({why}). Run again with --resume --fill-reviews to continue.")
+            return False
+    return True
+
+
 def draft_entry(draft: str, final: str, request: dict, reviewers: dict, rate: bool = True, repeats: int = 1) -> dict:
     """The refine loop's first draft next to its result. Reviewed only when the loop changed it and there are reviewers; an unchanged draft IS the result."""
     changed = draft.strip() != final.strip()
