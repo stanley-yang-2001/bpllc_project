@@ -97,3 +97,11 @@ def test_the_weekly_challenge_rotates_and_reports_progress():
     assert c["ends_on"] == date(2026, 11, 15) and c["done"] is False and c["have"] < c["target"]
     done = weekly_challenge(t, {"words_learned": 99, "days": 7, "answers": 999, "stories": 9})
     assert done["done"] is True and done["have"] == done["target"]
+
+
+def test_story_counts_counts_stories_not_mentions_and_matches_whole_words():
+    from tutor_core.rewards import story_counts
+    stories = ["The cat sat. The cat ran.", "A cathedral. Au revoir, cat!", "你好，朋友"]
+    got = story_counts(["cat", "Au revoir", "dog", "你好", "朋友", "art"], stories)
+    assert got == {"cat": 2, "au revoir": 1, "dog": 0, "你好": 1, "朋友": 1, "art": 0}
+    assert story_counts([], stories) == {} and story_counts(["cat"], []) == {"cat": 0}

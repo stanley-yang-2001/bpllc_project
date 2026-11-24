@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 from ..db import connection
 from ..deps import current_user, require_language
-from ..schemas import DeleteResult, PosCategories, StarterAdded, StarterPackList, UploadResult, WordOut, WordPage
-from ..services import preferences, vocab, word_sets
+from ..schemas import DeleteResult, PosCategories, StarterAdded, StarterPackList, UploadResult, WordOfDay, WordOut, WordPage
+from ..services import exposure, preferences, vocab, word_sets
 from tutor_core import definitions, pos
 from tutor_core.languages import LANGUAGES
 
@@ -48,6 +48,14 @@ def list_words(request: Request, language: str, q: str | None = None, limit: int
     require_language(language)
     with connection(request.app.state.pool) as conn:
         return vocab.list_words(conn, user["id"], language, q, limit, offset, set, missing_meaning)
+
+
+@router.get("/today", response_model=WordOfDay)
+def word_of_the_day(request: Request, language: str, user: dict = Depends(current_user)):
+    """One of the learner's own words for today (the same all day), from the ones met least. `word` is null when there is none yet."""
+    require_language(language)
+    with connection(request.app.state.pool) as conn:
+        return exposure.word_of_the_day(conn, user["id"], language)
 
 
 def _gloss_ok(conn, user: dict, language: str) -> bool:

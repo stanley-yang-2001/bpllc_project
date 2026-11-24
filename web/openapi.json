@@ -738,6 +738,42 @@
         "title": "EmojiIn",
         "type": "object"
       },
+      "ExposureOut": {
+        "description": "How often the learner has met a word: answers in practice, and saved stories it appears in. `met` is the two added.",
+        "properties": {
+          "answers": {
+            "title": "Answers",
+            "type": "integer"
+          },
+          "last_answered": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Answered"
+          },
+          "met": {
+            "title": "Met",
+            "type": "integer"
+          },
+          "stories": {
+            "title": "Stories",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "answers",
+          "stories",
+          "met"
+        ],
+        "title": "ExposureOut",
+        "type": "object"
+      },
       "FlashcardOut": {
         "properties": {
           "due_at": {
@@ -909,6 +945,17 @@
             ],
             "title": "Difficulty"
           },
+          "focus": {
+            "default": "all",
+            "enum": [
+              "all",
+              "least_met",
+              "due",
+              "new"
+            ],
+            "title": "Focus",
+            "type": "string"
+          },
           "language": {
             "title": "Language",
             "type": "string"
@@ -992,6 +1039,22 @@
       },
       "GeneratedStoryOut": {
         "properties": {
+          "focus": {
+            "default": "all",
+            "title": "Focus",
+            "type": "string"
+          },
+          "focus_matched": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focus Matched"
+          },
           "language": {
             "title": "Language",
             "type": "string"
@@ -3531,12 +3594,46 @@
         "title": "WordIn",
         "type": "object"
       },
+      "WordOfDay": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "word": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WordOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "WordOfDay",
+        "type": "object"
+      },
       "WordOut": {
         "properties": {
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExposureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "title": "Id",
@@ -6078,6 +6175,49 @@
           }
         },
         "summary": "Add Starter Pack",
+        "tags": [
+          "words"
+        ]
+      }
+    },
+    "/api/words/today": {
+      "get": {
+        "description": "One of the learner's own words for today (the same all day), from the ones met least. `word` is null when there is none yet.",
+        "operationId": "word_of_the_day_api_words_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "language",
+            "required": true,
+            "schema": {
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WordOfDay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Word Of The Day",
         "tags": [
           "words"
         ]

@@ -35,6 +35,7 @@ Dates are commit dates (UTC), so a late-evening commit in Chicago can show the n
 | 21 Nov | A reader that underlines your words in a story, with a card for each word and a way to add the ones that are not yet in your list (0099) |
 | 22 Nov | A picture for each word: an emoji from a grid or any emoji you type, or your own photo (shrunk in the browser, shrunk again and stripped of camera and location data on the server); shown in the word list, on the back of a flashcard and on the reader's word card; part of "Download my data" (0102, migration 0019) |
 | 23 Nov | A picture quiz: see a word's picture and pick the word (0103) |
+| 24 Nov | How often you have met each word (a Met column), a story focus (least met, due soon, new) and a word of the day on Home (0105) |
 
 ## 1. The foundation (September to 18 October 2026)
 

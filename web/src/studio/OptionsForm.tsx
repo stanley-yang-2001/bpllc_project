@@ -1,6 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
-import { ApiError, type StoryOptions } from "../api/client";
+import { ApiError, type StoryFocus, type StoryOptions } from "../api/client";
 import { SetPicker } from "../components/SetPicker";
 import { Button, ErrorText, inputCls } from "../components/ui";
 import { useI18n } from "../i18n/I18nProvider";
@@ -9,6 +9,8 @@ import { DifficultyPicker } from "./DifficultyPicker";
 import { CLASSIC, CUSTOM, CUSTOM_MAX, CUSTOM_TOPIC } from "./labels";
 import type { StoryChoices } from "./useStoryChoices";
 import type { StoryGeneration } from "./useStoryGeneration";
+
+const FOCUSES: StoryFocus[] = ["all", "least_met", "due", "new"];
 
 /** The kind, topic and difficulty pickers, the sets, and the Make button with its errors. */
 export function OptionsForm({ language, options, c, g, onMake }: { language: string; options: StoryOptions | undefined; c: StoryChoices; g: StoryGeneration; onMake: () => void }) {
@@ -59,6 +61,13 @@ export function OptionsForm({ language, options, c, g, onMake }: { language: str
         </div>
       </div>
       <DifficultyPicker d={c.difficulty} />
+      <div>
+        <label htmlFor="story-focus" className="mb-1 block text-sm font-medium text-slate-700">{t("exposure.focus.label")}</label>
+        <select id="story-focus" className={inputCls} value={c.focus} onChange={(e) => c.setFocus(e.target.value as StoryFocus)} aria-describedby="story-focus-hint">
+          {FOCUSES.map((f) => <option key={f} value={f}>{t(`exposure.focus.${f}`)}</option>)}
+        </select>
+        <p id="story-focus-hint" className="mt-1 text-xs text-slate-600">{t("exposure.focus.hint")}</p>
+      </div>
       <SetPicker language={language} value={c.sets} onChange={c.setSets} idPrefix="studio-set" />
       <div>
         <Button onClick={onMake} loading={generate.isPending} disabled={!c.canMake} icon={<Sparkles aria-hidden className="size-4" />}>

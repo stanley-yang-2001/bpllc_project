@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { StoryOptions } from "../api/client";
+import type { StoryFocus, StoryOptions } from "../api/client";
 import { nothingTicked, setIdsToSend, type SetChoice } from "../components/SetPicker";
 import { CLASSIC, CUSTOM, CUSTOM_TOPIC, customLabel } from "./labels";
 import { useDifficulty } from "./useDifficulty";
@@ -11,6 +11,7 @@ export function useStoryChoices(language: string, options: StoryOptions | undefi
   const [custom, setCustom] = useState("");
   const [customTopic, setCustomTopic] = useState("");
   const [sets, setSets] = useState<SetChoice>(null);       // null = every set (General always among them)
+  const [focus, setFocus] = useState<StoryFocus>("all");  // which of the words the story is built around
   const difficulty = useDifficulty(options?.difficulty);
 
   const kind = type === CUSTOM ? customLabel(custom) ?? "" : type;       // "" = surprise me (or an unusable label, which blocks Make)
@@ -21,9 +22,10 @@ export function useStoryChoices(language: string, options: StoryOptions | undefi
   const request = {
     language, story_type: kind || undefined, topic: !topicOn ? undefined : topicValue || undefined, ...difficulty.choice,
     ...(setIdsToSend(sets) ? { set_ids: setIdsToSend(sets) } : {}),
+    ...(focus !== "all" ? { focus } : {}),
   };
   return {
-    type, setType, topic, setTopic, custom, setCustom, customTopic, setCustomTopic, sets, setSets, difficulty,
+    type, setType, topic, setTopic, custom, setCustom, customTopic, setCustomTopic, sets, setSets, focus, setFocus, difficulty,
     kind, customBad, topicOn, topicBad, request, canMake: !(customBad || topicBad || difficulty.bad || nothingTicked(sets)),
   };
 }

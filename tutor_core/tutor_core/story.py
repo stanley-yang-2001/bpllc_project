@@ -73,6 +73,7 @@ class StoryRequest:
     set_ids: Optional[list] = None          # None = every word; else only the words in those sets (0 = General)
     two_pass: bool = False                  # draft first, then adapt it to the words (two_pass.py); off = the one-call pipeline
     options: StoryOptions = StoryOptions()  # candidates, judge, repair (story_options.py); all off = the pipeline as it always was
+    focus_words: Optional[tuple] = None     # only these of the learner's words (chosen by the caller, e.g. the ones met least); None = the whole list
 
     def cache_key(self) -> tuple:
         return (self.learner_id, self.language, self.story_type or "", self.topic or "") \
@@ -80,7 +81,8 @@ class StoryRequest:
             + ((tuple(sorted(self.set_ids)),) if self.set_ids is not None else ()) \
             + (('two_pass',) if self.two_pass else ()) \
             + self.options.cache_parts() \
-            + (('range',) if self.difficulty and os.environ.get("STORY_RANGE_PROMPT") == "1" else ())
+            + (('range',) if self.difficulty and os.environ.get("STORY_RANGE_PROMPT") == "1" else ()) \
+            + (('focus', self.focus_words) if self.focus_words is not None else ())
 
 
 def generate_story(
@@ -95,6 +97,7 @@ def generate_story(
     max_words: Optional[int] = None,
     difficulty: Optional[dict] = None,
     set_ids=None,
+    focus_words=None,
     two_pass=None,
     options=None,
     judge_call=None,
@@ -119,7 +122,8 @@ def generate_story(
         story_type = None
     request = StoryRequest(learner_id, language, story_type, clean_topic(topic) if topic else None, max_words, difficulty, clean_set_ids(set_ids),
                            os.environ.get("STORY_TWO_PASS") == "1" if two_pass is None else bool(two_pass),
-                           (StoryOptions.from_env() if options is None else options).normalised())
+                           (StoryOptions.from_env() if options is None else options).normalised(),
+                           None if focus_words is None else tuple(focus_words))
     call = call_groq_fn or groq_module.call_groq
     if judge_call is None and call_groq_fn is None and request.options.judge:
         judge_call = groq_module.make_model_call("GROQ_JUDGE_MODEL", "GROQ_JUDGE_EFFORT", "GROQ_JUDGE_API_KEY")       # None: the story model reviews
@@ -134,6 +138,9 @@ def generate_story(
 def _make_story(conn, request: StoryRequest, call, rng, judge_call=None) -> StoryResult:
     language = request.language
     words = load_words(conn, request.learner_id, language, request.set_ids)
+    if request.focus_words is not None:         # the caller chose some of the learner's words: only words the learner really has can be used, in the caller's order
+        mine = set(words)
+        words = [w for w in request.focus_words if w in mine]
     return _write_story(request, words, call, rng, conn if os.environ.get("STORY_EXAMPLES") == "1" else None, judge_call)
 
 

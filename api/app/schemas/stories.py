@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 from tutor_core import difficulty, prompts
@@ -39,6 +40,8 @@ class GeneratedStoryOut(BaseModel):
     report: dict
     words_total: int
     words_used: int
+    focus: str = "all"
+    focus_matched: int | None = None   # with a focus: how many of the offered words really fit it (the rest topped the list up)
 
 
 class StoryCard(BaseModel):
@@ -89,6 +92,7 @@ class GenerateIn(DifficultyIn):
     set_ids: list[int] | None = Field(default=None, max_length=100)     # the sets to use (0 = General); none = all of the learner's words
     story_type: str | None = None
     topic: str | None = None
+    focus: Literal["all", "least_met", "due", "new"] = "all"        # which of the learner's words the story is built around (services/exposure.py)
 
     @field_validator("story_type")
     @classmethod

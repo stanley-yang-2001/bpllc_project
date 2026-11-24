@@ -141,6 +141,25 @@ def words_in_stories(words: Iterable[str], stories: Iterable[str]) -> int:
     return found
 
 
+def story_counts(words: Iterable[str], stories: Iterable[str]) -> dict:
+    """{word, lower case: in how many of the stories it appears}, for every word given (0 when in none). The same matching as words_in_stories: whole words ignoring
+    case, a plain substring for Chinese, Japanese and Korean. A one-word entry is looked up in each story's set of words (one pass over the text, not one search per word);
+    only a phrase ("au revoir") and a CJK word are searched for in the text itself."""
+    import re
+    texts = [s.casefold() for s in stories]
+    tokens = [set(re.findall(r"\w+", t)) for t in texts]
+    out = {}
+    for w in {x.strip().casefold() for x in words if x and x.strip()}:
+        if _has_cjk(w):
+            out[w] = sum(1 for t in texts if w in t)
+        elif re.fullmatch(r"\w+", w):
+            out[w] = sum(1 for tk in tokens if w in tk)
+        else:
+            pattern = re.compile(rf"(?<!\w){re.escape(w)}(?!\w)")
+            out[w] = sum(1 for t in texts if pattern.search(t))
+    return out
+
+
 # One challenge per calendar week (Monday to Sunday, UTC), rotating so a learner meets a different kind of goal each week.
 # (id, what is counted, target). The counts cover every language, like the badges.
 CHALLENGES: Sequence[tuple[str, str, int]] = (

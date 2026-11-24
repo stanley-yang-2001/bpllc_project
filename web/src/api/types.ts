@@ -6,6 +6,10 @@ export type Word = Schemas["WordOut"];
 /** The picture of a word: an emoji, or the learner's own photo (with the address of the full picture and of a small copy). */
 export type Picture = Schemas["PictureOut"];
 export type WordPage = Schemas["WordPage"];
+/** One of the learner's own words for today, with how often they have met it. `word` is null when they have none in this language. */
+export type WordOfDay = Schemas["WordOfDay"];
+/** Which of the learner's words a story is built around. */
+export type StoryFocus = "all" | "least_met" | "due" | "new";
 export type UploadResult = Schemas["UploadResult"];
 export type GlossResult = Schemas["GlossOut"];
 export type GlossSpan = Schemas["GlossSpan"];

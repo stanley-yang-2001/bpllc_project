@@ -32,6 +32,7 @@ export function WordTable({ words, language, selected, onToggle, onToggleAll, re
             <th className="py-3 pr-4">{t("vocab.colWord")}</th>
             <th className="py-3 pr-4">{t("vocab.colMeaning")}</th>
             <th className="py-3 pr-4">{t("vocab.colPos")}</th>
+            <th className="py-3 pr-4 text-right">{t("exposure.column")}</th>
             {setNames && <th className="py-3 pr-4">{t("sets.column")}</th>}
           </tr>
         </thead>
@@ -45,6 +46,9 @@ export function WordTable({ words, language, selected, onToggle, onToggleAll, re
               <td className="py-2.5 pr-4 font-medium text-slate-900"><span lang={language}>{w.word}</span> <SpeakButton text={w.word} language={language} />{showReadings && readings.get(w.word) && <span className="block text-xs font-normal text-slate-600">{readings.get(w.word)}</span>}</td>
               <td className="py-2.5 pr-4"><MeaningCell word={w} language={language} /></td>
               <td className="py-2.5 pr-4"><PosCell word={w} language={language} /></td>
+              <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600">
+                {w.exposure && <span title={t("exposure.detail", { answers: w.exposure.answers, stories: w.exposure.stories })} aria-label={t("exposure.count", { count: w.exposure.met })}>{w.exposure.met}</span>}
+              </td>
               {setNames && <td className="py-2.5 pr-4 text-slate-600">{w.set_id ? setNames.get(w.set_id) ?? "" : t("sets.general")}</td>}
             </tr>
           ))}

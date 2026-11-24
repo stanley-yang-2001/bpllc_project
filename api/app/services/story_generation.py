@@ -9,7 +9,7 @@ from tutor_core.vocab import load_words
 from ..db import connection
 from ..errors import AppError
 from ..schemas import GenerateIn, SaveIn
-from . import stories
+from . import exposure, stories
 from .ai_runner import AiRunner, OwnModels
 
 MIN_WORDS = 5
@@ -28,8 +28,11 @@ def generate(pool, user_id: int, body: GenerateIn, runner: AiRunner) -> dict:
         raise AppError("language_unavailable", f"Stories in {lang.name} are not available yet.", 422)
     if body.set_ids is not None and any(i < 0 for i in body.set_ids):
         raise AppError("validation_error", "Choose the sets from your list.", 422)
+    focus = None
     with connection(pool) as conn:
         words = load_words(conn, user_id, body.language, body.set_ids)
+        if body.focus != "all" and len(words) >= MIN_WORDS:
+            focus = exposure.focus_words(conn, user_id, body.language, body.set_ids, body.focus)
     if len(words) < MIN_WORDS:
         chosen = "" if body.set_ids is None else " in the sets you chose"
         raise AppError("not_enough_words", f"Add at least {MIN_WORDS} {lang.name} words{chosen} before making a story.", 422)
@@ -37,7 +40,8 @@ def generate(pool, user_id: int, body: GenerateIn, runner: AiRunner) -> dict:
     with runner.slot(user_id, chosen, STORY_TOKENS):
         with connection(pool) as conn:
             result = generate_story(conn, user_id, body.language, use_cache=False, story_type=body.story_type,
-                                    topic=body.topic, difficulty=body.targets, set_ids=body.set_ids, call_groq_fn=chosen.call)
+                                    topic=body.topic, difficulty=body.targets, set_ids=body.set_ids, call_groq_fn=chosen.call,
+                                    focus_words=focus["words"] if focus else None)
     if not result.ok:       # a failure of the learner's own model is shown as it is, with a way back to the shared one; never a silent fallback
         raise runner.failure(chosen, "The story writer didn't answer. Please try again in a moment.",
                              own_hint="You can switch back to the shared model in Settings, under My model, by removing your model.")
@@ -45,7 +49,8 @@ def generate(pool, user_id: int, body: GenerateIn, runner: AiRunner) -> dict:
     if chosen.own_model:
         report["model"] = {"custom": True, "name": chosen.own_model}
     return {"story": result.text, "language": body.language, "story_type": result.story_type, "topic": result.topic,
-            "report": report, "words_total": result.words_total, "words_used": result.words_used}
+            "report": report, "words_total": result.words_total, "words_used": result.words_used,
+            "focus": body.focus, "focus_matched": focus["matched"] if focus else None}
 
 
 def save(pool, user_id: int, body: SaveIn, own_models: OwnModels) -> dict:

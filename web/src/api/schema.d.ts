@@ -884,6 +884,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/words/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Word Of The Day
+         * @description One of the learner's own words for today (the same all day), from the ones met least. `word` is null when there is none yet.
+         */
+        get: operations["word_of_the_day_api_words_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/words/upload": {
         parameters: {
             query?: never;
@@ -1237,6 +1257,20 @@ export interface components {
             /** Emoji */
             emoji: string;
         };
+        /**
+         * ExposureOut
+         * @description How often the learner has met a word: answers in practice, and saved stories it appears in. `met` is the two added.
+         */
+        ExposureOut: {
+            /** Answers */
+            answers: number;
+            /** Last Answered */
+            last_answered?: string | null;
+            /** Met */
+            met: number;
+            /** Stories */
+            stories: number;
+        };
         /** FlashcardOut */
         FlashcardOut: {
             /** Due At */
@@ -1298,6 +1332,12 @@ export interface components {
         GenerateIn: {
             /** Difficulty */
             difficulty?: string | null;
+            /**
+             * Focus
+             * @default all
+             * @enum {string}
+             */
+            focus: "all" | "least_met" | "due" | "new";
             /** Language */
             language: string;
             /** Length */
@@ -1315,6 +1355,13 @@ export interface components {
         };
         /** GeneratedStoryOut */
         GeneratedStoryOut: {
+            /**
+             * Focus
+             * @default all
+             */
+            focus: string;
+            /** Focus Matched */
+            focus_matched?: number | null;
             /** Language */
             language: string;
             /** Report */
@@ -2130,6 +2177,15 @@ export interface components {
             /** Word */
             word: string;
         };
+        /** WordOfDay */
+        WordOfDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            word?: components["schemas"]["WordOut"] | null;
+        };
         /** WordOut */
         WordOut: {
             /**
@@ -2137,6 +2193,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            exposure?: components["schemas"]["ExposureOut"] | null;
             /** Id */
             id: number;
             /** Language */
@@ -3824,6 +3881,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StarterAdded"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    word_of_the_day_api_words_today_get: {
+        parameters: {
+            query: {
+                language: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WordOfDay"];
                 };
             };
             /** @description Validation Error */

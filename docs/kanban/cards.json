@@ -1887,5 +1887,26 @@
       "story-tests",
       "kaggle"
     ]
+  },
+  {
+    "title": "Exposure counts, story focus, word of the day",
+    "status": "In review",
+    "area": "vocabulary",
+    "date": "2026-11-24",
+    "summary": "Each word shows how often it has been met (practice answers plus saved stories). Story Studio can build a story around the words met least, due soon or new. Home shows a word of the day from the words met least, stable for the day.",
+    "done": [
+      "API: exposure on listed words, GET /words/today, focus on stories/generate; core story_counts and focus_words",
+      "Web: Met column, focus choice with a note on the story, word-of-the-day card, nine languages",
+      "tests: 16 API, 2 core, 7 web"
+    ],
+    "todo": [
+      "Apply patch 0105, rebuild API and web images",
+      "Native-speaker check of the new messages",
+      "Next: today's reading card (daily story), read-along highlight"
+    ],
+    "labels": [
+      "vocabulary",
+      "stories"
+    ]
   }
 ]

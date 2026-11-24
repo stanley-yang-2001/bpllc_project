@@ -350,3 +350,14 @@ def test_the_report_shows_where_the_learners_words_sit_in_the_text():
     assert b["first_third"] == 1.0
     html_ = report._rhythm_table({"variants": [{"name": "x", "label": "X"}], "requests": [req]}, {"x": [(req, {"ok": True, "text": early + FLAT})]})
     assert "100%" in html_ and "first third" in html_
+
+
+def test_a_focus_list_replaces_the_learners_list_but_never_adds_a_word(monkeypatch):
+    from tutor_core import story as story_module
+    seen = {}
+    monkeypatch.setattr(story_module, "load_words", lambda conn, learner, language, set_ids=None: ["apple", "bread", "cheese", "dog", "egg"])
+    monkeypatch.setattr(story_module, "_write_story", lambda req, words, *a, **k: seen.setdefault("words", list(words)))
+    request = story_module.StoryRequest(1, "en", None, None, None, None, None, False, story_module.StoryOptions().normalised(), ("egg", "zebra", "apple"))
+    story_module._make_story(object(), request, None, None)
+    assert seen["words"] == ["egg", "apple"]                                       # the caller's order; "zebra" is not the learner's, so it is dropped
+    assert story_module.StoryRequest(1, "en").cache_key() != story_module.StoryRequest(1, "en", focus_words=("egg",)).cache_key()

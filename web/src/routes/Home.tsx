@@ -12,6 +12,7 @@ import { Card, PageHeader, Skeleton } from "../components/ui";
 import { FirstRunGuide } from "../vocab/FirstRunGuide";
 import { Quiet } from "../components/Quiet";
 import { RewardsCard } from "../rewards/RewardsCard";
+import { WordOfTheDay } from "../exposure/WordOfTheDay";
 
 const actions = [
   { to: "/vocabulary", title: "nav.vocabulary", text: "home.vocabulary.text", icon: BookOpen },
@@ -36,6 +37,7 @@ export default function Home() {
       {showGuide && <FirstRunGuide language={active} onAdded={() => setJustStarted(active)} />}
 
       {!showGuide && <Quiet><RewardsCard /></Quiet>}
+      {!showGuide && <Quiet><WordOfTheDay /></Quiet>}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <Card>

@@ -6,7 +6,7 @@ from tutor_core.words import WordError, validate_meaning, validate_word
 
 from ..db import cursor
 from ..errors import conflict, not_found, validation_error
-from . import pictures, word_sets
+from . import exposure, pictures, word_sets
 from .csv_import import bulk_add, parse_csv                                       # noqa: F401  (old import path)
 from .word_fill import fill_meanings, fill_pos, words_without_meaning, words_without_pos      # noqa: F401  (old import path)
 
@@ -34,7 +34,7 @@ def list_words(conn, user_id: int, language: str, q: str | None, limit: int, off
         total = cur.fetchone()["n"]
         cur.execute(f"SELECT {WORD_COLS} FROM words WHERE {where} ORDER BY id DESC LIMIT %s OFFSET %s", params + [limit, offset])
         items = cur.fetchall()
-    return {"items": pictures.attach(conn, items), "total": total, "limit": limit, "offset": offset}
+    return {"items": exposure.for_words(conn, user_id, language, pictures.attach(conn, items)), "total": total, "limit": limit, "offset": offset}
 
 
 def _clean(word, meaning, language):

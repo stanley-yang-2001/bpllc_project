@@ -1,9 +1,10 @@
 import { qs, request } from "./http";
-import type { Picture, Word, WordPage, UploadResult, WordSet, SetList, StarterPackList, StarterAdded, SetFilter, DefineResult } from "./types";
+import type { Picture, Word, WordOfDay, WordPage, UploadResult, WordSet, SetList, StarterPackList, StarterAdded, SetFilter, DefineResult } from "./types";
 
 export const wordsApi = {
   words: (p: { language: string; q?: string; limit?: number; offset?: number; set?: SetFilter; missing_meaning?: boolean }) =>
     request<WordPage>("GET", `/words?${qs({ ...p, set: p.set === "all" ? undefined : p.set, missing_meaning: p.missing_meaning ? "true" : undefined })}`),
+  wordOfTheDay: (language: string) => request<WordOfDay>("GET", `/words/today?${qs({ language })}`),
   starterPacks: (language: string) => request<StarterPackList>("GET", `/words/starter-packs?${qs({ language })}`),
   addStarterPack: (b: { language: string; pack: string }) => request<StarterAdded>("POST", "/words/starter-packs", { json: b }),
   addWord: (b: { language: string; word: string; meaning?: string; set_id?: number | null; pos?: string }) => request<Word>("POST", "/words", { json: b }),

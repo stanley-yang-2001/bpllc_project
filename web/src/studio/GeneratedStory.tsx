@@ -20,6 +20,7 @@ export function GeneratedStory({ g, languageName, onAnother }: { g: StoryGenerat
       <div className="flex flex-wrap items-center gap-2">
         <StoryMeta kind={story.story_type ?? "story"} topic={story.topic} difficulty={requested.difficulty} />
         <span className="text-xs text-slate-600">{t("studio.builtFrom", { used: story.words_used, total: story.words_total })}</span>
+        {story.focus && story.focus !== "all" && <span className="text-xs text-slate-600">{t("exposure.focus.used", { focus: t(`exposure.focus.${story.focus as "least_met" | "due" | "new"}`) })}</span>}
       </div>
       <GlossedText text={story.story} language={story.language} />
       <StoryTools text={story.story} language={story.language} id="studio" />

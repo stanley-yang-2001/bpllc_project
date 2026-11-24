@@ -1,9 +1,9 @@
 import { qs, request } from "./http";
-import type { StoryOptions, DifficultyChoice, GeneratedStory, SavedStory, StoryPage } from "./types";
+import type { StoryFocus, StoryOptions, DifficultyChoice, GeneratedStory, SavedStory, StoryPage } from "./types";
 
 export const storiesApi = {
   storyOptions: () => request<StoryOptions>("GET", "/stories/options"),
-  generateStory: (b: { language: string; story_type?: string; topic?: string; set_ids?: number[] } & DifficultyChoice) =>
+  generateStory: (b: { language: string; story_type?: string; topic?: string; set_ids?: number[]; focus?: StoryFocus } & DifficultyChoice) =>
     request<GeneratedStory>("POST", "/stories/generate", { json: b }),
   saveStory: (b: { language: string; body: string; story_type?: string | null; topic?: string | null; model?: string | null } & DifficultyChoice) =>
     request<SavedStory>("POST", "/stories", { json: b }),

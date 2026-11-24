@@ -1,7 +1,7 @@
 """Response and request models: words, sets, uploads and starter packs."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date as date_type, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -19,6 +19,14 @@ class EmojiIn(BaseModel):
     emoji: str = Field(max_length=64)
 
 
+class ExposureOut(BaseModel):
+    """How often the learner has met a word: answers in practice, and saved stories it appears in. `met` is the two added."""
+    answers: int
+    stories: int
+    met: int
+    last_answered: datetime | None = None
+
+
 class WordOut(BaseModel):
     id: int
     language: str
@@ -28,6 +36,12 @@ class WordOut(BaseModel):
     set_id: int | None = None          # null: the General set
     created_at: datetime
     picture: PictureOut | None = None  # null: no picture
+    exposure: ExposureOut | None = None   # only in the word list and the word of the day
+
+
+class WordOfDay(BaseModel):
+    date: date_type
+    word: WordOut | None = None        # null: the learner has no word in this language yet
 
 
 class SetOut(BaseModel):
